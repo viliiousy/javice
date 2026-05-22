@@ -699,3 +699,52 @@ textarea.inp{resize:vertical;min-height:64px}
 }
 .cal-day.has-event.has-task::after{ left:calc(50% - 2px); }
 .cal-day.has-event::after{ left:calc(50% - 6px); }
+
+/* ═══════════════════════════════════════
+   식단 빠른 추가 목록
+   ═══════════════════════════════════════ */
+.diet-quick-list{display:flex;flex-direction:column;gap:4px;max-height:180px;overflow-y:auto;margin-bottom:4px}
+.diet-quick-item{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:7px 10px;background:var(--card2);border:1px solid var(--border);
+  border-radius:8px;cursor:pointer;font-size:13px;transition:all 0.15s;
+}
+.diet-quick-item:hover{border-color:var(--accent-l);background:rgba(124,58,237,0.08)}
+.diet-quick-fav{border-color:rgba(245,158,11,0.3);background:rgba(245,158,11,0.05)}
+.diet-quick-fav:hover{border-color:var(--yellow)}
+.diet-quick-cal{font-size:11px;color:var(--text3);white-space:nowrap}
+.diet-fav-btn{
+  background:none;border:none;color:var(--text3);cursor:pointer;
+  font-size:14px;padding:0 4px;transition:color 0.15s;flex-shrink:0;
+}
+.diet-fav-btn.is-fav{color:var(--yellow)}
+.diet-fav-btn:hover{color:var(--yellow)}
+
+/* ═══════════════════════════════════════
+   메모 3줄 미리보기
+   ═══════════════════════════════════════ */
+.memo-preview{
+  font-size:12px;color:var(--text2);margin-top:3px;line-height:1.5;
+  /* 최대 3줄, 줄바꿈 유지 */
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
+  overflow:hidden;white-space:pre-wrap;word-break:break-word;
+}
+.memo-more{color:var(--text3);font-size:11px}
+
+/* ═══════════════════════════════════════
+   스탯 배너 긴급 할일
+   ═══════════════════════════════════════ */
+.stats-urgent{
+  display:flex;flex-direction:column;gap:2px;
+  padding:4px 0 2px;border-top:1px solid rgba(255,255,255,0.05);margin-top:4px;
+}
+.stats-urgent-item{
+  font-size:11px;color:var(--text2);
+  padding:1px 0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.stats-due{color:var(--text3);font-size:10px;margin-left:4px}
+.stats-overdue{color:var(--red);font-size:10px;margin-left:4px;font-weight:600}
+
+/* 완료됨 버튼 margin-left:auto 처리를 위해 flex-wrap */
+.task-filter-wrap{flex-wrap:wrap}

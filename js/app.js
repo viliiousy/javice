@@ -2,15 +2,16 @@
 
 const App = {
   S: {
-    calDate:    new Date(),
-    selDate:    new Date(),
-    lists:      [],
-    tasks:      {},
-    events:     [],
-    offline:    false,
-    taskFilter: 'all',
-    taskSort:   false,
-    calPanel:   'today',
+    calDate:       new Date(),
+    selDate:       new Date(),
+    lists:         [],
+    tasks:         {},
+    events:        [],
+    offline:       false,
+    taskFilter:    'all',
+    taskSort:      false,
+    calPanel:      'today',
+    showCompleted: false,
   },
 
   async init() {
@@ -112,8 +113,8 @@ const App = {
     }
   },
 
-  // ── 스탯 배너 (즉각 반영 + 반짝임) ──────
-  _statsPrev: {},
+  // ── 스탯 배너 (즉각 반영 + 반짝임 + 긴급 할일) ──
+  _statsPrev: '{}',
   _updateStatsBanner() {
     const el=document.getElementById('statsBanner'); if(!el) return;
     const hList=Habits.getList(), hChk=Habits.getChecked();
@@ -123,21 +124,55 @@ const App = {
     const pending=Object.values(this.S.tasks||{}).reduce((n,l)=>n+l.filter(t=>t.status==='needsAction').length,0);
     const clItems=Checklist.getItems().filter(i=>!i.done);
     const lastMsg=typeof JARVIS!=='undefined'&&JARVIS.history.length
-      ?JARVIS.history.filter(m=>m.role==='assistant').slice(-1)[0]?.content.replace(/\{[\s\S]*\}/g,'').trim():'' ;
+      ?JARVIS.history.filter(m=>m.role==='assistant').slice(-1)[0]?.content.replace(/\{[\s\S]*\}/g,'').trim():'';
 
-    // 변경 감지 → 반짝임
-    const cur={hDone,cal:dt.cal,pending,clCount:clItems.length};
-    const changed=JSON.stringify(cur)!==JSON.stringify(this._statsPrev);
-    if(changed) this._statsPrev=cur;
+    // 긴급 할일 TOP 3 (별표 + 마감일 기준)
+    const now=new Date();
+    const allPending=[];
+    Object.values(this.S.tasks||{}).forEach(list=>
+      list.filter(t=>t.status==='needsAction').forEach(t=>allPending.push(t))
+    );
+    allPending.sort((a,b)=>{
+      const aOver=a.due&&new Date(a.due)<now?1:0;
+      const bOver=b.due&&new Date(b.due)<now?1:0;
+      const aScore=(a.starred?8:0)+(aOver?4:0)+(a.due?2:0);
+      const bScore=(b.starred?8:0)+(bOver?4:0)+(b.due?2:0);
+      if(bScore!==aScore) return bScore-aScore;
+      if(a.due&&b.due) return new Date(a.due)-new Date(b.due);
+      return 0;
+    });
+    const urgent=allPending.slice(0,3);
 
-    el.innerHTML=`
-      <div class="stats-row${changed?' stats-flash':''}">
-        <div class="stat-chip ${hDone===hList.length&&hList.length>0?'stat-green':''}">✅ 습관 ${hDone}/${hList.length}</div>
-        <div class="stat-chip ${calPct>=80?'stat-green':calPct>=50?'stat-yellow':''}">🥗 ${dt.cal}/${ds.calorieGoal}kcal</div>
-        ${pending>0?`<div class="stat-chip">📋 할일 ${pending}개</div>`:''}
-        ${clItems.length>0?`<div class="stat-chip">✍️ 체크 ${clItems.length}개</div>`:''}
-      </div>
-      ${lastMsg?`<div class="stats-jarvis"><span class="stats-jarvis-icon">⚡</span><span class="stats-jarvis-txt">${esc(lastMsg.slice(0,90))}</span></div>`:''}`;
+    // 변경 감지
+    const curStr=JSON.stringify({hDone,cal:dt.cal,pending,clCount:clItems.length});
+    const changed=curStr!==this._statsPrev;
+    this._statsPrev=curStr;
+
+    const chipsHTML=`
+      <div class="stat-chip ${hDone===hList.length&&hList.length>0?'stat-green':''}">✅ 습관 ${hDone}/${hList.length}</div>
+      <div class="stat-chip ${calPct>=80?'stat-green':calPct>=50?'stat-yellow':''}">🥗 ${dt.cal}/${ds.calorieGoal}kcal</div>
+      ${pending>0?`<div class="stat-chip">📋 할일 ${pending}개</div>`:''}
+      ${clItems.length>0?`<div class="stat-chip">✍️ ${clItems.length}개</div>`:''}`;
+
+    const urgentHTML=urgent.length?`
+      <div class="stats-urgent">
+        ${urgent.map(t=>{
+          const due=t.due?new Date(t.due):null;
+          const over=due&&due<now;
+          const dueLabel=due?` <span class="${over?'stats-overdue':'stats-due'}">${_fmtDate(due)}</span>`:'';
+          return `<div class="stats-urgent-item">${t.starred?'⭐ ':''}${esc(t.title)}${dueLabel}</div>`;
+        }).join('')}
+      </div>`:'';
+
+    const jarvisHTML=lastMsg?`<div class="stats-jarvis"><span class="stats-jarvis-icon">⚡</span><span class="stats-jarvis-txt">${esc(lastMsg.slice(0,90))}</span></div>`:'';
+
+    el.innerHTML=`<div class="stats-row">${chipsHTML}</div>${urgentHTML}${jarvisHTML}`;
+
+    // 반짝임 애니메이션 (DOM 재삽입 트릭)
+    if(changed){
+      const row=el.querySelector('.stats-row');
+      if(row){ row.classList.remove('stats-flash'); void row.offsetWidth; row.classList.add('stats-flash'); }
+    }
   },
 
   // ── 날짜 선택 ────────────────────────
@@ -460,8 +495,10 @@ const App = {
   _buildTaskFilters() {
     const wrap=document.getElementById('taskFilters'); if(!wrap) return;
     const tabs=[{id:'all',label:'전체'},{id:'starred',label:'⭐ 별표'},...this.S.lists.map(l=>({id:l.id,label:l.title}))];
-    wrap.innerHTML=tabs.map(t=>`<button class="fit-tab${this.S.taskFilter===t.id?' active':''}" onclick="App._setFilter('${t.id}')">${esc(t.label)}</button>`).join('');
+    const completedBtn=`<button class="fit-tab${this.S.showCompleted?' active':''}" onclick="App._toggleCompleted()" style="margin-left:auto">${this.S.showCompleted?'✓ 완료됨 숨기기':'완료됨 보기'}</button>`;
+    wrap.innerHTML=tabs.map(t=>`<button class="fit-tab${this.S.taskFilter===t.id?' active':''}" onclick="App._setFilter('${t.id}')">${esc(t.label)}</button>`).join('')+completedBtn;
   },
+  _toggleCompleted(){ this.S.showCompleted=!this.S.showCompleted; this._buildTaskFilters(); this._renderTasks(); },
   _setFilter(id){ this.S.taskFilter=id; this._buildTaskFilters(); this._renderTasks(); },
 
   _renderTasks() {
@@ -470,7 +507,9 @@ const App = {
     for(const list of this.S.lists){
       (this.S.tasks[list.id]||[]).filter(t=>{
         if(t.status==='needsAction') return true;
-        if(t.status==='completed'&&t.completed) return new Date(t.completed).toDateString()===today;
+        // 완료 항목: showCompleted 모드일 때만 오늘 완료된 것 표시
+        if(this.S.showCompleted && t.status==='completed'&&t.completed)
+          return new Date(t.completed).toDateString()===today;
         return false;
       }).forEach(t=>all.push({...t,_lid:list.id,_lname:list.title}));
     }
