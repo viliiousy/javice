@@ -211,37 +211,7 @@ const JARVIS = {
           }
           break;
         }
-        case 'uncheck_habit': {
-          const uchk = Habits.getChecked();
-          const ui   = uchk.indexOf(action.habitId);
-          if (ui !== -1) {
-            uchk.splice(ui, 1);
-            Habits.setChecked(uchk);
-            Habits.render();
-            const uh = Habits.getList().find(x => x.id === action.habitId);
-            App.showToast(`↩ 습관 체크 해제: ${uh?.name || ''}`, 'success');
-          }
-          break;
-        }
-        case 'uncheck_exercise': {
-          const udow  = new Date().getDay();
-          const uplan = Fitness.PLAN[udow];
-          const uidx  = uplan?.exercises.findIndex(e =>
-            e.name.includes(action.exercise) || action.exercise.includes(e.name)
-          );
-          if (uidx >= 0) {
-            const uc2 = Fitness._checked();
-            const uei = uc2.indexOf(uidx);
-            if (uei !== -1) {
-              uc2.splice(uei, 1);
-              Fitness._save(uc2);
-              Fitness.render(udow);
-              App.showToast(`↩ 운동 체크 해제: ${uplan.exercises[uidx].name}`, 'success');
-            }
-          }
-          break;
-        }
-                case 'delete_task': {
+        case 'delete_task': {
           if (!Auth.isLoggedIn()) break;
           const lid2 = action.listId || App.S.lists[0]?.id;
           if (!lid2 || !action.taskId) break;
@@ -376,8 +346,6 @@ ${JSON.stringify(ctx, null, 2)}
 {"type":"delete_task","taskId":"id","listId":"id"}
 {"type":"open_food_log","meal":"저녁"}
 {"type":"open_add_event"}
-{"type":"uncheck_habit","habitId":"h1"}
-{"type":"uncheck_exercise","exercise":"운동이름"}
 
 식품 칼로리 기준:
 닭가슴살100g:165kcal/단31g, 삶은달걀1개:77kcal/단6g, 흰쌀밥200g:260kcal/탄57g,
