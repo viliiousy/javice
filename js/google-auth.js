@@ -63,6 +63,8 @@ const Auth = {
     this.userInfo     = null;
     sessionStorage.removeItem('gl_token');
     sessionStorage.removeItem('gl_expiry');
+    // 캘린더 캐시 초기화
+    if (typeof GoogleCalendar !== 'undefined') GoogleCalendar._calendarList = [];
     location.reload();
   },
 
