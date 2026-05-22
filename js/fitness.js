@@ -42,6 +42,8 @@ const Fitness = {
   _save(v,date=new Date()){ localStorage.setItem(this._checkKey(date),JSON.stringify(v)); },
 
   render(date=new Date(), planIdx=null) {
+    // 피트니스 카드가 없는 레이아웃에서는 조용히 종료
+    if (!document.getElementById('fitnessWrap')) return;
     const d    = new Date(date);
     const dow  = planIdx!==null ? planIdx : d.getDay();
     const plan = this.PLAN[dow];

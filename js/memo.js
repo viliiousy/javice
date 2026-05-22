@@ -7,7 +7,7 @@ const Memo = {
 
   render() {
     const wrap = document.getElementById('memoWrap');
-    if (!wrap) return;
+    if (!wrap) return; // 요소 없으면 조용히 종료
     const items = this.getItems();
 
     wrap.innerHTML = items.map(m => `

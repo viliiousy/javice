@@ -16,7 +16,7 @@ const Checklist = {
 
   render() {
     const wrap = document.getElementById('checklistWrap');
-    if (!wrap) return;
+    if (!wrap) return; // 요소 없으면 조용히 종료
     const items = this.getItems();
 
     const today = new Date(); today.setHours(0,0,0,0);

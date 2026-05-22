@@ -59,7 +59,6 @@ const App = {
     }
     this._updateHeaderDate(new Date());
     Habits.init(new Date());
-    Fitness.render(new Date());
     Diet.render(new Date());
     Checklist.render();
     Memo.render();
@@ -74,7 +73,7 @@ const App = {
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('app').style.display='block';
     this._updateHeaderDate(new Date());
-    Habits.init(new Date()); Fitness.render(new Date()); Diet.render(new Date()); Checklist.render(); Memo.render();
+    Habits.init(new Date()); Diet.render(new Date()); Checklist.render(); Memo.render();
     CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,[],this.S.selDate);
     document.getElementById('eventsWrap').innerHTML='<p class="empty">오프라인 모드</p>';
     document.getElementById('tasksContainer').innerHTML='<p class="empty">로그인 시 동기화됩니다</p>';
@@ -144,7 +143,6 @@ const App = {
     CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,date);
     this._renderCalPanel();
     Habits.render(date);
-    Fitness.render(date);
     Diet.render(date);
     this._updateHeaderDate(date);
   },

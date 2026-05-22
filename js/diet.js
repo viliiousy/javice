@@ -29,7 +29,8 @@ const Diet = {
     return { cal, protein, carb, fat };
   },
 
-  render() {
+  render(date=null) {
+    if (!document.getElementById('dietWrap')) return;
     const data = this.getData();
     const s    = this.getSettings();
     const t    = this.totals(data);
