@@ -76,6 +76,11 @@ const Auth = {
     try {
       const res  = await this.fetch('https://www.googleapis.com/oauth2/v2/userinfo');
       this.userInfo = await res.json();
+      // Drive 동기화: 먼저 불러온 후 앱 초기화
+      if (typeof DriveSync !== 'undefined') {
+        await DriveSync.load();
+        DriveSync.watchChanges();
+      }
       App.onAuthSuccess(this.userInfo);
     } catch (err) {
       if (!silent) App.showToast('사용자 정보 조회 실패', 'error');

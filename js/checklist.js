@@ -29,9 +29,10 @@ const Checklist = {
 
     wrap.innerHTML = sorted.map((item, idx) => {
       const due = item.dueDate ? new Date(item.dueDate+'T00:00:00') : null;
-      if (due) due.setHours(0,0,0,0);
-      const overdue = due && !item.done && due < today;
-      const dueStr  = due ? due.toLocaleDateString('ko-KR',{month:'short',day:'numeric',weekday:'short'}) : '';
+      const dueValid = due && !isNaN(due.getTime());
+      if (dueValid) due.setHours(0,0,0,0);
+      const overdue = dueValid && !item.done && due < today;
+      const dueStr  = dueValid ? due.toLocaleDateString('ko-KR',{month:'short',day:'numeric',weekday:'short'}) : '';
       return `<div class="cl-item${item.done?' done':''}" draggable="true"
           ondragstart="Checklist._dragStart(event,'${item.id}')"
           ondragover="Checklist._dragOver(event)"
@@ -66,12 +67,11 @@ const Checklist = {
   },
 
   showAdd() {
-    const today = new Date().toISOString().split('T')[0];
     App.openModal('✍️ 체크리스트 추가', `
       <div class="modal-row"><label class="modal-lbl">항목 *</label>
         <input id="clTitle" type="text" placeholder="항목 입력..." class="inp"></div>
       <div class="modal-row"><label class="modal-lbl">마감 날짜 (선택)</label>
-        <input id="clDue" type="date" value="${today}" class="inp inp-sm"></div>
+        <input id="clDue" type="date" value="" class="inp inp-sm"></div>
       <div class="modal-btns">
         <button onclick="Checklist._saveNew()" class="btn-sm accent">추가</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
