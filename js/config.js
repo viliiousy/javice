@@ -3,7 +3,7 @@
 
 const CONFIG = {
   // Google Cloud Console > API 및 서비스 > 사용자 인증 정보 > OAuth 2.0 클라이언트 ID
-  GOOGLE_CLIENT_ID: 'YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com',
+  GOOGLE_CLIENT_ID: '14470442015-uq9sskup7nq9uhirllspthqvd53d48bh.apps.googleusercontent.com',
 
   // OAuth 스코프 (수정 불필요)
   SCOPES: [
