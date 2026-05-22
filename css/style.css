@@ -572,3 +572,30 @@ textarea.inp{resize:vertical;min-height:64px}
 .cal-day.has-event.has-cl::before{right:3px}
 
 /* sw.js 갱신 메시지 숨김 */
+
+/* ── 날씨 헤더 ───────────────────────── */
+.h-weather-wrap{display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.h-weather-main{font-size:13px;font-weight:600;display:flex;align-items:center;gap:5px}
+.h-weather-range{font-size:11px;color:var(--text2);font-weight:400}
+.h-weather-adj{font-size:11px;color:var(--text3);display:flex;gap:4px;align-items:center}
+.h-weather-sep{opacity:0.4}
+
+/* ── 요일 선택기 (습관) ──────────────── */
+.day-picker{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.day-pick-btn{display:flex;align-items:center;gap:4px;padding:5px 10px;background:var(--card2);border:1px solid var(--border);border-radius:20px;cursor:pointer;font-size:12px;user-select:none;transition:all 0.15s}
+.day-pick-btn:has(input:checked){background:rgba(124,58,237,0.2);border-color:var(--accent)}
+.day-pick-btn input{accent-color:var(--accent)}
+.habit-days{font-size:10px;color:var(--text3);margin-left:4px;background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:8px}
+.habit-add-btn{padding:8px 12px;border-radius:8px;border:1px dashed var(--border);color:var(--text3);font-size:12px;cursor:pointer;text-align:center;transition:all 0.15s;margin-top:4px}
+.habit-add-btn:hover{border-color:var(--accent-l);color:var(--accent-l)}
+
+/* ── long press 메뉴 ────────────────── */
+.lp-menu{display:flex;flex-direction:column;gap:8px}
+.lp-btn{padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:14px;cursor:pointer;font-family:inherit;text-align:left;transition:all 0.15s}
+.lp-btn:hover{border-color:var(--accent);background:rgba(124,58,237,0.1)}
+
+/* ── 모바일 날씨 숨김 ────────────────── */
+@media(max-width:640px){
+  .h-weather-adj{display:none}
+  .h-weather-range{display:none}
+}
