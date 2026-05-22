@@ -638,3 +638,64 @@ textarea.inp{resize:vertical;min-height:64px}
 .task-due-inline.overdue{color:var(--red)}
 .task-body{flex:1;min-width:0;cursor:pointer}
 .task-body:hover .task-text{color:var(--accent-l)}
+
+/* ═══════════════════════════════════════
+   날씨 3일 레이아웃
+   ═══════════════════════════════════════ */
+.weather-3day{display:flex;gap:6px;align-items:center}
+.w3-item{display:flex;flex-direction:column;align-items:center;gap:1px;padding:3px 6px;border-radius:8px}
+.w3-today{background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.2)}
+.w3-side{opacity:0.7}
+.w3-label{font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase}
+.w3-icon{font-size:16px;line-height:1}
+.w3-temp{font-size:13px;font-weight:700}
+.w3-range{font-size:10px;color:var(--text3)}
+.w3-today .w3-temp{font-size:16px;color:var(--text)}
+.w3-today .w3-label{color:var(--accent-l)}
+
+/* ═══════════════════════════════════════
+   스탯 배너 반짝임
+   ═══════════════════════════════════════ */
+@keyframes statsPulse{
+  0%{opacity:1} 30%{opacity:0.4;transform:scale(1.01)} 60%{opacity:1} 100%{opacity:1}
+}
+.stats-flash{ animation:statsPulse 0.6s ease; }
+
+/* ═══════════════════════════════════════
+   체크리스트 개선 (삭제 버튼 항상 표시)
+   ═══════════════════════════════════════ */
+.cl-del-btn{
+  background:transparent;border:none;color:var(--text3);cursor:pointer;
+  font-size:13px;padding:3px 5px;border-radius:4px;flex-shrink:0;
+  transition:all 0.15s;opacity:0.5;
+}
+.cl-del-btn:hover{color:var(--red);opacity:1;background:rgba(239,68,68,0.1)}
+.cl-drag,.memo-drag{
+  color:var(--text3);cursor:grab;font-size:14px;padding:0 4px;
+  opacity:0.3;transition:opacity 0.15s;flex-shrink:0;user-select:none;
+}
+.cl-item:hover .cl-drag,.memo-item:hover .memo-drag{opacity:0.7}
+.cl-item.cl-dragging,.memo-item.cl-dragging{opacity:0.4}
+.cl-item.cl-dragover,.memo-item.cl-dragover{
+  border-color:var(--accent)!important;background:rgba(124,58,237,0.08);
+}
+.cl-body{flex:1;min-width:0;cursor:pointer}
+.cl-body:hover .cl-title{color:var(--accent-l)}
+
+/* ═══════════════════════════════════════
+   메모 카드 개선
+   ═══════════════════════════════════════ */
+.memo-item{display:flex;align-items:flex-start;gap:6px}
+.memo-content-wrap{flex:1;min-width:0}
+.memo-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.memo-date{font-size:10px;color:var(--text3);white-space:nowrap}
+
+/* ═══════════════════════════════════════
+   캘린더 Tasks dot (노란색)
+   ═══════════════════════════════════════ */
+.cal-day.has-task::after{
+  content:'';position:absolute;bottom:1px;left:calc(50% - 6px);
+  width:4px;height:4px;border-radius:50%;background:var(--yellow);
+}
+.cal-day.has-event.has-task::after{ left:calc(50% - 2px); }
+.cal-day.has-event::after{ left:calc(50% - 6px); }
