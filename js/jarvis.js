@@ -172,6 +172,7 @@ const JARVIS = {
     const reply=parsed.response||parsed.message||raw;
     if(reply){ this._addMsg('ai',reply); this._speak(reply); }
     if(Array.isArray(parsed.actions)) parsed.actions.forEach(a=>this._exec(a));
+    setTimeout(()=>{ if(typeof App!=='undefined') App._updateStatsBanner(); },300);
     if(Array.isArray(parsed.tips)&&parsed.tips.length) parsed.tips.forEach(t=>this._addMsg('tip',t));
   },
 

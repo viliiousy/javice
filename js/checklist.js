@@ -1,8 +1,7 @@
-// js/checklist.js — 체크리스트 (로컬, 캘린더 연동)
+// js/checklist.js — 체크리스트 (삭제 버튼 + 하단 추가 버튼)
 
 const Checklist = {
   _key() { return 'gl_checklist_v2'; },
-
   getItems() { return JSON.parse(localStorage.getItem(this._key()) || '[]'); },
   saveItems(v) { localStorage.setItem(this._key(), JSON.stringify(v)); },
 
@@ -19,10 +18,9 @@ const Checklist = {
     const wrap = document.getElementById('checklistWrap');
     if (!wrap) return;
     const items = this.getItems();
-    if (!items.length) { wrap.innerHTML = '<p class="empty">항목을 추가해보세요 ✍️</p>'; return; }
 
     const today = new Date(); today.setHours(0,0,0,0);
-    const sorted = [...items].sort((a,b) => {
+    const sorted = [...items].sort((a, b) => {
       if (a.done !== b.done) return a.done ? 1 : -1;
       const da = a.dueDate ? new Date(a.dueDate+'T00:00:00') : new Date('9999');
       const db = b.dueDate ? new Date(b.dueDate+'T00:00:00') : new Date('9999');
@@ -33,16 +31,17 @@ const Checklist = {
       const due = item.dueDate ? new Date(item.dueDate+'T00:00:00') : null;
       if (due) due.setHours(0,0,0,0);
       const overdue = due && !item.done && due < today;
-      const dueStr = due ? due.toLocaleDateString('ko-KR',{month:'short',day:'numeric',weekday:'short'}) : '';
+      const dueStr  = due ? due.toLocaleDateString('ko-KR',{month:'short',day:'numeric',weekday:'short'}) : '';
       return `<div class="cl-item${item.done?' done':''}">
         <div class="cl-check" onclick="Checklist.toggle('${item.id}')"></div>
         <div class="cl-body">
           <div class="cl-title">${esc(item.title)}</div>
           ${dueStr?`<div class="cl-due${overdue?' overdue':''}">${dueStr}</div>`:''}
         </div>
-        <button class="task-del" onclick="Checklist.remove('${item.id}')">✕</button>
+        <button class="task-del" onclick="Checklist.remove('${item.id}')" title="삭제">✕</button>
       </div>`;
-    }).join('');
+    }).join('')
+    + `<div class="habit-add-btn" onclick="Checklist.showAdd()">+ 항목 추가</div>`;
   },
 
   toggle(id) {
@@ -54,7 +53,6 @@ const Checklist = {
   remove(id) {
     this.saveItems(this.getItems().filter(i => i.id !== id));
     this.render();
-    // 캘린더 dots 갱신
     if (typeof App !== 'undefined') {
       CalendarUI.render(document.getElementById('miniCal'), App.S.calDate, App.S.events, App.S.selDate);
     }
@@ -65,7 +63,7 @@ const Checklist = {
     App.openModal('✍️ 체크리스트 추가', `
       <div class="modal-row">
         <label class="modal-lbl">항목 *</label>
-        <input id="clTitle" type="text" placeholder="할 일 입력..." class="inp">
+        <input id="clTitle" type="text" placeholder="항목 입력..." class="inp">
       </div>
       <div class="modal-row">
         <label class="modal-lbl">마감 날짜 (선택)</label>
@@ -88,7 +86,8 @@ const Checklist = {
     this.render();
     App.closeModal();
     App.showToast('추가됨 ✓','success');
-    // 캘린더 dots 갱신
-    CalendarUI.render(document.getElementById('miniCal'), App.S.calDate, App.S.events, App.S.selDate);
+    if (typeof App !== 'undefined') {
+      CalendarUI.render(document.getElementById('miniCal'), App.S.calDate, App.S.events, App.S.selDate);
+    }
   },
 };
