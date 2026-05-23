@@ -1,0 +1,17 @@
+name: Send Notifications
+
+on:
+  schedule:
+    # 매시간 정각 실행 (UTC 기준 - 한국은 +9시간)
+    - cron: '0 * * * *'
+  workflow_dispatch:  # 수동 실행 가능
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger notification cron
+        run: |
+          curl -X GET \
+            "https://javice.vercel.app/api/cron-notify" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
