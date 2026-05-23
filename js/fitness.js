@@ -31,15 +31,15 @@ const Fitness = {
   // 날짜별 커스텀 운동 추가 저장
   _customKey(date){ return `gl_fitness_custom_${new Date(date).toDateString()}`; },
   getCustomExercises(date=new Date()){
-    return JSON.parse(localStorage.getItem(this._customKey(date))||'[]');
+    return JSON.parse(UserStore.get(this._customKey(date))||'[]');
   },
   saveCustomExercises(v,date=new Date()){
-    localStorage.setItem(this._customKey(date),JSON.stringify(v));
+    UserStore.set(this._customKey(date),JSON.stringify(v));
   },
 
   _checkKey(date){ return `gl_fitness_${new Date(date).toDateString()}`; },
-  _checked(date=new Date()){ return JSON.parse(localStorage.getItem(this._checkKey(date))||'[]'); },
-  _save(v,date=new Date()){ localStorage.setItem(this._checkKey(date),JSON.stringify(v)); },
+  _checked(date=new Date()){ return JSON.parse(UserStore.get(this._checkKey(date))||'[]'); },
+  _save(v,date=new Date()){ UserStore.set(this._checkKey(date),JSON.stringify(v)); },
 
   render(date=new Date(), planIdx=null) {
     // 피트니스 카드가 없는 레이아웃에서는 조용히 종료

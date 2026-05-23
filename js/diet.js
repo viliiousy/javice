@@ -15,18 +15,18 @@ const Diet = {
   _histKey()           { return 'gl_diet_history'; },
 
   getSettings(){
-    return JSON.parse(localStorage.getItem(this._setKey())||JSON.stringify(
+    return JSON.parse(UserStore.get(this._setKey())||JSON.stringify(
       {calorieGoal:2200,proteinGoal:160,carbGoal:220,fatGoal:60}));
   },
   getData(date=new Date()){
-    return JSON.parse(localStorage.getItem(this._key(date))||JSON.stringify(
+    return JSON.parse(UserStore.get(this._key(date))||JSON.stringify(
       {아침:[],점심:[],저녁:[],간식:[]}));
   },
-  saveData(d,date=new Date()){ localStorage.setItem(this._key(date),JSON.stringify(d)); },
+  saveData(d,date=new Date()){ UserStore.set(this._key(date),JSON.stringify(d)); },
 
   // ── 즐겨찾기 ──────────────────────────
-  getFavs(){ return JSON.parse(localStorage.getItem(this._favKey())||'[]'); },
-  saveFavs(v){ localStorage.setItem(this._favKey(),JSON.stringify(v)); },
+  getFavs(){ return JSON.parse(UserStore.get(this._favKey())||'[]'); },
+  saveFavs(v){ UserStore.set(this._favKey(),JSON.stringify(v)); },
   toggleFav(name){
     const favs=this.getFavs();
     const idx=favs.indexOf(name);
@@ -36,8 +36,8 @@ const Diet = {
   isFav(name){ return this.getFavs().includes(name); },
 
   // ── 음식 히스토리 (최근 10개 + 빈도) ──
-  getHistory(){ return JSON.parse(localStorage.getItem(this._histKey())||'[]'); },
-  saveHistory(v){ localStorage.setItem(this._histKey(),JSON.stringify(v.slice(0,200))); },
+  getHistory(){ return JSON.parse(UserStore.get(this._histKey())||'[]'); },
+  saveHistory(v){ UserStore.set(this._histKey(),JSON.stringify(v.slice(0,200))); },
   addToHistory(food){
     const h=this.getHistory();
     // 중복 제거 후 맨 앞에 추가
@@ -328,7 +328,7 @@ const Diet = {
       </div>`);
   },
   saveSettings(){
-    localStorage.setItem(this._setKey(),JSON.stringify({
+    UserStore.set(this._setKey(),JSON.stringify({
       calorieGoal:parseInt(document.getElementById('sCalG').value)||2200,
       proteinGoal:parseInt(document.getElementById('sProtG').value)||160,
       carbGoal:   parseInt(document.getElementById('sCarbG').value)||220,

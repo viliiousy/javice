@@ -2,8 +2,8 @@
 
 const Memo = {
   _key(){ return 'gl_memos_v1'; },
-  getItems(){ return JSON.parse(localStorage.getItem(this._key())||'[]'); },
-  saveItems(v){ localStorage.setItem(this._key(),JSON.stringify(v)); },
+  getItems(){ return JSON.parse(UserStore.get(this._key())||'[]'); },
+  saveItems(v){ UserStore.set(this._key(), JSON.stringify(v)); },
 
   render(){
     const wrap=document.getElementById('memoWrap'); if(!wrap) return;

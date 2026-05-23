@@ -50,10 +50,14 @@
     </div>
     <div class="h-right">
       <div id="hWeather" class="h-weather-wrap"></div>
-      <div id="hUser" class="h-user" style="display:none">
+      <div id="hUser" class="h-user" style="display:none" onclick="App.toggleProfileMenu()">
         <img id="hAvatar" src="" alt="" class="h-avatar">
         <span id="hName" class="h-name"></span>
-        <button id="btnLogout" class="btn-sm">로그아웃</button>
+        <span class="h-chevron">▾</span>
+      </div>
+      <div id="profileMenu" class="profile-menu hidden">
+        <div class="profile-menu-item" onclick="App.toggleDarkMode()"><span id="darkModeLabel">🌙 다크 모드</span></div>
+        <div class="profile-menu-item" onclick="Auth.logout()">🚪 로그아웃</div>
       </div>
     </div>
   </header>
@@ -157,6 +161,7 @@
 
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script src="js/config.js"></script>
+<script src="js/user-store.js"></script>
 <script src="js/google-auth.js"></script>
 <script src="js/google-calendar.js"></script>
 <script src="js/google-tasks.js"></script>

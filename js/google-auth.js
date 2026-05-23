@@ -76,7 +76,12 @@ const Auth = {
     try {
       const res  = await this.fetch('https://www.googleapis.com/oauth2/v2/userinfo');
       this.userInfo = await res.json();
-      // Drive 동기화: 먼저 불러온 후 앱 초기화
+      // 계정별 데이터 분리
+      if (typeof UserStore !== 'undefined') {
+        const uid = this.userInfo.id || this.userInfo.sub || this.userInfo.email || 'user';
+        UserStore.setUser(uid);
+      }
+      // Drive 동기화
       if (typeof DriveSync !== 'undefined') {
         await DriveSync.load();
         DriveSync.watchChanges();

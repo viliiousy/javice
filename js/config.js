@@ -1,10 +1,13 @@
-const CONFIG = {
-  GOOGLE_CLIENT_ID: '14470442015-uq9sskup7nq9uhirllspthqvd53d48bh.apps.googleusercontent.com',
+// js/config.js — 설정
+// ⚠️ GOOGLE_CLIENT_ID 를 본인 것으로 교체하세요
 
+const CONFIG = {
+  GOOGLE_CLIENT_ID: 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com',
+
+  // drive.appdata 제거 (Drive API 활성화 후 다시 추가)
   SCOPES: [
     'https://www.googleapis.com/auth/calendar',
     'https://www.googleapis.com/auth/tasks',
-    'https://www.googleapis.com/auth/drive.appdata',
     'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/userinfo.email',
   ].join(' '),

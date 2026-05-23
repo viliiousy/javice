@@ -16,6 +16,7 @@ const App = {
 
   async init() {
     this._updateHeaderDate(new Date());
+    this.initDarkMode();
     this._setupListeners();
     setTimeout(()=>{ if(typeof JARVIS!=='undefined') JARVIS.init(); },500);
     const waitGIS=setInterval(()=>{
@@ -155,12 +156,11 @@ const App = {
       ${clItems.length>0?`<div class="stat-chip">✍️ ${clItems.length}개</div>`:''}`;
 
     const urgentHTML=urgent.length?`
-      <div class="stats-urgent">
+      <div class="stats-urgent-row">
         ${urgent.map(t=>{
           const due=t.due?new Date(t.due):null;
           const over=due&&due<now;
-          const dueLabel=due?` <span class="${over?'stats-overdue':'stats-due'}">${_fmtDate(due)}</span>`:'';
-          return `<div class="stats-urgent-item">${t.starred?'⭐ ':''}${esc(t.title)}${dueLabel}</div>`;
+          return `<div class="stats-urgent-chip${over?' urgent-over':''}${t.starred?' urgent-star':''}">${t.starred?'⭐':''}${esc(t.title.length>14?t.title.slice(0,13)+'…':t.title)}${due?`<span class="${over?'stats-overdue':'stats-due'}"> ${_fmtDate(due)}</span>`:''}</div>`;
         }).join('')}
       </div>`:'';
 
@@ -190,9 +190,44 @@ const App = {
   _updateHeaderDate(date) {
     const d=new Date(date);
     const isToday=d.toDateString()===new Date().toDateString();
+    const dow=d.getDay(); // 0=일,6=토
     const el=document.getElementById('hDate'), eld=document.getElementById('hDay');
-    if(el) el.textContent=d.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
-    if(eld) eld.textContent=(isToday?'오늘 · ':'')+d.toLocaleDateString('ko-KR',{weekday:'long'});
+    if(el){
+      el.textContent=d.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
+      el.style.cursor='pointer'; el.title='클릭하여 날짜 선택';
+      el.onclick=()=>App._showDatePicker();
+    }
+    if(eld){
+      const dayStr=(isToday?'오늘 · ':'')+d.toLocaleDateString('ko-KR',{weekday:'long'});
+      eld.textContent=dayStr;
+      eld.style.color=dow===0?'var(--red)':dow===6?'var(--blue)':'';
+    }
+  },
+
+  _showDatePicker() {
+    const cur=this.S.selDate||new Date();
+    const ds=cur.toISOString().split('T')[0];
+    App.openModal('📅 날짜 선택',`
+      <div class="modal-row">
+        <input id="datePick" type="date" value="${ds}" class="inp" style="font-size:16px;padding:12px">
+      </div>
+      <div class="modal-btns">
+        <button onclick="App._applyDatePick()" class="btn-sm accent">이동</button>
+        <button onclick="App._applyDatePick(new Date())" class="btn-sm">오늘</button>
+        <button onclick="App.closeModal()" class="btn-sm">취소</button>
+      </div>`);
+    setTimeout(()=>document.getElementById('datePick')?.focus(),50);
+  },
+
+  _applyDatePick(dateOverride) {
+    const val=dateOverride?null:document.getElementById('datePick')?.value;
+    const date=dateOverride||(val?new Date(val+'T00:00:00'):null);
+    if(!date) return;
+    App.closeModal();
+    this.selectCalDate(date);
+    // 캘린더 월도 맞춰주기
+    this.S.calDate=new Date(date.getFullYear(),date.getMonth(),1);
+    CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,date);
   },
 
   changeCalMonth(dir) {
@@ -657,6 +692,39 @@ const App = {
       this.showToast('할일 추가됨 ✓','success');
       this._updateStatsBanner();
     }catch{ this.showToast('추가 실패','error'); }
+  },
+
+  // ── 프로필 메뉴 ──────────────────────
+  toggleProfileMenu() {
+    const menu=document.getElementById('profileMenu');
+    if(!menu) return;
+    menu.classList.toggle('hidden');
+    // 바깥 클릭 닫기
+    setTimeout(()=>{
+      const close=(e)=>{ if(!e.target.closest('#hUser')&&!e.target.closest('#profileMenu')){ menu.classList.add('hidden'); document.removeEventListener('click',close); } };
+      document.addEventListener('click',close);
+    },0);
+  },
+
+  // ── 다크 모드 ─────────────────────────
+  get _darkMode(){ return localStorage.getItem('gl_dark')==='true'; },
+  set _darkMode(v){ localStorage.setItem('gl_dark',v?'true':'false'); },
+
+  initDarkMode() {
+    if(this._darkMode) document.documentElement.classList.add('dark');
+    this._updateDarkLabel();
+  },
+
+  toggleDarkMode() {
+    this._darkMode=!this._darkMode;
+    document.documentElement.classList.toggle('dark',this._darkMode);
+    this._updateDarkLabel();
+    document.getElementById('profileMenu')?.classList.add('hidden');
+  },
+
+  _updateDarkLabel() {
+    const el=document.getElementById('darkModeLabel');
+    if(el) el.textContent=this._darkMode?'☀️ 라이트 모드':'🌙 다크 모드';
   },
 
   openModal(title,body){ document.getElementById('modalTitle').textContent=title; document.getElementById('modalBody').innerHTML=body; document.getElementById('modal').classList.remove('hidden'); },

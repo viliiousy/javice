@@ -722,3 +722,136 @@ textarea.inp{ resize:vertical; min-height:64px; }
   .habits-wrap{ max-height:300px; }
   .diet-wrap{ max-height:400px; }
 }
+
+/* ═══════════════════════════════════════
+   다크 모드
+   ═══════════════════════════════════════ */
+html.dark {
+  --bg:       #0f1117;
+  --bg2:      #161b27;
+  --card:     #1a2035;
+  --card2:    #1e2640;
+  --border:   #2a3550;
+  --border2:  #374560;
+  --text:     #e2e8f0;
+  --text2:    #94a3b8;
+  --text3:    #64748b;
+  --text4:    #3d4f6e;
+  --accent-bg:#1e1b4b;
+}
+html.dark .header,
+html.dark .stats-banner,
+html.dark .card,
+html.dark .card-head,
+html.dark .modal-box,
+html.dark .modal-head { background:var(--card); }
+html.dark .task-form { background:var(--card2); }
+html.dark .j-msgs { background:var(--bg2); }
+html.dark .j-bubble { background:var(--card); border-color:var(--border); }
+html.dark .j-input-wrap { background:var(--card); }
+html.dark .btn-sm:not(.accent) { background:var(--card2); color:var(--text2); }
+html.dark .inp { background:var(--card2); border-color:var(--border); color:var(--text); }
+html.dark .fit-tab:not(.active) { background:var(--card2); color:var(--text2); }
+html.dark .cal-panel-tab:not(.active) { background:var(--card2); color:var(--text2); }
+html.dark .event-item { background:var(--card2); }
+html.dark .habit-item { background:var(--card2); }
+html.dark .habit-item.done { background:rgba(5,150,105,0.15); }
+html.dark .cl-item { background:var(--card2); }
+html.dark .memo-item { background:var(--card2); }
+html.dark .diet-summary,
+html.dark .macro,
+html.dark .meal-food { background:var(--card2); }
+html.dark .diet-quick-item { background:var(--card2); }
+html.dark .lp-btn { background:var(--card2); }
+html.dark .login-card { background:rgba(26,32,53,0.95); }
+html.dark .modal-box { background:var(--card); }
+html.dark .task-item:hover,
+html.dark .ex-item:hover { background:var(--card2); }
+html.dark .profile-menu { background:var(--card); border-color:var(--border); }
+
+/* ═══════════════════════════════════════
+   프로필 메뉴
+   ═══════════════════════════════════════ */
+.h-user { cursor:pointer; border-radius:8px; padding:3px 7px; transition:background 0.15s; }
+.h-user:hover { background:var(--bg); }
+.h-chevron { font-size:10px; color:var(--text3); }
+.profile-menu {
+  position:absolute; top:calc(100% + 6px); right:16px;
+  background:white; border:1px solid var(--border);
+  border-radius:12px; box-shadow:var(--shadow-lg);
+  z-index:200; min-width:160px; overflow:hidden;
+}
+.profile-menu-item {
+  padding:11px 16px; font-size:13px; color:var(--text);
+  cursor:pointer; transition:background 0.12s; font-weight:500;
+}
+.profile-menu-item:hover { background:var(--bg); }
+.header { position:relative; }
+
+/* ═══════════════════════════════════════
+   헤더 날짜 클릭
+   ═══════════════════════════════════════ */
+.h-date-main {
+  cursor:pointer; border-radius:6px; padding:1px 5px;
+  transition:background 0.12s;
+}
+.h-date-main:hover { background:var(--bg); }
+
+/* ═══════════════════════════════════════
+   캘린더 요일 색상 + 공휴일
+   ═══════════════════════════════════════ */
+.dow-blue { color:var(--blue) !important; font-weight:700; }
+.dow-red  { color:var(--red)  !important; font-weight:700; }
+.cal-day.day-red  { color:var(--red) !important; }
+.cal-day.day-blue { color:var(--blue) !important; }
+
+/* ═══════════════════════════════════════
+   스탯 배너 — 긴급할일 가로 나열
+   ═══════════════════════════════════════ */
+.stats-banner {
+  position:sticky; top:57px; z-index:99;
+  box-shadow:0 1px 3px rgba(0,0,0,0.06);
+}
+html.dark .stats-banner { background:var(--card); }
+
+.stats-urgent-row {
+  display:flex; gap:5px; flex-wrap:wrap;
+  padding:3px 0 1px;
+}
+.stats-urgent-chip {
+  font-size:11px; padding:2px 9px; border-radius:12px;
+  background:var(--bg); border:1px solid var(--border);
+  color:var(--text2); white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; max-width:180px;
+  font-weight:500;
+}
+.stats-urgent-chip.urgent-over { background:#fee2e2; border-color:#fca5a5; color:var(--red); }
+.stats-urgent-chip.urgent-star { border-color:#fde68a; }
+html.dark .stats-urgent-chip { background:var(--card2); }
+html.dark .stats-urgent-chip.urgent-over { background:rgba(220,38,38,0.15); }
+
+/* ═══════════════════════════════════════
+   모바일 스탯 긴급할일 + 날씨 표시
+   ═══════════════════════════════════════ */
+@media (max-width: 640px) {
+  .stats-banner { top:49px; padding:5px 12px; }
+  .stats-urgent-row { display:flex !important; }
+  .stats-urgent-chip { max-width:calc(33vw - 12px); font-size:10px; padding:2px 6px; }
+  .w3-side { display:flex !important; } /* 어제/내일 모바일도 표시 */
+  .w3-side .w3-label,
+  .w3-side .w3-range { display:none; } /* 날씨 레이블/범위 숨기고 아이콘+온도만 */
+  .w3-side { opacity:0.7; }
+  .weather-3day { gap:3px; }
+  .w3-item { padding:2px 4px; }
+  .stats-row { gap:4px; }
+}
+
+/* ═══════════════════════════════════════
+   모바일 체크리스트/습관 스와이프 힌트
+   ═══════════════════════════════════════ */
+@media (max-width: 640px) {
+  .cl-item, .habit-item {
+    touch-action:pan-y;
+    user-select:none;
+  }
+}
