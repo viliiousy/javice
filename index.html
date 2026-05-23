@@ -159,7 +159,7 @@
 </div>
 <div id="toast" class="toast hidden"></div>
 
-<script src="https://accounts.google.com/gsi/client" async></script>
+<script src="https://accounts.google.com/gsi/client" onload="Auth.init()" onerror="console.error('GIS 로드 실패')"></script>
 <script src="js/config.js"></script>
 <script src="js/user-store.js"></script>
 <script src="js/google-auth.js"></script>

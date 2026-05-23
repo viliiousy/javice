@@ -1,25 +1,14 @@
 // js/google-auth.js — Google Identity Services (GIS) 인증
 
 const Auth = {
-  accessToken: null,
+  accessToken:  null,
   tokenExpiry:  null,
   tokenClient:  null,
   userInfo:     null,
   _ready:       false,
 
+  // GIS onload 콜백으로 호출됨
   init() {
-    this._tryInit();
-  },
-
-  _tryInit() {
-    if (typeof google !== 'undefined' && google.accounts?.oauth2) {
-      this._setup();
-    } else {
-      setTimeout(() => this._tryInit(), 200);
-    }
-  },
-
-  _setup() {
     if (CONFIG.GOOGLE_CLIENT_ID.startsWith('YOUR_GOOGLE')) return;
 
     this.tokenClient = google.accounts.oauth2.initTokenClient({
@@ -40,7 +29,7 @@ const Auth = {
 
     this._ready = true;
 
-    // 세션 복원
+    // 세션 복원 (이미 로그인된 경우)
     const t = sessionStorage.getItem('gl_token');
     const e = sessionStorage.getItem('gl_expiry');
     if (t && e && Date.now() < parseInt(e, 10)) {
@@ -52,14 +41,7 @@ const Auth = {
 
   login() {
     if (!this._ready || !this.tokenClient) {
-      // 아직 준비 안 됐으면 준비될 때까지 기다렸다가 자동 실행
-      const wait = setInterval(() => {
-        if (this._ready && this.tokenClient) {
-          clearInterval(wait);
-          this.tokenClient.requestAccessToken();
-        }
-      }, 100);
-      setTimeout(() => clearInterval(wait), 10000);
+      App.showToast('Google 로딩 중입니다. 1초 후 다시 눌러주세요.', '');
       return;
     }
     this.tokenClient.requestAccessToken();
@@ -69,7 +51,7 @@ const Auth = {
     if (this.accessToken) {
       try { google.accounts.oauth2.revoke(this.accessToken, () => {}); } catch {}
     }
-    this.accessToken = null;
+    this.accessToken  = null;
     this.tokenExpiry  = null;
     this.userInfo     = null;
     this._ready       = false;
@@ -86,11 +68,10 @@ const Auth = {
 
   async _fetchUserInfo(silent = false) {
     try {
-      const res = await this.fetch('https://www.googleapis.com/oauth2/v2/userinfo');
+      const res   = await this.fetch('https://www.googleapis.com/oauth2/v2/userinfo');
       this.userInfo = await res.json();
       if (typeof UserStore !== 'undefined') {
-        const uid = this.userInfo.id || this.userInfo.email || 'user';
-        UserStore.setUser(uid);
+        UserStore.setUser(this.userInfo.id || this.userInfo.email || 'user');
       }
       if (typeof DriveSync !== 'undefined') {
         await DriveSync.load();

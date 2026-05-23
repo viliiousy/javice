@@ -19,8 +19,7 @@ const App = {
     this.initDarkMode();
     this._setupListeners();
     setTimeout(()=>{ if(typeof JARVIS!=='undefined') JARVIS.init(); },500);
-    // Auth.init()이 내부적으로 GIS 로드를 기다림
-    Auth.init();
+    // Auth.init()은 GIS 스크립트 onload에서 자동 호출됨
   },
 
   _setupListeners() {
