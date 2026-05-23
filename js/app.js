@@ -277,7 +277,7 @@ const App = {
       const isRed=dow===0||isHoliday;
 
       if(isToday){
-        eld.innerHTML=`<span style="color:#059669;font-weight:900">🕐 오늘</span> · ${dayStr}${taskBadge}`;
+        eld.innerHTML=`<span class="today-label">🕐 오늘</span> · ${dayStr}${taskBadge}`;
         eld.style.color='';
       } else {
         eld.innerHTML=`${dayStr}${taskBadge}`;
