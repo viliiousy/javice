@@ -73,9 +73,12 @@ const Auth = {
       if (typeof UserStore !== 'undefined') {
         UserStore.setUser(this.userInfo.id || this.userInfo.email || 'user');
       }
-      if (typeof DriveSync !== 'undefined') {
-        await DriveSync.load();
-        DriveSync.watchChanges();
+      // Firebase 동기화
+      if (typeof FirebaseSync !== 'undefined' && CONFIG.FIREBASE_DB_URL !== 'YOUR_FIREBASE_DB_URL') {
+        const uid = this.userInfo.id || this.userInfo.email || 'user';
+        FirebaseSync.init(uid, CONFIG.FIREBASE_DB_URL);
+        await FirebaseSync.load();
+        FirebaseSync.watchChanges();
       }
       App.onAuthSuccess(this.userInfo);
     } catch (err) {
