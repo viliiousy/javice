@@ -1,122 +1,145 @@
-// js/reorder.js — 재사용 가능한 꾹누르기 순서변경 모듈
+// js/reorder.js — 꾹누르기(longpress) 순서변경
 
 const Reorder = {
-  _active: null,     // 현재 드래그 중인 요소
+  _dragging:    null,
   _placeholder: null,
-  _startY: 0,
-  _items: null,
-  _onReorder: null,
+  _onReorder:   null,
+  _lpTimer:     null,
+  _container:   null,
 
-  // containerId: 부모 컨테이너 id, onReorder: 순서 변경 후 콜백
   enable(container, onReorder) {
-    this._onReorder = onReorder;
-    // 기존 리스너 제거 후 재등록
-    container.addEventListener('touchstart', e => this._onTouchStart(e), { passive: false });
-    container.addEventListener('touchmove',  e => this._onTouchMove(e),  { passive: false });
-    container.addEventListener('touchend',   e => this._onTouchEnd(e));
-    container.addEventListener('mousedown',  e => this._onMouseDown(e));
+    if (!container) return;
+    this._onReorder  = onReorder;
+    this._container  = container;
+
+    // 기존 리스너 제거
+    const clone = container.cloneNode(false);
+    while (container.firstChild) clone.appendChild(container.firstChild);
+    container.parentNode?.replaceChild(clone, container);
+    this._container = clone;
+
+    // touch
+    clone.addEventListener('touchstart',  e => this._tStart(e),  { passive: false });
+    clone.addEventListener('touchmove',   e => this._tMove(e),   { passive: false });
+    clone.addEventListener('touchend',    e => this._tEnd(e));
+    clone.addEventListener('touchcancel', e => this._cancel());
+    // mouse
+    clone.addEventListener('mousedown',   e => this._mStart(e));
+    document.addEventListener('mouseup',  () => this._cancel());
+    document.addEventListener('mousemove',e => this._mMove(e));
   },
 
-  _findItem(el) {
-    // [data-reorderable] 속성을 가진 부모 찾기
-    while (el && !el.dataset.reorderable) el = el.parentElement;
-    return el;
-  },
+  _getHandle(el) { return el.closest?.('[data-reorderable]'); },
 
-  _isHandle(el) {
-    // .reorder-handle 클릭 시에만 드래그 허용
-    return el.closest?.('.reorder-handle');
-  },
-
-  _onTouchStart(e) {
-    if (!this._isHandle(e.target)) return;
-    e.preventDefault();
-    const item = this._findItem(e.target);
+  // ── Touch ──────────────────────────────
+  _tStart(e) {
+    const item = this._getHandle(e.target);
     if (!item) return;
-    this._startDrag(item, e.touches[0].clientY);
+    this._lpTimer = setTimeout(() => {
+      this._startDrag(item, e.touches[0].clientY);
+      // 진동 피드백
+      try { navigator.vibrate?.(30); } catch {}
+    }, 400);
   },
-
-  _onMouseDown(e) {
-    if (!this._isHandle(e.target)) return;
-    e.preventDefault();
-    const item = this._findItem(e.target);
-    if (!item) return;
-    this._startDrag(item, e.clientY);
-    const onMove = ev => this._moveDrag(ev.clientY);
-    const onUp   = ()  => { this._endDrag(); document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  },
-
-  _startDrag(item, startY) {
-    this._active = item;
-    this._startY = startY;
-    item.classList.add('reorder-dragging');
-    // placeholder
-    this._placeholder = document.createElement('div');
-    this._placeholder.className = 'reorder-placeholder';
-    this._placeholder.style.height = item.offsetHeight + 'px';
-    item.parentNode.insertBefore(this._placeholder, item.nextSibling);
-    item.style.position = 'fixed';
-    item.style.zIndex   = '9999';
-    item.style.width    = item.offsetWidth + 'px';
-    item.style.left     = item.getBoundingClientRect().left + 'px';
-    item.style.top      = item.getBoundingClientRect().top  + 'px';
-  },
-
-  _onTouchMove(e) {
-    if (!this._active) return;
+  _tMove(e) {
+    if (!this._dragging) {
+      clearTimeout(this._lpTimer);
+      return;
+    }
     e.preventDefault();
     this._moveDrag(e.touches[0].clientY);
   },
+  _tEnd(e) {
+    clearTimeout(this._lpTimer);
+    if (this._dragging) { e.preventDefault(); this._endDrag(); }
+  },
 
-  _moveDrag(clientY) {
-    if (!this._active) return;
-    const dy = clientY - this._startY;
-    const rect = this._active.getBoundingClientRect();
-    this._active.style.top = (parseFloat(this._active.style.top) + dy) + 'px';
-    this._startY = clientY;
+  // ── Mouse ──────────────────────────────
+  _mStart(e) {
+    const item = this._getHandle(e.target);
+    if (!item) return;
+    this._lpTimer = setTimeout(() => {
+      this._startDrag(item, e.clientY);
+    }, 400);
+  },
+  _mMove(e) {
+    if (!this._dragging) return;
+    this._moveDrag(e.clientY);
+  },
+
+  _cancel() {
+    clearTimeout(this._lpTimer);
+    if (this._dragging) this._endDrag(true);
+  },
+
+  // ── 드래그 시작 ────────────────────────
+  _startDrag(item, y) {
+    this._dragging = item;
+    this._startY   = y;
+
+    // placeholder 삽입
+    this._placeholder = document.createElement('div');
+    this._placeholder.className = 'reorder-placeholder';
+    this._placeholder.style.height = item.offsetHeight + 'px';
+    item.after(this._placeholder);
+
+    // item을 fixed로 띄우기
+    const rect = item.getBoundingClientRect();
+    item.classList.add('reorder-dragging');
+    item.dataset.origWidth = item.offsetWidth;
+    item.style.cssText = `
+      position:fixed;z-index:9999;width:${rect.width}px;
+      left:${rect.left}px;top:${rect.top}px;
+      pointer-events:none;transition:none;
+    `;
+    this._itemTop = rect.top;
+  },
+
+  // ── 드래그 이동 ────────────────────────
+  _moveDrag(y) {
+    if (!this._dragging) return;
+    const dy = y - this._startY;
+    this._itemTop += dy;
+    this._startY   = y;
+    this._dragging.style.top = this._itemTop + 'px';
 
     // placeholder 위치 업데이트
-    const container = this._placeholder.parentNode;
-    const siblings  = [...container.querySelectorAll('[data-reorderable]')].filter(el => el !== this._active);
+    const siblings = [...this._container.querySelectorAll('[data-reorderable]')]
+      .filter(el => el !== this._dragging);
+
     for (const sib of siblings) {
-      const sibRect = sib.getBoundingClientRect();
-      const sibMid  = sibRect.top + sibRect.height / 2;
-      if (clientY < sibMid) {
-        container.insertBefore(this._placeholder, sib);
+      const rect = sib.getBoundingClientRect();
+      if (y < rect.top + rect.height / 2) {
+        sib.before(this._placeholder);
         return;
       }
     }
-    container.appendChild(this._placeholder);
+    // 마지막으로
+    const last = siblings[siblings.length - 1];
+    if (last) last.after(this._placeholder);
   },
 
-  _onTouchEnd(e) {
-    if (!this._active) return;
-    this._endDrag();
-  },
-
-  _endDrag() {
-    if (!this._active) return;
-    const item = this._active;
-    const container = this._placeholder.parentNode;
-
-    // placeholder 위치에 item 삽입
-    container.insertBefore(item, this._placeholder);
-    this._placeholder.remove();
+  // ── 드래그 종료 ────────────────────────
+  _endDrag(cancel = false) {
+    if (!this._dragging) return;
+    const item = this._dragging;
 
     // 스타일 복원
-    item.style.position = '';
-    item.style.zIndex   = '';
-    item.style.width    = '';
-    item.style.left     = '';
-    item.style.top      = '';
+    item.style.cssText = '';
     item.classList.remove('reorder-dragging');
 
-    // 새 순서 추출
-    const newOrder = [...container.querySelectorAll('[data-reorderable]')].map(el => el.dataset.reorderable);
-    this._active = null;
+    if (!cancel && this._placeholder) {
+      // placeholder 위치에 item 삽입
+      this._placeholder.after(item);
+    }
+    this._placeholder?.remove();
+    this._placeholder = null;
+    this._dragging    = null;
 
-    if (this._onReorder) this._onReorder(newOrder);
+    if (!cancel && this._onReorder) {
+      const newOrder = [...this._container.querySelectorAll('[data-reorderable]')]
+        .map(el => el.dataset.reorderable);
+      this._onReorder(newOrder);
+    }
   },
 };

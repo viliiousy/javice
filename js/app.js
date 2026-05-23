@@ -716,6 +716,7 @@ const App = {
     const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
     document.getElementById('tasksContainer').innerHTML=Object.entries(groups).map(([k,v])=>{
       if(k==='_all_') return `<div class="task-group">${v.map(t=>this._taskHTML(t)).join('')}</div>`;
+      // 카테고리 그룹 border-left 색상
       const listId=v[0]?._lid||'';
       const col=catColors[listId]||'';
       const style=col?`border-left:3px solid ${col};padding-left:8px;border-radius:0 var(--r-xs) var(--r-xs) 0`:'';
@@ -730,7 +731,11 @@ const App = {
     const done=t.status==='completed', due=t.due?new Date(t.due):null;
     const overdue=due&&due<new Date()&&!done, star=t.starred, hidden=t._hidden;
     const dueStr=due?`<span class="task-due-inline${overdue?' overdue':''}">${_fmtDate(due)}</span>`:'';
+    const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
+    const catCol=catColors[t._lid]||'';
+    const colorBar=catCol?`<div class="task-cat-bar" style="background:${catCol}"></div>`:'';
     return `<div class="task-item${done?' done':''}${hidden?' task-hidden':''}">
+      ${colorBar}
       <div class="task-check" onclick="event.stopPropagation();App._toggle('${t.id}','${t._lid}',${done})"></div>
       <div class="task-body" onclick="App._showTaskDetail('${t.id}','${t._lid}')">
         <div class="task-text">${hidden?'🙈 ':''}${esc(t.title)} ${dueStr}</div>

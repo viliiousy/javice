@@ -2,6 +2,21 @@
 
 const Diet = {
   MEALS:  ['아침','점심','저녁','간식'],
+
+  // 현재 시간 + 기록 상태 기반 default 식사 추천
+  _suggestMeal(date=new Date()) {
+    const data = this.getData(date);
+    const h = new Date().getHours();
+    // 아직 안 먹은 끼니 순서대로 추천
+    if (!data['아침'].length) return '아침';
+    if (!data['점심'].length) return '점심';
+    if (!data['저녁'].length) return '저녁';
+    // 다 먹었으면 시간대 기반
+    if (h < 10) return '아침';
+    if (h < 14) return '점심';
+    if (h < 20) return '저녁';
+    return '간식';
+  },
   EMOJIS: { 아침:'🌅', 점심:'🌞', 저녁:'🌙', 간식:'🍪' },
 
   // ── 날짜별 키 ─────────────────────────
@@ -141,7 +156,8 @@ const Diet = {
   },
 
   // ── 음식 추가 모달 ─────────────────────
-  showAdd(meal,dateStr=null){
+  showAdd(meal=null,dateStr=null){
+    if(!meal) meal=this._suggestMeal();
     const ds=dateStr||this._localDateStr();
     const favs=this.getFavs();
     const recent=this.getRecentUnique(10);
@@ -235,7 +251,7 @@ const Diet = {
       <p style="color:var(--text2);font-size:13px;margin-bottom:10px">사진을 업로드하면 AI가 자동 분석합니다.</p>
       <div style="margin-bottom:10px"><label class="modal-lbl">식사 구분</label>
         <select id="photoMeal" class="inp inp-sm">
-          ${this.MEALS.map(m=>`<option value="${m}">${this.EMOJIS[m]} ${m}</option>`).join('')}
+          ${this.MEALS.map(m=>`<option value="${m}"${m===this._suggestMeal()?'selected':''}>${this.EMOJIS[m]} ${m}</option>`).join('')}
         </select>
       </div>
       <div id="photoDropZone" class="photo-drop-zone" onclick="document.getElementById('photoFileInput').click()">
