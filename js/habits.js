@@ -66,9 +66,7 @@ const Habits = {
         <span class="habit-emoji">${h.emoji}</span>
         <span class="habit-name">${esc(h.name)}${daysLabel}</span>
         ${st>0&&!Habits._reorderMode?`<span class="habit-streak">🔥${st}</span>`:''}
-        ${isToday?`
-          <button class="reorder-toggle-btn" onclick="event.stopPropagation();Habits.toggleReorderMode()" title="순서 변경">↕️</button>
-          <button class="cl-del-btn" onclick="event.stopPropagation();Habits._del('${h.id}')">✕</button>`:''}
+        ${isToday?`<button class="cl-del-btn" onclick="event.stopPropagation();Habits._del('${h.id}')">✕</button>`:''}
       </div>`;
     }).join('')
     +`<div class="habit-add-btn" onclick="Habits.showInlineAdd()">+ 습관 추가</div>`;
@@ -139,6 +137,11 @@ const Habits = {
 
   toggleReorderMode() {
     this._reorderMode = !this._reorderMode;
+    const btn = document.getElementById('btnHabitReorder');
+    if (btn) {
+      btn.style.background = this._reorderMode ? 'var(--accent)' : '';
+      btn.style.color = this._reorderMode ? 'white' : '';
+    }
     this.render();
     if (this._reorderMode) {
       // render 후 Reorder 모듈 활성화

@@ -117,6 +117,7 @@
     <section class="card card-checklist">
       <div class="card-head">
         <span class="card-title">✍️ 체크리스트</span>
+        <button class="btn-sm" id="btnClReorder" onclick="Checklist.toggleReorderMode()" title="순서 변경">↕️</button>
       </div>
       <div id="checklistWrap" class="checklist-wrap"></div>
     </section>
@@ -125,6 +126,7 @@
     <section class="card card-habits">
       <div class="card-head">
         <span class="card-title">✅ 오늘의 습관</span>
+        <button class="btn-sm" id="btnHabitReorder" onclick="Habits.toggleReorderMode()" title="순서 변경">↕️</button>
       </div>
       <div id="habitsWrap" class="habits-wrap"></div>
       <div id="habitsFooter" class="habits-footer"></div>

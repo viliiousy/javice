@@ -48,8 +48,11 @@ const FirebaseSync = {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+        const remoteTs = parseInt(data['_savedAt'] || '0', 10);
         const count = this._restoreData(data);
-        console.log('[FirebaseSync] 불러오기 완료:', count, '개');
+        // 핵심: load 후에도 _lastSaveTs 설정해야 폴링 시 불필요한 덮어쓰기 방지
+        if (remoteTs > 0) this._lastSaveTs = remoteTs;
+        console.log('[FirebaseSync] 불러오기 완료:', count, '개, ts:', remoteTs);
         return true;
       }
       return false;
@@ -119,8 +122,10 @@ const FirebaseSync = {
   // 타임스탬프 비교 → 최신 데이터 승리
   async _smartPull() {
     if (!this._uid || !this._dbUrl) return;
-    // 최근 1초 이내 편집 중이면 스킵
-    if (Date.now() - this._lastEditTs < 1000) return;
+    // 편집 중(2초 이내)이면 스킵 - 내 변경 보호
+    if (Date.now() - this._lastEditTs < 2000) return;
+    // 저장 직후(3초 이내)면 스킵 - 방금 내가 저장한 것
+    if (Date.now() - this._lastSaveTs < 3000) return;
 
     try {
       const res = await fetch(`${this._dbUrl}/users/${this._uid}/_savedAt.json`);
@@ -130,16 +135,15 @@ const FirebaseSync = {
 
       console.log('[FirebaseSync] ts 비교 - 원격:', remoteTs, '로컬:', localTs);
 
-      // 원격이 더 최신이면 전체 불러오기 + UI 갱신
-      if (remoteTs > localTs + 500) { // 500ms 여유
+      // 원격이 1초 이상 최신일 때만 덮어씀
+      if (remoteTs > localTs + 1000) {
         console.log('[FirebaseSync] 원격이 최신 → 불러오기');
-        const ok = await this.load();
-        if (ok) {
-          this._lastSaveTs = remoteTs;
-          this._refreshUI();
-        }
+        const loaded = await this.load(); // load()가 _lastSaveTs도 갱신함
+        if (loaded) this._refreshUI();
       }
-    } catch {}
+    } catch (e) {
+      console.warn('[FirebaseSync] poll 실패:', e.message);
+    }
   },
 
   // 20초 폴링

@@ -1145,3 +1145,20 @@ html.dark .reorder-dragging { background: var(--card) !important; }
   border-color: rgba(79,70,229,0.3);
   background: var(--accent-bg);
 }
+
+/* ═══════════════════════════════════════
+   체크리스트 날짜 인라인
+   ═══════════════════════════════════════ */
+.cl-due-inline {
+  font-size: 10px;
+  color: var(--text3);
+  margin-left: 6px;
+  background: var(--bg);
+  padding: 1px 6px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.cl-due-inline.overdue {
+  color: var(--red);
+  background: #fee2e2;
+}

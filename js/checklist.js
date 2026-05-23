@@ -38,10 +38,8 @@ const Checklist = {
         ${Checklist._reorderMode?`<div class="reorder-handle" onclick="event.stopPropagation()" title="꾹 눌러서 순서 변경">⠿</div>`:''}
         <div class="cl-check" onclick="event.stopPropagation();Checklist.toggle('${item.id}')"></div>
         <div class="cl-body" onclick="Checklist._bodyTap('${item.id}')">
-          <div class="cl-title">${esc(item.title)}</div>
-          ${dueStr?`<div class="cl-due${overdue?' overdue':''}">${dueStr}</div>`:''}
+          <div class="cl-title">${esc(item.title)}${dueStr?` <span class="cl-due-inline${overdue?' overdue':''}">${dueStr}</span>`:''}</div>
         </div>
-        <button class="reorder-toggle-btn" onclick="event.stopPropagation();Checklist.toggleReorderMode()" title="순서 변경">↕️</button>
         <button class="cl-del-btn" onclick="event.stopPropagation();Checklist.remove('${item.id}')" title="삭제">✕</button>
       </div>`;
     }).join('')
@@ -77,6 +75,11 @@ const Checklist = {
 
   toggleReorderMode() {
     this._reorderMode = !this._reorderMode;
+    const btn = document.getElementById('btnClReorder');
+    if (btn) {
+      btn.style.background = this._reorderMode ? 'var(--accent)' : '';
+      btn.style.color = this._reorderMode ? 'white' : '';
+    }
     this.render();
     if (this._reorderMode && typeof Reorder !== 'undefined') {
       setTimeout(() => {
