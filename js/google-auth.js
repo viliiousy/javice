@@ -7,11 +7,25 @@ const Auth = {
   userInfo:     null,
 
   init() {
-    if (typeof google === 'undefined' || !google.accounts) return;
+    // GIS 스크립트 로드 완료까지 최대 10초 대기
+    this._waitForGIS(0);
+  },
 
-    // Placeholder check
+  _waitForGIS(attempt) {
+    if (typeof google !== 'undefined' && google.accounts) {
+      this._initClient();
+      return;
+    }
+    if (attempt > 100) {
+      console.error('[Auth] GIS 로드 실패');
+      return;
+    }
+    setTimeout(() => this._waitForGIS(attempt + 1), 100);
+  },
+
+  _initClient() {
     if (CONFIG.GOOGLE_CLIENT_ID.startsWith('YOUR_GOOGLE')) {
-      console.warn('[Auth] config.js 에 GOOGLE_CLIENT_ID 를 설정해주세요.');
+      console.warn('[Auth] GOOGLE_CLIENT_ID 를 설정해주세요.');
       return;
     }
 
@@ -40,15 +54,25 @@ const Auth = {
       this.tokenExpiry  = parseInt(e, 10);
       this._fetchUserInfo(true);
     }
+
+    console.log('[Auth] GIS 초기화 완료');
   },
 
   login() {
     if (CONFIG.GOOGLE_CLIENT_ID.startsWith('YOUR_GOOGLE')) {
-      alert('⚠️ config.js 에서 GOOGLE_CLIENT_ID 를 설정해주세요.\nREADME.md 를 참고하세요.');
+      alert('⚠️ config.js 에서 GOOGLE_CLIENT_ID 를 설정해주세요.');
       return;
     }
     if (!this.tokenClient) {
-      App.showToast('Google 초기화 중입니다. 잠시 후 다시 시도해주세요.', 'error');
+      // tokenClient 없으면 GIS 초기화 대기 후 재시도
+      App.showToast('잠시만요...', '');
+      const retry = setInterval(() => {
+        if (this.tokenClient) {
+          clearInterval(retry);
+          this.tokenClient.requestAccessToken();
+        }
+      }, 200);
+      setTimeout(() => clearInterval(retry), 8000);
       return;
     }
     this.tokenClient.requestAccessToken();

@@ -19,10 +19,8 @@ const App = {
     this.initDarkMode();
     this._setupListeners();
     setTimeout(()=>{ if(typeof JARVIS!=='undefined') JARVIS.init(); },500);
-    const waitGIS=setInterval(()=>{
-      if(typeof google!=='undefined'&&google.accounts){ clearInterval(waitGIS); Auth.init(); }
-    },150);
-    setTimeout(()=>clearInterval(waitGIS),5000);
+    // Auth.init()이 내부적으로 GIS 로드를 기다림
+    Auth.init();
   },
 
   _setupListeners() {
