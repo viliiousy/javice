@@ -124,10 +124,14 @@ const Checklist = {
       <div class="modal-row"><label class="modal-lbl">마감 날짜 (선택)</label>
         <input id="clDue" type="date" value="" class="inp inp-sm"></div>
       <div class="modal-btns">
-        <button onclick="Checklist._saveNew()" class="btn-sm accent">추가</button>
+        <button id="btnClSaveNew" class="btn-sm accent">추가</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
       </div>`);
-    setTimeout(()=>document.getElementById('clTitle')?.focus(),50);
+    setTimeout(()=>{
+      document.getElementById('clTitle')?.focus();
+      document.getElementById('btnClSaveNew')?.addEventListener('click',()=>Checklist._saveNew());
+      document.getElementById('clTitle')?.addEventListener('keypress',e=>{ if(e.key==='Enter') Checklist._saveNew(); });
+    },50);
   },
 
   _saveNew() {

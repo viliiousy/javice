@@ -278,8 +278,9 @@ const App = {
       const isRed=dow===0||isHoliday;
 
       if(isToday){
-        eld.innerHTML=`<span class="today-label">🕐 오늘</span> · ${dayStr}${taskBadge}`;
+        eld.innerHTML=`<span class="today-label" style="color:#059669;font-weight:900">🕐 오늘</span> · <span style="color:var(--text2)">${dayStr}</span>${taskBadge}`;
         eld.style.color='';
+        eld.style.fontWeight='';
       } else {
         eld.innerHTML=`${dayStr}${taskBadge}`;
         eld.style.color=isRed?'var(--red)':dow===6?'var(--blue)':'';
@@ -739,7 +740,10 @@ const App = {
       ${colorBar}
       <div class="task-check" onclick="event.stopPropagation();App._toggle('${t.id}','${t._lid}',${done})"></div>
       <div class="task-body" onclick="App._showTaskDetail('${t.id}','${t._lid}')">
-        <div class="task-text">${hidden?'🙈 ':''}${esc(t.title)} ${dueStr}</div>
+        <div class="task-text-row">
+          <span class="task-title-txt">${hidden?'🙈 ':''}${esc(t.title)}</span>
+          ${dueStr}
+        </div>
         ${t.notes?`<div class="task-notes">${esc(t.notes.slice(0,60))}${t.notes.length>60?'…':''}</div>`:''}
       </div>
       <button class="task-star${star?' starred':''}" onclick="event.stopPropagation();App._toggleStar('${t.id}','${t._lid}')"></button>

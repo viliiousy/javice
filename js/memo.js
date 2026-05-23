@@ -89,6 +89,25 @@ const Memo = {
     this.saveItems(this.getItems().filter(m=>m.id!==id)); this.render();
   },
 
+  _reorderMode: false,
+  toggleReorderMode() {
+    this._reorderMode = !this._reorderMode;
+    const btn = document.getElementById('btnMemoReorder');
+    if (btn) { btn.style.background=this._reorderMode?'var(--accent)':''; btn.style.color=this._reorderMode?'white':''; }
+    this.render();
+    if (this._reorderMode && typeof Reorder !== 'undefined') {
+      setTimeout(() => {
+        const wrap = document.getElementById('memoWrap');
+        if (wrap) Reorder.enable(wrap, (newOrder) => {
+          const items = this.getItems();
+          const sorted = newOrder.map(id => items.find(i => i.id === id)).filter(Boolean);
+          items.forEach(i => { if (!sorted.find(x => x.id === i.id)) sorted.push(i); });
+          this.saveItems(sorted); this.render(); Sounds?.click();
+        });
+      }, 50);
+    }
+  },
+
   _moveUp(id){
     const items=this.getItems(); const i=items.findIndex(x=>x.id===id); if(i<=0) return;
     [items[i-1],items[i]]=[items[i],items[i-1]];
