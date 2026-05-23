@@ -2,7 +2,7 @@
 // ⚠️ GOOGLE_CLIENT_ID 를 본인 것으로 교체하세요
 
 const CONFIG = {
-  GOOGLE_CLIENT_ID: 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com',
+  GOOGLE_CLIENT_ID: '14470442015-uq9sskup7nq9uhirl1spthqvd53d48bh.apps.googleusercontent.com',
 
   // drive.appdata 제거 (Drive API 활성화 후 다시 추가)
   SCOPES: [
