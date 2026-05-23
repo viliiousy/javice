@@ -4,6 +4,7 @@ const CONFIG = {
   SCOPES: [
     'https://www.googleapis.com/auth/calendar',
     'https://www.googleapis.com/auth/tasks',
+    'https://www.googleapis.com/auth/drive.appdata',
     'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/userinfo.email',
   ].join(' '),
