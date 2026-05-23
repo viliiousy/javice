@@ -74,13 +74,13 @@ const Weather = {
           <div class="w3-label">오늘</div>
           <div class="w3-icon">${todayIcon}</div>
           <div class="w3-temp">${Math.round(c.temperature_2m)}°</div>
-          <div class="w3-range">${Math.round(d.temperature_2m_max[safeT])}°/${Math.round(d.temperature_2m_min[safeT])}°</div>
+          <div class="w3-range">${Math.round(d.temperature_2m_max[safeT])}°↑ ${Math.round(d.temperature_2m_min[safeT])}°↓</div>
         </div>
         <div class="w3-item w3-side">
           <div class="w3-label">내일</div>
           <div class="w3-icon">${nIcon}</div>
           <div class="w3-temp">${Math.round(d.temperature_2m_max[ni])}°</div>
-          <div class="w3-range">${Math.round(d.temperature_2m_min[ni])}°</div>
+          <div class="w3-range">${Math.round(d.temperature_2m_min[ni])}°↓</div>
         </div>
       </div>`;
   },

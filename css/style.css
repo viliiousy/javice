@@ -152,6 +152,22 @@ html,body{
 .stats-jarvis-txt{ overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:calc(100vw - 80px); }
 @keyframes statsPulse{ 0%,100%{opacity:1} 40%{opacity:0.5;transform:scale(1.01)} }
 .stats-flash{ animation:statsPulse 0.5s ease; }
+@keyframes chipBlink{
+  0%  { transform:scale(1);   box-shadow:none; }
+  25% { transform:scale(1.12); box-shadow:0 0 0 3px rgba(79,70,229,0.35), 0 0 12px rgba(79,70,229,0.25); }
+  50% { transform:scale(0.97); box-shadow:none; }
+  75% { transform:scale(1.06); box-shadow:0 0 0 2px rgba(79,70,229,0.2); }
+  100%{ transform:scale(1);   box-shadow:none; }
+}
+@keyframes chipBlinkGreen{
+  0%  { transform:scale(1);   box-shadow:none; }
+  25% { transform:scale(1.12); box-shadow:0 0 0 3px rgba(5,150,105,0.4), 0 0 12px rgba(5,150,105,0.3); }
+  50% { transform:scale(0.97); box-shadow:none; }
+  75% { transform:scale(1.06); box-shadow:0 0 0 2px rgba(5,150,105,0.2); }
+  100%{ transform:scale(1);   box-shadow:none; }
+}
+.chip-flash { animation:chipBlink 0.55s ease; }
+.chip-flash.stat-green { animation:chipBlinkGreen 0.55s ease; }
 
 /* ── 대시보드 그리드 ─────────────────── */
 .dashboard{
@@ -809,10 +825,15 @@ html.dark .profile-menu { background:var(--card); border-color:var(--border); }
    스탯 배너 — 긴급할일 가로 나열
    ═══════════════════════════════════════ */
 .stats-banner {
-  position:sticky; top:53px; z-index:99;
   box-shadow:0 1px 3px rgba(0,0,0,0.06);
 }
 html.dark .stats-banner { background:var(--card); }
+/* 헤더+스탯 묶음 */
+.header-sticky-group {
+  position:sticky; top:0; z-index:100;
+  background:white;
+}
+html.dark .header-sticky-group { background:var(--card); }
 
 .stats-urgent-row {
   display:flex; gap:5px; flex-wrap:wrap;
@@ -837,12 +858,13 @@ html.dark .stats-urgent-chip.urgent-over { background:rgba(220,38,38,0.15); }
   .stats-banner { top:49px; padding:5px 12px; }
   .stats-urgent-row { display:flex !important; }
   .stats-urgent-chip { max-width:calc(33vw - 12px); font-size:10px; padding:2px 6px; }
-  .w3-side { display:flex !important; } /* 어제/내일 모바일도 표시 */
-  .w3-side .w3-label,
-  .w3-side .w3-range { display:none; } /* 날씨 레이블/범위 숨기고 아이콘+온도만 */
-  .w3-side { opacity:0.7; }
+  .w3-side { display:flex !important; opacity:0.75; }
+  .w3-side .w3-range { display:block !important; font-size:9px; }
+  .w3-side .w3-label { display:block !important; font-size:9px; }
   .weather-3day { gap:3px; }
   .w3-item { padding:2px 4px; }
+  .w3-temp { font-size:11px; }
+  .w3-today .w3-temp { font-size:13px; }
   .stats-row { gap:4px; }
 }
 
@@ -924,5 +946,5 @@ html.dark .date-picker-dropdown {
 
 /* 모바일 stats-banner top 조정 */
 @media (max-width: 640px) {
-  .stats-banner { top: 49px; }
+  /* stats-banner top은 header-sticky-group이 처리 */
 }

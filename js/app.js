@@ -167,8 +167,12 @@ const App = {
 
     // 반짝임 애니메이션 (DOM 재삽입 트릭)
     if(changed){
-      const row=el.querySelector('.stats-row');
-      if(row){ row.classList.remove('stats-flash'); void row.offsetWidth; row.classList.add('stats-flash'); }
+      // 변경된 칩만 반짝임
+      el.querySelectorAll('.stat-chip').forEach(chip=>{
+        chip.classList.remove('chip-flash');
+        void chip.offsetWidth;
+        chip.classList.add('chip-flash');
+      });
     }
 
     // 칩 클릭 → 해당 섹션 스크롤
@@ -181,7 +185,11 @@ const App = {
           else if(txt.includes('kcal')||txt.includes('식단')) target=document.querySelector('.card-diet');
           else if(txt.includes('할일')) target=document.querySelector('.card-tasks');
           else if(txt.includes('체크')) target=document.querySelector('.card-checklist');
-          if(target) target.scrollIntoView({behavior:'smooth',block:'start'});
+          if(target){
+            const stickyH=(document.querySelector('.header-sticky-group')?.offsetHeight||110)+8;
+            const y=target.getBoundingClientRect().top+window.scrollY-stickyH;
+            window.scrollTo({top:y,behavior:'smooth'});
+          }
         };
       });
       el.querySelectorAll('.stats-urgent-chip').forEach(chip=>{
@@ -209,22 +217,19 @@ const App = {
     const hDateWrap=document.querySelector('.h-date');
     const el=document.getElementById('hDate'), eld=document.getElementById('hDay');
 
-    if(hDateWrap){
-      hDateWrap.classList.toggle('h-date-today', isToday);
-    }
+    if(hDateWrap) hDateWrap.classList.toggle('h-date-today', isToday);
     if(el){
-      if(isToday){
-        el.innerHTML=`🔥 오늘`;
-      } else {
-        el.textContent=d.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
-      }
+      el.textContent=d.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
       el.style.cursor='pointer';
       el.onclick=(e)=>{ e.stopPropagation(); App._toggleDateDropdown(d); };
     }
     if(eld){
-      const dayStr=d.toLocaleDateString('ko-KR',{weekday:'long'});
-      eld.textContent=dayStr;
-      eld.style.color=dow===0?'var(--red)':dow===6?'var(--blue)':'';
+      if(isToday){
+        eld.innerHTML=`<span style="color:#059669;font-weight:900;font-size:12px">🕐 오늘</span> · ${d.toLocaleDateString('ko-KR',{weekday:'long'})}`;
+      } else {
+        eld.textContent=d.toLocaleDateString('ko-KR',{weekday:'long'});
+      }
+      eld.style.color=(!isToday&&dow===0)?'var(--red)':(!isToday&&dow===6)?'var(--blue)':'';
     }
   },
 

@@ -1,7 +1,7 @@
 // js/config.js — 설정
 
 const CONFIG = {
-  GOOGLE_CLIENT_ID: '14470442015-llsapdnno92lbe2mblvqu1ihd4ccpms6.apps.googleusercontent.com',
+  GOOGLE_CLIENT_ID: '14470442015-uq9sskup7nq9uhirl1spthqvd53d48bh.apps.googleusercontent.com',
 
   SCOPES: [
     'https://www.googleapis.com/auth/calendar',
