@@ -81,10 +81,8 @@ const Auth = {
         FirebaseSync.init(normalizedUid, CONFIG.FIREBASE_DB_URL);
         App.showToast('데이터 불러오는 중...', '');
         const loaded = await FirebaseSync.load();
-
-        // 4. 감시 시작 (이후 변경사항 자동 저장)
-        FirebaseSync.watchChanges();
-
+        // 폴링 시작 (다른 기기 변경 감지)
+        FirebaseSync.startPolling();
         if (loaded) {
           App.showToast('동기화 완료 ✓', 'success');
         }

@@ -17,11 +17,11 @@ const Habits = {
     const v = UserStore.get('gl_habits_list');
     return JSON.parse(v || JSON.stringify(this.DEFAULTS));
   },
-  saveList(v) { UserStore.set('gl_habits_list', JSON.stringify(v)); },
+  saveList(v) { UserStore.set('gl_habits_list', JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
 
   _dateKey(date) { const d=new Date(date); return `gl_habits_${d.toDateString()}`; },
   getChecked(date=new Date()) { return JSON.parse(UserStore.get(this._dateKey(date))||'[]'); },
-  setChecked(v,date=new Date()) { UserStore.set(this._dateKey(date), JSON.stringify(v)); },
+  setChecked(v,date=new Date()) { UserStore.set(this._dateKey(date), JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
 
   getHabitsForDate(date=new Date()) {
     const dow=new Date(date).getDay();

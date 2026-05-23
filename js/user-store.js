@@ -39,7 +39,10 @@ const UserStore = {
   },
 
   set(rawKey, val) {
-    try { localStorage.setItem(this.key(rawKey), val); } catch(e) { console.warn('[UserStore] set failed:', e); }
+    try {
+      localStorage.setItem(this.key(rawKey), val);
+      // FirebaseSync에 변경 알림 (각 모듈에서 직접 호출하는 것이 우선)
+    } catch(e) { console.warn('[UserStore] set failed:', e); }
   },
 
   remove(rawKey) {

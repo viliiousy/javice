@@ -15,6 +15,7 @@ const GoogleCalendar = {
     const s = JSON.stringify(v);
     if (typeof UserStore!=='undefined') UserStore.set('gl_cal_settings', s);
     else localStorage.setItem('gl_cal_settings', s);
+    FirebaseSync?.scheduleSave();
   },
 
   isVisible(calId) {

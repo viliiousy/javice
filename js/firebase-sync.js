@@ -1,70 +1,67 @@
-// js/firebase-sync.js — 타임스탬프 기반 충돌 해결 동기화
+// js/firebase-sync.js — Firebase 동기화 (명시적 호출 방식)
 
 const FirebaseSync = {
-  _uid:       null,
-  _dbUrl:     null,
-  _saveTimer: null,
-  _syncing:   false,
-  _watching:  false,
-  _pollTimer: null,
-  _lastSaveTs: 0,    // 내가 마지막으로 저장한 시각
-  _lastEditTs: 0,    // 내가 마지막으로 로컬 데이터를 편집한 시각
-  _origSet:   null,
+  _uid:        null,
+  _dbUrl:      null,
+  _saveTimer:  null,
+  _syncing:    false,
+  _lastSaveTs: 0,
+  _lastEditTs: 0,
+  _pollTimer:  null,
 
   init(normalizedUid, dbUrl) {
     if (!normalizedUid || !dbUrl || dbUrl.includes('YOUR_FIREBASE')) return;
     this._uid   = normalizedUid;
     this._dbUrl = dbUrl.replace(/\/$/, '');
-    console.log('[FirebaseSync] 초기화:', this._uid);
+    console.log('[FB] 초기화:', this._uid);
   },
 
+  ready() { return !!(this._uid && this._dbUrl); },
+
   _collectData() {
-    const data = UserStore.getAllData();
-    ['gl_ai_key','gl_tts','gl_dark','gl_cat_colors'].forEach(k => {
-      const v = localStorage.getItem(k);
-      if (v !== null) data[k] = v;
-    });
-    // 저장 시각 기록 (충돌 해결용)
+    const data   = UserStore.getAllData();
+    const extras = ['gl_ai_key','gl_tts','gl_dark','gl_cat_colors'];
+    extras.forEach(k => { const v=localStorage.getItem(k); if(v!=null) data[k]=v; });
     data['_savedAt'] = String(Date.now());
     return data;
   },
 
-  _restoreData(remoteData) {
-    if (!remoteData || typeof remoteData !== 'object') return;
-    const orig = this._origSet || localStorage.setItem.bind(localStorage);
-    let count = 0;
-    Object.entries(remoteData).forEach(([k, v]) => {
-      if (!k || k === '_savedAt' || v === null || v === undefined) return;
-      orig(k, String(v));
-      count++;
+  _restore(remoteData) {
+    if (!remoteData || typeof remoteData !== 'object') return 0;
+    let n = 0;
+    Object.entries(remoteData).forEach(([k,v]) => {
+      if (!k || k==='_savedAt' || v==null) return;
+      localStorage.setItem(k, String(v));
+      n++;
     });
-    return count;
+    return n;
   },
 
   async load() {
-    if (!this._uid || !this._dbUrl) return false;
+    if (!this.ready()) return false;
     try {
       const res  = await fetch(`${this._dbUrl}/users/${this._uid}.json`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-        const remoteTs = parseInt(data['_savedAt'] || '0', 10);
-        const count = this._restoreData(data);
-        // 핵심: load 후에도 _lastSaveTs 설정해야 폴링 시 불필요한 덮어쓰기 방지
-        if (remoteTs > 0) this._lastSaveTs = remoteTs;
-        console.log('[FirebaseSync] 불러오기 완료:', count, '개, ts:', remoteTs);
+      if (data && typeof data==='object' && Object.keys(data).length > 0) {
+        const remoteTs = parseInt(data['_savedAt']||'0',10);
+        this._restore(data);
+        if (remoteTs > 0) this._lastSaveTs = remoteTs; // 핵심: load 후 ts 설정
+        console.log('[FB] 불러오기 완료, ts:', remoteTs);
         return true;
       }
       return false;
-    } catch (e) {
-      console.error('[FirebaseSync] 불러오기 실패:', e.message);
+    } catch(e) {
+      console.error('[FB] 불러오기 실패:', e.message);
       return false;
     }
   },
 
   async save() {
-    if (!this._uid || !this._dbUrl) return;
-    if (this._syncing) { this.scheduleSave(); return; }
+    if (!this.ready() || this._syncing) {
+      if (this._syncing) this.scheduleSave();
+      return;
+    }
     this._syncing = true;
     try {
       const data = this._collectData();
@@ -74,86 +71,53 @@ const FirebaseSync = {
         body:    JSON.stringify(data),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      this._lastSaveTs = Date.now();
-      console.log('[FirebaseSync] 저장 완료, ts:', this._lastSaveTs);
-    } catch (e) {
-      console.error('[FirebaseSync] 저장 실패:', e.message);
+      this._lastSaveTs = parseInt(data['_savedAt'],10);
+      console.log('[FB] 저장 완료, ts:', this._lastSaveTs);
+    } catch(e) {
+      console.error('[FB] 저장 실패:', e.message);
     } finally {
       this._syncing = false;
     }
   },
 
+  // 각 모듈에서 데이터 변경 시 직접 호출
   scheduleSave() {
-    this._lastEditTs = Date.now(); // 편집 시각 기록
+    this._lastEditTs = Date.now();
     clearTimeout(this._saveTimer);
     this._saveTimer = setTimeout(() => this.save(), 1000);
   },
 
-  watchChanges() {
-    if (this._watching || !this._uid) return;
-    this._watching = true;
-
-    const prefix = `u_${this._uid}_`;
-    const extras = new Set(['gl_ai_key','gl_tts','gl_dark','gl_cat_colors']);
-    this._origSet = localStorage.setItem.bind(localStorage);
-
-    localStorage.setItem = (key, val) => {
-      this._origSet(key, val);
-      if (key && (key.startsWith(prefix) || extras.has(key))) {
-        this.scheduleSave();
-      }
-    };
-
-    // 페이지 다시 포커스 시 최신 데이터 동기화
+  startPolling() {
+    if (this._pollTimer) return;
+    // 20초마다 다른 기기 변경 확인
+    this._pollTimer = setInterval(() => this._poll(), 20000);
+    // 앱 포커스 시 즉시 확인
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        // 편집 후 2초 경과했을 때만 pull (내 변경 덮어쓰기 방지)
-        if (Date.now() - this._lastEditTs > 2000) {
-          setTimeout(() => this._smartPull(), 500);
-        }
+      if (document.visibilityState==='visible') {
+        setTimeout(() => this._poll(), 500);
       }
     });
-
-    // 20초마다 스마트 폴링
-    this._pollTimer = setInterval(() => this._smartPoll(), 20000);
-    console.log('[FirebaseSync] 감시 시작');
+    console.log('[FB] 폴링 시작 (20초)');
   },
 
-  // 타임스탬프 비교 → 최신 데이터 승리
-  async _smartPull() {
-    if (!this._uid || !this._dbUrl) return;
-    // 편집 중(2초 이내)이면 스킵 - 내 변경 보호
-    if (Date.now() - this._lastEditTs < 2000) return;
-    // 저장 직후(3초 이내)면 스킵 - 방금 내가 저장한 것
-    if (Date.now() - this._lastSaveTs < 3000) return;
-
+  async _poll() {
+    if (!this.ready()) return;
+    if (Date.now() - this._lastEditTs < 2000) return; // 편집 중 스킵
+    if (Date.now() - this._lastSaveTs  < 3000) return; // 방금 저장 스킵
     try {
       const res = await fetch(`${this._dbUrl}/users/${this._uid}/_savedAt.json`);
       if (!res.ok) return;
-      const remoteTs = parseInt(await res.json() || '0', 10);
-      const localTs  = this._lastSaveTs;
-
-      console.log('[FirebaseSync] ts 비교 - 원격:', remoteTs, '로컬:', localTs);
-
-      // 원격이 1초 이상 최신일 때만 덮어씀
-      if (remoteTs > localTs + 1000) {
-        console.log('[FirebaseSync] 원격이 최신 → 불러오기');
-        const loaded = await this.load(); // load()가 _lastSaveTs도 갱신함
-        if (loaded) this._refreshUI();
+      const remoteTs = parseInt(await res.json()||'0',10);
+      if (remoteTs > this._lastSaveTs + 1000) {
+        console.log('[FB] 원격 변경 감지, ts:', remoteTs, '→ 불러오기');
+        const ok = await this.load();
+        if (ok) this._refreshUI();
       }
-    } catch (e) {
-      console.warn('[FirebaseSync] poll 실패:', e.message);
-    }
-  },
-
-  // 20초 폴링
-  async _smartPoll() {
-    if (Date.now() - this._lastEditTs < 2000) return;
-    await this._smartPull();
+    } catch {}
   },
 
   _refreshUI() {
-    if (typeof App === 'undefined') return;
+    if (typeof App==='undefined') return;
     const date = App.S?.selDate || new Date();
     requestAnimationFrame(() => {
       try { Habits.render(date); } catch {}
@@ -162,6 +126,5 @@ const FirebaseSync = {
       try { Memo.render(); } catch {}
       try { App._updateStatsBanner(); } catch {}
     });
-    console.log('[FirebaseSync] UI 갱신 완료');
   },
 };

@@ -3,7 +3,7 @@
 const Checklist = {
   _key() { return 'gl_checklist_v2'; },
   getItems() { return JSON.parse(UserStore.get(this._key())||'[]'); },
-  saveItems(v) { UserStore.set(this._key(), JSON.stringify(v)); },
+  saveItems(v) { UserStore.set(this._key(), JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
 
   getItemsForDate(date) {
     const d=new Date(date); d.setHours(0,0,0,0);

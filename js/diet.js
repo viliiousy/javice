@@ -22,11 +22,11 @@ const Diet = {
     return JSON.parse(UserStore.get(this._key(date))||JSON.stringify(
       {아침:[],점심:[],저녁:[],간식:[]}));
   },
-  saveData(d,date=new Date()){ UserStore.set(this._key(date),JSON.stringify(d)); },
+  saveData(d,date=new Date()){ UserStore.set(this._key(date),JSON.stringify(d)); FirebaseSync?.scheduleSave(); },
 
   // ── 즐겨찾기 ──────────────────────────
   getFavs(){ return JSON.parse(UserStore.get(this._favKey())||'[]'); },
-  saveFavs(v){ UserStore.set(this._favKey(),JSON.stringify(v)); },
+  saveFavs(v){ UserStore.set(this._favKey(),JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
   toggleFav(name){
     const favs=this.getFavs();
     const idx=favs.indexOf(name);
@@ -37,7 +37,7 @@ const Diet = {
 
   // ── 음식 히스토리 (최근 10개 + 빈도) ──
   getHistory(){ return JSON.parse(UserStore.get(this._histKey())||'[]'); },
-  saveHistory(v){ UserStore.set(this._histKey(),JSON.stringify(v.slice(0,200))); },
+  saveHistory(v){ UserStore.set(this._histKey(),JSON.stringify(v.slice(0,200))); FirebaseSync?.scheduleSave(); },
   addToHistory(food){
     const h=this.getHistory();
     // 중복 제거 후 맨 앞에 추가
