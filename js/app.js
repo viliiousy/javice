@@ -24,20 +24,21 @@ const App = {
 
   _setupListeners() {
     const $=id=>document.getElementById(id);
-    $('btnGoogleLogin').onclick =()=>Auth.login();
-    $('btnOfflineMode').onclick =()=>this.startOffline();
-    $('btnLogout').onclick      =()=>Auth.logout();
-    $('btnSync').onclick        =()=>this.sync();
-    $('btnAddTask').onclick     =()=>this._showTaskForm(true);
-    $('btnCancelTask').onclick  =()=>this._showTaskForm(false);
-    $('btnSaveTask').onclick    =()=>this._saveTask();
-    $('btnAddEvent').onclick    =()=>this.showLongPressMenu(this.S.selDate);
-    $('btnManageHabits').onclick=()=>Habits.showManageModal();
+    const on=(id,fn)=>{ const el=$(id); if(el) el.onclick=fn; };
+    on('btnGoogleLogin', ()=>Auth.login());
+    on('btnOfflineMode', ()=>this.startOffline());
+    on('btnLogout',      ()=>Auth.logout());
+    on('btnSync',        ()=>this.sync());
+    on('btnAddTask',     ()=>this._showTaskForm(true));
+    on('btnCancelTask',  ()=>this._showTaskForm(false));
+    on('btnSaveTask',    ()=>this._saveTask());
+    on('btnAddEvent',    ()=>this.showLongPressMenu(this.S.selDate));
+    on('btnManageHabits',()=>Habits.showManageModal());
+    on('btnDateSort',    ()=>this._toggleDateSort());
+    on('btnModalClose',  ()=>this.closeModal());
     $('btnCalSettings')?.addEventListener('click',()=>GoogleCalendar.showSettings());
-    $('btnModalClose').onclick  =()=>this.closeModal();
-    $('modal').onclick          =e=>{ if(e.target===$('modal')) this.closeModal(); };
-    $('taskInput').onkeypress   =e=>{ if(e.key==='Enter') this._saveTask(); };
-    $('btnDateSort').onclick    =()=>this._toggleDateSort();
+    const modal=$('modal'); if(modal) modal.onclick=e=>{ if(e.target===modal) this.closeModal(); };
+    const ti=$('taskInput'); if(ti) ti.onkeypress=e=>{ if(e.key==='Enter') this._saveTask(); };
   },
 
   _toggleDateSort() {
