@@ -118,93 +118,110 @@ const App = {
   _statsPrev: '{}',
   _updateStatsBanner() {
     const el=document.getElementById('statsBanner'); if(!el) return;
+    const now=new Date();
+
+    // 습관
     const hList=Habits.getList(), hChk=Habits.getChecked();
     const hDone=hList.filter(h=>hChk.includes(h.id)).length;
+
+    // 식단
     const dt=Diet.totals(Diet.getData()), ds=Diet.getSettings();
     const calPct=ds.calorieGoal?Math.round(dt.cal/ds.calorieGoal*100):0;
-    const pending=Object.values(this.S.tasks||{}).reduce((n,l)=>n+l.filter(t=>t.status==='needsAction').length,0);
+
+    // 할일 (숨김 제외)
+    const allPending=[];
+    Object.entries(this.S.tasks||{}).forEach(([lid,list])=>
+      list.filter(t=>t.status==='needsAction'&&!t._hidden).forEach(t=>allPending.push({...t,_lid:lid}))
+    );
+    const pending=allPending.length;
     const clItems=Checklist.getItems().filter(i=>!i.done);
     const lastMsg=typeof JARVIS!=='undefined'&&JARVIS.history.length
-      ?JARVIS.history.filter(m=>m.role==='assistant').slice(-1)[0]?.content.replace(/\{[\s\S]*\}/g,'').trim():'';
+      ?JARVIS.history.filter(m=>m.role==='assistant').slice(-1)[0]?.content.replace(/[{][\s\S]*[}]/g,'').trim():'';
 
-    // 긴급 할일 TOP 3 (별표 + 마감일 기준)
-    const now=new Date();
-    const allPending=[];
-    Object.values(this.S.tasks||{}).forEach(list=>
-      list.filter(t=>t.status==='needsAction').forEach(t=>allPending.push(t))
-    );
-    allPending.sort((a,b)=>{
-      const aOver=a.due&&new Date(a.due)<now?1:0;
-      const bOver=b.due&&new Date(b.due)<now?1:0;
-      const aScore=(a.starred?8:0)+(aOver?4:0)+(a.due?2:0);
-      const bScore=(b.starred?8:0)+(bOver?4:0)+(b.due?2:0);
-      if(bScore!==aScore) return bScore-aScore;
+    // 이번주 일정 + 기한 있는 할일 (오늘~7일)
+    const weekEnd=new Date(now); weekEnd.setDate(now.getDate()+7); weekEnd.setHours(23,59,59,999);
+    const upcoming=[];
+    // 캘린더 이벤트
+    (this.S.events||[]).forEach(e=>{
+      try{
+        const d=e.start?.dateTime?new Date(e.start.dateTime):new Date(e.start?.date+'T00:00:00');
+        if(d>=now&&d<=weekEnd) upcoming.push({label:(e.summary||'').slice(0,15),isTask:false,date:d});
+      }catch{}
+    });
+    // 기한 있는 할일
+    allPending.filter(t=>t.due).forEach(t=>{
+      try{
+        const d=new Date(t.due);
+        if(d>=now&&d<=weekEnd) upcoming.push({label:(t.title||'').slice(0,15),isTask:true,date:d});
+      }catch{}
+    });
+    upcoming.sort((a,b)=>a.date-b.date);
+
+    // 긴급 할일 TOP 3
+    const urgentTasks=[...allPending].sort((a,b)=>{
+      const aO=a.due&&new Date(a.due)<now?1:0,bO=b.due&&new Date(b.due)<now?1:0;
+      const aS=(a.starred?8:0)+(aO?4:0)+(a.due?2:0),bS=(b.starred?8:0)+(bO?4:0)+(b.due?2:0);
+      if(bS!==aS) return bS-aS;
       if(a.due&&b.due) return new Date(a.due)-new Date(b.due);
       return 0;
-    });
-    const urgent=allPending.slice(0,3);
+    }).slice(0,3);
 
-    // 변경 감지
-    const curStr=JSON.stringify({hDone,cal:dt.cal,pending,clCount:clItems.length});
+    // 변경 감지 (긴급할일 id+status 포함)
+    const curStr=JSON.stringify({hDone,cal:dt.cal,pending,cl:clItems.length,uIds:urgentTasks.map(t=>t.id+t.status).join()});
     const changed=curStr!==this._statsPrev;
+    const prevObj=this._statsPrev&&this._statsPrev!=='{}'?JSON.parse(this._statsPrev):{};
     this._statsPrev=curStr;
 
+    // HTML 조립
     const chipsHTML=`
-      <div class="stat-chip ${hDone===hList.length&&hList.length>0?'stat-green':''}">✅ 습관 ${hDone}/${hList.length}</div>
-      <div class="stat-chip ${calPct>=80?'stat-green':calPct>=50?'stat-yellow':''}">🥗 ${dt.cal}/${ds.calorieGoal}kcal</div>
-      ${pending>0?`<div class="stat-chip">📋 할일 ${pending}개</div>`:''}
-      ${clItems.length>0?`<div class="stat-chip">✍️ ${clItems.length}개</div>`:''}`;
+      <div class="stat-chip ${hDone===hList.length&&hList.length>0?'stat-green':''}" data-s="habits">✅ 습관 ${hDone}/${hList.length}</div>
+      <div class="stat-chip ${calPct>=80?'stat-green':calPct>=50?'stat-yellow':''}" data-s="diet">🥗 ${dt.cal}/${ds.calorieGoal}kcal</div>
+      ${pending>0?`<div class="stat-chip" data-s="tasks">📋 할일 ${pending}개</div>`:''}
+      ${clItems.length>0?`<div class="stat-chip" data-s="checklist">✍️ ${clItems.length}개</div>`:''}`;
 
-    const urgentHTML=urgent.length?`
+    // 이번주 일정/할일 - 3개씩 줄바꿈
+    const upcomingHTML=upcoming.length?`
+      <div class="stats-upcoming">
+        ${upcoming.map(i=>`<span class="stats-upcoming-chip ${i.isTask?'uc-task':'uc-event'}">${i.isTask?'📋':'📅'} ${esc(i.label)}</span>`).join('')}
+      </div>`:'';
+
+    const urgentHTML=urgentTasks.length?`
       <div class="stats-urgent-row">
-        ${urgent.map(t=>{
-          const due=t.due?new Date(t.due):null;
-          const over=due&&due<now;
-          return `<div class="stats-urgent-chip${over?' urgent-over':''}${t.starred?' urgent-star':''}">${t.starred?'⭐':''}${esc(t.title.length>14?t.title.slice(0,13)+'…':t.title)}${due?`<span class="${over?'stats-overdue':'stats-due'}"> ${_fmtDate(due)}</span>`:''}</div>`;
+        ${urgentTasks.map(t=>{
+          const due=t.due?new Date(t.due):null,over=due&&due<now;
+          return `<div class="stats-urgent-chip${over?' urgent-over':''}${t.starred?' urgent-star':''}" data-s="tasks">${t.starred?'⭐':''}${esc(t.title.length>15?t.title.slice(0,14)+'…':t.title)}${due?` <span class="${over?'stats-overdue':'stats-due'}">${_fmtDate(due)}</span>`:''}</div>`;
         }).join('')}
       </div>`:'';
 
     const jarvisHTML=lastMsg?`<div class="stats-jarvis"><span class="stats-jarvis-icon">⚡</span><span class="stats-jarvis-txt">${esc(lastMsg.slice(0,90))}</span></div>`:'';
 
-    el.innerHTML=`<div class="stats-row">${chipsHTML}</div>${urgentHTML}${jarvisHTML}`;
+    el.innerHTML=`<div class="stats-row">${chipsHTML}</div>${upcomingHTML}${urgentHTML}${jarvisHTML}`;
 
-    // 반짝임 애니메이션 (DOM 재삽입 트릭)
+    // 칩별 반짝임
     if(changed){
-        // 변경된 항목 칩만 반짝임
-      const prev=this._statsPrev ? JSON.parse(this._statsPrev) : {};
-      if(prev.hDone!==undefined && prev.hDone!==hDone){
-        const chip=el.querySelector('.stat-chip:nth-child(1)');
-        if(chip){ chip.classList.remove('chip-flash'); void chip.offsetWidth; chip.classList.add('chip-flash'); }
+      if(prevObj.hDone!==undefined&&prevObj.hDone!==hDone){
+        const c=el.querySelector('[data-s="habits"]'); if(c){c.classList.remove('chip-flash');void c.offsetWidth;c.classList.add('chip-flash');}
       }
-      if(prev.cal!==undefined && prev.cal!==dt.cal){
-        const chip=el.querySelector('.stat-chip:nth-child(2)');
-        if(chip){ chip.classList.remove('chip-flash'); void chip.offsetWidth; chip.classList.add('chip-flash'); }
+      if(prevObj.cal!==undefined&&prevObj.cal!==dt.cal){
+        const c=el.querySelector('[data-s="diet"]'); if(c){c.classList.remove('chip-flash');void c.offsetWidth;c.classList.add('chip-flash');}
       }
-      if(prev.pending!==undefined && prev.pending!==pending){
-        const chips=el.querySelectorAll('.stat-chip');
-        if(chips.length>2){ chips[2].classList.remove('chip-flash'); void chips[2].offsetWidth; chips[2].classList.add('chip-flash'); }
+      if(prevObj.pending!==undefined&&prevObj.pending!==pending){
+        const c=el.querySelector('[data-s="tasks"]'); if(c){c.classList.remove('chip-flash');void c.offsetWidth;c.classList.add('chip-flash');}
       }
     }
 
-    // 칩 클릭 → 해당 섹션 스크롤
+    // 칩 클릭 → 섹션 스크롤
     setTimeout(()=>{
-      el.querySelectorAll('.stat-chip').forEach(chip=>{
+      el.querySelectorAll('[data-s]').forEach(chip=>{
         chip.onclick=()=>{
-          const txt=chip.textContent;
-          let target=null;
-          if(txt.includes('습관')) target=document.querySelector('.card-habits');
-          else if(txt.includes('kcal')||txt.includes('식단')) target=document.querySelector('.card-diet');
-          else if(txt.includes('할일')) target=document.querySelector('.card-tasks');
-          else if(txt.includes('체크')) target=document.querySelector('.card-checklist');
+          const sec=chip.dataset.s;
+          const map={habits:'.card-habits',diet:'.card-diet',tasks:'.card-tasks',checklist:'.card-checklist'};
+          const target=document.querySelector(map[sec]);
           if(target){
-            const stickyH=(document.querySelector('.header-sticky-group')?.offsetHeight||110)+8;
-            const y=target.getBoundingClientRect().top+window.scrollY-stickyH;
-            window.scrollTo({top:y,behavior:'smooth'});
+            const sH=(document.querySelector('.header-sticky-group')?.offsetHeight||100)+8;
+            window.scrollTo({top:target.getBoundingClientRect().top+window.scrollY-sH,behavior:'smooth'});
           }
         };
-      });
-      el.querySelectorAll('.stats-urgent-chip').forEach(chip=>{
-        chip.onclick=()=>{ document.querySelector('.card-tasks')?.scrollIntoView({behavior:'smooth',block:'start'}); };
       });
     },50);
   },
@@ -230,13 +247,9 @@ const App = {
 
     if(hDateWrap) hDateWrap.classList.toggle('h-date-today', isToday);
     if(el){
-      // 모바일에서는 짧은 날짜 형식
-      const isMobile=window.innerWidth<=640;
-      if(isMobile){
-        const yy=String(d.getFullYear()).slice(2);
-        const mm=d.getMonth()+1;
-        const dd=d.getDate();
-        el.textContent=`${yy}년 ${mm}월 ${dd}일`;
+      // 날짜 표시: 모바일이면 26년 5월 23일, PC면 2026년 5월 23일
+      if(window.innerWidth<=640){
+        el.textContent=`${String(d.getFullYear()).slice(2)}년 ${d.getMonth()+1}월 ${d.getDate()}일`;
       } else {
         el.textContent=d.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
       }
@@ -244,12 +257,14 @@ const App = {
       el.onclick=(e)=>{ e.stopPropagation(); App._toggleDateDropdown(d); };
     }
     if(eld){
+      const dayStr=d.toLocaleDateString('ko-KR',{weekday:'long'});
       if(isToday){
-        eld.innerHTML=`<span style="color:#059669;font-weight:900;font-size:12px">🕐 오늘</span> · ${d.toLocaleDateString('ko-KR',{weekday:'long'})}`;
+        eld.innerHTML=`<span style="color:#059669;font-weight:900">🕐 오늘</span> · ${dayStr}`;
+        eld.style.color='';
       } else {
-        eld.textContent=d.toLocaleDateString('ko-KR',{weekday:'long'});
+        eld.textContent=dayStr;
+        eld.style.color=dow===0?'var(--red)':dow===6?'var(--blue)':'';
       }
-      eld.style.color=(!isToday&&dow===0)?'var(--red)':(!isToday&&dow===6)?'var(--blue)':'';
     }
   },
 
@@ -271,16 +286,20 @@ const App = {
     const render=()=>{
       calContainer.innerHTML='';
       CalendarUI.render(calContainer, pickerDate, App.S.events, currentDate);
-      // 달력 클릭 오버라이드
-      calContainer.querySelectorAll('.cal-day:not(.other-month)').forEach(el=>{
-        el.onclick=(e)=>{
-          e.stopPropagation();
-          const txt=el.textContent.trim();
+      // 달력 클릭 오버라이드 (touch + mouse 모두)
+      calContainer.querySelectorAll('.cal-day:not(.other-month)').forEach(dayEl=>{
+        const handler=(e)=>{
+          e.stopPropagation(); e.preventDefault();
+          const txt=dayEl.textContent.trim();
           if(!txt||isNaN(parseInt(txt))) return;
           const d=new Date(pickerDate.getFullYear(), pickerDate.getMonth(), parseInt(txt));
           dropdown.remove();
           App.selectCalDate(d);
         };
+        dayEl.onclick=handler;
+        dayEl.ontouchend=handler;
+        // long press 방지
+        dayEl.onmousedown=null; dayEl.ontouchstart=(e)=>e.stopPropagation();
       });
       // 월 이동 버튼 오버라이드
       calContainer.querySelector('.cal-nav-btn:first-child').onclick=(e)=>{
