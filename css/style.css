@@ -1019,3 +1019,38 @@ html.dark .uc-task  { background: rgba(133,77,14,0.2); color: #fcd34d; border-co
 .task-group + .task-group {
   margin-top: 6px;
 }
+
+/* ═══════════════════════════════════════
+   할일 - 숨김/별표 버튼 항상 살짝 표시
+   ═══════════════════════════════════════ */
+.task-star {
+  opacity: 0.25 !important;
+}
+.task-star:hover,
+.task-star.starred {
+  opacity: 1 !important;
+}
+.task-hide-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  opacity: 0.2;
+  border-radius: 4px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.task-item:hover .task-hide-btn { opacity: 0.6; }
+.task-hide-btn:hover { opacity: 1 !important; background: var(--bg); }
+
+/* 2. 카테고리 색상 - border 방식 */
+.task-group[style*="border-left"] {
+  border-radius: var(--r-xs);
+  padding: 6px 6px 6px 10px !important;
+  margin-bottom: 8px;
+}
+
+/* h-logo 링크 스타일 */
+.h-logo { color: var(--accent); }
+html.dark .h-logo { color: var(--accent-l); }

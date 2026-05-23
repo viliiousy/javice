@@ -241,7 +241,7 @@ const Diet = {
       <div id="photoDropZone" class="photo-drop-zone" onclick="document.getElementById('photoFileInput').click()">
         <div id="photoPreviewWrap"><div style="font-size:48px">📷</div>
           <p style="color:var(--text2);font-size:13px">클릭하거나 사진을 올려주세요</p></div>
-        <input id="photoFileInput" type="file" accept="image/*" capture="environment" style="display:none"
+        <input id="photoFileInput" type="file" accept="image/*" style="display:none"
           onchange="Diet._onPhotoSelected(this,'${ds}')">
       </div>
       <div id="photoResult" style="display:none;margin-top:10px"></div>
@@ -277,10 +277,12 @@ const Diet = {
     try{
       const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
         method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
-        body:JSON.stringify({ model:'meta-llama/llama-4-scout-17b-16e-instruct', max_tokens:800,
+        body:JSON.stringify({ model:'meta-llama/llama-4-scout-17b-16e-instruct', max_tokens:1000,
           messages:[{role:'user',content:[
             {type:'image_url',image_url:{url:`data:image/jpeg;base64,${this._photoBase64}`}},
-            {type:'text',text:`음식 사진 분석 JSON만 출력:\n{"foods":[{"name":"","amount":"","cal":0,"protein":0,"carb":0,"fat":0}],"total_cal":0,"comment":""}\n한국 음식 기준으로 정확하게 추정.`}
+            {type:'text',text:`이 사진에 있는 음식을 분석해서 아래 JSON 형식으로만 출력해줘. 다른 텍스트 없이 JSON만.
+{"foods":[{"name":"음식명","amount":"양(예:100g,1개)","cal":칼로리숫자,"protein":단백질g,"carb":탄수화물g,"fat":지방g}],"total_cal":총칼로리,"meal":"아침|점심|저녁|간식","comment":"한줄코멘트"}
+한국 음식 기준으로 칼로리를 최대한 정확하게 추정해줘. 음식이 없으면 foods를 빈 배열로 반환해줘.`}
           ]}]
         }),
       });

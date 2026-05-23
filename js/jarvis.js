@@ -46,7 +46,7 @@ const JARVIS = {
             </div>
           </div>
         </div>
-        <input id="jPhotoInput" type="file" accept="image/*" capture="environment" style="display:none" onchange="JARVIS._onPhotoSelected(this)">
+        <input id="jPhotoInput" type="file" accept="image/*" style="display:none" onchange="JARVIS._onPhotoSelected(this)">
         <div class="j-input-wrap">
           <div id="jVoiceBar" class="j-voice-bar hidden"><span class="j-pulse"></span> 듣고 있습니다...</div>
           <div class="j-input-row">
@@ -200,7 +200,7 @@ const JARVIS = {
     try{
       const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
         method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
-        body:JSON.stringify({ model:'meta-llama/llama-4-scout-17b-16e-instruct', max_tokens:800,
+        body:JSON.stringify({ model:'meta-llama/llama-4-scout-17b-16e-instruct', max_tokens:1000,
           messages:[{role:'user',content:[
             {type:'image_url',image_url:{url:`data:${mimeType};base64,${base64}`}},
             {type:'text',text:`음식 사진 분석 JSON만 출력:\n{"foods":[{"name":"","amount":"","cal":0,"protein":0,"carb":0,"fat":0}],"total_cal":0,"meal":"아침|점심|저녁|간식","comment":""}\n한국 음식 기준으로 정확하게 추정해줘.`}
@@ -245,7 +245,7 @@ const JARVIS = {
     const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
       method:'POST',
       headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
-      body:JSON.stringify({model:'llama-3.1-8b-instant',max_tokens:1200,messages:[{role:'system',content:sys},...msgs]}),
+      body:JSON.stringify({model:'llama-3.3-70b-versatile',max_tokens:1200,messages:[{role:'system',content:sys},...msgs]}),
     });
     if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error(e.error?.message||`HTTP ${res.status}`); }
     const data=await res.json();

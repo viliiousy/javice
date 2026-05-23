@@ -29,6 +29,8 @@ const App = {
     on('btnOfflineMode', ()=>this.startOffline());
     on('btnLogout',      ()=>Auth.logout());
     on('btnSync',        ()=>this.sync());
+    on('btnShowCompleted',()=>{ this.S.showCompleted=!this.S.showCompleted; const b=document.getElementById('btnShowCompleted'); if(b)b.style.background=this.S.showCompleted?'var(--accent)':''; this._renderTasks(); });
+    on('btnShowHidden',  ()=>{ this.S.showHidden=!this.S.showHidden; const b=document.getElementById('btnShowHidden'); if(b)b.style.background=this.S.showHidden?'var(--accent)':''; this._renderTasks(); });
     on('btnAddTask',     ()=>this._showTaskForm(true));
     on('btnCancelTask',  ()=>this._showTaskForm(false));
     on('btnSaveTask',    ()=>this._saveTask());
@@ -656,20 +658,25 @@ const App = {
   _buildTaskFilters() {
     const wrap=document.getElementById('taskFilters'); if(!wrap) return;
     const tabs=[{id:'all',label:'전체'},{id:'starred',label:'⭐ 별표'},...this.S.lists.map(l=>({id:l.id,label:l.title}))];
-    const completedBtn=`<button class="fit-tab${this.S.showCompleted?' active':''}" onclick="App._toggleCompleted()" style="margin-left:auto">${this.S.showCompleted?'✓ 완료숨기기':'완료됨'}</button>`;
-    const hiddenBtn=`<button class="fit-tab${this.S.showHidden?' active':''}" onclick="App._toggleHidden()">🙈 ${this.S.showHidden?'숨김숨기기':'숨김보기'}</button>`;
+    const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
     wrap.innerHTML=tabs.map(t=>{
       const isListTab=t.id!=='all'&&t.id!=='starred';
-      const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
       const col=isListTab&&catColors[t.id]?catColors[t.id]:'';
-      const borderStyle=col?`border-color:${col};color:${col}`:'' ;
+      const borderStyle=col?`border-color:${col};color:${col};border-width:2px`:'' ;
       return `<button class="fit-tab${this.S.taskFilter===t.id?' active':''}"
         onclick="App._setFilter('${t.id}')"
         oncontextmenu="event.preventDefault();App._showCatColorPicker('${t.id}','${esc(t.label)}')"
+        ontouchstart="App._tabLongPress('${t.id}','${esc(t.label)}',event)"
+        ontouchend="App._tabLongPressEnd()"
         style="${borderStyle}">${esc(t.label)}</button>`;
-    }).join('')+completedBtn+hiddenBtn;
+    }).join('');
   },
   _toggleCompleted(){ this.S.showCompleted=!this.S.showCompleted; this._buildTaskFilters(); this._renderTasks(); },
+  _tabLpTimer: null,
+  _tabLongPress(id,label,e){
+    this._tabLpTimer=setTimeout(()=>{ this._showCatColorPicker(id,label); },600);
+  },
+  _tabLongPressEnd(){ clearTimeout(this._tabLpTimer); },
   _toggleHidden(){ this.S.showHidden=!this.S.showHidden; this._buildTaskFilters(); this._renderTasks(); },
   _setFilter(id){ this.S.taskFilter=id; this._buildTaskFilters(); this._renderTasks(); },
 
@@ -725,7 +732,7 @@ const App = {
         ${t.notes?`<div class="task-notes">${esc(t.notes.slice(0,60))}${t.notes.length>60?'…':''}</div>`:''}
       </div>
       <button class="task-star${star?' starred':''}" onclick="event.stopPropagation();App._toggleStar('${t.id}','${t._lid}')"></button>
-      <button class="task-hide btn-sm" onclick="event.stopPropagation();App._toggleHideTask('${t.id}','${t._lid}')" title="${hidden?'숨김 해제':'숨김'}" style="font-size:11px;opacity:0;padding:2px 5px">${hidden?'👁':'🙈'}</button>
+      <button class="task-hide-btn" onclick="event.stopPropagation();App._toggleHideTask('${t.id}','${t._lid}')" title="${hidden?'숨김 해제':'숨김'}">${hidden?'👁':'🙈'}</button>
       <button class="task-del" onclick="event.stopPropagation();App._delTask('${t.id}','${t._lid}')">✕</button>
     </div>`;
   },
