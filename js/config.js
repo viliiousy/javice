@@ -1,5 +1,5 @@
 const CONFIG = {
-  GOOGLE_CLIENT_ID: '14470442015-uq9sskup7nq9uhirl1spthqvd53d48bh.apps.googleusercontent.com',
+  GOOGLE_CLIENT_ID: '14470442015-uq9sskup7nq9uhirllspthqvd53d48bh.apps.googleusercontent.com',
 
   SCOPES: [
     'https://www.googleapis.com/auth/calendar',
