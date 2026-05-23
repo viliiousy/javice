@@ -57,18 +57,20 @@ const Habits = {
       const isDone=chk.includes(h.id);
       const st=this.streak(h.id);
       const daysLabel=(h.days&&h.days.length<7)?`<span class="habit-days">${h.days.map(d=>this.DAYS_KO[d]).join('')}</span>`:'';
+      const idx=list.indexOf(h);
       return `<div class="habit-item${isDone?' done':''}"
         data-id="${h.id}"
-        onclick="Habits._handleTap('${h.id}','${new Date(date).toDateString()}')"
-        ontouchstart="Habits._touchStart(event,'${h.id}')"
-        ontouchmove="Habits._touchMove(event)"
-        ontouchend="Habits._touchEnd(event,'${h.id}','${new Date(date).toDateString()}')">
-        <div class="habit-drag" onmousedown="Habits._dragStart(event,'${h.id}')" ontouchstart="Habits._lpStart(event,'${h.id}','${new Date(date).toDateString()}')">⠿</div>
+        onclick="Habits._handleTap('${h.id}','${new Date(date).toDateString()}')">
         <div class="habit-chk">${isDone?'✓':''}</div>
         <span class="habit-emoji">${h.emoji}</span>
         <span class="habit-name">${esc(h.name)}${daysLabel}</span>
         ${st>0?`<span class="habit-streak">🔥${st}</span>`:''}
-        ${isToday?`<button class="cl-del-btn" onclick="event.stopPropagation();Habits._del('${h.id}')">✕</button>`:''}
+        ${isToday?`
+          <div class="reorder-btns">
+            <button class="reorder-btn" onclick="event.stopPropagation();Habits._moveUp(${idx})" ${idx===0?'disabled':''}>↑</button>
+            <button class="reorder-btn" onclick="event.stopPropagation();Habits._moveDown(${idx})" ${idx===list.length-1?'disabled':''}>↓</button>
+          </div>
+          <button class="cl-del-btn" onclick="event.stopPropagation();Habits._del('${h.id}')">✕</button>`:''}
       </div>`;
     }).join('')
     +`<div class="habit-add-btn" onclick="Habits.showInlineAdd()">+ 습관 추가</div>`;
@@ -105,24 +107,52 @@ const Habits = {
     const chk=this.getChecked(date);
     const i=chk.indexOf(id);
     if(i===-1) chk.push(id); else chk.splice(i,1);
+    const isDoneNow=!chk.includes(id);
     this.setChecked(chk,date);
     this.render(date);
     if(typeof App!=='undefined') App._updateStatsBanner();
+    if(isDoneNow){
+      Sounds?.check();
+      // 퍼펙트 달성 체크
+      const newChk=this.getChecked(date);
+      const todayList=this.getHabitsForDate(date);
+      if(todayList.length>0&&todayList.every(h=>newChk.includes(h.id))) setTimeout(()=>Sounds?.achieve(),200);
+    } else { Sounds?.uncheck(); }
   },
 
   toggle(id,date=new Date()) {
     const chk=this.getChecked(date);
     const i=chk.indexOf(id);
     if(i===-1) chk.push(id); else chk.splice(i,1);
+    const isDoneNow=!chk.includes(id);
     this.setChecked(chk,date);
     this.render(date);
     if(typeof App!=='undefined') App._updateStatsBanner();
+    if(isDoneNow){
+      Sounds?.check();
+      // 퍼펙트 달성 체크
+      const newChk=this.getChecked(date);
+      const todayList=this.getHabitsForDate(date);
+      if(todayList.length>0&&todayList.every(h=>newChk.includes(h.id))) setTimeout(()=>Sounds?.achieve(),200);
+    } else { Sounds?.uncheck(); }
   },
 
   _del(id) {
     if(!confirm('이 습관을 삭제하시겠습니까?')) return;
+    Sounds?.delete();
     this.saveList(this.getList().filter(h=>h.id!==id));
     this.render();
+  },
+
+  _moveUp(idx) {
+    const list=this.getList(); if(idx<=0) return;
+    [list[idx-1],list[idx]]=[list[idx],list[idx-1]];
+    this.saveList(list); this.render(); Sounds?.click();
+  },
+  _moveDown(idx) {
+    const list=this.getList(); if(idx>=list.length-1) return;
+    [list[idx],list[idx+1]]=[list[idx+1],list[idx]];
+    this.saveList(list); this.render(); Sounds?.click();
   },
 
   showInlineAdd() {

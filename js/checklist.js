@@ -33,22 +33,16 @@ const Checklist = {
       const overdue=dueValid&&!item.done&&due<today;
       const dueStr=dueValid?due.toLocaleDateString('ko-KR',{month:'short',day:'numeric',weekday:'short'}):'';
 
-      return `<div class="cl-item${item.done?' done':''}" data-id="${item.id}"
-          draggable="true"
-          ondragstart="Checklist._dragStart(event,'${item.id}')"
-          ondragover="Checklist._dragOver(event)"
-          ondrop="Checklist._drop(event,'${item.id}')"
-          ondragend="Checklist._dragEnd(event)"
-          ontouchstart="Checklist._touchStart(event,'${item.id}')"
-          ontouchmove="Checklist._touchMove(event)"
-          ontouchend="Checklist._touchEnd(event,'${item.id}')">
-        <div class="cl-drag"
-          ontouchstart="Checklist._lpStart(event,'${item.id}')"
-          ontouchend="Checklist._lpEnd()">⠿</div>
+      const origIdx=items.findIndex(i=>i.id===item.id);
+      return `<div class="cl-item${item.done?' done':''}" data-id="${item.id}">
         <div class="cl-check" onclick="event.stopPropagation();Checklist.toggle('${item.id}')"></div>
         <div class="cl-body" onclick="Checklist._bodyTap('${item.id}')">
           <div class="cl-title">${esc(item.title)}</div>
           ${dueStr?`<div class="cl-due${overdue?' overdue':''}">${dueStr}</div>`:''}
+        </div>
+        <div class="reorder-btns">
+          <button class="reorder-btn" onclick="event.stopPropagation();Checklist._moveUp('${item.id}')" ${origIdx===0?'disabled':''}>↑</button>
+          <button class="reorder-btn" onclick="event.stopPropagation();Checklist._moveDown('${item.id}')" ${origIdx===items.length-1?'disabled':''}>↓</button>
         </div>
         <button class="cl-del-btn" onclick="event.stopPropagation();Checklist.remove('${item.id}')" title="삭제">✕</button>
       </div>`;
@@ -84,11 +78,16 @@ const Checklist = {
   toggle(id) {
     const items=this.getItems();
     const it=items.find(i=>i.id===id);
-    if(it){ it.done=!it.done; this.saveItems(items); this.render(); }
+    if(it){
+      it.done=!it.done;
+      it.done?Sounds?.check():Sounds?.uncheck();
+      this.saveItems(items); this.render();
+    }
     if(typeof App!=='undefined') App._updateStatsBanner();
   },
 
   remove(id) {
+    Sounds?.delete();
     this.saveItems(this.getItems().filter(i=>i.id!==id));
     this.render();
     if(typeof App!=='undefined'){
@@ -146,18 +145,14 @@ const Checklist = {
     CalendarUI.render(document.getElementById('miniCal'),App.S.calDate,App.S.events,App.S.selDate);
   },
 
-  // ── 드래그 & 드롭 ─────────────────────
-  _dragId:null,
-  _dragStart(e,id){ this._dragId=id; e.currentTarget.classList.add('cl-dragging'); e.dataTransfer.effectAllowed='move'; },
-  _dragOver(e){ e.preventDefault(); e.currentTarget.classList.add('cl-dragover'); },
-  _drop(e,targetId){
-    e.preventDefault(); e.currentTarget.classList.remove('cl-dragover');
-    if(this._dragId===targetId) return;
-    const items=this.getItems();
-    const fi=items.findIndex(i=>i.id===this._dragId), ti=items.findIndex(i=>i.id===targetId);
-    if(fi<0||ti<0) return;
-    const [moved]=items.splice(fi,1); items.splice(ti,0,moved);
-    this.saveItems(items); this.render();
+  _moveUp(id){
+    const items=this.getItems(); const i=items.findIndex(x=>x.id===id); if(i<=0) return;
+    [items[i-1],items[i]]=[items[i],items[i-1]];
+    this.saveItems(items); this.render(); Sounds?.click();
   },
-  _dragEnd(e){ e.currentTarget?.classList.remove('cl-dragging'); document.querySelectorAll('.cl-dragover').forEach(el=>el.classList.remove('cl-dragover')); this._dragId=null; },
+  _moveDown(id){
+    const items=this.getItems(); const i=items.findIndex(x=>x.id===id); if(i>=items.length-1) return;
+    [items[i],items[i+1]]=[items[i+1],items[i]];
+    this.saveItems(items); this.render(); Sounds?.click();
+  },
 };

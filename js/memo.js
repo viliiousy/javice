@@ -21,7 +21,10 @@ const Memo = {
           ondrop="Memo._drop(event,'${m.id}')"
           ondragend="Memo._dragEnd(event)"
           onclick="Memo.showEdit('${m.id}')">
-        <div class="memo-drag">⠿</div>
+        <div class="memo-reorder">
+          <button class="reorder-btn" onclick="event.stopPropagation();Memo._moveUp('${m.id}')">↑</button>
+          <button class="reorder-btn" onclick="event.stopPropagation();Memo._moveDown('${m.id}')">↓</button>
+        </div>
         <div class="memo-content-wrap">
           <div class="memo-title">${esc(m.title)}</div>
           ${preview?`<div class="memo-preview">${preview}${hasMore?'<span class="memo-more">…</span>':''}</div>`:''}
@@ -86,19 +89,16 @@ const Memo = {
     this.saveItems(this.getItems().filter(m=>m.id!==id)); this.render();
   },
 
-  _dragId:null,
-  _dragStart(e,id){ this._dragId=id; e.currentTarget.classList.add('cl-dragging'); e.dataTransfer.effectAllowed='move'; },
-  _dragOver(e){ e.preventDefault(); e.currentTarget.classList.add('cl-dragover'); },
-  _drop(e,targetId){
-    e.preventDefault(); e.currentTarget.classList.remove('cl-dragover');
-    if(this._dragId===targetId) return;
-    const items=this.getItems();
-    const fi=items.findIndex(i=>i.id===this._dragId), ti=items.findIndex(i=>i.id===targetId);
-    if(fi<0||ti<0) return;
-    const [moved]=items.splice(fi,1); items.splice(ti,0,moved);
-    this.saveItems(items); this.render();
+  _moveUp(id){
+    const items=this.getItems(); const i=items.findIndex(x=>x.id===id); if(i<=0) return;
+    [items[i-1],items[i]]=[items[i],items[i-1]];
+    this.saveItems(items); this.render(); Sounds?.click();
   },
-  _dragEnd(e){ e.currentTarget?.classList.remove('cl-dragging'); document.querySelectorAll('.cl-dragover').forEach(el=>el.classList.remove('cl-dragover')); this._dragId=null; },
+  _moveDown(id){
+    const items=this.getItems(); const i=items.findIndex(x=>x.id===id); if(i>=items.length-1) return;
+    [items[i],items[i+1]]=[items[i+1],items[i]];
+    this.saveItems(items); this.render(); Sounds?.click();
+  },
 };
 
 function _fmtMemoDate(iso){

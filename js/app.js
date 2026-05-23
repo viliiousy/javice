@@ -821,6 +821,7 @@ const App = {
       if(t){ t.status=!done?'completed':'needsAction'; t.completed=!done?new Date().toISOString():null; }
       this._renderTasks();
       this._updateStatsBanner();
+      !done?Sounds?.check():Sounds?.uncheck();
       this.showToast(!done?'완료! ✓':'다시 할일로','success');
     }catch{ this.showToast('업데이트 실패','error'); }
   },
@@ -839,6 +840,7 @@ const App = {
       this.S.tasks[listId]=this.S.tasks[listId]?.filter(t=>t.id!==taskId);
       this._renderTasks();
       CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,this.S.selDate);
+      Sounds?.delete();
       this.showToast('삭제됨','success');
       this._updateStatsBanner();
     }catch{ this.showToast('삭제 실패','error'); }
@@ -897,6 +899,7 @@ const App = {
   initDarkMode() {
     if(this._darkMode) document.documentElement.classList.add('dark');
     this._updateDarkLabel();
+    setTimeout(()=>this._updateSoundLabel(),100);
   },
 
   toggleDarkMode() {
@@ -904,6 +907,21 @@ const App = {
     document.documentElement.classList.toggle('dark',this._darkMode);
     this._updateDarkLabel();
     document.getElementById('profileMenu')?.classList.add('hidden');
+  },
+
+  toggleSound() {
+    if(typeof Sounds!=='undefined'){
+      Sounds.enabled=!Sounds.enabled;
+      const el=document.getElementById('soundLabel');
+      if(el) el.textContent=Sounds.enabled?'🔔 사운드 켜짐':'🔕 사운드 꺼짐';
+      if(Sounds.enabled) Sounds.click();
+    }
+    document.getElementById('profileMenu')?.classList.add('hidden');
+  },
+
+  _updateSoundLabel() {
+    const el=document.getElementById('soundLabel');
+    if(el&&typeof Sounds!=='undefined') el.textContent=Sounds.enabled?'🔔 사운드 켜짐':'🔕 사운드 꺼짐';
   },
 
   _updateDarkLabel() {

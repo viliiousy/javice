@@ -1054,3 +1054,45 @@ html.dark .uc-task  { background: rgba(133,77,14,0.2); color: #fcd34d; border-co
 /* h-logo 링크 스타일 */
 .h-logo { color: var(--accent); }
 html.dark .h-logo { color: var(--accent-l); }
+
+/* ═══════════════════════════════════════
+   ↑↓ 순서변경 버튼
+   ═══════════════════════════════════════ */
+.reorder-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex-shrink: 0;
+}
+.reorder-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 10px;
+  width: 20px;
+  height: 16px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s;
+  line-height: 1;
+  padding: 0;
+}
+.reorder-btn:hover:not([disabled]) {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.reorder-btn[disabled] { opacity: 0.2; cursor: default; }
+html.dark .reorder-btn { background: var(--card2); }
+
+.memo-reorder {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex-shrink: 0;
+  opacity: 0.3;
+}
+.memo-item:hover .memo-reorder { opacity: 1; }
