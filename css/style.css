@@ -1000,3 +1000,22 @@ html.dark .uc-task  { background: rgba(133,77,14,0.2); color: #fcd34d; border-co
   .h-date-sub { font-size: 10px; }
   .header { padding: 9px 12px; }
 }
+
+/* ═══════════════════════════════════════
+   스탯 upcoming 날짜
+   ═══════════════════════════════════════ */
+.uc-date {
+  font-size: 10px;
+  opacity: 0.75;
+  font-weight: 600;
+}
+
+/* ═══════════════════════════════════════
+   할일 카테고리 그룹 배경
+   ═══════════════════════════════════════ */
+.task-group {
+  transition: background 0.2s;
+}
+.task-group + .task-group {
+  margin-top: 6px;
+}

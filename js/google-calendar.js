@@ -6,9 +6,16 @@ const GoogleCalendar = {
 
   // ── 설정 관리 ─────────────────────────
   getSettings() {
-    return JSON.parse(localStorage.getItem('gl_cal_settings') || '{"visible":[],"default":"primary"}');
+    const raw = typeof UserStore!=='undefined'
+      ? UserStore.get('gl_cal_settings')
+      : localStorage.getItem('gl_cal_settings');
+    return JSON.parse(raw || '{"visible":[],"default":"primary"}');
   },
-  saveSettings(v) { localStorage.setItem('gl_cal_settings', JSON.stringify(v)); },
+  saveSettings(v) {
+    const s = JSON.stringify(v);
+    if (typeof UserStore!=='undefined') UserStore.set('gl_cal_settings', s);
+    else localStorage.setItem('gl_cal_settings', s);
+  },
 
   isVisible(calId) {
     const s = this.getSettings();

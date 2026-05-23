@@ -179,10 +179,13 @@ const App = {
       ${pending>0?`<div class="stat-chip" data-s="tasks">📋 할일 ${pending}개</div>`:''}
       ${clItems.length>0?`<div class="stat-chip" data-s="checklist">✍️ ${clItems.length}개</div>`:''}`;
 
-    // 이번주 일정/할일 - 3개씩 줄바꿈
+    // 이번주 일정/할일 - 날짜 포함, 3개씩 줄바꿈
     const upcomingHTML=upcoming.length?`
       <div class="stats-upcoming">
-        ${upcoming.map(i=>`<span class="stats-upcoming-chip ${i.isTask?'uc-task':'uc-event'}">${i.isTask?'📋':'📅'} ${esc(i.label)}</span>`).join('')}
+        ${upcoming.map(i=>{
+          const md=`${i.date.getMonth()+1}/${i.date.getDate()}`;
+          return `<span class="stats-upcoming-chip ${i.isTask?'uc-task':'uc-event'}">${i.isTask?'📋':'📅'} <span class="uc-date">${md}</span> ${esc(i.label)}</span>`;
+        }).join('')}
       </div>`:'';
 
     const urgentHTML=urgentTasks.length?`
@@ -258,12 +261,25 @@ const App = {
     }
     if(eld){
       const dayStr=d.toLocaleDateString('ko-KR',{weekday:'long'});
+      // 해당 날짜 할일 개수
+      const dateStr=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const taskCount=Object.values(this.S.tasks||{}).reduce((n,l)=>n+l.filter(t=>{
+        if(t.status!=='needsAction') return false;
+        if(!t.due) return isToday; // 날짜 없는건 오늘에만 표시
+        return t.due.split('T')[0]===dateStr;
+      }).length,0);
+      const taskBadge=taskCount>0?` <span style="font-size:10px;background:var(--accent);color:white;padding:1px 6px;border-radius:10px;font-weight:700">할일 ${taskCount}</span>`:'';
+
+      // 6. 공휴일/일요일 빨간색 체크
+      const isHoliday=typeof CalendarUI!=='undefined'&&CalendarUI._isHoliday(d.getFullYear(),d.getMonth(),d.getDate());
+      const isRed=dow===0||isHoliday;
+
       if(isToday){
-        eld.innerHTML=`<span style="color:#059669;font-weight:900">🕐 오늘</span> · ${dayStr}`;
+        eld.innerHTML=`<span style="color:#059669;font-weight:900">🕐 오늘</span> · ${dayStr}${taskBadge}`;
         eld.style.color='';
       } else {
-        eld.textContent=dayStr;
-        eld.style.color=dow===0?'var(--red)':dow===6?'var(--blue)':'';
+        eld.innerHTML=`${dayStr}${taskBadge}`;
+        eld.style.color=isRed?'var(--red)':dow===6?'var(--blue)':'';
       }
     }
   },
@@ -683,14 +699,18 @@ const App = {
     });
     if(!all.length){ document.getElementById('tasksContainer').innerHTML=`<p class="empty">${filter==='starred'?'별표 없음 ☆':'할일 없음 🎉'}</p>`; return; }
     const groups={};
-    if(this.S.taskSort){ all.forEach(t=>{ const k=t.due?new Date(t.due).toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'short'}):'날짜 없음'; if(!groups[k])groups[k]=[]; groups[k].push(t); }); }
-    else{ all.forEach(t=>{ if(!groups[t._lname])groups[t._lname]=[]; groups[t._lname].push(t); }); }
+    // 항상 날짜순 정렬 (이미 위에서 sort 완료), 카테고리 그룹핑
+    all.forEach(t=>{ if(!groups[t._lname])groups[t._lname]=[]; groups[t._lname].push(t); });
     const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
     document.getElementById('tasksContainer').innerHTML=Object.entries(groups).map(([k,v])=>{
       const listId=v[0]?._lid||'';
       const col=catColors[listId]||'';
-      const style=col?`style="background:${col}18;border-left:3px solid ${col};padding-left:8px;border-radius:0 var(--r-xs) var(--r-xs) 0"`:'' ;
-      return `<div class="task-group" ${style}><div class="task-group-name" style="${col?'color:'+col:''}">${esc(k)}</div>${v.map(t=>this._taskHTML(t)).join('')}</div>`;
+      const bgStyle=col?`background:${col}12;border-radius:var(--r-xs);padding:4px;margin-bottom:4px`:'';
+      const borderStyle=col?`border-left:3px solid ${col};padding-left:8px`:'';
+      return `<div class="task-group" style="${bgStyle}${borderStyle}">
+        <div class="task-group-name" style="${col?'color:'+col+';font-weight:700':''}">${esc(k)}</div>
+        ${v.map(t=>this._taskHTML(t)).join('')}
+      </div>`;
     }).join('');
   },
 
