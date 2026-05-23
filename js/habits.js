@@ -102,7 +102,6 @@ const Habits = {
   _handleTap(id,dateStr) {
     if(this._swiping) return;
     const date=new Date(dateStr);
-    if(date.toDateString()!==new Date().toDateString()) return;
     const chk=this.getChecked(date);
     const i=chk.indexOf(id);
     if(i===-1) chk.push(id); else chk.splice(i,1);
@@ -112,7 +111,6 @@ const Habits = {
   },
 
   toggle(id,date=new Date()) {
-    if(new Date(date).toDateString()!==new Date().toDateString()) return;
     const chk=this.getChecked(date);
     const i=chk.indexOf(id);
     if(i===-1) chk.push(id); else chk.splice(i,1);

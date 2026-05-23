@@ -809,7 +809,7 @@ html.dark .profile-menu { background:var(--card); border-color:var(--border); }
    스탯 배너 — 긴급할일 가로 나열
    ═══════════════════════════════════════ */
 .stats-banner {
-  position:sticky; top:57px; z-index:99;
+  position:sticky; top:53px; z-index:99;
   box-shadow:0 1px 3px rgba(0,0,0,0.06);
 }
 html.dark .stats-banner { background:var(--card); }
@@ -854,4 +854,75 @@ html.dark .stats-urgent-chip.urgent-over { background:rgba(220,38,38,0.15); }
     touch-action:pan-y;
     user-select:none;
   }
+}
+
+
+/* ═══════════════════════════════════════
+   달력 공휴일/일요일 배경
+   ═══════════════════════════════════════ */
+.cal-day.day-red {
+  color: var(--red) !important;
+  background: rgba(220,38,38,0.07);
+  border-radius: 6px;
+}
+.cal-day.day-red:hover {
+  background: rgba(220,38,38,0.15) !important;
+}
+.cal-day.today.day-red {
+  background: var(--accent) !important;
+  color: white !important;
+}
+
+/* 5. 모바일 stat chip 클릭 커서 */
+.stat-chip { cursor: pointer; }
+.stats-urgent-chip { cursor: pointer; }
+
+/* 2. 날짜 클릭 달력 드롭다운 */
+.date-picker-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+  z-index: 300;
+  padding: 12px;
+  min-width: 280px;
+}
+html.dark .date-picker-dropdown {
+  background: var(--card);
+  border-color: var(--border);
+}
+.date-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.date-picker-today-btn {
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* 3. 오늘 날짜 헤더 강조 */
+.h-date-today .h-date-main {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--accent);
+}
+.h-date-today .h-date-sub {
+  font-weight: 700;
+}
+
+/* 모바일 stats-banner top 조정 */
+@media (max-width: 640px) {
+  .stats-banner { top: 49px; }
 }

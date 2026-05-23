@@ -33,7 +33,6 @@ const App = {
     on('btnCancelTask',  ()=>this._showTaskForm(false));
     on('btnSaveTask',    ()=>this._saveTask());
     on('btnAddEvent',    ()=>this.showLongPressMenu(this.S.selDate));
-    on('btnManageHabits',()=>Habits.showManageModal());
     on('btnDateSort',    ()=>this._toggleDateSort());
     on('btnModalClose',  ()=>this.closeModal());
     $('btnCalSettings')?.addEventListener('click',()=>GoogleCalendar.showSettings());
@@ -171,6 +170,24 @@ const App = {
       const row=el.querySelector('.stats-row');
       if(row){ row.classList.remove('stats-flash'); void row.offsetWidth; row.classList.add('stats-flash'); }
     }
+
+    // 칩 클릭 → 해당 섹션 스크롤
+    setTimeout(()=>{
+      el.querySelectorAll('.stat-chip').forEach(chip=>{
+        chip.onclick=()=>{
+          const txt=chip.textContent;
+          let target=null;
+          if(txt.includes('습관')) target=document.querySelector('.card-habits');
+          else if(txt.includes('kcal')||txt.includes('식단')) target=document.querySelector('.card-diet');
+          else if(txt.includes('할일')) target=document.querySelector('.card-tasks');
+          else if(txt.includes('체크')) target=document.querySelector('.card-checklist');
+          if(target) target.scrollIntoView({behavior:'smooth',block:'start'});
+        };
+      });
+      el.querySelectorAll('.stats-urgent-chip').forEach(chip=>{
+        chip.onclick=()=>{ document.querySelector('.card-tasks')?.scrollIntoView({behavior:'smooth',block:'start'}); };
+      });
+    },50);
   },
 
   // ── 날짜 선택 ────────────────────────
@@ -188,45 +205,96 @@ const App = {
   _updateHeaderDate(date) {
     const d=new Date(date);
     const isToday=d.toDateString()===new Date().toDateString();
-    const dow=d.getDay(); // 0=일,6=토
+    const dow=d.getDay();
+    const hDateWrap=document.querySelector('.h-date');
     const el=document.getElementById('hDate'), eld=document.getElementById('hDay');
+
+    if(hDateWrap){
+      hDateWrap.classList.toggle('h-date-today', isToday);
+    }
     if(el){
-      el.textContent=d.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
-      el.style.cursor='pointer'; el.title='클릭하여 날짜 선택';
-      el.onclick=()=>App._showDatePicker();
+      if(isToday){
+        el.innerHTML=`🔥 오늘`;
+      } else {
+        el.textContent=d.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
+      }
+      el.style.cursor='pointer';
+      el.onclick=(e)=>{ e.stopPropagation(); App._toggleDateDropdown(d); };
     }
     if(eld){
-      const dayStr=(isToday?'오늘 · ':'')+d.toLocaleDateString('ko-KR',{weekday:'long'});
+      const dayStr=d.toLocaleDateString('ko-KR',{weekday:'long'});
       eld.textContent=dayStr;
       eld.style.color=dow===0?'var(--red)':dow===6?'var(--blue)':'';
     }
   },
 
-  _showDatePicker() {
-    const cur=this.S.selDate||new Date();
-    const ds=cur.toISOString().split('T')[0];
-    App.openModal('📅 날짜 선택',`
-      <div class="modal-row">
-        <input id="datePick" type="date" value="${ds}" class="inp" style="font-size:16px;padding:12px">
-      </div>
-      <div class="modal-btns">
-        <button onclick="App._applyDatePick()" class="btn-sm accent">이동</button>
-        <button onclick="App._applyDatePick(new Date())" class="btn-sm">오늘</button>
-        <button onclick="App.closeModal()" class="btn-sm">취소</button>
-      </div>`);
-    setTimeout(()=>document.getElementById('datePick')?.focus(),50);
+  _toggleDateDropdown(currentDate) {
+    // 기존 드롭다운 닫기
+    const existing=document.getElementById('datePicker');
+    if(existing){ existing.remove(); return; }
+
+    const hDate=document.querySelector('.h-date');
+    if(!hDate) return;
+
+    const dropdown=document.createElement('div');
+    dropdown.id='datePicker';
+    dropdown.className='date-picker-dropdown';
+
+    const calContainer=document.createElement('div');
+    let pickerDate=new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+
+    const render=()=>{
+      calContainer.innerHTML='';
+      CalendarUI.render(calContainer, pickerDate, App.S.events, currentDate);
+      // 달력 클릭 오버라이드
+      calContainer.querySelectorAll('.cal-day:not(.other-month)').forEach(el=>{
+        el.onclick=(e)=>{
+          e.stopPropagation();
+          const txt=el.textContent.trim();
+          if(!txt||isNaN(parseInt(txt))) return;
+          const d=new Date(pickerDate.getFullYear(), pickerDate.getMonth(), parseInt(txt));
+          dropdown.remove();
+          App.selectCalDate(d);
+        };
+      });
+      // 월 이동 버튼 오버라이드
+      calContainer.querySelector('.cal-nav-btn:first-child').onclick=(e)=>{
+        e.stopPropagation();
+        pickerDate=new Date(pickerDate.getFullYear(), pickerDate.getMonth()-1, 1);
+        render();
+      };
+      calContainer.querySelector('.cal-nav-btn:last-child').onclick=(e)=>{
+        e.stopPropagation();
+        pickerDate=new Date(pickerDate.getFullYear(), pickerDate.getMonth()+1, 1);
+        render();
+      };
+    };
+
+    dropdown.innerHTML=`<div class="date-picker-header">
+      <span style="font-size:13px;font-weight:700;color:var(--text)">날짜 선택</span>
+      <button class="date-picker-today-btn" id="dpTodayBtn">오늘</button>
+    </div>`;
+    dropdown.appendChild(calContainer);
+
+    hDate.style.position='relative';
+    hDate.appendChild(dropdown);
+    render();
+
+    dropdown.querySelector('#dpTodayBtn').onclick=(e)=>{
+      e.stopPropagation();
+      dropdown.remove();
+      App.selectCalDate(new Date());
+    };
+
+    // 바깥 클릭 닫기
+    setTimeout(()=>{
+      document.addEventListener('click', function close(e){
+        if(!dropdown.contains(e.target)){ dropdown.remove(); document.removeEventListener('click',close); }
+      });
+    },0);
   },
 
-  _applyDatePick(dateOverride) {
-    const val=dateOverride?null:document.getElementById('datePick')?.value;
-    const date=dateOverride||(val?new Date(val+'T00:00:00'):null);
-    if(!date) return;
-    App.closeModal();
-    this.selectCalDate(date);
-    // 캘린더 월도 맞춰주기
-    this.S.calDate=new Date(date.getFullYear(),date.getMonth(),1);
-    CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,date);
-  },
+
 
   changeCalMonth(dir) {
     const d=this.S.calDate;
