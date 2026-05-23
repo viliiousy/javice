@@ -93,7 +93,10 @@ const App = {
       this.S.tasks={};
       await Promise.all(this.S.lists.map(async l=>{
         this.S.tasks[l.id]=await GoogleTasks.fetchTasks(l.id);
-        this.S.tasks[l.id].forEach(t=>{ t.starred=localStorage.getItem('gl_star_'+t.id)==='1'; });
+        this.S.tasks[l.id].forEach(t=>{
+          t.starred=localStorage.getItem('gl_star_'+t.id)==='1';
+          t._hidden=localStorage.getItem('gl_hidden_'+t.id)==='1';
+        });
       }));
       this._buildTaskFilters();
       this._renderTasks();
@@ -167,12 +170,20 @@ const App = {
 
     // 반짝임 애니메이션 (DOM 재삽입 트릭)
     if(changed){
-      // 변경된 칩만 반짝임
-      el.querySelectorAll('.stat-chip').forEach(chip=>{
-        chip.classList.remove('chip-flash');
-        void chip.offsetWidth;
-        chip.classList.add('chip-flash');
-      });
+        // 변경된 항목 칩만 반짝임
+      const prev=this._statsPrev ? JSON.parse(this._statsPrev) : {};
+      if(prev.hDone!==undefined && prev.hDone!==hDone){
+        const chip=el.querySelector('.stat-chip:nth-child(1)');
+        if(chip){ chip.classList.remove('chip-flash'); void chip.offsetWidth; chip.classList.add('chip-flash'); }
+      }
+      if(prev.cal!==undefined && prev.cal!==dt.cal){
+        const chip=el.querySelector('.stat-chip:nth-child(2)');
+        if(chip){ chip.classList.remove('chip-flash'); void chip.offsetWidth; chip.classList.add('chip-flash'); }
+      }
+      if(prev.pending!==undefined && prev.pending!==pending){
+        const chips=el.querySelectorAll('.stat-chip');
+        if(chips.length>2){ chips[2].classList.remove('chip-flash'); void chips[2].offsetWidth; chips[2].classList.add('chip-flash'); }
+      }
     }
 
     // 칩 클릭 → 해당 섹션 스크롤
@@ -219,7 +230,16 @@ const App = {
 
     if(hDateWrap) hDateWrap.classList.toggle('h-date-today', isToday);
     if(el){
-      el.textContent=d.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
+      // 모바일에서는 짧은 날짜 형식
+      const isMobile=window.innerWidth<=640;
+      if(isMobile){
+        const yy=String(d.getFullYear()).slice(2);
+        const mm=d.getMonth()+1;
+        const dd=d.getDate();
+        el.textContent=`${yy}년 ${mm}월 ${dd}일`;
+      } else {
+        el.textContent=d.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
+      }
       el.style.cursor='pointer';
       el.onclick=(e)=>{ e.stopPropagation(); App._toggleDateDropdown(d); };
     }
@@ -601,10 +621,21 @@ const App = {
   _buildTaskFilters() {
     const wrap=document.getElementById('taskFilters'); if(!wrap) return;
     const tabs=[{id:'all',label:'전체'},{id:'starred',label:'⭐ 별표'},...this.S.lists.map(l=>({id:l.id,label:l.title}))];
-    const completedBtn=`<button class="fit-tab${this.S.showCompleted?' active':''}" onclick="App._toggleCompleted()" style="margin-left:auto">${this.S.showCompleted?'✓ 완료됨 숨기기':'완료됨 보기'}</button>`;
-    wrap.innerHTML=tabs.map(t=>`<button class="fit-tab${this.S.taskFilter===t.id?' active':''}" onclick="App._setFilter('${t.id}')">${esc(t.label)}</button>`).join('')+completedBtn;
+    const completedBtn=`<button class="fit-tab${this.S.showCompleted?' active':''}" onclick="App._toggleCompleted()" style="margin-left:auto">${this.S.showCompleted?'✓ 완료숨기기':'완료됨'}</button>`;
+    const hiddenBtn=`<button class="fit-tab${this.S.showHidden?' active':''}" onclick="App._toggleHidden()">🙈 ${this.S.showHidden?'숨김숨기기':'숨김보기'}</button>`;
+    wrap.innerHTML=tabs.map(t=>{
+      const isListTab=t.id!=='all'&&t.id!=='starred';
+      const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
+      const col=isListTab&&catColors[t.id]?catColors[t.id]:'';
+      const borderStyle=col?`border-color:${col};color:${col}`:'' ;
+      return `<button class="fit-tab${this.S.taskFilter===t.id?' active':''}"
+        onclick="App._setFilter('${t.id}')"
+        oncontextmenu="event.preventDefault();App._showCatColorPicker('${t.id}','${esc(t.label)}')"
+        style="${borderStyle}">${esc(t.label)}</button>`;
+    }).join('')+completedBtn+hiddenBtn;
   },
   _toggleCompleted(){ this.S.showCompleted=!this.S.showCompleted; this._buildTaskFilters(); this._renderTasks(); },
+  _toggleHidden(){ this.S.showHidden=!this.S.showHidden; this._buildTaskFilters(); this._renderTasks(); },
   _setFilter(id){ this.S.taskFilter=id; this._buildTaskFilters(); this._renderTasks(); },
 
   _renderTasks() {
@@ -621,29 +652,51 @@ const App = {
     }
     if(filter==='starred') all=all.filter(t=>t.starred);
     else if(filter!=='all') all=all.filter(t=>t._lid===filter);
-    all.sort((a,b)=>(b.starred?1:0)-(a.starred?1:0));
-    if(this.S.taskSort) all.sort((a,b)=>{ if(a.starred&&!b.starred)return -1; if(!a.starred&&b.starred)return 1; return (a.due?new Date(a.due):new Date('9999'))-(b.due?new Date(b.due):new Date('9999')); });
+    // 숨김 처리
+    if(!this.S.showHidden) all=all.filter(t=>!t._hidden);
+    // 기본: 날짜순 + 별표 우선
+    all.sort((a,b)=>{
+      if(a.starred&&!b.starred) return -1;
+      if(!a.starred&&b.starred) return 1;
+      const da=a.due?new Date(a.due):new Date('9999');
+      const db=b.due?new Date(b.due):new Date('9999');
+      return da-db;
+    });
     if(!all.length){ document.getElementById('tasksContainer').innerHTML=`<p class="empty">${filter==='starred'?'별표 없음 ☆':'할일 없음 🎉'}</p>`; return; }
     const groups={};
     if(this.S.taskSort){ all.forEach(t=>{ const k=t.due?new Date(t.due).toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'short'}):'날짜 없음'; if(!groups[k])groups[k]=[]; groups[k].push(t); }); }
     else{ all.forEach(t=>{ if(!groups[t._lname])groups[t._lname]=[]; groups[t._lname].push(t); }); }
-    document.getElementById('tasksContainer').innerHTML=Object.entries(groups).map(([k,v])=>
-      `<div class="task-group"><div class="task-group-name">${esc(k)}</div>${v.map(t=>this._taskHTML(t)).join('')}</div>`).join('');
+    const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
+    document.getElementById('tasksContainer').innerHTML=Object.entries(groups).map(([k,v])=>{
+      const listId=v[0]?._lid||'';
+      const col=catColors[listId]||'';
+      const style=col?`style="background:${col}18;border-left:3px solid ${col};padding-left:8px;border-radius:0 var(--r-xs) var(--r-xs) 0"`:'' ;
+      return `<div class="task-group" ${style}><div class="task-group-name" style="${col?'color:'+col:''}">${esc(k)}</div>${v.map(t=>this._taskHTML(t)).join('')}</div>`;
+    }).join('');
   },
 
   _taskHTML(t) {
     const done=t.status==='completed', due=t.due?new Date(t.due):null;
-    const overdue=due&&due<new Date()&&!done, star=t.starred;
+    const overdue=due&&due<new Date()&&!done, star=t.starred, hidden=t._hidden;
     const dueStr=due?`<span class="task-due-inline${overdue?' overdue':''}">${_fmtDate(due)}</span>`:'';
-    return `<div class="task-item${done?' done':''}">
+    return `<div class="task-item${done?' done':''}${hidden?' task-hidden':''}">
       <div class="task-check" onclick="event.stopPropagation();App._toggle('${t.id}','${t._lid}',${done})"></div>
       <div class="task-body" onclick="App._showTaskDetail('${t.id}','${t._lid}')">
-        <div class="task-text">${esc(t.title)} ${dueStr}</div>
+        <div class="task-text">${hidden?'🙈 ':''}${esc(t.title)} ${dueStr}</div>
         ${t.notes?`<div class="task-notes">${esc(t.notes.slice(0,60))}${t.notes.length>60?'…':''}</div>`:''}
       </div>
       <button class="task-star${star?' starred':''}" onclick="event.stopPropagation();App._toggleStar('${t.id}','${t._lid}')"></button>
+      <button class="task-hide btn-sm" onclick="event.stopPropagation();App._toggleHideTask('${t.id}','${t._lid}')" title="${hidden?'숨김 해제':'숨김'}" style="font-size:11px;opacity:0;padding:2px 5px">${hidden?'👁':'🙈'}</button>
       <button class="task-del" onclick="event.stopPropagation();App._delTask('${t.id}','${t._lid}')">✕</button>
     </div>`;
+  },
+
+  _toggleHideTask(taskId,listId){
+    const t=this.S.tasks[listId]?.find(x=>x.id===taskId); if(!t) return;
+    t._hidden=!t._hidden;
+    localStorage.setItem('gl_hidden_'+taskId, t._hidden?'1':'');
+    this._renderTasks();
+    this._updateStatsBanner();
   },
 
   _showTaskDetail(taskId, listId) {
@@ -770,7 +823,16 @@ const App = {
     const menu=document.getElementById('profileMenu');
     if(!menu) return;
     menu.classList.toggle('hidden');
-    // 바깥 클릭 닫기
+    // 프로필 아이콘 위치 기준으로 메뉴 위치 설정
+    if(!menu.classList.contains('hidden')){
+      const hUser=document.getElementById('hUser');
+      if(hUser){
+        const rect=hUser.getBoundingClientRect();
+        menu.style.top=(rect.bottom+4)+'px';
+        menu.style.right=(window.innerWidth-rect.right)+'px';
+        menu.style.left='auto';
+      }
+    }
     setTimeout(()=>{
       const close=(e)=>{ if(!e.target.closest('#hUser')&&!e.target.closest('#profileMenu')){ menu.classList.add('hidden'); document.removeEventListener('click',close); } };
       document.addEventListener('click',close);
@@ -796,6 +858,30 @@ const App = {
   _updateDarkLabel() {
     const el=document.getElementById('darkModeLabel');
     if(el) el.textContent=this._darkMode?'☀️ 라이트 모드':'🌙 다크 모드';
+  },
+
+  _showCatColorPicker(listId, listName) {
+    const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
+    const cur=catColors[listId]||'';
+    const colors=['#4f46e5','#0891b2','#059669','#d97706','#dc2626','#7c3aed','#db2777','#64748b',''];
+    App.openModal(`🎨 "${listName}" 색상`,`
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">카테고리 배경 색상을 선택하세요.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+        ${colors.map(c=>c
+          ?`<div onclick="App._saveCatColor('${listId}','${c}')" style="width:32px;height:32px;border-radius:50%;background:${c};cursor:pointer;border:3px solid ${c===cur?'var(--text)':'transparent'}"></div>`
+          :`<div onclick="App._saveCatColor('${listId}','')" style="width:32px;height:32px;border-radius:50%;background:var(--bg);border:2px dashed var(--border2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px">✕</div>`
+        ).join('')}
+      </div>
+      <div class="modal-btns"><button onclick="App.closeModal()" class="btn-sm">닫기</button></div>`);
+  },
+
+  _saveCatColor(listId, color) {
+    const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
+    if(color) catColors[listId]=color; else delete catColors[listId];
+    localStorage.setItem('gl_cat_colors',JSON.stringify(catColors));
+    this._buildTaskFilters();
+    this._renderTasks();
+    App.closeModal();
   },
 
   openModal(title,body){ document.getElementById('modalTitle').textContent=title; document.getElementById('modalBody').innerHTML=body; document.getElementById('modal').classList.remove('hidden'); },
