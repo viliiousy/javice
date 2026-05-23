@@ -1,14 +1,13 @@
 // js/google-auth.js — Google Identity Services (GIS) 인증
 
 const Auth = {
-  accessToken:  null,
+  accessToken: null,
   tokenExpiry:  null,
   tokenClient:  null,
   userInfo:     null,
-  _ready:       false,
 
-  // GIS onload 콜백으로 호출됨
   init() {
+    if (typeof google === 'undefined' || !google.accounts) return;
     if (CONFIG.GOOGLE_CLIENT_ID.startsWith('YOUR_GOOGLE')) return;
 
     this.tokenClient = google.accounts.oauth2.initTokenClient({
@@ -27,9 +26,7 @@ const Auth = {
       },
     });
 
-    this._ready = true;
-
-    // 세션 복원 (이미 로그인된 경우)
+    // 세션 복원
     const t = sessionStorage.getItem('gl_token');
     const e = sessionStorage.getItem('gl_expiry');
     if (t && e && Date.now() < parseInt(e, 10)) {
@@ -40,8 +37,8 @@ const Auth = {
   },
 
   login() {
-    if (!this._ready || !this.tokenClient) {
-      App.showToast('Google 로딩 중입니다. 1초 후 다시 눌러주세요.', '');
+    if (!this.tokenClient) {
+      App.showToast('Google 초기화 중입니다. 잠시 후 다시 시도해주세요.', 'error');
       return;
     }
     this.tokenClient.requestAccessToken();
@@ -51,10 +48,9 @@ const Auth = {
     if (this.accessToken) {
       try { google.accounts.oauth2.revoke(this.accessToken, () => {}); } catch {}
     }
-    this.accessToken  = null;
+    this.accessToken = null;
     this.tokenExpiry  = null;
     this.userInfo     = null;
-    this._ready       = false;
     this.tokenClient  = null;
     sessionStorage.removeItem('gl_token');
     sessionStorage.removeItem('gl_expiry');
@@ -68,18 +64,25 @@ const Auth = {
 
   async _fetchUserInfo(silent = false) {
     try {
-      const res   = await this.fetch('https://www.googleapis.com/oauth2/v2/userinfo');
+      const res     = await this.fetch('https://www.googleapis.com/oauth2/v2/userinfo');
       this.userInfo = await res.json();
+
+      // 계정별 데이터 분리
       if (typeof UserStore !== 'undefined') {
-        UserStore.setUser(this.userInfo.id || this.userInfo.email || 'user');
+        const uid = this.userInfo.id || this.userInfo.email || 'user';
+        UserStore.setUser(uid);
       }
+
       // Firebase 동기화
-      if (typeof FirebaseSync !== 'undefined' && CONFIG.FIREBASE_DB_URL !== 'YOUR_FIREBASE_DB_URL') {
+      if (typeof FirebaseSync !== 'undefined' &&
+          CONFIG.FIREBASE_DB_URL &&
+          CONFIG.FIREBASE_DB_URL !== 'YOUR_FIREBASE_DB_URL') {
         const uid = this.userInfo.id || this.userInfo.email || 'user';
         FirebaseSync.init(uid, CONFIG.FIREBASE_DB_URL);
         await FirebaseSync.load();
         FirebaseSync.watchChanges();
       }
+
       App.onAuthSuccess(this.userInfo);
     } catch (err) {
       if (!silent) App.showToast('사용자 정보 조회 실패', 'error');
