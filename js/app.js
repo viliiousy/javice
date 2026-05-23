@@ -706,15 +706,20 @@ const App = {
     });
     if(!all.length){ document.getElementById('tasksContainer').innerHTML=`<p class="empty">${filter==='starred'?'별표 없음 ☆':'할일 없음 🎉'}</p>`; return; }
     const groups={};
-    // 항상 날짜순 정렬 (이미 위에서 sort 완료), 카테고리 그룹핑
-    all.forEach(t=>{ if(!groups[t._lname])groups[t._lname]=[]; groups[t._lname].push(t); });
+    // 전체/날짜순 탭: 단일 목록으로 날짜순 표시
+    // 특정 목록 탭: 해당 카테고리만 그룹핑
+    if(filter==='all'||filter==='starred'){
+      groups['_all_']=[...all];
+    } else {
+      all.forEach(t=>{ if(!groups[t._lname])groups[t._lname]=[]; groups[t._lname].push(t); });
+    }
     const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
     document.getElementById('tasksContainer').innerHTML=Object.entries(groups).map(([k,v])=>{
+      if(k==='_all_') return `<div class="task-group">${v.map(t=>this._taskHTML(t)).join('')}</div>`;
       const listId=v[0]?._lid||'';
       const col=catColors[listId]||'';
-      const bgStyle=col?`background:${col}12;border-radius:var(--r-xs);padding:4px;margin-bottom:4px`:'';
-      const borderStyle=col?`border-left:3px solid ${col};padding-left:8px`:'';
-      return `<div class="task-group" style="${bgStyle}${borderStyle}">
+      const style=col?`border-left:3px solid ${col};padding-left:8px;border-radius:0 var(--r-xs) var(--r-xs) 0`:'';
+      return `<div class="task-group" style="${style}">
         <div class="task-group-name" style="${col?'color:'+col+';font-weight:700':''}">${esc(k)}</div>
         ${v.map(t=>this._taskHTML(t)).join('')}
       </div>`;

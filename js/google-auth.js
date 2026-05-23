@@ -13,7 +13,7 @@ const Auth = {
     this.tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: CONFIG.GOOGLE_CLIENT_ID,
       scope:     CONFIG.SCOPES,
-      callback:  (resp) => {
+      callback:  async (resp) => {
         if (resp.error) {
           App.showToast('로그인 실패: ' + resp.error, 'error');
           return;
@@ -22,7 +22,7 @@ const Auth = {
         this.tokenExpiry  = Date.now() + resp.expires_in * 1000;
         sessionStorage.setItem('gl_token',  this.accessToken);
         sessionStorage.setItem('gl_expiry', String(this.tokenExpiry));
-        this._fetchUserInfo();
+        await this._fetchUserInfo();
       },
     });
 
@@ -38,7 +38,7 @@ const Auth = {
 
   login() {
     if (!this.tokenClient) {
-      App.showToast('Google 초기화 중입니다. 잠시 후 다시 시도해주세요.', 'error');
+      App.showToast('Google 로딩 중입니다. 1초 후 다시 눌러주세요.', '');
       return;
     }
     this.tokenClient.requestAccessToken();
@@ -48,13 +48,12 @@ const Auth = {
     if (this.accessToken) {
       try { google.accounts.oauth2.revoke(this.accessToken, () => {}); } catch {}
     }
-    this.accessToken = null;
+    this.accessToken  = null;
     this.tokenExpiry  = null;
     this.userInfo     = null;
     this.tokenClient  = null;
     sessionStorage.removeItem('gl_token');
     sessionStorage.removeItem('gl_expiry');
-    if (typeof GoogleCalendar !== 'undefined') GoogleCalendar._calendarList = [];
     location.reload();
   },
 
@@ -67,24 +66,35 @@ const Auth = {
       const res     = await this.fetch('https://www.googleapis.com/oauth2/v2/userinfo');
       this.userInfo = await res.json();
 
-      // 계정별 데이터 분리
-      if (typeof UserStore !== 'undefined') {
-        const uid = this.userInfo.id || this.userInfo.email || 'user';
-        UserStore.setUser(uid);
-      }
+      // 1. uid 정규화 (UserStore와 FirebaseSync 동일하게)
+      const rawUid  = this.userInfo.id || this.userInfo.email || 'user';
 
-      // Firebase 동기화
+      // 2. UserStore 계정 설정 (내부에서 정규화)
+      UserStore.setUser(rawUid);
+      const normalizedUid = UserStore.getUser(); // 정규화된 uid
+
+      // 3. Firebase 초기화 + 데이터 불러오기
       if (typeof FirebaseSync !== 'undefined' &&
           CONFIG.FIREBASE_DB_URL &&
-          CONFIG.FIREBASE_DB_URL !== 'YOUR_FIREBASE_DB_URL') {
-        const uid = this.userInfo.id || this.userInfo.email || 'user';
-        FirebaseSync.init(uid, CONFIG.FIREBASE_DB_URL);
-        await FirebaseSync.load();
+          !CONFIG.FIREBASE_DB_URL.includes('YOUR_FIREBASE')) {
+
+        FirebaseSync.init(normalizedUid, CONFIG.FIREBASE_DB_URL);
+        App.showToast('데이터 불러오는 중...', '');
+        const loaded = await FirebaseSync.load();
+
+        // 4. 감시 시작 (이후 변경사항 자동 저장)
         FirebaseSync.watchChanges();
+
+        if (loaded) {
+          App.showToast('동기화 완료 ✓', 'success');
+        }
       }
 
+      // 5. 앱 초기화
       App.onAuthSuccess(this.userInfo);
+
     } catch (err) {
+      console.error('[Auth] fetchUserInfo 실패:', err);
       if (!silent) App.showToast('사용자 정보 조회 실패', 'error');
       App.onAuthSuccess({});
     }
