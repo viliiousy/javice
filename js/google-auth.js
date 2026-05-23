@@ -5,36 +5,28 @@ const Auth = {
   tokenExpiry:  null,
   tokenClient:  null,
   userInfo:     null,
+  _ready:       false,
 
   init() {
-    // GIS 스크립트 로드 완료까지 최대 10초 대기
-    this._waitForGIS(0);
+    this._tryInit();
   },
 
-  _waitForGIS(attempt) {
-    if (typeof google !== 'undefined' && google.accounts) {
-      this._initClient();
-      return;
+  _tryInit() {
+    if (typeof google !== 'undefined' && google.accounts?.oauth2) {
+      this._setup();
+    } else {
+      setTimeout(() => this._tryInit(), 200);
     }
-    if (attempt > 100) {
-      console.error('[Auth] GIS 로드 실패');
-      return;
-    }
-    setTimeout(() => this._waitForGIS(attempt + 1), 100);
   },
 
-  _initClient() {
-    if (CONFIG.GOOGLE_CLIENT_ID.startsWith('YOUR_GOOGLE')) {
-      console.warn('[Auth] GOOGLE_CLIENT_ID 를 설정해주세요.');
-      return;
-    }
+  _setup() {
+    if (CONFIG.GOOGLE_CLIENT_ID.startsWith('YOUR_GOOGLE')) return;
 
     this.tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: CONFIG.GOOGLE_CLIENT_ID,
       scope:     CONFIG.SCOPES,
       callback:  (resp) => {
         if (resp.error) {
-          console.error('[Auth] error:', resp.error, resp.error_description);
           App.showToast('로그인 실패: ' + resp.error, 'error');
           return;
         }
@@ -46,6 +38,8 @@ const Auth = {
       },
     });
 
+    this._ready = true;
+
     // 세션 복원
     const t = sessionStorage.getItem('gl_token');
     const e = sessionStorage.getItem('gl_expiry');
@@ -54,25 +48,18 @@ const Auth = {
       this.tokenExpiry  = parseInt(e, 10);
       this._fetchUserInfo(true);
     }
-
-    console.log('[Auth] GIS 초기화 완료');
   },
 
   login() {
-    if (CONFIG.GOOGLE_CLIENT_ID.startsWith('YOUR_GOOGLE')) {
-      alert('⚠️ config.js 에서 GOOGLE_CLIENT_ID 를 설정해주세요.');
-      return;
-    }
-    if (!this.tokenClient) {
-      // tokenClient 없으면 GIS 초기화 대기 후 재시도
-      App.showToast('잠시만요...', '');
-      const retry = setInterval(() => {
-        if (this.tokenClient) {
-          clearInterval(retry);
+    if (!this._ready || !this.tokenClient) {
+      // 아직 준비 안 됐으면 준비될 때까지 기다렸다가 자동 실행
+      const wait = setInterval(() => {
+        if (this._ready && this.tokenClient) {
+          clearInterval(wait);
           this.tokenClient.requestAccessToken();
         }
-      }, 200);
-      setTimeout(() => clearInterval(retry), 8000);
+      }, 100);
+      setTimeout(() => clearInterval(wait), 10000);
       return;
     }
     this.tokenClient.requestAccessToken();
@@ -80,14 +67,15 @@ const Auth = {
 
   logout() {
     if (this.accessToken) {
-      google.accounts.oauth2.revoke(this.accessToken, () => {});
+      try { google.accounts.oauth2.revoke(this.accessToken, () => {}); } catch {}
     }
     this.accessToken = null;
     this.tokenExpiry  = null;
     this.userInfo     = null;
+    this._ready       = false;
+    this.tokenClient  = null;
     sessionStorage.removeItem('gl_token');
     sessionStorage.removeItem('gl_expiry');
-    // 캘린더 캐시 초기화
     if (typeof GoogleCalendar !== 'undefined') GoogleCalendar._calendarList = [];
     location.reload();
   },
@@ -98,14 +86,12 @@ const Auth = {
 
   async _fetchUserInfo(silent = false) {
     try {
-      const res  = await this.fetch('https://www.googleapis.com/oauth2/v2/userinfo');
+      const res = await this.fetch('https://www.googleapis.com/oauth2/v2/userinfo');
       this.userInfo = await res.json();
-      // 계정별 데이터 분리
       if (typeof UserStore !== 'undefined') {
-        const uid = this.userInfo.id || this.userInfo.sub || this.userInfo.email || 'user';
+        const uid = this.userInfo.id || this.userInfo.email || 'user';
         UserStore.setUser(uid);
       }
-      // Drive 동기화
       if (typeof DriveSync !== 'undefined') {
         await DriveSync.load();
         DriveSync.watchChanges();
@@ -117,7 +103,6 @@ const Auth = {
     }
   },
 
-  // 인증된 fetch — 모든 Google API 호출에 사용
   async fetch(url, opts = {}) {
     if (!this.accessToken) throw new Error('Not authenticated');
     const res = await fetch(url, {
@@ -131,7 +116,7 @@ const Auth = {
     if (res.status === 401) {
       sessionStorage.removeItem('gl_token');
       sessionStorage.removeItem('gl_expiry');
-      App.showToast('로그인이 만료되었습니다. 다시 로그인해주세요.', 'error');
+      App.showToast('로그인이 만료됐습니다. 다시 로그인해주세요.', 'error');
       throw new Error('Token expired');
     }
     return res;
