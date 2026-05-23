@@ -29,17 +29,22 @@ const Fitness = {
   },
 
   // 날짜별 커스텀 운동 추가 저장
-  _customKey(date){ return `gl_fitness_custom_${new Date(date).toDateString()}`; },
+  _dateStr(date) {
+    const d=new Date(date);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  },
+  _customKey(date){ return `gl_fitness_custom_${this._dateStr(date)}`; },
   getCustomExercises(date=new Date()){
     return JSON.parse(UserStore.get(this._customKey(date))||'[]');
   },
   saveCustomExercises(v,date=new Date()){
     UserStore.set(this._customKey(date),JSON.stringify(v));
+    FirebaseSync?.scheduleSave();
   },
 
-  _checkKey(date){ return `gl_fitness_${new Date(date).toDateString()}`; },
+  _checkKey(date){ return `gl_fitness_${this._dateStr(date)}`; },
   _checked(date=new Date()){ return JSON.parse(UserStore.get(this._checkKey(date))||'[]'); },
-  _save(v,date=new Date()){ UserStore.set(this._checkKey(date),JSON.stringify(v)); },
+  _save(v,date=new Date()){ UserStore.set(this._checkKey(date),JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
 
   render(date=new Date(), planIdx=null) {
     // 피트니스 카드가 없는 레이아웃에서는 조용히 종료
@@ -49,7 +54,7 @@ const Fitness = {
     const plan = this.PLAN[dow];
     const chk  = this._checked(d);
     const custom = this.getCustomExercises(d);
-    const isToday = d.toDateString()===new Date().toDateString();
+    const isToday = this._dateStr(d)===this._dateStr(new Date());
     const allEx = [...plan.exercises, ...custom];
 
     // 카드 타이틀
@@ -82,16 +87,16 @@ const Fitness = {
     const pct=Math.round(done/allEx.length*100);
 
     // 탭: 요일별
-    const tabs=DOW.map((d,i)=>`<button class="fit-tab${i===dow?' active':''}" onclick="Fitness.render(new Date('${new Date(date).toDateString()}'),${i})">${d}</button>`).join('');
+    const tabs=DOW.map((d,i)=>`<button class="fit-tab${i===dow?' active':''}" onclick="Fitness.render(new Date('${Fitness._dateStr(date)}T00:00:00'),${i})">>${d}</button>`).join('');
 
     container.innerHTML=`
       <div class="fit-tabs">${tabs}</div>
       ${allEx.map((ex,i)=>`
-        <div class="ex-item${chk.includes(i)?' done':''}" onclick="Fitness.toggle(${i},'${new Date(date).toDateString()}')">
+        <div class="ex-item${chk.includes(i)?' done':''}" onclick="Fitness.toggle(${i},'${Fitness._dateStr(date)}')">>
           <div class="ex-chk">${chk.includes(i)?'✓':''}</div>
           <span class="ex-name">${esc(ex.name)}</span>
           <span class="ex-sets">${ex.sets}</span>
-          ${i>=plan.exercises.length&&isToday?`<button class="task-del" onclick="event.stopPropagation();Fitness._delCustom(${i-plan.exercises.length},'${new Date(date).toDateString()}')">✕</button>`:''}
+          ${i>=plan.exercises.length&&isToday?`<button class="task-del" onclick="event.stopPropagation();Fitness._delCustom(${i-plan.exercises.length},'${Fitness._dateStr(date)}')">>✕</button>`:''}
         </div>`).join('')}
       ${isToday?'<div class="habit-add-btn" onclick="Fitness.showInlineAdd()">+ 운동 추가</div>':''}
       <div class="fit-progress">
@@ -101,8 +106,8 @@ const Fitness = {
   },
 
   toggle(idx, dateStr=null) {
-    const d = dateStr ? new Date(dateStr) : new Date();
-    if (d.toDateString()!==new Date().toDateString()) return;
+    const d = dateStr ? new Date(dateStr+'T00:00:00') : new Date();
+    if (this._dateStr(d)!==this._dateStr(new Date())) return;
     const chk=this._checked(d);
     const i=chk.indexOf(idx);
     if (i===-1) chk.push(idx); else chk.splice(i,1);

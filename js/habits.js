@@ -19,7 +19,11 @@ const Habits = {
   },
   saveList(v) { UserStore.set('gl_habits_list', JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
 
-  _dateKey(date) { const d=new Date(date); return `gl_habits_${d.toDateString()}`; },
+  _dateStr(date) {
+    const d=new Date(date);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  },
+  _dateKey(date) { return `gl_habits_${this._dateStr(date)}`; },
   getChecked(date=new Date()) { return JSON.parse(UserStore.get(this._dateKey(date))||'[]'); },
   setChecked(v,date=new Date()) { UserStore.set(this._dateKey(date), JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
 
@@ -47,7 +51,7 @@ const Habits = {
     const wrap=document.getElementById('habitsWrap'); if(!wrap) return;
     const list=this.getHabitsForDate(date);
     const chk=this.getChecked(date);
-    const isToday=new Date(date).toDateString()===new Date().toDateString();
+    const isToday=this._dateStr(date)===this._dateStr(new Date());
     const done=list.filter(h=>chk.includes(h.id)).length;
 
     const titleEl=document.querySelector('.card-habits .card-title');
@@ -60,7 +64,7 @@ const Habits = {
       const idx=list.indexOf(h);
       return `<div class="habit-item${isDone?' done':''}${Habits._reorderMode?' reorder-mode':''}"
         data-reorderable="${h.id}"
-        onclick="Habits._handleTap('${h.id}','${new Date(date).toDateString()}')">
+        onclick="Habits._handleTap('${h.id}','${Habits._dateStr(date)}')">
         ${Habits._reorderMode?`<div class="reorder-handle" onclick="event.stopPropagation()" title="꾹 눌러서 순서 변경">⠿</div>`:''}
         <div class="habit-chk">${isDone?'✓':''}</div>
         <span class="habit-emoji">${h.emoji}</span>
@@ -99,7 +103,7 @@ const Habits = {
   },
   _handleTap(id,dateStr) {
     if(this._swiping) return;
-    const date=new Date(dateStr);
+    const date=new Date(dateStr+'T00:00:00');
     const chk=this.getChecked(date);
     const i=chk.indexOf(id);
     const willBeChecked=(i===-1); // push 전에 미리 판단
