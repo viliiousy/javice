@@ -33,17 +33,15 @@ const Checklist = {
       const overdue=dueValid&&!item.done&&due<today;
       const dueStr=dueValid?due.toLocaleDateString('ko-KR',{month:'short',day:'numeric',weekday:'short'}):'';
 
-      const origIdx=items.findIndex(i=>i.id===item.id);
-      return `<div class="cl-item${item.done?' done':''}" data-id="${item.id}">
+      return `<div class="cl-item${item.done?' done':''}${Checklist._reorderMode?' reorder-mode':''}"
+          data-reorderable="${item.id}">
+        ${Checklist._reorderMode?`<div class="reorder-handle" onclick="event.stopPropagation()" title="꾹 눌러서 순서 변경">⠿</div>`:''}
         <div class="cl-check" onclick="event.stopPropagation();Checklist.toggle('${item.id}')"></div>
         <div class="cl-body" onclick="Checklist._bodyTap('${item.id}')">
           <div class="cl-title">${esc(item.title)}</div>
           ${dueStr?`<div class="cl-due${overdue?' overdue':''}">${dueStr}</div>`:''}
         </div>
-        <div class="reorder-btns">
-          <button class="reorder-btn" onclick="event.stopPropagation();Checklist._moveUp('${item.id}')" ${origIdx===0?'disabled':''}>↑</button>
-          <button class="reorder-btn" onclick="event.stopPropagation();Checklist._moveDown('${item.id}')" ${origIdx===items.length-1?'disabled':''}>↓</button>
-        </div>
+        <button class="reorder-toggle-btn" onclick="event.stopPropagation();Checklist.toggleReorderMode()" title="순서 변경">↕️</button>
         <button class="cl-del-btn" onclick="event.stopPropagation();Checklist.remove('${item.id}')" title="삭제">✕</button>
       </div>`;
     }).join('')
@@ -72,6 +70,26 @@ const Checklist = {
       this.toggle(id);
     } else {
       this.showEdit(id);
+    }
+  },
+
+  _reorderMode: false,
+
+  toggleReorderMode() {
+    this._reorderMode = !this._reorderMode;
+    this.render();
+    if (this._reorderMode && typeof Reorder !== 'undefined') {
+      setTimeout(() => {
+        const wrap = document.getElementById('checklistWrap');
+        if (wrap) Reorder.enable(wrap, (newOrder) => {
+          const items = this.getItems();
+          const sorted = newOrder.map(id => items.find(i => i.id === id)).filter(Boolean);
+          items.forEach(i => { if (!sorted.find(x => x.id === i.id)) sorted.push(i); });
+          this.saveItems(sorted);
+          this.render();
+          Sounds?.click();
+        });
+      }, 50);
     }
   },
 

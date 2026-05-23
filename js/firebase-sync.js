@@ -1,4 +1,4 @@
-// js/firebase-sync.js — Firebase 동기화 (레이스 컨디션 완전 해결)
+// js/firebase-sync.js — 타임스탬프 기반 충돌 해결 동기화
 
 const FirebaseSync = {
   _uid:       null,
@@ -7,8 +7,8 @@ const FirebaseSync = {
   _syncing:   false,
   _watching:  false,
   _pollTimer: null,
-  _lastSave:  0,       // 마지막 저장 시각
-  _lastLocal: 0,       // 마지막 로컬 변경 시각
+  _lastSaveTs: 0,    // 내가 마지막으로 저장한 시각
+  _lastEditTs: 0,    // 내가 마지막으로 로컬 데이터를 편집한 시각
   _origSet:   null,
 
   init(normalizedUid, dbUrl) {
@@ -24,23 +24,21 @@ const FirebaseSync = {
       const v = localStorage.getItem(k);
       if (v !== null) data[k] = v;
     });
+    // 저장 시각 기록 (충돌 해결용)
+    data['_savedAt'] = String(Date.now());
     return data;
   },
 
-  // 원본 setItem으로 직접 복원 (감시 루프 방지)
   _restoreData(remoteData) {
     if (!remoteData || typeof remoteData !== 'object') return;
     const orig = this._origSet || localStorage.setItem.bind(localStorage);
-
+    let count = 0;
     Object.entries(remoteData).forEach(([k, v]) => {
-      if (!k || v === null || v === undefined) return;
-
-      // 로컬에 최근 변경된 키는 덮어쓰지 않음
-      const localVal = localStorage.getItem(k);
-      if (localVal === String(v)) return; // 동일하면 스킵
-
+      if (!k || k === '_savedAt' || v === null || v === undefined) return;
       orig(k, String(v));
+      count++;
     });
+    return count;
   },
 
   async load() {
@@ -50,11 +48,10 @@ const FirebaseSync = {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-        this._restoreData(data);
-        console.log('[FirebaseSync] 불러오기 완료:', Object.keys(data).length, '개');
+        const count = this._restoreData(data);
+        console.log('[FirebaseSync] 불러오기 완료:', count, '개');
         return true;
       }
-      console.log('[FirebaseSync] 저장 데이터 없음 (첫 로그인)');
       return false;
     } catch (e) {
       console.error('[FirebaseSync] 불러오기 실패:', e.message);
@@ -67,18 +64,15 @@ const FirebaseSync = {
     if (this._syncing) { this.scheduleSave(); return; }
     this._syncing = true;
     try {
-      const data     = this._collectData();
-      const keyCount = Object.keys(data).length;
-      if (keyCount === 0) return;
-
-      const res = await fetch(`${this._dbUrl}/users/${this._uid}.json`, {
+      const data = this._collectData();
+      const res  = await fetch(`${this._dbUrl}/users/${this._uid}.json`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(data),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      this._lastSave = Date.now();
-      console.log('[FirebaseSync] 저장 완료:', keyCount, '개');
+      this._lastSaveTs = Date.now();
+      console.log('[FirebaseSync] 저장 완료, ts:', this._lastSaveTs);
     } catch (e) {
       console.error('[FirebaseSync] 저장 실패:', e.message);
     } finally {
@@ -86,9 +80,8 @@ const FirebaseSync = {
     }
   },
 
-  // 변경 즉시 저장 (1초 디바운스)
   scheduleSave() {
-    this._lastLocal = Date.now();
+    this._lastEditTs = Date.now(); // 편집 시각 기록
     clearTimeout(this._saveTimer);
     this._saveTimer = setTimeout(() => this.save(), 1000);
   },
@@ -99,7 +92,6 @@ const FirebaseSync = {
 
     const prefix = `u_${this._uid}_`;
     const extras = new Set(['gl_ai_key','gl_tts','gl_dark','gl_cat_colors']);
-
     this._origSet = localStorage.setItem.bind(localStorage);
 
     localStorage.setItem = (key, val) => {
@@ -109,55 +101,51 @@ const FirebaseSync = {
       }
     };
 
-    // 페이지 포커스 시 서버에서 불러오기 (다른 기기 변경 반영)
+    // 페이지 다시 포커스 시 최신 데이터 동기화
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
-        // 마지막 로컬 변경이 3초 이상 지났을 때만 fetch
-        if (Date.now() - this._lastLocal > 3000) {
-          setTimeout(() => this._pollOnce(), 500);
+        // 편집 후 2초 경과했을 때만 pull (내 변경 덮어쓰기 방지)
+        if (Date.now() - this._lastEditTs > 2000) {
+          setTimeout(() => this._smartPull(), 500);
         }
       }
     });
 
-    // 30초마다 폴링 (다른 기기 변경 감지)
-    this._startPolling();
-
-    console.log('[FirebaseSync] 감시 시작. prefix:', prefix);
+    // 20초마다 스마트 폴링
+    this._pollTimer = setInterval(() => this._smartPoll(), 20000);
+    console.log('[FirebaseSync] 감시 시작');
   },
 
-  _startPolling() {
-    if (this._pollTimer) return;
-    this._pollTimer = setInterval(() => this._pollOnce(), 30000);
-  },
-
-  async _pollOnce() {
-    // 최근 3초 이내 로컬 변경이 있으면 스킵 (내 변경 덮어쓰기 방지)
-    if (Date.now() - this._lastLocal < 3000) return;
-    // 최근 3초 이내 저장했으면 스킵
-    if (Date.now() - this._lastSave < 3000) return;
+  // 타임스탬프 비교 → 최신 데이터 승리
+  async _smartPull() {
+    if (!this._uid || !this._dbUrl) return;
+    // 최근 1초 이내 편집 중이면 스킵
+    if (Date.now() - this._lastEditTs < 1000) return;
 
     try {
-      const res = await fetch(`${this._dbUrl}/users/${this._uid}.json`);
+      const res = await fetch(`${this._dbUrl}/users/${this._uid}/_savedAt.json`);
       if (!res.ok) return;
-      const data = await res.json();
-      if (!data || typeof data !== 'object') return;
+      const remoteTs = parseInt(await res.json() || '0', 10);
+      const localTs  = this._lastSaveTs;
 
-      // 변경된 키만 업데이트
-      const orig = this._origSet || localStorage.setItem.bind(localStorage);
-      let changed = false;
-      Object.entries(data).forEach(([k, v]) => {
-        if (!k || v === null) return;
-        if (localStorage.getItem(k) !== String(v)) {
-          orig(k, String(v));
-          changed = true;
+      console.log('[FirebaseSync] ts 비교 - 원격:', remoteTs, '로컬:', localTs);
+
+      // 원격이 더 최신이면 전체 불러오기 + UI 갱신
+      if (remoteTs > localTs + 500) { // 500ms 여유
+        console.log('[FirebaseSync] 원격이 최신 → 불러오기');
+        const ok = await this.load();
+        if (ok) {
+          this._lastSaveTs = remoteTs;
+          this._refreshUI();
         }
-      });
-
-      if (changed) {
-        console.log('[FirebaseSync] 원격 변경 감지 → UI 갱신');
-        this._refreshUI();
       }
     } catch {}
+  },
+
+  // 20초 폴링
+  async _smartPoll() {
+    if (Date.now() - this._lastEditTs < 2000) return;
+    await this._smartPull();
   },
 
   _refreshUI() {
@@ -170,5 +158,6 @@ const FirebaseSync = {
       try { Memo.render(); } catch {}
       try { App._updateStatsBanner(); } catch {}
     });
+    console.log('[FirebaseSync] UI 갱신 완료');
   },
 };

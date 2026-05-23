@@ -58,18 +58,16 @@ const Habits = {
       const st=this.streak(h.id);
       const daysLabel=(h.days&&h.days.length<7)?`<span class="habit-days">${h.days.map(d=>this.DAYS_KO[d]).join('')}</span>`:'';
       const idx=list.indexOf(h);
-      return `<div class="habit-item${isDone?' done':''}"
-        data-id="${h.id}"
+      return `<div class="habit-item${isDone?' done':''}${Habits._reorderMode?' reorder-mode':''}"
+        data-reorderable="${h.id}"
         onclick="Habits._handleTap('${h.id}','${new Date(date).toDateString()}')">
+        ${Habits._reorderMode?`<div class="reorder-handle" onclick="event.stopPropagation()" title="꾹 눌러서 순서 변경">⠿</div>`:''}
         <div class="habit-chk">${isDone?'✓':''}</div>
         <span class="habit-emoji">${h.emoji}</span>
         <span class="habit-name">${esc(h.name)}${daysLabel}</span>
-        ${st>0?`<span class="habit-streak">🔥${st}</span>`:''}
+        ${st>0&&!Habits._reorderMode?`<span class="habit-streak">🔥${st}</span>`:''}
         ${isToday?`
-          <div class="reorder-btns">
-            <button class="reorder-btn" onclick="event.stopPropagation();Habits._moveUp(${idx})" ${idx===0?'disabled':''}>↑</button>
-            <button class="reorder-btn" onclick="event.stopPropagation();Habits._moveDown(${idx})" ${idx===list.length-1?'disabled':''}>↓</button>
-          </div>
+          <button class="reorder-toggle-btn" onclick="event.stopPropagation();Habits.toggleReorderMode()" title="순서 변경">↕️</button>
           <button class="cl-del-btn" onclick="event.stopPropagation();Habits._del('${h.id}')">✕</button>`:''}
       </div>`;
     }).join('')
@@ -106,12 +104,12 @@ const Habits = {
     const date=new Date(dateStr);
     const chk=this.getChecked(date);
     const i=chk.indexOf(id);
+    const willBeChecked=(i===-1); // push 전에 미리 판단
     if(i===-1) chk.push(id); else chk.splice(i,1);
-    const isDoneNow=!chk.includes(id);
     this.setChecked(chk,date);
     this.render(date);
     if(typeof App!=='undefined') App._updateStatsBanner();
-    if(isDoneNow){
+    if(willBeChecked){
       Sounds?.check();
       // 퍼펙트 달성 체크
       const newChk=this.getChecked(date);
@@ -135,6 +133,29 @@ const Habits = {
       const todayList=this.getHabitsForDate(date);
       if(todayList.length>0&&todayList.every(h=>newChk.includes(h.id))) setTimeout(()=>Sounds?.achieve(),200);
     } else { Sounds?.uncheck(); }
+  },
+
+  _reorderMode: false,
+
+  toggleReorderMode() {
+    this._reorderMode = !this._reorderMode;
+    this.render();
+    if (this._reorderMode) {
+      // render 후 Reorder 모듈 활성화
+      setTimeout(() => {
+        const wrap = document.getElementById('habitsWrap');
+        if (wrap && typeof Reorder !== 'undefined') {
+          Reorder.enable(wrap, (newOrder) => {
+            const list = this.getList();
+            const sorted = newOrder.map(id => list.find(h => h.id === id)).filter(Boolean);
+            // 순서에 없는 항목 뒤에 추가
+            list.forEach(h => { if (!sorted.find(x => x.id === h.id)) sorted.push(h); });
+            this.saveList(sorted);
+            Sounds?.click();
+          });
+        }
+      }, 50);
+    }
   },
 
   _del(id) {

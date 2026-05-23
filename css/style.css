@@ -1096,3 +1096,52 @@ html.dark .reorder-btn { background: var(--card2); }
   opacity: 0.3;
 }
 .memo-item:hover .memo-reorder { opacity: 1; }
+
+/* ═══════════════════════════════════════
+   순서변경 모드
+   ═══════════════════════════════════════ */
+.reorder-toggle-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  opacity: 0.3;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.reorder-toggle-btn:hover { opacity: 1; }
+.reorder-mode .reorder-toggle-btn { opacity: 1; }
+
+.reorder-handle {
+  font-size: 16px;
+  color: var(--text3);
+  cursor: grab;
+  padding: 0 6px;
+  flex-shrink: 0;
+  user-select: none;
+  touch-action: none;
+}
+.reorder-handle:active { cursor: grabbing; }
+
+.reorder-dragging {
+  opacity: 0.8;
+  box-shadow: var(--shadow-lg) !important;
+  border-color: var(--accent) !important;
+  background: white !important;
+}
+html.dark .reorder-dragging { background: var(--card) !important; }
+
+.reorder-placeholder {
+  border: 2px dashed var(--accent);
+  border-radius: var(--r-xs);
+  background: var(--accent-bg);
+  margin-bottom: 5px;
+  opacity: 0.5;
+}
+
+.habit-item.reorder-mode,
+.cl-item.reorder-mode {
+  border-color: rgba(79,70,229,0.3);
+  background: var(--accent-bg);
+}
