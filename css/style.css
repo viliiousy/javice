@@ -1162,3 +1162,40 @@ html.dark .reorder-dragging { background: var(--card) !important; }
   color: var(--red);
   background: #fee2e2;
 }
+
+/* ═══════════════════════════════════════
+   모바일 헤더 날짜 + 프로필 개선
+   ═══════════════════════════════════════ */
+@media (max-width: 640px) {
+  /* 날짜 크기 줄이고 색상 변경 */
+  .h-date-main {
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: var(--text) !important;
+  }
+  .h-date-sub {
+    font-size: 10px !important;
+  }
+  /* 오늘 표시 색상 - 초록으로 */
+  .h-date-sub .today-label {
+    color: #059669 !important;
+    font-weight: 700 !important;
+  }
+  /* 프로필 아이콘 크게 */
+  .h-avatar {
+    width: 34px !important;
+    height: 34px !important;
+    border: 2px solid var(--accent-l) !important;
+  }
+  .h-user {
+    gap: 6px !important;
+  }
+}
+
+/* PC에서도 프로필 아이콘 약간 키우기 */
+.h-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--border2);
+}

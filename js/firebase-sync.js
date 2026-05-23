@@ -126,5 +126,7 @@ const FirebaseSync = {
       try { Memo.render(); } catch {}
       try { App._updateStatsBanner(); } catch {}
     });
+    // 동기화 알림 사운드
+    try { Sounds?.sync(); } catch {}
   },
 };
