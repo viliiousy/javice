@@ -57,6 +57,7 @@
         <span class="h-chevron">▾</span>
       </div>
       <div id="profileMenu" class="profile-menu hidden">
+        <div class="profile-menu-item" onclick="Notifications.showSettings()">🔔 알림 설정</div>
         <div class="profile-menu-item" onclick="App.toggleDarkMode()"><span id="darkModeLabel">🌙 다크 모드</span></div>
         <div class="profile-menu-item" onclick="App.toggleSound()"><span id="soundLabel">🔔 사운드 켜짐</span></div>
         <div class="profile-menu-item" onclick="Auth.logout()">🚪 로그아웃</div>
@@ -167,6 +168,7 @@
 <script src="js/config.js"></script>
 <script src="js/user-store.js"></script>
 <script src="js/sounds.js"></script>
+<script src="js/notifications.js"></script>
 <script src="js/reorder.js"></script>
 <script src="js/google-auth.js"></script>
 <script src="js/google-calendar.js"></script>

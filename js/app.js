@@ -59,6 +59,7 @@ const App = {
     }
     this._updateHeaderDate(new Date());
     try { Habits.init(new Date()); } catch(e){ console.warn('Habits init',e); }
+    try { Notifications.init(); } catch(e){ console.warn('Notifications init',e); }
     try { Diet.render(new Date()); } catch(e){ console.warn('Diet render',e); }
     try { Checklist.render(); }     catch(e){ console.warn('Checklist render',e); }
     try { Memo.render(); }          catch(e){ console.warn('Memo render',e); }

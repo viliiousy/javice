@@ -1234,3 +1234,38 @@ html.dark .reorder-dragging { background: var(--card) !important; }
   margin-bottom: 5px;
   opacity: 0.5;
 }
+
+/* ═══════════════════════════════════════
+   알림 설정 UI
+   ═══════════════════════════════════════ */
+.notif-section {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.notif-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.notif-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.notif-row input[type="checkbox"] {
+  width: 18px; height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.notif-time-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 5px;
+}
