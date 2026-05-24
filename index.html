@@ -175,30 +175,39 @@
 <script src="js/user-store.js"></script>
 <script src="js/sounds.js"></script>
 <script src="js/notifications.js"></script>
-<script type="module" id="fcmInit">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
-
-  window._fcmGetToken = async function() {
-    try {
-      const app = initializeApp(CONFIG.FIREBASE_CONFIG, "javice-fcm");
-      const messaging = getMessaging(app);
-      const token = await getToken(messaging, { vapidKey: CONFIG.FCM_VAPID_KEY });
-      console.log("[FCM] 토큰 발급 성공:", token.slice(0,20)+"...");
-      return token;
-    } catch(e) {
-      console.error("[FCM] 토큰 발급 실패:", e);
-      return null;
+<!-- Firebase compat SDK (모듈 방식 대신 글로벌 방식) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
+<script>
+  // Firebase 초기화 + FCM 토큰 발급 함수
+  (function() {
+    function initFCM() {
+      if(typeof firebase === 'undefined' || !CONFIG?.FIREBASE_CONFIG) {
+        setTimeout(initFCM, 200);
+        return;
+      }
+      try {
+        if(!firebase.apps.length) {
+          firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
+        }
+        const messaging = firebase.messaging();
+        window._fcmGetToken = async function() {
+          try {
+            const token = await messaging.getToken({ vapidKey: CONFIG.FCM_VAPID_KEY });
+            console.log('[FCM] 토큰 발급 성공:', token ? token.slice(0,20)+'...' : '없음');
+            return token;
+          } catch(e) {
+            console.error('[FCM] 토큰 오류:', e.message);
+            return null;
+          }
+        };
+        console.log('[FCM] 초기화 완료');
+      } catch(e) {
+        console.error('[FCM] 초기화 실패:', e.message);
+      }
     }
-  };
-
-  window._fcmOnMessage = function(callback) {
-    try {
-      const app = initializeApp(CONFIG.FIREBASE_CONFIG, "javice-fcm");
-      const messaging = getMessaging(app);
-      onMessage(messaging, callback);
-    } catch(e) {}
-  };
+    setTimeout(initFCM, 500);
+  })();
 </script>
 <script src="js/reorder.js"></script>
 <script src="js/google-auth.js"></script>
