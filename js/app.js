@@ -245,45 +245,61 @@ const App = {
   },
 
   _updateHeaderDate(date) {
-    const d=new Date(date);
-    const isToday=d.toDateString()===new Date().toDateString();
-    const dow=d.getDay();
-    const hDateWrap=document.querySelector('.h-date');
-    const el=document.getElementById('hDate'), eld=document.getElementById('hDay');
+    const d   = new Date(date);
+    const now = new Date();
+    const isToday = (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth()    === now.getMonth()    &&
+      d.getDate()     === now.getDate()
+    );
+    const dow = d.getDay();
 
-    if(hDateWrap) hDateWrap.classList.toggle('h-date-today', isToday);
-    if(el){
-      // 날짜 표시: 모바일이면 26년 5월 23일, PC면 2026년 5월 23일
-      if(window.innerWidth<=640){
-        el.textContent=`${String(d.getFullYear()).slice(2)}년 ${d.getMonth()+1}월 ${d.getDate()}일`;
-      } else {
-        el.textContent=d.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
-      }
-      el.style.cursor='pointer';
-      el.onclick=(e)=>{ e.stopPropagation(); App._toggleDateDropdown(d); };
+    // 날짜 텍스트
+    const elDate = document.getElementById('hDate');
+    if(elDate) {
+      const isMobile = window.innerWidth <= 640;
+      elDate.textContent = isMobile
+        ? `${String(d.getFullYear()).slice(2)}년 ${d.getMonth()+1}월 ${d.getDate()}일`
+        : d.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
+      elDate.style.cursor = 'pointer';
+      elDate.onclick = (e) => { e.stopPropagation(); App._toggleDateDropdown(d); };
     }
-    if(eld){
-      const dayStr=d.toLocaleDateString('ko-KR',{weekday:'long'});
-      // 해당 날짜 할일 개수
-      const dateStr=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      const taskCount=Object.values(this.S.tasks||{}).reduce((n,l)=>n+l.filter(t=>{
-        if(t.status!=='needsAction') return false;
-        if(!t.due) return isToday; // 날짜 없는건 오늘에만 표시
-        return t.due.split('T')[0]===dateStr;
-      }).length,0);
-      const taskBadge=taskCount>0?` <span style="font-size:10px;background:var(--accent);color:white;padding:1px 6px;border-radius:10px;font-weight:700">할일 ${taskCount}</span>`:'';
 
-      // 6. 공휴일/일요일 빨간색 체크
-      const isHoliday=typeof CalendarUI!=='undefined'&&CalendarUI._isHoliday(d.getFullYear(),d.getMonth(),d.getDate());
-      const isRed=dow===0||isHoliday;
+    // 요일 + 오늘 표시
+    const elDay = document.getElementById('hDay');
+    if(elDay) {
+      elDay.innerHTML = '';
+      elDay.style.cssText = '';
+      const dayStr = d.toLocaleDateString('ko-KR', {weekday:'long'});
 
-      if(isToday){
-        eld.innerHTML=`<span class="today-label" style="color:#059669;font-weight:900">🕐 오늘</span> · <span style="color:var(--text2)">${dayStr}</span>${taskBadge}`;
-        eld.style.color='';
-        eld.style.fontWeight='';
+      if(isToday) {
+        // 오늘: 초록색 강제
+        elDay.innerHTML = '<span id="todayBadge">🕐 오늘</span> · ' + dayStr;
+        const badge = document.getElementById('todayBadge');
+        if(badge) {
+          badge.style.color = '#059669';
+          badge.style.fontWeight = '900';
+          badge.style.fontSize = '12px';
+        }
       } else {
-        eld.innerHTML=`${dayStr}${taskBadge}`;
-        eld.style.color=isRed?'var(--red)':dow===6?'var(--blue)':'';
+        const isHoliday = typeof CalendarUI!=='undefined' && CalendarUI._isHoliday(d.getFullYear(), d.getMonth(), d.getDate());
+        const color = (dow===0||isHoliday) ? '#dc2626' : dow===6 ? '#2563eb' : '';
+        elDay.textContent = dayStr;
+        if(color) elDay.style.color = color;
+      }
+
+      // 할일 뱃지
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const taskCount = Object.values(this.S.tasks||{}).reduce((n,l) =>
+        n + l.filter(t => {
+          if(t.status!=='needsAction'||t._hidden) return false;
+          return t.due ? t.due.split('T')[0]===dateStr : isToday;
+        }).length, 0);
+      if(taskCount > 0) {
+        const badge = document.createElement('span');
+        badge.textContent = '할일 ' + taskCount;
+        badge.style.cssText = 'font-size:9px;background:#4f46e5;color:white;padding:1px 5px;border-radius:8px;font-weight:700;margin-left:4px;vertical-align:middle';
+        elDay.appendChild(badge);
       }
     }
   },

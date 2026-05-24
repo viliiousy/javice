@@ -187,32 +187,26 @@ const Habits = {
     const daysHTML = this.DAYS_KO.map((d,i)=>
       `<label class="day-pick-btn"><input type="checkbox" value="${i}" checked class="day-chk"> ${d}</label>`
     ).join('');
-    App.openModal('✅ 습관 추가',`
-      <div class="modal-row"><label class="modal-lbl">이름 *</label>
+    App.openModal('✅ 습관 추가',
+      `<div class="modal-row"><label class="modal-lbl">이름 *</label>
         <input id="hName" type="text" placeholder="예: 물 2L 마시기" class="inp"></div>
       <div class="modal-row"><label class="modal-lbl">이모지</label>
         <input id="hEmoji" type="text" placeholder="✅" class="inp" style="width:80px" maxlength="2"></div>
       <div class="modal-row"><label class="modal-lbl">반복 요일</label>
-        <div class="day-picker">${daysHTML}</div>
-      </div>
+        <div class="day-picker">${daysHTML}</div></div>
       <div class="modal-btns" style="margin-top:12px">
         <button id="btnHSave" class="btn-sm accent">추가</button>
-        <button id="btnHCancel" class="btn-sm">취소</button>
-      </div>`, () => {
-        // afterRender 콜백 - 확실히 DOM이 준비된 후 실행
-        const saveBtn = document.getElementById('btnHSave');
-        const cancelBtn = document.getElementById('btnHCancel');
-        const nameInp = document.getElementById('hName');
-        const doSave = () => Habits._saveNew();
-        if(saveBtn)  saveBtn.addEventListener('touchend', (e)=>{ e.preventDefault(); doSave(); }, {once:true});
-        if(saveBtn)  saveBtn.addEventListener('click', doSave);
-        if(cancelBtn) cancelBtn.addEventListener('click', ()=>App.closeModal());
-        if(cancelBtn) cancelBtn.addEventListener('touchend', (e)=>{ e.preventDefault(); App.closeModal(); });
-        if(nameInp) { nameInp.focus(); nameInp.addEventListener('keydown', e=>{ if(e.key==='Enter') doSave(); }); }
-    });
+        <button onclick="App.closeModal()" class="btn-sm">취소</button>
+      </div>`
+    );
+    setTimeout(() => {
+      document.getElementById('hName')?.focus();
+      document.getElementById('btnHSave')?.addEventListener('click', () => Habits._saveNew());
+      document.getElementById('hName')?.addEventListener('keypress', e => { if(e.key==='Enter') Habits._saveNew(); });
+    }, 50);
   },
 
-  _saveNew() {
+    _saveNew() {
     const name=document.getElementById('hName')?.value.trim();
     if(!name){ App.showToast('이름을 입력해주세요','error'); return; }
     const emoji=document.getElementById('hEmoji')?.value.trim()||'✅';
