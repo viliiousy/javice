@@ -21,10 +21,7 @@ const Memo = {
           ondrop="Memo._drop(event,'${m.id}')"
           ondragend="Memo._dragEnd(event)"
           onclick="Memo.showEdit('${m.id}')">
-        <div class="memo-reorder">
-          <button class="reorder-btn" onclick="event.stopPropagation();Memo._moveUp('${m.id}')">↑</button>
-          <button class="reorder-btn" onclick="event.stopPropagation();Memo._moveDown('${m.id}')">↓</button>
-        </div>
+
         <div class="memo-content-wrap">
           <div class="memo-title">${esc(m.title)}</div>
           ${preview?`<div class="memo-preview">${preview}${hasMore?'<span class="memo-more">…</span>':''}</div>`:''}

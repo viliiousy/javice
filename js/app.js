@@ -964,7 +964,12 @@ const App = {
     App.closeModal();
   },
 
-  openModal(title,body){ document.getElementById('modalTitle').textContent=title; document.getElementById('modalBody').innerHTML=body; document.getElementById('modal').classList.remove('hidden'); },
+  openModal(title,body,afterRender){
+    document.getElementById('modalTitle').textContent=title;
+    document.getElementById('modalBody').innerHTML=body;
+    document.getElementById('modal').classList.remove('hidden');
+    if(afterRender) setTimeout(afterRender, 80);
+  },
   closeModal(){ document.getElementById('modal').classList.add('hidden'); },
 
   showToast(msg,type=''){

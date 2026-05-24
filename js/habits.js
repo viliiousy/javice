@@ -184,33 +184,32 @@ const Habits = {
   },
 
   showInlineAdd() {
+    const daysHTML = this.DAYS_KO.map((d,i)=>
+      `<label class="day-pick-btn"><input type="checkbox" value="${i}" checked class="day-chk"> ${d}</label>`
+    ).join('');
     App.openModal('✅ 습관 추가',`
       <div class="modal-row"><label class="modal-lbl">이름 *</label>
         <input id="hName" type="text" placeholder="예: 물 2L 마시기" class="inp"></div>
       <div class="modal-row"><label class="modal-lbl">이모지</label>
-        <input id="hEmoji" type="text" placeholder="💧" class="inp" style="width:80px" maxlength="2"></div>
+        <input id="hEmoji" type="text" placeholder="✅" class="inp" style="width:80px" maxlength="2"></div>
       <div class="modal-row"><label class="modal-lbl">반복 요일</label>
-        <div class="day-picker">
-          ${this.DAYS_KO.map((d,i)=>`<label class="day-pick-btn"><input type="checkbox" value="${i}" checked class="day-chk"> ${d}</label>`).join('')}
-        </div>
+        <div class="day-picker">${daysHTML}</div>
       </div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:12px">※ 오늘부터 적용</div>
-      <div class="modal-btns">
-        <button id="btnHabitSaveNew" class="btn-sm accent" type="button">추가</button>
-        <button class="btn-sm" type="button" id="btnHabitCancel">취소</button>
-      </div>`);
-    const attach = () => {
-      const btn  = document.getElementById('btnHabitSaveNew');
-      const inp  = document.getElementById('hName');
-      const can  = document.getElementById('btnHabitCancel');
-      if(btn)  { btn.onclick  = (e) => { e.preventDefault(); e.stopPropagation(); Habits._saveNew(); }; }
-      if(can)  { can.onclick  = (e) => { e.preventDefault(); App.closeModal(); }; }
-      if(inp)  {
-        inp.focus();
-        inp.onkeydown = (e) => { if(e.key==='Enter'){ e.preventDefault(); Habits._saveNew(); } };
-      }
-    };
-    setTimeout(attach, 100);
+      <div class="modal-btns" style="margin-top:12px">
+        <button id="btnHSave" class="btn-sm accent">추가</button>
+        <button id="btnHCancel" class="btn-sm">취소</button>
+      </div>`, () => {
+        // afterRender 콜백 - 확실히 DOM이 준비된 후 실행
+        const saveBtn = document.getElementById('btnHSave');
+        const cancelBtn = document.getElementById('btnHCancel');
+        const nameInp = document.getElementById('hName');
+        const doSave = () => Habits._saveNew();
+        if(saveBtn)  saveBtn.addEventListener('touchend', (e)=>{ e.preventDefault(); doSave(); }, {once:true});
+        if(saveBtn)  saveBtn.addEventListener('click', doSave);
+        if(cancelBtn) cancelBtn.addEventListener('click', ()=>App.closeModal());
+        if(cancelBtn) cancelBtn.addEventListener('touchend', (e)=>{ e.preventDefault(); App.closeModal(); });
+        if(nameInp) { nameInp.focus(); nameInp.addEventListener('keydown', e=>{ if(e.key==='Enter') doSave(); }); }
+    });
   },
 
   _saveNew() {

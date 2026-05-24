@@ -33,6 +33,12 @@ const Diet = {
     return JSON.parse(UserStore.get(this._setKey())||JSON.stringify(
       {calorieGoal:2200,proteinGoal:160,carbGoal:220,fatGoal:60}));
   },
+  getCalorieGoalForDate(date=new Date()) {
+    const s = this.getSettings();
+    const dow = new Date(date).getDay();
+    return (s.calByDay && s.calByDay[dow]) ? s.calByDay[dow] : s.calorieGoal;
+  },
+
   getData(date=new Date()){
     return JSON.parse(UserStore.get(this._key(date))||JSON.stringify(
       {아침:[],점심:[],저녁:[],간식:[]}));
