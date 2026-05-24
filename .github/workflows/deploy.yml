@@ -9,5 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Inject version
+        run: |
+          VERSION=$(TZ='Asia/Seoul' date +'v%y.%m.%d.%H%M')
+          echo "Version: $VERSION"
+          # index.html 버전 교체
+          sed -i "s/v[0-9]\{2\}\.[0-9]\{2\}\.[0-9]\{2\}\.[0-9]\{4\} 업데이트/$VERSION 업데이트/g" index.html
+          echo "Version injected: $VERSION"
+
       - name: Deploy to Vercel
         run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes

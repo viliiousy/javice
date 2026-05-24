@@ -31,8 +31,8 @@ const Habits = {
     const dow     = new Date(date).getDay();
     const dateStr = this._dateStr(date);
     return this.getList().filter(h => {
-      // 생성일 이후에만 표시
-      if(h.createdAt && dateStr < h.createdAt) return false;
+      if(h.createdAt  && dateStr < h.createdAt)  return false; // 생성 전
+      if(h.deletedFrom && dateStr >= h.deletedFrom) return false; // 삭제 후
       return !h.days || h.days.length===0 || h.days.includes(dow);
     });
   },
@@ -65,7 +65,12 @@ const Habits = {
     wrap.innerHTML=list.map(h=>{
       const isDone=chk.includes(h.id);
       const st=this.streak(h.id);
-      const daysLabel=(h.days&&h.days.length<7)?`<span class="habit-days">${h.days.map(d=>this.DAYS_KO[d]).join('')}</span>`:'';
+      const _d = h.days||[];
+      let daysLabel = '';
+      if(_d.length===7 || _d.length===0) daysLabel='<span class="habit-days">매일</span>';
+      else if(_d.length===5&&[1,2,3,4,5].every(x=>_d.includes(x))) daysLabel='<span class="habit-days">평일</span>';
+      else if(_d.length===2&&[0,6].every(x=>_d.includes(x))) daysLabel='<span class="habit-days">주말</span>';
+      else daysLabel=`<span class="habit-days">${_d.map(d=>this.DAYS_KO[d]).join('')}</span>`;
       const idx=list.indexOf(h);
       return `<div class="habit-item${isDone?' done':''}${Habits._reorderMode?' reorder-mode':''}"
         data-reorderable="${h.id}"
@@ -74,7 +79,7 @@ const Habits = {
         <div class="habit-chk">${isDone?'✓':''}</div>
         <span class="habit-name">${esc(h.name)}${daysLabel}</span>
         ${st>0&&!Habits._reorderMode?`<span class="habit-streak">🔥${st}</span>`:''}
-        ${isToday?`<button class="cl-del-btn" onclick="event.stopPropagation();Habits._del('${h.id}')">✕</button>`:''}
+        <button class="cl-del-btn" onclick="event.stopPropagation();Habits._delFrom('${h.id}','${Habits._dateStr(date)}')" title="이 날짜부터 삭제">✕</button>
       </div>`;
     }).join('')
     +`<div class="habit-add-btn" onclick="Habits.showInlineAdd()">+ 습관 추가</div>`;
@@ -174,6 +179,25 @@ const Habits = {
     Sounds?.delete();
     this.saveList(this.getList().filter(h=>h.id!==id));
     this.render();
+  },
+
+  _delFrom(id, dateStr) {
+    const today = this._dateStr(new Date());
+    if(dateStr === today) {
+      // 오늘이면 완전 삭제
+      if(!confirm('이 습관을 삭제하시겠습니까?')) return;
+      Sounds?.delete();
+      this.saveList(this.getList().filter(h=>h.id!==id));
+    } else {
+      // 과거 날짜면 해당일부터 숨기기 (deletedFrom 저장)
+      if(!confirm('오늘 이후로 이 습관을 중단하시겠습니까?')) return;
+      const list = this.getList();
+      const h = list.find(x=>x.id===id);
+      if(h) h.deletedFrom = today; // 오늘부터 안 보이게
+      this.saveList(list);
+    }
+    this.render();
+    FirebaseSync?.scheduleSave();
   },
 
   _moveUp(idx) {

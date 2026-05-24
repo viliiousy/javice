@@ -175,40 +175,7 @@
 <script src="js/user-store.js"></script>
 <script src="js/sounds.js"></script>
 <script src="js/notifications.js"></script>
-<!-- Firebase compat SDK (모듈 방식 대신 글로벌 방식) -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
-<script>
-  // Firebase 초기화 + FCM 토큰 발급 함수
-  (function() {
-    function initFCM() {
-      if(typeof firebase === 'undefined' || !CONFIG?.FIREBASE_CONFIG) {
-        setTimeout(initFCM, 200);
-        return;
-      }
-      try {
-        if(!firebase.apps.length) {
-          firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
-        }
-        const messaging = firebase.messaging();
-        window._fcmGetToken = async function() {
-          try {
-            const token = await messaging.getToken({ vapidKey: CONFIG.FCM_VAPID_KEY });
-            console.log('[FCM] 토큰 발급 성공:', token ? token.slice(0,20)+'...' : '없음');
-            return token;
-          } catch(e) {
-            console.error('[FCM] 토큰 오류:', e.message);
-            return null;
-          }
-        };
-        console.log('[FCM] 초기화 완료');
-      } catch(e) {
-        console.error('[FCM] 초기화 실패:', e.message);
-      }
-    }
-    setTimeout(initFCM, 500);
-  })();
-</script>
+
 <script src="js/reorder.js"></script>
 <script src="js/google-auth.js"></script>
 <script src="js/google-calendar.js"></script>
@@ -224,5 +191,28 @@
 <script src="js/app.js"></script>
 <script src="js/jarvis.js"></script>
 <script>if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});</script>
+<!-- Firebase compat SDK for FCM -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
+<script>
+window.addEventListener('load', function() {
+  try {
+    if(!firebase.apps.length) firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
+    const _msg = firebase.messaging();
+    window._fcmGetToken = async function() {
+      try {
+        const sw = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+        const token = await _msg.getToken({
+          vapidKey: CONFIG.FCM_VAPID_KEY,
+          serviceWorkerRegistration: sw
+        });
+        console.log('[FCM] 토큰:', token ? '성공 '+token.slice(0,15)+'...' : 'null');
+        return token || null;
+      } catch(e) { console.error('[FCM] 오류:', e.code||'', e.message); return null; }
+    };
+    console.log('[FCM] SDK 준비완료');
+  } catch(e) { console.error('[FCM] init 실패:', e.message); }
+});
+</script>
 </body>
 </html>
