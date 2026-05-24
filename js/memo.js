@@ -15,13 +15,9 @@ const Memo = {
       const preview=lines.slice(0,3).map(l=>esc(l)).join('<br>');
       const hasMore=lines.length>3;
 
-      return `<div class="memo-item" draggable="true"
-          ondragstart="Memo._dragStart(event,'${m.id}')"
-          ondragover="Memo._dragOver(event)"
-          ondrop="Memo._drop(event,'${m.id}')"
-          ondragend="Memo._dragEnd(event)"
-          onclick="Memo.showEdit('${m.id}')">
-
+      return `<div class="memo-item${Memo._reorderMode?' reorder-mode':''}"
+          data-reorderable="${m.id}"
+          onclick="${Memo._reorderMode?'':"Memo.showEdit('" + m.id + "')"}">
         <div class="memo-content-wrap">
           <div class="memo-title">${esc(m.title)}</div>
           ${preview?`<div class="memo-preview">${preview}${hasMore?'<span class="memo-more">…</span>':''}</div>`:''}
@@ -90,18 +86,23 @@ const Memo = {
   toggleReorderMode() {
     this._reorderMode = !this._reorderMode;
     const btn = document.getElementById('btnMemoReorder');
-    if (btn) { btn.style.background=this._reorderMode?'var(--accent)':''; btn.style.color=this._reorderMode?'white':''; }
+    if(btn) {
+      btn.style.background = this._reorderMode ? 'var(--accent)' : '';
+      btn.style.color      = this._reorderMode ? 'white' : '';
+    }
     this.render();
-    if (this._reorderMode && typeof Reorder !== 'undefined') {
+    if(this._reorderMode && typeof Reorder !== 'undefined') {
       setTimeout(() => {
         const wrap = document.getElementById('memoWrap');
-        if (wrap) Reorder.enable(wrap, (newOrder) => {
-          const items = this.getItems();
-          const sorted = newOrder.map(id => items.find(i => i.id === id)).filter(Boolean);
-          items.forEach(i => { if (!sorted.find(x => x.id === i.id)) sorted.push(i); });
-          this.saveItems(sorted); this.render(); Sounds?.click();
+        if(wrap) Reorder.enable(wrap, (newOrder) => {
+          const items  = this.getItems();
+          const sorted = newOrder.map(id => items.find(i=>i.id===id)).filter(Boolean);
+          items.forEach(i => { if(!sorted.find(x=>x.id===i.id)) sorted.push(i); });
+          this.saveItems(sorted);
+          this.render();
+          Sounds?.click();
         });
-      }, 50);
+      }, 80);
     }
   },
 

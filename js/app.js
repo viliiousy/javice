@@ -263,6 +263,7 @@ const App = {
         : d.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
       elDate.style.cursor = 'pointer';
       elDate.onclick = (e) => { e.stopPropagation(); App._toggleDateDropdown(d); };
+      elDate.ontouchend = (e) => { e.preventDefault(); e.stopPropagation(); App._toggleDateDropdown(d); };
     }
 
     // 요일 + 오늘 표시

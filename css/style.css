@@ -1400,3 +1400,17 @@ html.dark .reorder-dragging { background: var(--card) !important; }
   padding: 4px 6px !important;
   font-size: 12px !important;
 }
+
+
+/* ═══════════════════════════════════════
+   헤더 날짜 흰박스 + 짤림 수정
+   ═══════════════════════════════════════ */
+.h-date { overflow: visible !important; }
+.h-date-main { overflow: visible !important; white-space: nowrap; }
+.h-date-sub  { overflow: visible !important; white-space: nowrap; }
+.h-left { overflow: visible !important; }
+@media (max-width: 640px) {
+  .h-date  { overflow: visible !important; }
+  .h-left  { overflow: visible !important; flex-shrink: 1; min-width: 0; }
+  .header  { overflow: visible !important; }
+}
