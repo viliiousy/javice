@@ -184,32 +184,30 @@ const Habits = {
   },
 
   showInlineAdd() {
-    const daysHTML = this.DAYS_KO.map((d,i)=>
-      `<label class="day-pick-btn"><input type="checkbox" value="${i}" checked class="day-chk"> ${d}</label>`
-    ).join('');
     App.openModal('✅ 습관 추가',
-      `<div class="modal-row"><label class="modal-lbl">이름 *</label>
-        <input id="hName" type="text" placeholder="예: 물 2L 마시기" class="inp"></div>
-      <div class="modal-row"><label class="modal-lbl">이모지</label>
-        <input id="hEmoji" type="text" placeholder="✅" class="inp" style="width:80px" maxlength="2"></div>
-      <div class="modal-row"><label class="modal-lbl">반복 요일</label>
-        <div class="day-picker">${daysHTML}</div></div>
-      <div class="modal-btns" style="margin-top:12px">
-        <button onclick="Habits._saveNew()" class="btn-sm accent">추가</button>
-        <button onclick="App.closeModal()" class="btn-sm">취소</button>
-      </div>`
+      '<div class="modal-row"><label class="modal-lbl">이름 *</label>' +
+      '<input id="hName" type="text" placeholder="예: 물 2L 마시기" class="inp"></div>' +
+      '<div class="modal-row"><label class="modal-lbl">이모지</label>' +
+      '<input id="hEmoji" type="text" placeholder="✅" class="inp" style="width:80px" maxlength="2"></div>' +
+      '<div class="modal-btns" style="margin-top:12px">' +
+      '<button onclick="Habits._saveNew()" class="btn-sm accent">추가</button>' +
+      '<button onclick="App.closeModal()" class="btn-sm">취소</button>' +
+      '</div>'
     );
     setTimeout(() => document.getElementById('hName')?.focus(), 50);
   },
 
   _saveNew() {
-    const name=document.getElementById('hName')?.value.trim();
+    const name  = document.getElementById('hName')?.value.trim();
     if(!name){ App.showToast('이름을 입력해주세요','error'); return; }
-    const emoji=document.getElementById('hEmoji')?.value.trim()||'✅';
-    const days=[...document.querySelectorAll('.day-chk:checked')].map(c=>parseInt(c.value));
-    const list=this.getList();
-    list.push({id:'h'+Date.now(),name,emoji,days:days.length?days:[0,1,2,3,4,5,6]});
-    this.saveList(list); this.render(); App.closeModal(); App.showToast('습관 추가됨 ✓','success');
+    const emoji = document.getElementById('hEmoji')?.value.trim() || '✅';
+    const list  = this.getList();
+    list.push({ id:'h'+Date.now(), name, emoji, days:[0,1,2,3,4,5,6] });
+    this.saveList(list);
+    this.render();
+    App.closeModal();
+    App.showToast('습관 추가됨 ✓','success');
+    FirebaseSync?.scheduleSave();
   },
 
   showEditHabit(id) {

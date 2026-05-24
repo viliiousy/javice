@@ -339,25 +339,58 @@ const Diet = {
   // ── 설정 ──────────────────────────────
   showSettings(){
     const s=this.getSettings();
+    const days=['일','월','화','수','목','금','토'];
+    const dayRows = (key, label, defVal) => days.map((d,i) =>
+      `<td><input type="number" id="${key}_${i}" value="${s[key+'ByDay']?.[i]||''}" placeholder="${defVal}" class="inp" style="width:46px;padding:3px;font-size:10px;text-align:center"></td>`
+    ).join('');
+
     App.openModal('⚙️ 식단 목표 설정',`
-      <div class="modal-row"><label class="modal-lbl">칼로리 목표 (kcal)</label><input id="sCalG" type="number" value="${s.calorieGoal}" class="inp"></div>
+      <div class="modal-row"><label class="modal-lbl">기본 칼로리 (kcal)</label><input id="sCalG" type="number" value="${s.calorieGoal}" class="inp"></div>
       <div class="modal-grid2">
         <div><label class="modal-lbl">단백질 (g)</label><input id="sProtG" type="number" value="${s.proteinGoal}" class="inp inp-sm"></div>
         <div><label class="modal-lbl">탄수화물 (g)</label><input id="sCarbG" type="number" value="${s.carbGoal}" class="inp inp-sm"></div>
         <div><label class="modal-lbl">지방 (g)</label><input id="sFatG" type="number" value="${s.fatGoal}" class="inp inp-sm"></div>
       </div>
-      <div class="modal-btns">
+      <div style="margin-top:12px">
+        <label class="modal-lbl" style="margin-bottom:6px;display:block">📅 요일별 목표 (비우면 기본값)</label>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:11px;text-align:center">
+            <tr style="color:var(--text3)">
+              <td style="padding:3px;text-align:left;font-size:10px">항목</td>
+              ${days.map((d,i)=>`<td style="padding:3px;color:${i===0||i===6?'var(--red)':'var(--text2)'};font-weight:600">${d}</td>`).join('')}
+            </tr>
+            <tr><td style="font-size:10px;color:var(--text3);text-align:left;padding:3px">칼로리</td>${dayRows('cal',  '칼로리', s.calorieGoal)}</tr>
+            <tr><td style="font-size:10px;color:var(--text3);text-align:left;padding:3px">단백질g</td>${dayRows('pro',  '단백질', s.proteinGoal)}</tr>
+            <tr><td style="font-size:10px;color:var(--text3);text-align:left;padding:3px">탄수화물g</td>${dayRows('carb', '탄수화물', s.carbGoal)}</tr>
+            <tr><td style="font-size:10px;color:var(--text3);text-align:left;padding:3px">지방g</td>${dayRows('fat',  '지방', s.fatGoal)}</tr>
+          </table>
+        </div>
+      </div>
+      <div class="modal-btns" style="margin-top:14px">
         <button onclick="Diet.saveSettings()" class="btn-sm accent">저장</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
       </div>`);
   },
   saveSettings(){
+    const byDay = (key) => {
+      const obj={};
+      [0,1,2,3,4,5,6].forEach(i=>{
+        const v=parseInt(document.getElementById(key+'_'+i)?.value);
+        if(v>0) obj[i]=v;
+      });
+      return obj;
+    };
     UserStore.set(this._setKey(),JSON.stringify({
       calorieGoal:parseInt(document.getElementById('sCalG').value)||2200,
       proteinGoal:parseInt(document.getElementById('sProtG').value)||160,
       carbGoal:   parseInt(document.getElementById('sCarbG').value)||220,
       fatGoal:    parseInt(document.getElementById('sFatG').value)||60,
+      calByDay:  byDay('cal'),
+      proByDay:  byDay('pro'),
+      carbByDay: byDay('carb'),
+      fatByDay:  byDay('fat'),
     }));
+    FirebaseSync?.scheduleSave();
     this.render(); App.closeModal(); App.showToast('저장됨 ✓','success');
   },
 };
