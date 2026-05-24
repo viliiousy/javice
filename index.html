@@ -201,10 +201,11 @@ window.addEventListener('load', function() {
     const _msg = firebase.messaging();
     window._fcmGetToken = async function() {
       try {
-        const sw = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+        // sw.js (기존 서비스워커) 사용
+        const swReg = await navigator.serviceWorker.ready;
         const token = await _msg.getToken({
           vapidKey: CONFIG.FCM_VAPID_KEY,
-          serviceWorkerRegistration: sw
+          serviceWorkerRegistration: swReg,
         });
         console.log('[FCM] 토큰:', token ? '성공 '+token.slice(0,15)+'...' : 'null');
         return token || null;
