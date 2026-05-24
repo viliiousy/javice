@@ -17,7 +17,8 @@ const Memo = {
 
       return `<div class="memo-item${Memo._reorderMode?' reorder-mode':''}"
           data-reorderable="${m.id}"
-          onclick="${Memo._reorderMode?'':"Memo.showEdit('" + m.id + "')"}">
+          onclick="${Memo._reorderMode?'void(0)':"Memo.showEdit('" + m.id + "')"}">
+        ${Memo._reorderMode?'<div class="memo-drag-hint">⠿</div>':''}
         <div class="memo-content-wrap">
           <div class="memo-title">${esc(m.title)}</div>
           ${preview?`<div class="memo-preview">${preview}${hasMore?'<span class="memo-more">…</span>':''}</div>`:''}

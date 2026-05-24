@@ -184,25 +184,25 @@ const Habits = {
   },
 
   showInlineAdd() {
-    App.openModal('✅ 습관 추가',
-      '<div class="modal-row"><label class="modal-lbl">이름 *</label>' +
-      '<input id="hName" type="text" placeholder="예: 물 2L 마시기" class="inp"></div>' +
-      '<div class="modal-row"><label class="modal-lbl">이모지</label>' +
-      '<input id="hEmoji" type="text" placeholder="✅" class="inp" style="width:80px" maxlength="2"></div>' +
-      '<div class="modal-btns" style="margin-top:12px">' +
-      '<button onclick="Habits._saveNew()" class="btn-sm accent">추가</button>' +
-      '<button onclick="App.closeModal()" class="btn-sm">취소</button>' +
-      '</div>'
-    );
-    setTimeout(() => document.getElementById('hName')?.focus(), 50);
+    App.openModal('✅ 습관 추가',`
+      <div class="modal-row"><label class="modal-lbl">습관 이름 *</label>
+        <input id="habitName" type="text" placeholder="예: 물 2L 마시기" class="inp"></div>
+      <div class="modal-btns">
+        <button id="btnHabitAdd" class="btn-sm accent">추가</button>
+        <button onclick="App.closeModal()" class="btn-sm">취소</button>
+      </div>`);
+    setTimeout(()=>{
+      document.getElementById('habitName')?.focus();
+      document.getElementById('btnHabitAdd')?.addEventListener('click',()=>Habits._saveNew());
+      document.getElementById('habitName')?.addEventListener('keypress',e=>{ if(e.key==='Enter') Habits._saveNew(); });
+    },50);
   },
 
-  _saveNew() {
-    const name  = document.getElementById('hName')?.value.trim();
+    _saveNew() {
+    const name = document.getElementById('habitName')?.value.trim();
     if(!name){ App.showToast('이름을 입력해주세요','error'); return; }
-    const emoji = document.getElementById('hEmoji')?.value.trim() || '✅';
-    const list  = this.getList();
-    list.push({ id:'h'+Date.now(), name, emoji, days:[0,1,2,3,4,5,6] });
+    const list = this.getList();
+    list.push({ id:'h'+Date.now(), name, emoji:'✅', days:[0,1,2,3,4,5,6] });
     this.saveList(list);
     this.render();
     App.closeModal();

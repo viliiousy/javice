@@ -106,6 +106,8 @@ function dateStr(offset = 0) {
 async function processUser(uid, tokenData) {
   const { token, settings } = tokenData;
   if (!token || !settings?.enabled) return 0;
+  // local_ 토큰은 로컬 알림 전용 - FCM 발송 불가
+  if (token.startsWith('local_')) return 0;
 
   const now    = new Date(Date.now() + 9 * 3600000); // KST
   const hour   = now.getUTCHours();

@@ -90,18 +90,20 @@ const Reorder = {
     if (!this._active) return;
     const item = this._getItem(e.target);
     if (!item) return;
+    e.preventDefault();
 
     this._startY = e.clientY;
     clearTimeout(this._lpTimer);
     this._lpTimer = setTimeout(() => {
       this._startDrag(item, e.clientY);
-    }, 500);
+    }, 400);
   },
 
   _mMove(e) {
     if (this._dragging) {
+      e.preventDefault();
       this._moveDrag(e.clientY);
-    } else if (Math.abs(e.clientY - this._startY) > 8) {
+    } else if (Math.abs(e.clientY - this._startY) > 5) {
       clearTimeout(this._lpTimer);
     }
   },

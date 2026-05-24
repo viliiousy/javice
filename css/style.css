@@ -1414,3 +1414,21 @@ html.dark .reorder-dragging { background: var(--card) !important; }
   .h-left  { overflow: visible !important; flex-shrink: 1; min-width: 0; }
   .header  { overflow: visible !important; }
 }
+
+/* ═══════════════════════════════════════
+   메모 reorder 모드
+   ═══════════════════════════════════════ */
+.memo-item.reorder-mode {
+  cursor: grab;
+  border: 1.5px dashed var(--accent) !important;
+  background: var(--accent-bg) !important;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.memo-drag-hint {
+  font-size: 18px;
+  color: var(--accent);
+  padding: 0 8px 0 4px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
