@@ -51,19 +51,23 @@ const Notifications = {
         return false;
       }
 
-      // FCM 구독
-      const subscription = await this._swReg.pushManager.subscribe({
-        userVisibleOnly:      true,
-        applicationServerKey: this._urlBase64ToUint8Array(vapidKey),
-      });
+      // FCM SDK로 토큰 가져오기
+      let fcmToken = null;
+      if(window._fcmGetToken) {
+        fcmToken = await window._fcmGetToken();
+      }
 
-      // 서버에 토큰 저장
-      const tokenData = JSON.stringify(subscription);
-      this._token     = tokenData;
-      UserStore.set('gl_fcm_token', tokenData);
+      if(!fcmToken) {
+        App.showToast('FCM 토큰 발급 실패 - 잠시 후 재시도', 'error');
+        return false;
+      }
+
+      this._token = fcmToken;
+      UserStore.set('gl_fcm_token', fcmToken);
+      FirebaseSync?.scheduleSave();
 
       // Vercel API에 등록
-      await this._registerToken(tokenData);
+      await this._registerToken(fcmToken);
       App.showToast('✅ 알림이 활성화됐습니다', 'success');
       return true;
     } catch (e) {
@@ -78,11 +82,13 @@ const Notifications = {
     const uid = UserStore.getUser();
     const settings = this.getSettings();
     try {
-      await fetch('/api/subscribe', {
+      const res = await fetch('/api/subscribe', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ uid, token, settings }),
       });
+      const data = await res.json();
+      console.log('[Notif] 토큰 등록:', data);
     } catch (e) {
       console.warn('[Notif] 토큰 등록 실패:', e);
     }

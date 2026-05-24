@@ -686,7 +686,7 @@ textarea.inp{ resize:vertical; min-height:64px; }
   .header{ padding:10px 14px; }
   .h-logo{ font-size:16px; }
   .h-date-main{ font-size:12px; }
-  .h-date-sub{ display:none; }
+  .h-date-sub{ font-size:10px; }
   .h-name{ display:none; }
   .w3-side{ display:none; }  /* 어제/내일 숨김 */
 

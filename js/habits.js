@@ -200,13 +200,15 @@ const Habits = {
       </div>`
     );
     setTimeout(() => {
-      document.getElementById('hName')?.focus();
-      document.getElementById('btnHSave')?.addEventListener('click', () => Habits._saveNew());
-      document.getElementById('hName')?.addEventListener('keypress', e => { if(e.key==='Enter') Habits._saveNew(); });
+      const btn = document.getElementById('btnHSave');
+      const inp = document.getElementById('hName');
+      if(inp) inp.focus();
+      if(btn) btn.addEventListener('click', () => Habits._saveNew());
+      if(inp) inp.addEventListener('keypress', e => { if(e.key==='Enter') Habits._saveNew(); });
     }, 50);
   },
 
-    _saveNew() {
+  _saveNew() {
     const name=document.getElementById('hName')?.value.trim();
     if(!name){ App.showToast('이름을 입력해주세요','error'); return; }
     const emoji=document.getElementById('hEmoji')?.value.trim()||'✅';
