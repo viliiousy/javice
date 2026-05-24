@@ -194,12 +194,16 @@ const Habits = {
           ${this.DAYS_KO.map((d,i)=>`<label class="day-pick-btn"><input type="checkbox" value="${i}" checked class="day-chk"> ${d}</label>`).join('')}
         </div>
       </div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:12px">※ 오늘부터 적용, 과거 기록 유지</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:12px">※ 오늘부터 적용</div>
       <div class="modal-btns">
-        <button onclick="Habits._saveNew()" class="btn-sm accent">추가</button>
+        <button id="btnHabitSaveNew" class="btn-sm accent">추가</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
       </div>`);
-    setTimeout(()=>document.getElementById('hName')?.focus(),50);
+    setTimeout(()=>{
+      document.getElementById('hName')?.focus();
+      document.getElementById('btnHabitSaveNew')?.addEventListener('click', ()=>Habits._saveNew());
+      document.getElementById('hName')?.addEventListener('keypress', e=>{ if(e.key==='Enter') Habits._saveNew(); });
+    },50);
   },
 
   _saveNew() {

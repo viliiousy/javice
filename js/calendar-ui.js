@@ -82,8 +82,8 @@ const CalendarUI = {
 
       cells+=`<div class="${cls}"
         onclick="App.selectCalDate(new Date(${yr},${mo},${d}))"
+        ontouchend="(function(e){e.preventDefault();App.selectCalDate(new Date(${yr},${mo},${d}));CalendarUI._endLP();})(event)"
         ontouchstart="CalendarUI._startLP(${yr},${mo},${d},event)"
-        ontouchend="CalendarUI._endLP()"
         ontouchcancel="CalendarUI._endLP()"
         onmousedown="CalendarUI._startLP(${yr},${mo},${d},event)"
         onmouseup="CalendarUI._endLP()"

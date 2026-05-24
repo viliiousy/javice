@@ -1299,7 +1299,7 @@ html.dark .reorder-dragging { background: var(--card) !important; }
    날씨 크기 60% 축소 (모바일)
    ═══════════════════════════════════════ */
 @media (max-width: 640px) {
-  .weather-3day { transform: scale(0.72); transform-origin: right center; }
+  .weather-3day { transform: scale(0.82); transform-origin: right center; }
   .h-weather-wrap { overflow: visible; }
 }
 
@@ -1307,4 +1307,53 @@ html.dark .reorder-dragging { background: var(--card) !important; }
 .today-label {
   color: #059669 !important;
   font-weight: 900 !important;
+}
+
+
+/* ═══════════════════════════════════════
+   모바일 헤더 날짜 두줄 + 간격 축소
+   ═══════════════════════════════════════ */
+@media (max-width: 640px) {
+  .h-date {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0px;
+    line-height: 1.2;
+  }
+  .h-date-main {
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    color: var(--text) !important;
+    line-height: 1.2;
+  }
+  .h-date-sub {
+    font-size: 11px !important;
+    line-height: 1.2;
+  }
+  /* 헤더와 스탯바 사이 공백 제거 */
+  .header { padding: 6px 12px !important; }
+  .header-sticky-group { gap: 0; }
+  .stats-banner { padding: 4px 12px !important; }
+}
+
+/* ═══════════════════════════════════════
+   reorder 모드 - 아이템 전체 드래그 가능
+   ═══════════════════════════════════════ */
+.habit-item.reorder-mode,
+.cl-item.reorder-mode {
+  cursor: grab;
+  background: var(--accent-bg) !important;
+  border: 1.5px dashed var(--accent) !important;
+  user-select: none;
+}
+.habit-item.reorder-mode:active,
+.cl-item.reorder-mode:active {
+  cursor: grabbing;
+}
+/* reorder 모드에서 텍스트 선택 방지 */
+.habit-item.reorder-mode *,
+.cl-item.reorder-mode * {
+  user-select: none;
+  -webkit-user-select: none;
 }
