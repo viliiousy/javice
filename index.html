@@ -171,28 +171,29 @@
 <script src="js/user-store.js"></script>
 <script src="js/sounds.js"></script>
 <script src="js/notifications.js"></script>
-<!-- Firebase SDK for FCM token -->
 <script type="module" id="fcmInit">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyAuto-generated",
-    projectId: "javice-6b647",
-    messagingSenderId: "651258693434",
-    appId: "javice-web"
-  };
-
   window._fcmGetToken = async function() {
     try {
-      const app = initializeApp(firebaseConfig, "javice-fcm");
+      const app = initializeApp(CONFIG.FIREBASE_CONFIG, "javice-fcm");
       const messaging = getMessaging(app);
       const token = await getToken(messaging, { vapidKey: CONFIG.FCM_VAPID_KEY });
+      console.log("[FCM] 토큰 발급 성공:", token.slice(0,20)+"...");
       return token;
     } catch(e) {
-      console.error("[FCM]", e);
+      console.error("[FCM] 토큰 발급 실패:", e);
       return null;
     }
+  };
+
+  window._fcmOnMessage = function(callback) {
+    try {
+      const app = initializeApp(CONFIG.FIREBASE_CONFIG, "javice-fcm");
+      const messaging = getMessaging(app);
+      onMessage(messaging, callback);
+    } catch(e) {}
   };
 </script>
 <script src="js/reorder.js"></script>

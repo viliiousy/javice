@@ -51,11 +51,22 @@ const Notifications = {
         return false;
       }
 
-      // 알림 권한만 받기 (브라우저 로컬 알림)
-      const token = 'local_' + UserStore.getUser() + '_' + Date.now();
+      // FCM 토큰 발급 시도
+      let token = null;
+      if(window._fcmGetToken) {
+        App.showToast('FCM 토큰 발급 중...', '');
+        token = await window._fcmGetToken();
+      }
+      if(!token) {
+        // fallback: 로컬 알림용 토큰
+        token = 'local_' + UserStore.getUser() + '_' + Date.now();
+      }
       this._token = token;
       UserStore.set('gl_fcm_token', token);
       FirebaseSync?.scheduleSave();
+      if(!token.startsWith('local_')) {
+        await this._registerToken(token);
+      }
       App.showToast('✅ 알림이 활성화됐습니다', 'success');
       return true;
     } catch (e) {
