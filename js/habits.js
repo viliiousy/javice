@@ -195,17 +195,11 @@ const Habits = {
       <div class="modal-row"><label class="modal-lbl">반복 요일</label>
         <div class="day-picker">${daysHTML}</div></div>
       <div class="modal-btns" style="margin-top:12px">
-        <button id="btnHSave" class="btn-sm accent">추가</button>
+        <button onclick="Habits._saveNew()" class="btn-sm accent">추가</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
       </div>`
     );
-    setTimeout(() => {
-      const btn = document.getElementById('btnHSave');
-      const inp = document.getElementById('hName');
-      if(inp) inp.focus();
-      if(btn) btn.addEventListener('click', () => Habits._saveNew());
-      if(inp) inp.addEventListener('keypress', e => { if(e.key==='Enter') Habits._saveNew(); });
-    }, 50);
+    setTimeout(() => document.getElementById('hName')?.focus(), 50);
   },
 
   _saveNew() {

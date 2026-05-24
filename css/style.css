@@ -1357,3 +1357,46 @@ html.dark .reorder-dragging { background: var(--card) !important; }
   user-select: none;
   -webkit-user-select: none;
 }
+
+
+/* ═══════════════════════════════════════
+   헤더 모바일 - 텍스트 넘침 방지
+   ═══════════════════════════════════════ */
+@media (max-width: 640px) {
+  .header { padding: 5px 10px !important; min-height: 0; }
+  .h-left { flex: 1; min-width: 0; overflow: hidden; }
+  .h-logo { font-size: 13px !important; white-space: nowrap; }
+  .h-date { min-width: 0; flex: 1; overflow: hidden; }
+  .h-date-main { font-size: 11px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .h-date-sub  { font-size: 10px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+  .stats-banner { padding: 3px 10px !important; }
+  /* header-sticky-group 패딩 0 */
+  .header-sticky-group { gap: 0 !important; }
+}
+
+/* ═══════════════════════════════════════
+   알림 모달 한줄 레이아웃
+   ═══════════════════════════════════════ */
+.notif-time-lbl {
+  font-size: 12px;
+  color: var(--text2);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.notif-time-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 5px;
+}
+.notif-time-inp,
+.notif-time-row input[type="time"],
+.notif-time-row select {
+  flex: 0 0 auto;
+  width: 120px !important;
+  padding: 4px 6px !important;
+  font-size: 12px !important;
+}

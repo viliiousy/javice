@@ -51,23 +51,11 @@ const Notifications = {
         return false;
       }
 
-      // FCM SDK로 토큰 가져오기
-      let fcmToken = null;
-      if(window._fcmGetToken) {
-        fcmToken = await window._fcmGetToken();
-      }
-
-      if(!fcmToken) {
-        App.showToast('FCM 토큰 발급 실패 - 잠시 후 재시도', 'error');
-        return false;
-      }
-
-      this._token = fcmToken;
-      UserStore.set('gl_fcm_token', fcmToken);
+      // 알림 권한만 받기 (브라우저 로컬 알림)
+      const token = 'local_' + UserStore.getUser() + '_' + Date.now();
+      this._token = token;
+      UserStore.set('gl_fcm_token', token);
       FirebaseSync?.scheduleSave();
-
-      // Vercel API에 등록
-      await this._registerToken(fcmToken);
       App.showToast('✅ 알림이 활성화됐습니다', 'success');
       return true;
     } catch (e) {
@@ -94,20 +82,20 @@ const Notifications = {
     }
   },
 
-  // 테스트 알림
+  // 테스트 알림 (로컬 Notification API)
   async sendTest() {
-    const token = UserStore.get('gl_fcm_token');
-    if (!token) { App.showToast('먼저 알림을 활성화해주세요', 'error'); return; }
-    try {
-      const res  = await fetch('/api/test-push', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ token }),
+    if(Notification.permission !== 'granted') {
+      await Notification.requestPermission();
+    }
+    if(Notification.permission === 'granted') {
+      new Notification('⚡ 자비스 알림 테스트', {
+        body: '알림이 정상 작동합니다! 🎉',
+        icon: '/icons/icon-192.png',
       });
-      const data = await res.json();
-      if (data.success) App.showToast('✅ 테스트 알림 전송됨', 'success');
-      else App.showToast('전송 실패: ' + JSON.stringify(data), 'error');
-    } catch (e) { App.showToast('전송 실패: ' + e.message, 'error'); }
+      App.showToast('✅ 테스트 알림 전송됨', 'success');
+    } else {
+      App.showToast('알림 권한이 없습니다', 'error');
+    }
   },
 
   // 알림 설정 모달
@@ -135,8 +123,8 @@ const Notifications = {
             onchange="Notifications._toggle('habits',this.checked)">
         </div>
         <div class="notif-time-row" id="nr_habits" ${!s.habits?.enabled?'style="display:none"':''}>
-          <span style="font-size:12px;color:var(--text2)">알림 시간</span>
-          <input type="time" value="${s.habits?.time||'21:00'}" class="inp inp-sm"
+          <span class="notif-time-lbl">알림 시간</span>
+          <input type="time" value="${s.habits?.time||'21:00'}" class="inp notif-time-inp"
             onchange="Notifications._setTime('habits','time',this.value)">
         </div>
       </div>
@@ -164,7 +152,7 @@ const Notifications = {
             onchange="Notifications._toggle('tasks',this.checked)">
         </div>
         <div class="notif-time-row" id="nr_tasks" ${!s.tasks?.enabled?'style="display:none"':''}>
-          <span style="font-size:12px;color:var(--text2)">알림 시간</span>
+          <span class="notif-time-lbl">알림 시간</span>
           <input type="time" value="${s.tasks?.time||'09:00'}" class="inp inp-sm"
             onchange="Notifications._setTime('tasks','time',this.value)">
         </div>
@@ -177,7 +165,7 @@ const Notifications = {
             onchange="Notifications._toggle('calendar',this.checked)">
         </div>
         <div class="notif-time-row" id="nr_calendar" ${!s.calendar?.enabled?'style="display:none"':''}>
-          <span style="font-size:12px;color:var(--text2)">몇 분 전</span>
+          <span class="notif-time-lbl">몇 분 전</span>
           <select class="inp inp-sm" onchange="Notifications._setTime('calendar','minutesBefore',parseInt(this.value))">
             ${[10,15,30,60].map(m=>`<option value="${m}" ${s.calendar?.minutesBefore===m?'selected':''}>${m}분 전</option>`).join('')}
           </select>
