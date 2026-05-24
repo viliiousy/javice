@@ -28,8 +28,13 @@ const Habits = {
   setChecked(v,date=new Date()) { UserStore.set(this._dateKey(date), JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
 
   getHabitsForDate(date=new Date()) {
-    const dow=new Date(date).getDay();
-    return this.getList().filter(h=>!h.days||h.days.length===0||h.days.includes(dow));
+    const dow     = new Date(date).getDay();
+    const dateStr = this._dateStr(date);
+    return this.getList().filter(h => {
+      // 생성일 이후에만 표시
+      if(h.createdAt && dateStr < h.createdAt) return false;
+      return !h.days || h.days.length===0 || h.days.includes(dow);
+    });
   },
 
   streak(id) {
@@ -67,7 +72,6 @@ const Habits = {
         onclick="Habits._handleTap('${h.id}','${Habits._dateStr(date)}')">
         ${Habits._reorderMode?`<div class="reorder-handle" onclick="event.stopPropagation()" title="꾹 눌러서 순서 변경">⠿</div>`:''}
         <div class="habit-chk">${isDone?'✓':''}</div>
-        <span class="habit-emoji">${h.emoji}</span>
         <span class="habit-name">${esc(h.name)}${daysLabel}</span>
         ${st>0&&!Habits._reorderMode?`<span class="habit-streak">🔥${st}</span>`:''}
         ${isToday?`<button class="cl-del-btn" onclick="event.stopPropagation();Habits._del('${h.id}')">✕</button>`:''}
@@ -184,13 +188,21 @@ const Habits = {
   },
 
   showInlineAdd() {
-    App.openModal('✅ 습관 추가',`
-      <div class="modal-row"><label class="modal-lbl">습관 이름 *</label>
-        <input id="habitName" type="text" placeholder="예: 물 2L 마시기" class="inp"></div>
-      <div class="modal-btns">
-        <button id="btnHabitAdd" class="btn-sm accent">추가</button>
-        <button onclick="App.closeModal()" class="btn-sm">취소</button>
-      </div>`);
+    const dayBtns = this.DAYS_KO.map((d,i) =>
+      '<label class="day-pick-btn">' +
+      '<input type="checkbox" value="' + i + '" checked class="hday-chk"> ' + d +
+      '</label>'
+    ).join('');
+    App.openModal('✅ 습관 추가',
+      '<div class="modal-row"><label class="modal-lbl">습관 이름 *</label>' +
+      '<input id="habitName" type="text" placeholder="예: 물 2L 마시기" class="inp"></div>' +
+      '<div class="modal-row"><label class="modal-lbl">반복 요일</label>' +
+      '<div class="day-picker">' + dayBtns + '</div></div>' +
+      '<div class="modal-btns" style="margin-top:10px">' +
+      '<button id="btnHabitAdd" class="btn-sm accent">추가</button>' +
+      '<button onclick="App.closeModal()" class="btn-sm">취소</button>' +
+      '</div>'
+    );
     setTimeout(()=>{
       document.getElementById('habitName')?.focus();
       document.getElementById('btnHabitAdd')?.addEventListener('click',()=>Habits._saveNew());
@@ -201,8 +213,16 @@ const Habits = {
     _saveNew() {
     const name = document.getElementById('habitName')?.value.trim();
     if(!name){ App.showToast('이름을 입력해주세요','error'); return; }
+    const days = [...document.querySelectorAll('.hday-chk:checked')].map(c=>parseInt(c.value));
     const list = this.getList();
-    list.push({ id:'h'+Date.now(), name, emoji:'✅', days:[0,1,2,3,4,5,6] });
+    const today = this._dateStr(new Date());
+    list.push({
+      id: 'h'+Date.now(),
+      name,
+      emoji: '',
+      days: days.length ? days : [0,1,2,3,4,5,6],
+      createdAt: today,  // 생성일 저장
+    });
     this.saveList(list);
     this.render();
     App.closeModal();

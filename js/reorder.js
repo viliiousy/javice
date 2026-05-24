@@ -1,180 +1,191 @@
-// js/reorder.js — 순서변경 모듈 (reorder 모드일 때만 꾹누르기 드래그)
+// js/reorder.js — 순서변경 (PC: 꾹누르기 400ms, 모바일: 터치 500ms)
 
 const Reorder = {
-  _dragging:    null,
+  _dragging:  null,
   _placeholder: null,
-  _onReorder:   null,
-  _lpTimer:     null,
-  _container:   null,
-  _startY:      0,
-  _itemTop:     0,
-  _active:      false, // reorder 모드 활성 여부
+  _onReorder: null,
+  _container: null,
+  _startX: 0,
+  _startY: 0,
+  _itemTop: 0,
+  _itemLeft: 0,
+  _lpTimer: null,
+  _active: false,
+  _handlers: [],
 
   enable(container, onReorder) {
-    if (!container) return;
+    if(!container) return;
     this._onReorder = onReorder;
     this._container = container;
     this._active    = true;
 
-    // 기존 이벤트 제거 후 재등록
-    container._reorderHandlers?.forEach(([type, fn]) => container.removeEventListener(type, fn));
-    container._reorderHandlers = [];
+    // 기존 핸들러 제거
+    this._handlers.forEach(([el,t,fn]) => el.removeEventListener(t,fn));
+    this._handlers = [];
 
-    const addEvt = (type, fn, opts) => {
-      container.addEventListener(type, fn, opts);
-      container._reorderHandlers.push([type, fn]);
+    const add = (el, type, fn, opts) => {
+      el.addEventListener(type, fn, opts);
+      this._handlers.push([el, type, fn]);
     };
 
-    addEvt('touchstart',  e => this._tStart(e),  { passive: false });
-    addEvt('touchmove',   e => this._tMove(e),   { passive: false });
-    addEvt('touchend',    e => this._tEnd(e),    { passive: false });
-    addEvt('touchcancel', e => this._cancel());
-    addEvt('mousedown',   e => this._mStart(e));
+    // 터치 이벤트
+    add(container, 'touchstart', e => this._onTouchStart(e), {passive:false});
+    add(container, 'touchmove',  e => this._onTouchMove(e),  {passive:false});
+    add(container, 'touchend',   e => this._onTouchEnd(e));
+    add(container, 'touchcancel',() => this._cancel());
 
-    document.addEventListener('mouseup',   () => this._cancel());
-    document.addEventListener('mousemove', e => this._mMove(e));
+    // 마우스 이벤트 (document 레벨)
+    add(container, 'mousedown', e => this._onMouseDown(e));
+    const onMove = e => this._onMouseMove(e);
+    const onUp   = e => this._onMouseUp(e);
+    add(document, 'mousemove', onMove);
+    add(document, 'mouseup',   onUp);
   },
 
-  disable(container) {
-    if (!container) return;
+  disable() {
     this._active = false;
     this._cancel();
-    container._reorderHandlers?.forEach(([type, fn]) => container.removeEventListener(type, fn));
-    container._reorderHandlers = [];
+    this._handlers.forEach(([el,t,fn]) => el.removeEventListener(t,fn));
+    this._handlers = [];
   },
 
-  // 드래그 가능한 아이템 찾기 (핸들 아닌 아무 곳이나)
   _getItem(el) {
-    // reorder-toggle-btn, cl-del-btn, cl-check 등 버튼은 제외
-    if (el.closest('.reorder-toggle-btn, .cl-del-btn, .cl-check, .habit-chk, .cl-del-btn')) return null;
+    // 버튼류 제외
+    if(el.closest('button, .cl-check, .habit-chk, .cl-del-btn, .reorder-toggle-btn')) return null;
     return el.closest('[data-reorderable]');
   },
 
-  // ── Touch ──────────────────────────────
-  _tStart(e) {
-    if (!this._active) return;
+  // ── TOUCH ──────────────────────────────
+  _onTouchStart(e) {
+    if(!this._active) return;
     const item = this._getItem(e.target);
-    if (!item) return;
-
+    if(!item) return;
+    this._startX = e.touches[0].clientX;
     this._startY = e.touches[0].clientY;
     clearTimeout(this._lpTimer);
     this._lpTimer = setTimeout(() => {
-      e.preventDefault();
-      this._startDrag(item, e.touches[0].clientY);
+      this._startDrag(item, e.touches[0].clientX, e.touches[0].clientY);
       try { navigator.vibrate?.(40); } catch {}
     }, 500);
   },
 
-  _tMove(e) {
-    if (this._dragging) {
-      e.preventDefault();
-      this._moveDrag(e.touches[0].clientY);
-    } else {
-      // 손가락 많이 움직이면 꾹누르기 취소
-      if (Math.abs(e.touches[0].clientY - this._startY) > 8) {
-        clearTimeout(this._lpTimer);
-      }
+  _onTouchMove(e) {
+    const dx = Math.abs(e.touches[0].clientX - this._startX);
+    const dy = Math.abs(e.touches[0].clientY - this._startY);
+    if(!this._dragging) {
+      if(dx > 8 || dy > 8) clearTimeout(this._lpTimer);
+      return;
     }
-  },
-
-  _tEnd(e) {
-    clearTimeout(this._lpTimer);
-    if (this._dragging) {
-      e.preventDefault();
-      this._endDrag();
-    }
-  },
-
-  // ── Mouse ──────────────────────────────
-  _mStart(e) {
-    if (!this._active) return;
-    const item = this._getItem(e.target);
-    if (!item) return;
     e.preventDefault();
+    this._moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+  },
 
+  _onTouchEnd(e) {
+    clearTimeout(this._lpTimer);
+    if(this._dragging) { e.preventDefault(); this._endDrag(); }
+  },
+
+  // ── MOUSE ──────────────────────────────
+  _onMouseDown(e) {
+    if(!this._active || e.button !== 0) return;
+    const item = this._getItem(e.target);
+    if(!item) return;
+    this._startX = e.clientX;
     this._startY = e.clientY;
     clearTimeout(this._lpTimer);
     this._lpTimer = setTimeout(() => {
-      this._startDrag(item, e.clientY);
+      this._startDrag(item, e.clientX, e.clientY);
     }, 400);
   },
 
-  _mMove(e) {
-    if (this._dragging) {
-      e.preventDefault();
-      this._moveDrag(e.clientY);
-    } else if (Math.abs(e.clientY - this._startY) > 5) {
-      clearTimeout(this._lpTimer);
+  _onMouseMove(e) {
+    const dx = Math.abs(e.clientX - this._startX);
+    const dy = Math.abs(e.clientY - this._startY);
+    if(!this._dragging) {
+      if(dx > 5 || dy > 5) clearTimeout(this._lpTimer);
+      return;
     }
+    e.preventDefault();
+    this._moveDrag(e.clientX, e.clientY);
+  },
+
+  _onMouseUp(e) {
+    clearTimeout(this._lpTimer);
+    if(this._dragging) this._endDrag();
   },
 
   _cancel() {
     clearTimeout(this._lpTimer);
-    if (this._dragging) this._endDrag(true);
+    if(this._dragging) this._endDrag(true);
   },
 
   // ── 드래그 시작 ────────────────────────
-  _startDrag(item, y) {
+  _startDrag(item, x, y) {
     this._dragging = item;
+    this._startX   = x;
     this._startY   = y;
 
+    // placeholder
     this._placeholder = document.createElement('div');
     this._placeholder.className = 'reorder-placeholder';
     this._placeholder.style.height = item.offsetHeight + 'px';
     item.after(this._placeholder);
 
     const rect = item.getBoundingClientRect();
-    this._itemTop = rect.top;
+    this._itemTop  = rect.top;
+    this._itemLeft = rect.left;
+
     item.classList.add('reorder-dragging');
-    item.style.cssText = `
-      position:fixed;z-index:9999;
-      width:${rect.width}px;
-      left:${rect.left}px;
-      top:${rect.top}px;
-      pointer-events:none;
-      transition:none;
-      box-shadow:0 8px 24px rgba(0,0,0,0.18);
-    `;
+    item.style.cssText = [
+      'position:fixed',
+      'z-index:9999',
+      `width:${rect.width}px`,
+      `left:${rect.left}px`,
+      `top:${rect.top}px`,
+      'pointer-events:none',
+      'transition:none',
+      'box-shadow:0 8px 24px rgba(0,0,0,0.18)',
+    ].join(';');
   },
 
   // ── 드래그 이동 ────────────────────────
-  _moveDrag(y) {
-    if (!this._dragging) return;
+  _moveDrag(x, y) {
+    if(!this._dragging) return;
     const dy = y - this._startY;
-    this._itemTop += dy;
-    this._startY   = y;
+    this._itemTop  += dy;
+    this._startY    = y;
     this._dragging.style.top = this._itemTop + 'px';
 
     const siblings = [...this._container.querySelectorAll('[data-reorderable]')]
-      .filter(el => el !== this._dragging && !el.classList.contains('reorder-dragging'));
+      .filter(el => el !== this._dragging);
 
-    for (const sib of siblings) {
-      const rect = sib.getBoundingClientRect();
-      if (y < rect.top + rect.height / 2) {
+    for(const sib of siblings) {
+      const r = sib.getBoundingClientRect();
+      if(y < r.top + r.height / 2) {
         sib.before(this._placeholder);
         return;
       }
     }
-    const last = siblings[siblings.length - 1];
-    if (last) last.after(this._placeholder);
+    const last = siblings[siblings.length-1];
+    if(last) last.after(this._placeholder);
   },
 
   // ── 드래그 종료 ────────────────────────
-  _endDrag(cancel = false) {
-    if (!this._dragging) return;
+  _endDrag(cancel=false) {
+    if(!this._dragging) return;
     const item = this._dragging;
 
     item.style.cssText = '';
     item.classList.remove('reorder-dragging');
 
-    if (!cancel && this._placeholder) {
+    if(!cancel && this._placeholder) {
       this._placeholder.before(item);
     }
     this._placeholder?.remove();
     this._placeholder = null;
     this._dragging    = null;
 
-    if (!cancel && this._onReorder) {
+    if(!cancel && this._onReorder) {
       const newOrder = [...this._container.querySelectorAll('[data-reorderable]')]
         .map(el => el.dataset.reorderable);
       this._onReorder(newOrder);
