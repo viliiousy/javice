@@ -97,8 +97,8 @@ const App = {
       await Promise.all(this.S.lists.map(async l=>{
         this.S.tasks[l.id]=await GoogleTasks.fetchTasks(l.id);
         this.S.tasks[l.id].forEach(t=>{
-          t.starred=localStorage.getItem('gl_star_'+t.id)==='1';
-          t._hidden=localStorage.getItem('gl_hidden_'+t.id)==='1';
+          t.starred=UserStore.get('gl_star_'+t.id)==='1';
+          t._hidden=UserStore.get('gl_hidden_'+t.id)==='1';
         });
       }));
       this._buildTaskFilters();
@@ -755,7 +755,8 @@ const App = {
   _toggleHideTask(taskId,listId){
     const t=this.S.tasks[listId]?.find(x=>x.id===taskId); if(!t) return;
     t._hidden=!t._hidden;
-    localStorage.setItem('gl_hidden_'+taskId, t._hidden?'1':'');
+    UserStore.set('gl_hidden_'+taskId, t._hidden?'1':'');
+    FirebaseSync?.scheduleSave();
     this._renderTasks();
     this._updateStatsBanner();
   },

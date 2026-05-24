@@ -196,14 +196,21 @@ const Habits = {
       </div>
       <div style="font-size:11px;color:var(--text3);margin-bottom:12px">※ 오늘부터 적용</div>
       <div class="modal-btns">
-        <button id="btnHabitSaveNew" class="btn-sm accent">추가</button>
-        <button onclick="App.closeModal()" class="btn-sm">취소</button>
+        <button id="btnHabitSaveNew" class="btn-sm accent" type="button">추가</button>
+        <button class="btn-sm" type="button" id="btnHabitCancel">취소</button>
       </div>`);
-    setTimeout(()=>{
-      document.getElementById('hName')?.focus();
-      document.getElementById('btnHabitSaveNew')?.addEventListener('click', ()=>Habits._saveNew());
-      document.getElementById('hName')?.addEventListener('keypress', e=>{ if(e.key==='Enter') Habits._saveNew(); });
-    },50);
+    const attach = () => {
+      const btn  = document.getElementById('btnHabitSaveNew');
+      const inp  = document.getElementById('hName');
+      const can  = document.getElementById('btnHabitCancel');
+      if(btn)  { btn.onclick  = (e) => { e.preventDefault(); e.stopPropagation(); Habits._saveNew(); }; }
+      if(can)  { can.onclick  = (e) => { e.preventDefault(); App.closeModal(); }; }
+      if(inp)  {
+        inp.focus();
+        inp.onkeydown = (e) => { if(e.key==='Enter'){ e.preventDefault(); Habits._saveNew(); } };
+      }
+    };
+    setTimeout(attach, 100);
   },
 
   _saveNew() {
