@@ -47,7 +47,7 @@
   <div class="header-sticky-group">
   <header class="header" style="position:static;box-shadow:none;">
     <div class="h-left">
-      <a href="/" class="h-logo" style="text-decoration:none;display:flex;flex-direction:column;align-items:center;gap:1px"><img src="icons/icon-192.png" style="width:28px;height:28px;border-radius:6px"><span style="font-size:9px;font-weight:700;color:var(--accent);letter-spacing:0.5px">자비스</span></a>
+      <a href="/" class="h-logo" style="text-decoration:none;display:flex;flex-direction:column;align-items:center;gap:1px"><img src="icons/icon-192.png" style="width:34px;height:34px;border-radius:8px"><span style="font-size:10px;font-weight:700;color:var(--accent);letter-spacing:0.5px">자비스</span></a>
       <div class="h-date">
         <div id="hDate" class="h-date-main"></div>
         <div id="hDay" class="h-date-sub"></div>
@@ -57,8 +57,6 @@
       <div id="hWeather" class="h-weather-wrap"></div>
       <div id="hUser" class="h-user" style="display:none" onclick="App.toggleProfileMenu()">
         <img id="hAvatar" src="" alt="" class="h-avatar">
-        <span id="hName" class="h-name"></span>
-        <span class="h-chevron">▾</span>
       </div>
       <div id="profileMenu" class="profile-menu hidden">
         <div class="profile-menu-item" style="font-size:11px;color:var(--text3);cursor:default;padding:6px 16px;border-bottom:1px solid var(--border)">v26.05.25.0116 업데이트</div>
@@ -123,7 +121,7 @@
     <section class="card card-checklist">
       <div class="card-head">
         <span class="card-title">✍️ 체크리스트</span>
-        <button class="btn-sm" id="btnClReorder" onclick="Checklist.toggleReorderMode()" title="순서 변경">↕️</button>
+        <button class="btn-sm" id="btnClReorder" onclick="Checklist.toggleReorderMode()" title="편집 모드">⚙️</button>
       </div>
       <div id="checklistWrap" class="checklist-wrap"></div>
     </section>
@@ -132,7 +130,7 @@
     <section class="card card-habits">
       <div class="card-head">
         <span class="card-title">✅ 오늘의 습관</span>
-        <button class="btn-sm" id="btnHabitReorder" onclick="Habits.toggleReorderMode()" title="순서 변경">↕️</button>
+        <button class="btn-sm" id="btnHabitReorder" onclick="Habits.toggleReorderMode()" title="편집 모드" title="순서 변경">↕️</button>
       </div>
       <div id="habitsWrap" class="habits-wrap"></div>
       <div id="habitsFooter" class="habits-footer"></div>
@@ -151,7 +149,7 @@
     <section class="card card-memo">
       <div class="card-head">
         <span class="card-title">📝 메모</span>
-        <button class="btn-sm" id="btnMemoReorder" onclick="Memo.toggleReorderMode()" title="순서 변경">↕️</button>
+        <button class="btn-sm" id="btnMemoReorder" onclick="Memo.toggleReorderMode()" title="편집 모드">⚙️</button>
       </div>
       <div id="memoWrap" class="memo-wrap"></div>
     </section>

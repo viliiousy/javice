@@ -350,11 +350,13 @@ const JARVIS = {
           if(after.length<before.length){ Memo.saveItems(after); Memo.render(); App.showToast('🗑 메모 삭제됨','success'); } break;
         }
         case 'log_food': {
-          const d=Diet.getData(); const meal=action.meal||'간식';
+          const _targetDate = action.date ? new Date(action.date+'T00:00:00') : new Date();
+          const d=Diet.getData(_targetDate); const meal=action.meal||'간식';
           if(!d[meal])d[meal]=[];
           const food={name:action.name,cal:action.cal||0,protein:action.protein||0,carb:action.carb||0,fat:action.fat||0};
-          d[meal].push(food); Diet.saveData(d); Diet.addToHistory(food); Diet.render();
-          App.showToast(`🥗 ${meal}: ${action.name}`,'success'); break;
+          d[meal].push(food); Diet.saveData(d, _targetDate); Diet.addToHistory(food); Diet.render(_targetDate);
+          const _dl = action.date && action.date!==new Date().toISOString().split('T')[0] ? ` (${action.date})` : '';
+          App.showToast(`🥗 ${meal}: ${action.name}${_dl}`,'success'); break;
         }
         case 'delete_food': {
           const dd=Diet.getData(); const meal=action.meal||'간식';

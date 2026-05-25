@@ -80,7 +80,8 @@ const Memo = {
   },
 
   remove(id){
-    this.saveItems(this.getItems().filter(m=>m.id!==id)); this.render();
+    if(!confirm('메모를 삭제하시겠습니까?')) return;
+    this.saveItems(this.getItems().filter(m=>m.id!==id)); this.render(); FirebaseSync?.scheduleSave();
   },
 
   _reorderMode: false,

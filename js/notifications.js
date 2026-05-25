@@ -51,35 +51,26 @@ const Notifications = {
         return false;
       }
 
-      // FCM 토큰 발급
-      let token = null;
-      if(window._fcmGetToken) {
-        try {
-          App.showToast('FCM 토큰 발급 중...', '');
-          token = await window._fcmGetToken();
-          console.log('[FCM] 토큰 발급:', token ? '성공 ('+token.slice(0,15)+'...)' : '실패');
-        } catch(e) {
-          console.error('[FCM] 토큰 오류:', e);
-        }
-      } else {
-        console.warn('[FCM] _fcmGetToken 없음 - Firebase SDK 로드 확인 필요');
+      // Web Push subscription (Firebase 없이 직접)
+      let subscription = null;
+      try {
+        subscription = await this._swReg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: this._urlBase64ToUint8Array(CONFIG.FCM_VAPID_KEY),
+        });
+        console.log('[Push] 구독 성공:', subscription.endpoint.slice(0,40)+'...');
+      } catch(e) {
+        console.error('[Push] 구독 실패:', e.message);
+        App.showToast('알림 구독 실패: ' + e.message, 'error');
+        return false;
       }
 
-      if(!token) {
-        token = 'local_' + UserStore.getUser() + '_' + Date.now();
-        console.log('[FCM] 로컬 토큰 사용:', token.slice(0,20));
-      }
-
-      this._token = token;
-      UserStore.set('gl_fcm_token', token);
+      const tokenStr = JSON.stringify(subscription);
+      this._token = tokenStr;
+      UserStore.set('gl_fcm_token', tokenStr);
       FirebaseSync?.scheduleSave();
-
-      if(!token.startsWith('local_')) {
-        await this._registerToken(token);
-        App.showToast('✅ 백그라운드 알림 활성화됨', 'success');
-      } else {
-        App.showToast('✅ 로컬 알림 활성화됨 (앱 열린 상태에서만)', '');
-      }
+      await this._registerToken(tokenStr);
+      App.showToast('✅ 백그라운드 알림 활성화됨', 'success');
       return true;
     } catch (e) {
       console.error('[Notif] 구독 실패:', e);

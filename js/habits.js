@@ -183,19 +183,16 @@ const Habits = {
 
   _delFrom(id, dateStr) {
     const today = this._dateStr(new Date());
-    if(dateStr === today) {
-      // 오늘이면 완전 삭제
-      if(!confirm('이 습관을 삭제하시겠습니까?')) return;
-      Sounds?.delete();
-      this.saveList(this.getList().filter(h=>h.id!==id));
-    } else {
-      // 과거 날짜면 해당일부터 숨기기 (deletedFrom 저장)
-      if(!confirm('오늘 이후로 이 습관을 중단하시겠습니까?')) return;
-      const list = this.getList();
-      const h = list.find(x=>x.id===id);
-      if(h) h.deletedFrom = today; // 오늘부터 안 보이게
-      this.saveList(list);
-    }
+    const list  = this.getList();
+    const h     = list.find(x=>x.id===id);
+    if(!h) return;
+
+    if(!confirm('이 습관을 삭제하시겠습니까?')) return;
+    Sounds?.delete();
+
+    // 항상 deletedFrom = 오늘로 저장 (과거 기록 유지)
+    h.deletedFrom = today;
+    this.saveList(list);
     this.render();
     FirebaseSync?.scheduleSave();
   },

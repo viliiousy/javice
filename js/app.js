@@ -776,6 +776,7 @@ const App = {
     FirebaseSync?.scheduleSave();
     this._renderTasks();
     this._updateStatsBanner();
+    this._updateHeaderDate(this._curDate || new Date());
   },
 
   _showTaskDetail(taskId, listId) {
