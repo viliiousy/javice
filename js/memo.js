@@ -24,7 +24,7 @@ const Memo = {
           ${preview?`<div class="memo-preview">${preview}${hasMore?'<span class="memo-more">…</span>':''}</div>`:''}
         </div>
         <div class="memo-right">
-          <button class="cl-del-btn" onclick="event.stopPropagation();Memo.remove('${m.id}')" title="삭제">✕</button>
+          ${Memo._reorderMode?`<button class="cl-del-btn edit-del-btn" onclick="event.stopPropagation();Memo.remove('${m.id}')" title="삭제">✕</button>`:''}
           <div class="memo-date">${_fmtMemoDate(m.updatedAt)}</div>
         </div>
       </div>`;

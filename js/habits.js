@@ -79,7 +79,7 @@ const Habits = {
         <div class="habit-chk">${isDone?'✓':''}</div>
         <span class="habit-name">${esc(h.name)}${daysLabel}</span>
         ${st>0&&!Habits._reorderMode?`<span class="habit-streak">🔥${st}</span>`:''}
-        <button class="cl-del-btn" onclick="event.stopPropagation();Habits._delFrom('${h.id}','${Habits._dateStr(date)}')" title="이 날짜부터 삭제">✕</button>
+        ${Habits._reorderMode?`<button class="cl-del-btn edit-del-btn" onclick="event.stopPropagation();Habits._delFrom('${h.id}','${Habits._dateStr(date)}')" title="삭제">✕</button>`:''}
       </div>`;
     }).join('')
     +`<div class="habit-add-btn" onclick="Habits.showInlineAdd()">+ 습관 추가</div>`;
@@ -182,19 +182,26 @@ const Habits = {
   },
 
   _delFrom(id, dateStr) {
-    const today = this._dateStr(new Date());
-    const list  = this.getList();
-    const h     = list.find(x=>x.id===id);
+    const today  = this._dateStr(new Date());
+    const list   = this.getList();
+    const h      = list.find(x=>x.id===id);
     if(!h) return;
 
-    if(!confirm('이 습관을 삭제하시겠습니까?')) return;
+    // 현재 보는 날짜가 오늘 이전이면 "오늘부터 삭제" 안내
+    const viewingPast = dateStr < today;
+    const msg = viewingPast
+      ? `이 습관을 오늘(${today})부터 삭제하시겠습니까?
+(과거 기록은 유지됩니다)`
+      : '이 습관을 삭제하시겠습니까?';
+    if(!confirm(msg)) return;
     Sounds?.delete();
 
-    // 항상 deletedFrom = 오늘로 저장 (과거 기록 유지)
+    // deletedFrom = 오늘 (오늘부터 안 보임, 과거 기록 보존)
     h.deletedFrom = today;
     this.saveList(list);
     this.render();
     FirebaseSync?.scheduleSave();
+    App.showToast('습관 삭제됨 (오늘부터)', 'success');
   },
 
   _moveUp(idx) {

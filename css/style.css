@@ -1432,3 +1432,19 @@ html.dark .reorder-dragging { background: var(--card) !important; }
   flex-shrink: 0;
   opacity: 0.7;
 }
+
+/* ═══════════════════════════════════════
+   편집 모드 삭제 버튼 (빨간색)
+   ═══════════════════════════════════════ */
+.edit-del-btn {
+  background: #ef4444 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 6px !important;
+  width: 28px !important;
+  height: 28px !important;
+  font-size: 13px !important;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.edit-del-btn:hover { background: #dc2626 !important; }

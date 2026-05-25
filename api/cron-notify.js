@@ -123,18 +123,27 @@ async function processUser(uid, tokenData) {
 
   const sends = [];
 
-  const push = async (title, body) => {
-    // Web Push subscription 형식인지 FCM 토큰인지 판단
-    if(token.startsWith('{')) {
+  // 토큰 파싱
+  let fcmToken = null;
+  if(token.startsWith('{')) {
+    try {
       const sub = JSON.parse(token);
       if(sub.endpoint?.includes('fcm.googleapis.com')) {
-        // FCM endpoint → FCM V1 API 사용
-        const fcmReg = sub.endpoint.split('/').pop();
-        return sendFCM(fcmReg, title, body);
+        // Web Push subscription의 FCM endpoint에서 토큰 추출
+        fcmToken = sub.endpoint.split('/').pop();
       }
-    } else if(token.length > 100) {
-      return sendFCM(token, title, body);
-    }
+    } catch {}
+  } else if(!token.startsWith('local_') && token.length > 50) {
+    fcmToken = token;
+  }
+
+  if(!fcmToken) {
+    console.log('[cron] 유효한 FCM 토큰 없음, uid:', uid);
+    return 0;
+  }
+
+  const push = async (title, body) => {
+    return sendFCM(fcmToken, title, body);
   };
 
   if(settings.habits?.enabled) {

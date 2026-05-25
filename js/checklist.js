@@ -40,7 +40,7 @@ const Checklist = {
         <div class="cl-body" onclick="Checklist._bodyTap('${item.id}')">
           <div class="cl-title">${esc(item.title)}${dueStr?` <span class="cl-due-inline${overdue?' overdue':''}">${dueStr}</span>`:''}</div>
         </div>
-        <button class="cl-del-btn" onclick="event.stopPropagation();Checklist.remove('${item.id}')" title="삭제">✕</button>
+        ${Checklist._reorderMode?`<button class="cl-del-btn edit-del-btn" onclick="event.stopPropagation();Checklist.remove('${item.id}')" title="삭제">✕</button>`:''}
       </div>`;
     }).join('')
     +`<div class="habit-add-btn" onclick="Checklist.showAdd()">+ 항목 추가</div>`;
