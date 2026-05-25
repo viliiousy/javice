@@ -65,6 +65,13 @@ const FirebaseSync = {
     this._syncing = true;
     try {
       const data = this._collectData();
+      // 빈 데이터 저장 방지 - _savedAt 외에 실제 데이터 없으면 스킵
+      const realKeys = Object.keys(data).filter(k => k !== '_savedAt');
+      if(realKeys.length === 0) {
+        console.warn('[FB] 빈 데이터 저장 방지');
+        this._syncing = false;
+        return;
+      }
       const res  = await fetch(`${this._dbUrl}/users/${this._uid}.json`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },

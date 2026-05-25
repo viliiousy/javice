@@ -53,9 +53,14 @@ const App = {
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('app').style.display='block';
     if(userInfo?.name){
-      document.getElementById('hName').textContent=userInfo.name;
-      if(userInfo.picture) document.getElementById('hAvatar').src=userInfo.picture;
-      document.getElementById('hUser').style.display='flex';
+      const hName = document.getElementById('hName');
+      if(hName) hName.textContent=userInfo.name;
+      if(userInfo.picture) { const av=document.getElementById('hAvatar'); if(av) av.src=userInfo.picture; }
+      const hUser = document.getElementById('hUser');
+      if(hUser) hUser.style.display='flex';
+    } else {
+      const hUser = document.getElementById('hUser');
+      if(hUser) hUser.style.display='flex';
     }
     this._updateHeaderDate(new Date());
     try { Habits.init(new Date()); } catch(e){ console.warn('Habits init',e); }
