@@ -146,9 +146,11 @@ async function processUser(uid, tokenData) {
     return sendFCM(fcmToken, title, body);
   };
 
+  const force = tokenData.force === true;
+
   if(settings.habits?.enabled) {
     const [hh] = (settings.habits.time||'21:00').split(':').map(Number);
-    if(hour===hh && min<5) {
+    if(force || (hour===hh && min<5)) {
       const list = JSON.parse(userData[`${prefix}gl_habits_list`]||'[]');
       const done = JSON.parse(userData[`${prefix}gl_habits_${today}`]||'[]');
       const miss = list.filter(h=>!done.includes(h.id));
@@ -158,7 +160,7 @@ async function processUser(uid, tokenData) {
   if(settings.diet?.enabled) {
     for(const [meal,t] of Object.entries({아침:settings.diet.아침||'09:00',점심:settings.diet.점심||'13:00',저녁:settings.diet.저녁||'19:00'})) {
       const [hh]=t.split(':').map(Number);
-      if(hour===hh && min<5) {
+      if(force || (hour===hh && min<5)) {
         const diet=JSON.parse(userData[`${prefix}gl_diet_${today}`]||'{}');
         if(!(diet[meal]?.length)) sends.push(push(`🥗 ${meal} 식단 기록`,`${meal}을 아직 기록하지 않으셨어요!`));
       }
@@ -166,7 +168,7 @@ async function processUser(uid, tokenData) {
   }
   if(settings.tasks?.enabled) {
     const [hh]=(settings.tasks.time||'09:00').split(':').map(Number);
-    if(hour===hh && min<5) {
+    if(force || (hour===hh && min<5)) {
       const due=[];
       Object.entries(userData).forEach(([k,v])=>{
         if(!k.startsWith(prefix)) return;
@@ -184,12 +186,14 @@ module.exports = async (req, res) => {
   const auth = req.headers.authorization;
   if(auth && auth!==`Bearer ${process.env.CRON_SECRET}`) { res.status(401).json({error:'Unauthorized'}); return; }
 
+  const forceAll = req.query?.force === '1';
+
   try {
     const tokens = await fbGet('/fcm_tokens.json');
     if(!tokens) { res.status(200).json({sent:0}); return; }
     let total=0;
     for(const [uid,data] of Object.entries(tokens)) {
-      try { total += await processUser(uid,data); } catch(e) { console.error(uid,e.message); }
+      try { total += await processUser(uid, forceAll ? {...data, force:true} : data); } catch(e) { console.error(uid,e.message); }
     }
     res.status(200).json({success:true,sent:total,time:new Date().toISOString()});
   } catch(e) {
