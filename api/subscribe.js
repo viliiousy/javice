@@ -1,20 +1,4 @@
-// api/subscribe.js — Web Push 구독 저장
-
-const https = require('https');
-
-async function fbPatch(path, data) {
-  const url  = new URL(`${process.env.FIREBASE_DB_URL}${path}`);
-  const body = JSON.stringify(data);
-  return new Promise((resolve, reject) => {
-    const req = https.request({
-      hostname: url.hostname, path: url.pathname,
-      method: 'PUT',
-      headers: { 'Content-Type':'application/json', 'Content-Length':Buffer.byteLength(body) }
-    }, res => { let d=''; res.on('data',c=>d+=c); res.on('end',()=>resolve(JSON.parse(d))); });
-    req.on('error', reject); req.write(body); req.end();
-  });
-}
-
+// api/subscribe.js
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -25,10 +9,22 @@ module.exports = async (req, res) => {
   try {
     const { uid, token, settings } = req.body;
     if(!uid || !token) { res.status(400).json({ error:'uid and token required' }); return; }
-    await fbPatch(`/fcm_tokens/${uid}`, { token, settings: settings||{}, updatedAt: Date.now() });
-    res.status(200).json({ success: true });
+
+    const dbUrl = process.env.FIREBASE_DB_URL;
+    const data  = JSON.stringify({ token, settings: settings||{}, updatedAt: Date.now() });
+    const url   = `${dbUrl}/fcm_tokens/${uid}.json`;
+
+    const response = await fetch(url, {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    data,
+    });
+
+    const result = await response.json();
+    console.log('[subscribe] Firebase 응답:', response.status, JSON.stringify(result).slice(0,100));
+    res.status(200).json({ success: true, status: response.status });
   } catch(e) {
-    console.error('[subscribe]', e);
+    console.error('[subscribe] 오류:', e.message);
     res.status(500).json({ error: e.message });
   }
 };
