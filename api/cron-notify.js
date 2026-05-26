@@ -119,9 +119,13 @@ async function processUser(uid, tokenData) {
   const today  = dateStr();
   const prefix = `u_${uid}_`;
   const userData = await fbGet(`/users/${uid}.json`);
+  console.log('[cron] userData keys:', userData ? Object.keys(userData).filter(k=>k.includes('habit')).join(',') : 'NULL');
   if(!userData) return 0;
 
   const sends = [];
+
+  console.log('[cron] processUser uid:', uid, 'token:', token?.slice(0,20), 'force:', tokenData.force);
+  console.log('[cron] settings:', JSON.stringify(settings).slice(0,100));
 
   // 토큰 파싱
   let fcmToken = null;
@@ -137,6 +141,7 @@ async function processUser(uid, tokenData) {
     fcmToken = token;
   }
 
+  console.log('[cron] fcmToken:', fcmToken ? fcmToken.slice(0,20)+'...' : 'NULL');
   if(!fcmToken) {
     console.log('[cron] 유효한 FCM 토큰 없음, uid:', uid);
     return 0;
