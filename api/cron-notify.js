@@ -127,17 +127,26 @@ async function processUser(uid, tokenData) {
   console.log('[cron] processUser uid:', uid, 'token:', token?.slice(0,20), 'force:', tokenData.force);
   console.log('[cron] settings:', JSON.stringify(settings).slice(0,100));
 
-  // 토큰 파싱
+  // 토큰 파싱 (문자열 FCM 토큰 또는 구버전 Web Push JSON 구독 객체 처리)
   let fcmToken = null;
   if(token.startsWith('{')) {
+    // 구버전: JSON.stringify(PushSubscription) 형태
     try {
       const sub = JSON.parse(token);
       if(sub.endpoint?.includes('fcm.googleapis.com')) {
-        // Web Push subscription의 FCM endpoint에서 토큰 추출
-        fcmToken = sub.endpoint.split('/').pop();
+        // FCM endpoint URL 끝에서 토큰 추출
+        // e.g. https://fcm.googleapis.com/fcm/send/TOKEN
+        const parts = sub.endpoint.split('/');
+        const candidate = parts[parts.length - 1];
+        if(candidate && candidate.length > 30) {
+          fcmToken = candidate;
+        }
       }
-    } catch {}
-  } else if(!token.startsWith('local_') && token.length > 50) {
+    } catch(e) {
+      console.error('[cron] 토큰 JSON 파싱 실패:', e.message);
+    }
+  } else if(token && !token.startsWith('local_') && token.length > 30) {
+    // 신규: Firebase SDK getToken()이 반환한 순수 FCM 토큰 문자열
     fcmToken = token;
   }
 

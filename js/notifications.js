@@ -35,14 +35,8 @@ const Notifications = {
     }
   },
 
-  // 알림 권한 요청 + FCM 구독
+  // 알림 권한 요청 + FCM 토큰 발급
   async subscribe() {
-    const vapidKey = CONFIG.FCM_VAPID_KEY;
-    if (!vapidKey || vapidKey.includes('YOUR_')) {
-      App.showToast('VAPID 키가 설정되지 않았습니다', 'error');
-      return false;
-    }
-
     try {
       // 권한 요청
       const permission = await Notification.requestPermission();
@@ -51,25 +45,40 @@ const Notifications = {
         return false;
       }
 
-      // Web Push subscription (Firebase 없이 직접)
-      let subscription = null;
-      try {
-        subscription = await this._swReg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: this._urlBase64ToUint8Array(CONFIG.FCM_VAPID_KEY),
-        });
-        console.log('[Push] 구독 성공:', subscription.endpoint.slice(0,40)+'...');
-      } catch(e) {
-        console.error('[Push] 구독 실패:', e.message);
-        App.showToast('알림 구독 실패: ' + e.message, 'error');
+      // Firebase SDK로 FCM 토큰 발급 (index.html에서 초기화된 _fcmGetToken 사용)
+      let token = null;
+      if (typeof window._fcmGetToken === 'function') {
+        token = await window._fcmGetToken();
+      }
+
+      // Firebase SDK 실패 시 Web Push 직접 방식으로 폴백
+      if (!token) {
+        console.warn('[Notif] Firebase SDK 토큰 발급 실패, Web Push 폴백 시도...');
+        try {
+          const sub = await this._swReg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: this._urlBase64ToUint8Array(CONFIG.FCM_VAPID_KEY),
+          });
+          // FCM endpoint에서 토큰 추출
+          if (sub.endpoint?.includes('fcm.googleapis.com')) {
+            token = sub.endpoint.split('/').pop();
+          }
+          console.log('[Push] Web Push 폴백 토큰:', token ? token.slice(0,20)+'...' : 'null');
+        } catch(e) {
+          console.error('[Push] Web Push 폴백 실패:', e.message);
+        }
+      }
+
+      if (!token) {
+        App.showToast('FCM 토큰 발급 실패 (브라우저 설정 확인)', 'error');
         return false;
       }
 
-      const tokenStr = JSON.stringify(subscription);
-      this._token = tokenStr;
-      UserStore.set('gl_fcm_token', tokenStr);
+      console.log('[Notif] FCM 토큰 발급 성공:', token.slice(0,20)+'...');
+      this._token = token;
+      UserStore.set('gl_fcm_token', token);
       FirebaseSync?.scheduleSave();
-      await this._registerToken(tokenStr);
+      await this._registerToken(token);
       App.showToast('✅ 백그라운드 알림 활성화됨', 'success');
       return true;
     } catch (e) {
