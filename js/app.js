@@ -102,7 +102,9 @@ const App = {
       await Promise.all(this.S.lists.map(async l=>{
         this.S.tasks[l.id]=await GoogleTasks.fetchTasks(l.id);
         this.S.tasks[l.id].forEach(t=>{
-          t.starred=UserStore.get('gl_star_'+t.id)==='1';
+          // API notes 마커 기반 starred OR 로컬 localStorage starred 둘 중 하나라도 true면 starred
+          const localStar = UserStore.get('gl_star_'+t.id)==='1';
+          t.starred = !!(t._apiStarred || localStar);
           t._hidden=UserStore.get('gl_hidden_'+t.id)==='1';
         });
       }));
@@ -115,6 +117,7 @@ const App = {
       CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,this.S.selDate);
       this._renderCalPanel();
       this._updateStatsBanner();
+      this._updateHeaderDate(this.S.selDate); // 동기화 후 할일 뱃지 즉시 반영
       this.showToast(`동기화 완료 ✓ (일정 ${this.S.events.length}개)`,'success');
     } catch(err){
       console.error('[Sync]',err);
@@ -164,6 +167,7 @@ const App = {
       }catch{}
     });
     upcoming.sort((a,b)=>a.date-b.date);
+    upcoming.splice(6); // 근일주일 일정 최대 6개 표시
 
     // 긴급 할일 TOP 3
     const urgentTasks=[...allPending].sort((a,b)=>{
@@ -837,9 +841,11 @@ const App = {
         this.S.tasks[newListId].unshift(created);
         this.S.tasks[listId]=this.S.tasks[listId]?.filter(t=>t.id!==taskId);
       } else {
-        const updated=await GoogleTasks.updateTask(listId,taskId,{title,notes,due});
+        const updated=await GoogleTasks.updateTask(listId,taskId,{title,notes,due:due||null});
         const t=this.S.tasks[listId]?.find(x=>x.id===taskId);
-        if(t) Object.assign(t,{title,notes:notes||'',due:updated.due||null});
+        // updated.due는 RFC3339 형식 (UTC) → 로컬 표시 시 날짜 부분만 사용
+        const newDue = updated.due ? updated.due.split('T')[0]+'T00:00:00.000Z' : null;
+        if(t) Object.assign(t,{title,notes:notes||'',due:newDue});
       }
       this._renderTasks();
       CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,this.S.selDate);
@@ -863,7 +869,15 @@ const App = {
   _toggleStar(taskId,listId){
     const t=this.S.tasks[listId]?.find(x=>x.id===taskId); if(!t) return;
     t.starred=!t.starred;
+    // 로컬 스토리지 업데이트
     t.starred?localStorage.setItem('gl_star_'+taskId,'1'):localStorage.removeItem('gl_star_'+taskId);
+    // Google Tasks API notes 필드에 별표 상태 동기화 (fire-and-forget)
+    if(!this.S.offline && Auth.isLoggedIn()){
+      GoogleTasks.setTaskStar(listId, taskId, t.starred, t.notes||'');
+      // API 마커 상태도 로컬에 반영
+      t._apiStarred = t.starred;
+    }
+    FirebaseSync?.scheduleSave();
     this._renderTasks();
   },
 

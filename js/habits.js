@@ -82,7 +82,7 @@ const Habits = {
         ${Habits._reorderMode?`<button class="cl-del-btn edit-del-btn" onclick="event.stopPropagation();Habits._delFrom('${h.id}','${Habits._dateStr(date)}')" title="삭제">✕</button>`:''}
       </div>`;
     }).join('')
-    +`<div class="habit-add-btn" onclick="Habits.showInlineAdd()">+ 습관 추가</div>`;
+    +`<div class="habit-add-btn" onclick="Habits.showInlineAdd(App?.S?.selDate)">+ 습관 추가</div>`;
 
     document.getElementById('habitsFooter').innerHTML=`${isToday?'오늘':'해당 날짜'} <strong>${done}/${list.length}</strong> 완료 ${done===list.length&&list.length>0?'🏆 퍼펙트!':''}`;
   },
@@ -186,22 +186,31 @@ const Habits = {
     const h      = list.find(x=>x.id===id);
     if(!h) return;
 
-    // 현재 보는 날짜가 오늘 이전이면 "오늘부터 삭제" 안내
-    const viewingPast = dateStr < today;
-    const msg = viewingPast
-      ? `이 습관을 오늘(${today})부터 삭제하시겠습니까?\n(과거 기록은 유지됩니다)`
-      : '이 습관을 삭제하시겠습니까?\n(오늘부터 숨겨집니다. 과거 기록은 유지됩니다)';
+    // 삭제 기준일 = 선택한 날짜(dateStr) 기준
+    // 단, 선택 날짜가 과거라면 과거 날짜부터 삭제 (그 날짜 이후로 숨겨짐)
+    const deleteFrom = dateStr || today;
+    const isPast = deleteFrom < today;
+    const isFuture = deleteFrom > today;
+    let msg;
+    if (isPast) {
+      msg = `이 습관을 ${deleteFrom}부터 삭제하시겠습니까?\n(해당 날짜 이후 기록은 삭제되고 이전 기록은 유지됩니다)`;
+    } else if (isFuture) {
+      msg = `이 습관을 ${deleteFrom}부터 삭제하시겠습니까?\n(해당 날짜 이전 기록은 유지됩니다)`;
+    } else {
+      msg = '이 습관을 삭제하시겠습니까?\n(오늘부터 숨겨집니다. 과거 기록은 유지됩니다)';
+    }
     if(!confirm(msg)) return;
     Sounds?.delete();
 
-    // deletedFrom = 오늘 (오늘부터 안 보임, 과거 기록 보존)
-    h.deletedFrom = today;
+    // deletedFrom = 선택한 날짜 (해당 날짜부터 안 보임, 이전 기록 보존)
+    h.deletedFrom = deleteFrom;
     this.saveList(list);
     // 현재 보던 날짜 컨텍스트를 유지해서 렌더링 (오늘로 점프하지 않음)
     const renderDate = new Date(dateStr + 'T00:00:00');
     this.render(isNaN(renderDate.getTime()) ? new Date() : renderDate);
     FirebaseSync?.scheduleSave();
-    App.showToast('습관 삭제됨 (오늘부터)', 'success');
+    const label = deleteFrom === today ? '오늘' : deleteFrom;
+    App.showToast(`습관 삭제됨 (${label}부터)`, 'success');
   },
 
   _moveUp(idx) {
@@ -215,7 +224,16 @@ const Habits = {
     this.saveList(list); this.render(); Sounds?.click();
   },
 
-  showInlineAdd() {
+  _pendingAddDate: null, // showInlineAdd 호출 시 기준 날짜 저장
+
+  showInlineAdd(baseDate) {
+    // baseDate 미전달 시 현재 선택된 날짜 사용, 없으면 오늘
+    this._pendingAddDate = baseDate || App?.S?.selDate || new Date();
+    const baseDateStr = this._dateStr(this._pendingAddDate);
+    const today = this._dateStr(new Date());
+    const dateLabel = baseDateStr !== today
+      ? ` (${new Date(baseDateStr + 'T00:00:00').toLocaleDateString('ko-KR',{month:'short',day:'numeric'})}부터)`
+      : '';
     const dayBtns = this.DAYS_KO.map((d,i) =>
       '<label class="day-pick-btn">' +
       '<input type="checkbox" value="' + i + '" checked class="hday-chk"> ' + d +
@@ -226,6 +244,7 @@ const Habits = {
       '<input id="habitName" type="text" placeholder="예: 물 2L 마시기" class="inp"></div>' +
       '<div class="modal-row"><label class="modal-lbl">반복 요일</label>' +
       '<div class="day-picker">' + dayBtns + '</div></div>' +
+      `<div style="font-size:11px;color:var(--text3);margin-bottom:8px">시작일: ${baseDateStr}${dateLabel}</div>` +
       '<div class="modal-btns" style="margin-top:10px">' +
       '<button id="btnHabitAdd" class="btn-sm accent">추가</button>' +
       '<button onclick="App.closeModal()" class="btn-sm">취소</button>' +
@@ -238,21 +257,27 @@ const Habits = {
     },50);
   },
 
-    _saveNew() {
+  _saveNew() {
     const name = document.getElementById('habitName')?.value.trim();
     if(!name){ App.showToast('이름을 입력해주세요','error'); return; }
     const days = [...document.querySelectorAll('.hday-chk:checked')].map(c=>parseInt(c.value));
     const list = this.getList();
-    const today = this._dateStr(new Date());
+    // 생성 기준일: 모달 열 때 기억해둔 날짜 (selDate) 사용, 없으면 오늘
+    const createdAt = this._pendingAddDate
+      ? this._dateStr(this._pendingAddDate)
+      : this._dateStr(new Date());
+    this._pendingAddDate = null;
     list.push({
       id: 'h'+Date.now(),
       name,
       emoji: '',
       days: days.length ? days : [0,1,2,3,4,5,6],
-      createdAt: today,  // 생성일 저장
+      createdAt,  // 선택한 날짜부터 습관 시작
     });
     this.saveList(list);
-    this.render();
+    // selDate 기준으로 렌더링
+    const renderDate = App?.S?.selDate || new Date();
+    this.render(renderDate);
     App.closeModal();
     App.showToast('습관 추가됨 ✓','success');
     FirebaseSync?.scheduleSave();
@@ -272,7 +297,7 @@ const Habits = {
       </div>
       <div class="modal-btns">
         <button onclick="Habits._saveEdit('${id}')" class="btn-sm accent">저장</button>
-        <button onclick="Habits._delFrom('${id}','${this._dateStr(new Date())}');App.closeModal();" class="btn-danger">삭제</button>
+        <button onclick="Habits._delFrom('${id}','${this._dateStr(App?.S?.selDate||new Date())}');App.closeModal();" class="btn-danger">삭제</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
       </div>`);
   },

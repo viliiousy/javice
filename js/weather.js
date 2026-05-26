@@ -22,11 +22,27 @@ const Weather = {
     const el = document.getElementById('hWeather');
     if (!el) return;
     el.innerHTML = '<span style="color:var(--text3);font-size:11px">🌤 로딩중</span>';
+    // 전체 타임아웃: 12초 내에 완료 안 되면 fallback UI 표시
+    const globalTimer = setTimeout(() => {
+      const el2 = document.getElementById('hWeather');
+      if (el2 && el2.innerHTML.includes('로딩중')) {
+        el2.innerHTML = '<span style="color:var(--text3);font-size:11px">🌤 날씨 정보 없음</span>';
+      }
+    }, 12000);
     try {
-      const pos = await this._getPos();
-      await this._render(pos.coords.latitude, pos.coords.longitude);
-    } catch {
-      await this._render(CONFIG.WEATHER_LAT, CONFIG.WEATHER_LON);
+      let lat = CONFIG.WEATHER_LAT, lon = CONFIG.WEATHER_LON;
+      try {
+        const pos = await this._getPos();
+        lat = pos.coords.latitude;
+        lon = pos.coords.longitude;
+      } catch { /* GPS 실패 시 기본 좌표 사용 */ }
+      await this._render(lat, lon);
+    } catch(e) {
+      console.warn('[Weather] 렌더 실패:', e.message);
+      const el2 = document.getElementById('hWeather');
+      if (el2) el2.innerHTML = '<span style="color:var(--text3);font-size:11px">🌤 날씨 정보 없음</span>';
+    } finally {
+      clearTimeout(globalTimer);
     }
   },
 
@@ -44,8 +60,15 @@ const Weather = {
       + `&daily=weather_code,temperature_2m_max,temperature_2m_min`
       + `&timezone=Asia%2FSeoul&forecast_days=3&past_days=1`;
 
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('api error');
+    const controller = new AbortController();
+    const fetchTimer = setTimeout(() => controller.abort(), 8000);
+    let res;
+    try {
+      res = await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(fetchTimer);
+    }
+    if (!res.ok) throw new Error(`api error ${res.status}`);
     const data = await res.json();
     const c = data.current, d = data.daily;
 

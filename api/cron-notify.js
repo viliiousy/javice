@@ -162,9 +162,15 @@ async function processUser(uid, tokenData) {
 
   const force = tokenData.force === true;
 
+  // 시:분 파싱 후 현재 시각이 설정 시간 ±5분 이내인지 확인
+  function timeMatches(timeStr, hour, min) {
+    const parts = (timeStr || '09:00').split(':').map(Number);
+    const hh = parts[0], mm = parts[1] || 0;
+    return hour === hh && min >= mm && min < mm + 5;
+  }
+
   if(settings.habits?.enabled) {
-    const [hh] = (settings.habits.time||'21:00').split(':').map(Number);
-    if(force || (hour===hh && min<5)) {
+    if(force || timeMatches(settings.habits.time, hour, min)) {
       const list = JSON.parse(userData[`${prefix}gl_habits_list`]||'[]');
       const done = JSON.parse(userData[`${prefix}gl_habits_${today}`]||'[]');
       const miss = list.filter(h=>!done.includes(h.id));
@@ -173,16 +179,14 @@ async function processUser(uid, tokenData) {
   }
   if(settings.diet?.enabled) {
     for(const [meal,t] of Object.entries({아침:settings.diet.아침||'09:00',점심:settings.diet.점심||'13:00',저녁:settings.diet.저녁||'19:00'})) {
-      const [hh]=t.split(':').map(Number);
-      if(force || (hour===hh && min<5)) {
+      if(force || timeMatches(t, hour, min)) {
         const diet=JSON.parse(userData[`${prefix}gl_diet_${today}`]||'{}');
         if(!(diet[meal]?.length)) sends.push(push(`🥗 ${meal} 식단 기록`,`${meal}을 아직 기록하지 않으셨어요!`));
       }
     }
   }
   if(settings.tasks?.enabled) {
-    const [hh]=(settings.tasks.time||'09:00').split(':').map(Number);
-    if(force || (hour===hh && min<5)) {
+    if(force || timeMatches(settings.tasks.time, hour, min)) {
       const due=[];
       Object.entries(userData).forEach(([k,v])=>{
         if(!k.startsWith(prefix)) return;
