@@ -130,22 +130,28 @@ const App = {
   _updateStatsBanner() {
     const el=document.getElementById('statsBanner'); if(!el) return;
     const now=new Date();
+    const selDate=this.S.selDate||now;
 
-    // 습관 — getHabitsForDate()로 오늘 기준 활성 습관만 카운트
-    // (deletedFrom 설정된 삭제 습관, createdAt이 오늘 이후인 습관 자동 제외)
-    const hList=Habits.getHabitsForDate(now), hChk=Habits.getChecked(now);
+    // 습관 — 캘린더에서 선택한 날짜(selDate) 기준 활성 습관만 카운트
+    // (deletedFrom 설정된 삭제 습관, createdAt이 selDate 이후인 습관 자동 제외)
+    const hList=Habits.getHabitsForDate(selDate), hChk=Habits.getChecked(selDate);
     const hDone=hList.filter(h=>hChk.includes(h.id)).length;
 
     // 식단
     const dt=Diet.totals(Diet.getData()), ds=Diet.getSettings();
     const calPct=ds.calorieGoal?Math.round(dt.cal/ds.calorieGoal*100):0;
 
-    // 할일 (숨김 제외)
+    // 할일 — 전체 미완료·미숨김 목록 (upcoming/urgent 계산에 사용)
     const allPending=[];
     Object.entries(this.S.tasks||{}).forEach(([lid,list])=>
       list.filter(t=>t.status==='needsAction'&&!t._hidden).forEach(t=>allPending.push({...t,_lid:lid}))
     );
-    const pending=allPending.length;
+    // 기준: 선택된 날짜의 미완료·미숨김 할일
+    // due 있는 할일은 selDate와 due 날짜가 일치하는 것만, due 없는 할일은 오늘 선택 시에만 카운트
+    const selDateStr=`${selDate.getFullYear()}-${String(selDate.getMonth()+1).padStart(2,'0')}-${String(selDate.getDate()).padStart(2,'0')}`;
+    const nowDateStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const isSelToday=selDateStr===nowDateStr;
+    const pending=allPending.filter(t=>t.due?t.due.split('T')[0]===selDateStr:isSelToday).length;
     const clItems=Checklist.getItems().filter(i=>!i.done);
     const lastMsg=typeof JARVIS!=='undefined'&&JARVIS.history.length
       ?JARVIS.history.filter(m=>m.role==='assistant').slice(-1)[0]?.content.replace(/[{][\s\S]*[}]/g,'').trim():'';
@@ -300,6 +306,11 @@ const App = {
       }
 
       // 할일 뱃지
+      // 기준: 선택된 날짜(date 파라미터 = selDate)의 미완료·미숨김 할일
+      // - status==='needsAction': 완료된 할일 제외
+      // - !t._hidden: 숨김 처리된 할일 제외
+      // - due 있는 할일: due 날짜가 선택 날짜와 일치하는 것만
+      // - due 없는 할일: 선택 날짜가 오늘인 경우에만 카운트
       const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
       const taskCount = Object.values(this.S.tasks||{}).reduce((n,l) =>
         n + l.filter(t => {

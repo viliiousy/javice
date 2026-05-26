@@ -22,21 +22,42 @@ const Weather = {
     const el = document.getElementById('hWeather');
     if (!el) return;
     el.innerHTML = '<span style="color:var(--text3);font-size:11px">🌤 로딩중</span>';
-    // 전체 타임아웃: 16초 내에 완료 안 되면 fallback UI 표시
-    // (GPS 최대 3초 + fetch 최대 10초 + 여유 3초)
+    // 전체 타임아웃: 20초 내에 완료 안 되면 fallback UI 표시
+    // (GPS 최대 3초 + IP fallback 최대 5초 + fetch 최대 10초 + 여유 2초)
     const globalTimer = setTimeout(() => {
       const el2 = document.getElementById('hWeather');
       if (el2 && el2.innerHTML.includes('로딩중')) {
         el2.innerHTML = '<span style="color:var(--text3);font-size:11px">🌤 날씨 정보 없음</span>';
       }
-    }, 16000);
+    }, 20000);
     try {
       let lat = CONFIG.WEATHER_LAT, lon = CONFIG.WEATHER_LON;
       try {
+        // 1단계: GPS 시도 (3초 타임아웃)
         const pos = await this._getPos();
         lat = pos.coords.latitude;
         lon = pos.coords.longitude;
-      } catch { /* GPS 실패 시 기본 좌표 사용 */ }
+      } catch {
+        // 2단계: GPS 실패 시 IP 기반 위치로 즉시 fallback
+        // PC(Windows)는 GPS 없이 Wi-Fi/IP 위치를 쓰므로 geolocation이 느리거나 실패함
+        console.info('[Weather] GPS 실패 → IP 기반 위치로 fallback');
+        try {
+          const ctrl = new AbortController();
+          const ipTimer = setTimeout(() => ctrl.abort(), 5000);
+          try {
+            const ipRes = await fetch('https://ipapi.co/json/', { signal: ctrl.signal });
+            if (ipRes.ok) {
+              const ipData = await ipRes.json();
+              if (ipData.latitude && ipData.longitude) {
+                lat = ipData.latitude;
+                lon = ipData.longitude;
+              }
+            }
+          } finally {
+            clearTimeout(ipTimer);
+          }
+        } catch { /* IP fallback도 실패 시 CONFIG 기본 좌표 유지 */ }
+      }
       await this._render(lat, lon);
     } catch(e) {
       console.warn('[Weather] 렌더 실패:', e.message);
@@ -50,7 +71,7 @@ const Weather = {
   _getPos() {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) { reject(new Error('no geo')); return; }
-      // GPS 타임아웃을 3초로 단축 → fetch에 더 많은 시간 확보
+      // GPS 타임아웃 3초 — 실패 시 init()에서 IP fallback 처리
       navigator.geolocation.getCurrentPosition(resolve, reject, { timeout:3000, maximumAge:300000 });
     });
   },
