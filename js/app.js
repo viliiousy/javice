@@ -131,8 +131,9 @@ const App = {
     const el=document.getElementById('statsBanner'); if(!el) return;
     const now=new Date();
 
-    // 습관
-    const hList=Habits.getList(), hChk=Habits.getChecked();
+    // 습관 — getHabitsForDate()로 오늘 기준 활성 습관만 카운트
+    // (deletedFrom 설정된 삭제 습관, createdAt이 오늘 이후인 습관 자동 제외)
+    const hList=Habits.getHabitsForDate(now), hChk=Habits.getChecked(now);
     const hDone=hList.filter(h=>hChk.includes(h.id)).length;
 
     // 식단

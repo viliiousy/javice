@@ -22,13 +22,14 @@ const Weather = {
     const el = document.getElementById('hWeather');
     if (!el) return;
     el.innerHTML = '<span style="color:var(--text3);font-size:11px">🌤 로딩중</span>';
-    // 전체 타임아웃: 12초 내에 완료 안 되면 fallback UI 표시
+    // 전체 타임아웃: 16초 내에 완료 안 되면 fallback UI 표시
+    // (GPS 최대 3초 + fetch 최대 10초 + 여유 3초)
     const globalTimer = setTimeout(() => {
       const el2 = document.getElementById('hWeather');
       if (el2 && el2.innerHTML.includes('로딩중')) {
         el2.innerHTML = '<span style="color:var(--text3);font-size:11px">🌤 날씨 정보 없음</span>';
       }
-    }, 12000);
+    }, 16000);
     try {
       let lat = CONFIG.WEATHER_LAT, lon = CONFIG.WEATHER_LON;
       try {
@@ -49,7 +50,8 @@ const Weather = {
   _getPos() {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) { reject(new Error('no geo')); return; }
-      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout:6000, maximumAge:300000 });
+      // GPS 타임아웃을 3초로 단축 → fetch에 더 많은 시간 확보
+      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout:3000, maximumAge:300000 });
     });
   },
 
@@ -61,7 +63,8 @@ const Weather = {
       + `&timezone=Asia%2FSeoul&forecast_days=3&past_days=1`;
 
     const controller = new AbortController();
-    const fetchTimer = setTimeout(() => controller.abort(), 8000);
+    // AbortController 타임아웃을 10초로 늘림 (기존 8초에서 증가)
+    const fetchTimer = setTimeout(() => controller.abort(), 10000);
     let res;
     try {
       res = await fetch(url, { signal: controller.signal });
