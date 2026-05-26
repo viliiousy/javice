@@ -8,7 +8,7 @@ async function fbPatch(path, data) {
   return new Promise((resolve, reject) => {
     const req = https.request({
       hostname: url.hostname, path: url.pathname,
-      method: 'PATCH',
+      method: 'PUT',
       headers: { 'Content-Type':'application/json', 'Content-Length':Buffer.byteLength(body) }
     }, res => { let d=''; res.on('data',c=>d+=c); res.on('end',()=>resolve(JSON.parse(d))); });
     req.on('error', reject); req.write(body); req.end();
