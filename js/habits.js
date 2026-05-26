@@ -103,7 +103,7 @@ const Habits = {
   _touchEnd(e,id,dateStr) {
     if(this._swiping) {
       const dx=e.changedTouches[0].clientX-this._touchSX;
-      if(dx < -60) { this._del(id); return; } // 왼쪽 스와이프 → 삭제
+      if(dx < -60) { this._delFrom(id, dateStr); return; } // 왼쪽 스와이프 → 소프트 삭제 (오늘부터)
     }
   },
   _lpStart(e,id,dateStr) {
@@ -155,7 +155,8 @@ const Habits = {
       btn.style.background = this._reorderMode ? 'var(--accent)' : '';
       btn.style.color = this._reorderMode ? 'white' : '';
     }
-    this.render();
+    // 현재 선택된 날짜 컨텍스트 유지 (App.S.selDate가 없으면 오늘)
+    this.render(App?.S?.selDate || new Date());
     if (this._reorderMode) {
       // render 후 Reorder 모듈 활성화
       setTimeout(() => {
@@ -175,10 +176,8 @@ const Habits = {
   },
 
   _del(id) {
-    if(!confirm('이 습관을 삭제하시겠습니까?')) return;
-    Sounds?.delete();
-    this.saveList(this.getList().filter(h=>h.id!==id));
-    this.render();
+    // _del은 _delFrom(소프트 삭제)으로 대체됨 — 직접 호출 시 오늘 날짜로 소프트 삭제
+    this._delFrom(id, this._dateStr(new Date()));
   },
 
   _delFrom(id, dateStr) {
@@ -190,16 +189,17 @@ const Habits = {
     // 현재 보는 날짜가 오늘 이전이면 "오늘부터 삭제" 안내
     const viewingPast = dateStr < today;
     const msg = viewingPast
-      ? `이 습관을 오늘(${today})부터 삭제하시겠습니까?
-(과거 기록은 유지됩니다)`
-      : '이 습관을 삭제하시겠습니까?';
+      ? `이 습관을 오늘(${today})부터 삭제하시겠습니까?\n(과거 기록은 유지됩니다)`
+      : '이 습관을 삭제하시겠습니까?\n(오늘부터 숨겨집니다. 과거 기록은 유지됩니다)';
     if(!confirm(msg)) return;
     Sounds?.delete();
 
     // deletedFrom = 오늘 (오늘부터 안 보임, 과거 기록 보존)
     h.deletedFrom = today;
     this.saveList(list);
-    this.render();
+    // 현재 보던 날짜 컨텍스트를 유지해서 렌더링 (오늘로 점프하지 않음)
+    const renderDate = new Date(dateStr + 'T00:00:00');
+    this.render(isNaN(renderDate.getTime()) ? new Date() : renderDate);
     FirebaseSync?.scheduleSave();
     App.showToast('습관 삭제됨 (오늘부터)', 'success');
   },
@@ -272,7 +272,7 @@ const Habits = {
       </div>
       <div class="modal-btns">
         <button onclick="Habits._saveEdit('${id}')" class="btn-sm accent">저장</button>
-        <button onclick="Habits._del('${id}');App.closeModal();" class="btn-danger">삭제</button>
+        <button onclick="Habits._delFrom('${id}','${this._dateStr(new Date())}');App.closeModal();" class="btn-danger">삭제</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
       </div>`);
   },

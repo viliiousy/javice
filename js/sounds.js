@@ -11,7 +11,9 @@ const Sounds = {
     if (!this._ctx) {
       try { this._ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; }
     }
-    if (this._ctx.state === 'suspended') this._ctx.resume();
+    if (this._ctx.state === 'suspended') {
+      this._ctx.resume().catch(() => {});
+    }
     return this._ctx;
   },
 
@@ -105,6 +107,14 @@ const Sounds = {
       o.start(t); o.stop(t + 0.25);
     });
   },
+
+  // AudioContext를 즉시 resume하는 내부 헬퍼 (사용자 제스처 없이도 시도)
+  _resumeCtx() {
+    if (this._ctx && this._ctx.state === 'suspended') {
+      this._ctx.resume().catch(() => {});
+    }
+  },
+
   // 동기화 완료 - 부드러운 슈웅 사운드
   sync() {
     if (!this.enabled) return;
@@ -136,3 +146,17 @@ const Sounds = {
     source.stop(ctx.currentTime + 0.4);
   },
 };
+
+// ── 백그라운드 복귀 시 AudioContext 자동 resume ──────────────────────────────
+// PWA/모바일에서 앱이 백그라운드로 전환되면 브라우저가 AudioContext를 suspend 시킴.
+// visibilitychange 이벤트로 포그라운드 복귀를 감지해 즉시 resume 처리.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    Sounds._resumeCtx();
+  }
+});
+
+// 사용자 제스처(터치/클릭) 시에도 resume 시도 — iOS Safari 대응
+['touchstart', 'click', 'keydown'].forEach(evt => {
+  document.addEventListener(evt, () => Sounds._resumeCtx(), { once: false, passive: true });
+});
