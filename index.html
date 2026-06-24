@@ -1,492 +1,217 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>내 시세 터미널</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-<style>
-  :root{
-    --paper:#F3F3F1;--surface:#FFFFFF;--ink:#14181F;--ink2:#646C78;--ink3:#9AA1AB;
-    --line:#E7E8EB;--line2:#DCDEE2;--gold:#A8842A;--up:#E03A4E;--dn:#2563EB;
-    --r:14px;--r2:10px;--sh:0 1px 2px rgba(20,24,31,.05);
-    --sans:"Pretendard",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif;
-  }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
-  .tnum{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
-  .wrap{max-width:760px;margin:0 auto}
-  header{position:sticky;top:0;z-index:6;background:var(--paper);padding:16px 18px 0}
-  .eyebrow{font-size:11px;letter-spacing:.24em;color:var(--ink3);font-weight:700}
-  .mast{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;padding:2px 0 12px}
-  .mast h1{font-size:25px;font-weight:800;letter-spacing:-.02em;margin:0}
-  .mast .right{display:flex;align-items:center;gap:6px}
-  .upd{font-size:11px;color:var(--ink3);text-align:right;line-height:1.3;max-width:130px}
-  .ico{background:var(--surface);border:1px solid var(--line2);color:var(--ink);width:36px;height:36px;border-radius:10px;font-size:15px;cursor:pointer;flex:none;display:flex;align-items:center;justify-content:center}
-  .ico:active{transform:scale(.94)}
-  .rule{height:2px;background:linear-gradient(90deg,var(--gold),transparent)}
-  nav{position:sticky;top:0;z-index:5;background:var(--paper);display:flex;gap:4px;padding:12px 18px 8px}
-  nav button{flex:1;padding:9px 0;border:none;background:transparent;color:var(--ink2);font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;border-radius:9px;position:relative}
-  nav button.on{color:var(--ink);background:var(--surface);box-shadow:var(--sh);border:1px solid var(--line)}
-  main{padding:6px 18px 96px}
-  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:14px 15px;margin-bottom:10px;animation:rise .26s ease both}
-  @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-  .ctop{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-  .nm{font-size:16px;font-weight:700;letter-spacing:-.01em}
-  .meta{font-size:11.5px;color:var(--ink3);margin-top:2px}
-  .badge{display:inline-block;font-size:10.5px;font-weight:700;color:var(--ink2);background:var(--paper);border:1px solid var(--line2);border-radius:5px;padding:1px 5px;margin-left:6px;vertical-align:middle}
-  .pwrap{text-align:right;flex:none}
-  .price{font-size:20px;font-weight:700;letter-spacing:-.01em}
-  .delta{font-size:12.5px;font-weight:700;margin-top:2px}
-  .up{color:var(--up)}.dn{color:var(--dn)}.flat{color:var(--ink3)}
-  @keyframes fu{0%{background:rgba(224,58,78,.13)}100%{background:transparent}}
-  @keyframes fd{0%{background:rgba(37,99,235,.13)}100%{background:transparent}}
-  .fl-up{animation:fu 1s ease}.fl-dn{animation:fd 1s ease}
-  .cbot{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line);flex-wrap:wrap}
-  .cbot label{font-size:11.5px;color:var(--ink3);font-weight:600}
-  .floor{width:104px;background:var(--paper);border:1px solid var(--line2);color:var(--ink);border-radius:8px;padding:6px 9px;font-size:13px;font-family:var(--sans)}
-  .chip-btn{background:var(--paper);border:1px solid var(--line2);color:var(--ink2);border-radius:8px;padding:6px 11px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--sans)}
-  .chip-btn:active{transform:scale(.95)}
-  .chip-btn.rm{color:#C2384A}
-  .dir-dn{color:var(--dn);border-color:#BBD0F5}
-  .dir-up{color:var(--up);border-color:#F4C2C8}
-  [data-sort]{touch-action:pan-y}
-  .card.drag{opacity:.92;box-shadow:0 10px 28px rgba(20,24,31,.18);transform:scale(1.015);touch-action:none;cursor:grabbing}
-  .sp{flex:1}
-  .sw{position:relative;width:40px;height:23px;flex:none}
-  .sw input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:2}
-  .sw span{position:absolute;inset:0;background:var(--line2);border-radius:12px;transition:.18s}
-  .sw span:before{content:"";position:absolute;top:3px;left:3px;width:17px;height:17px;background:#fff;border-radius:50%;transition:.18s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
-  .sw input:checked+span{background:var(--gold)}
-  .sw input:checked+span:before{transform:translateX(17px)}
-  .lists{display:flex;gap:7px;overflow-x:auto;padding:4px 0 12px;-webkit-overflow-scrolling:touch}
-  .lists::-webkit-scrollbar{display:none}
-  .lchip{flex:none;border:1px solid var(--line2);background:var(--surface);color:var(--ink2);border-radius:20px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
-  .lchip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
-  .lchip.add{color:var(--gold);border-style:dashed}
-  .lhead{display:flex;align-items:center;gap:8px;margin:2px 0 12px}
-  .lhead .t{font-size:17px;font-weight:800;flex:1}
-  #search{width:100%;background:var(--surface);border:1px solid var(--line2);color:var(--ink);border-radius:12px;padding:13px 15px;font-size:16px;margin:4px 0 12px;font-family:var(--sans);box-shadow:var(--sh)}
-  .res{display:flex;align-items:center;gap:8px;padding:11px 13px;background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:7px;box-shadow:var(--sh)}
-  .res .rn{font-size:14.5px;font-weight:600}.res .rc{font-size:11.5px;color:var(--ink3);margin-top:1px}
-  .add{font-size:12.5px;font-weight:700;padding:8px 11px;border-radius:9px;border:1px solid var(--line2);background:var(--paper);color:var(--ink2);cursor:pointer;white-space:nowrap;font-family:var(--sans)}
-  .add.star{color:var(--gold);border-color:#E5D9B5;background:#FBF7EA}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  @media(max-width:560px){.grid{grid-template-columns:1fr}}
-  .gcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
-  .gtop{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;cursor:pointer}
-  .gtv{height:150px;border-top:1px solid var(--line)}
-  .seg2{display:inline-flex;background:var(--surface);border:1px solid var(--line2);border-radius:9px;padding:3px;margin-bottom:12px}
-  .seg2 button{border:none;background:transparent;color:var(--ink2);font-family:var(--sans);font-size:13px;font-weight:600;padding:6px 16px;border-radius:7px;cursor:pointer}
-  .seg2 button.on{background:var(--ink);color:#fff}
-  .combo{height:48vh;min-height:340px;margin-bottom:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
-  .wsearch{width:100%;background:var(--surface);border:1px solid var(--line2);color:var(--ink);border-radius:11px;padding:11px 13px;font-size:15px;margin:0 0 10px;font-family:var(--sans);box-shadow:var(--sh)}
-  .empty{color:var(--ink2);text-align:center;padding:46px 16px;font-size:14px;line-height:1.8}
-  .empty .big{font-size:15px;color:var(--ink);font-weight:700;display:block;margin-bottom:4px}
-  #setup{padding:22px 20px;max-width:460px;margin:0 auto}
-  #setup .eyebrow{margin-bottom:4px}
-  #setup h2{font-size:21px;font-weight:800;margin:2px 0 18px;letter-spacing:-.01em}
-  #setup label{font-size:12.5px;color:var(--ink2);font-weight:600}
-  #setup input{width:100%;background:var(--surface);border:1px solid var(--line2);color:var(--ink);border-radius:10px;padding:11px 13px;font-size:15px;margin:6px 0 13px;font-family:var(--sans)}
-  .hint{font-size:12px;color:var(--ink3);line-height:1.7;margin:-5px 0 16px}
-  .primary{width:100%;background:var(--ink);color:#fff;border:none;border-radius:11px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--sans)}
-  .primary:active{transform:scale(.99)}
-  #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(8px);background:var(--ink);color:#fff;padding:9px 18px;border-radius:22px;font-size:13px;font-weight:600;opacity:0;transition:.25s;z-index:40;pointer-events:none}
-  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  .ov{position:fixed;inset:0;background:rgba(20,24,31,.5);z-index:30;display:none;align-items:center;justify-content:center;padding:18px}
-  .ov.on{display:flex}
-  .sheet{background:var(--surface);border-radius:16px;width:100%;max-width:380px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
-  .sheet h3{font-size:16px;font-weight:800;margin:0 0 14px}
-  .sheet input{width:100%;background:var(--paper);border:1px solid var(--line2);border-radius:10px;padding:11px 13px;font-size:15px;font-family:var(--sans);margin-bottom:12px;color:var(--ink)}
-  .sheet .opt{display:block;width:100%;text-align:left;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14.5px;font-weight:600;margin-bottom:8px;cursor:pointer;font-family:var(--sans);color:var(--ink)}
-  .sheet .opt.new{color:var(--gold);border-style:dashed}
-  .sheet .rowb{display:flex;gap:8px;margin-top:4px}
-  .sheet .rowb button{flex:1;border-radius:10px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--sans);border:1px solid var(--line2);background:var(--paper);color:var(--ink2)}
-  .sheet .rowb button.go{background:var(--ink);color:#fff;border-color:var(--ink)}
-  #chart{position:fixed;inset:0;background:var(--paper);z-index:35;display:none;flex-direction:column;padding:12px}
-  #chart.on{display:flex}
-  #chart .bar{display:flex;align-items:center;gap:10px;padding:4px 4px 10px}
-  #chart .bar b{flex:1;font-size:17px;font-weight:800}
-  #tvbox{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#ffffff">
+  <title>자비스 대시보드</title>
+  <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="자비스">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<div id="setup" style="display:none">
-  <div class="eyebrow">MARKET TERMINAL · 처음 설정</div>
-  <h2>한 번만 연결하면 끝이에요</h2>
-  <label>GitHub 사용자명</label>
-  <input id="s-owner" placeholder="viliiousy">
-  <label>저장소 이름</label>
-  <input id="s-repo" placeholder="economy">
-  <label>브랜치</label>
-  <input id="s-branch" value="main">
-  <label>GitHub 토큰 (Contents 읽기/쓰기)</label>
-  <input id="s-token" placeholder="github_pat_...">
-  <p class="hint">토큰은 이 브라우저에만 저장돼요. 종목을 추가·삭제하면 자동으로 저장하는 데에만 쓰여요.</p>
-  <button class="primary" onclick="saveSetup()">연결하고 시작</button>
+<!-- Login -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-orbs"><div class="orb orb1"></div><div class="orb orb2"></div><div class="orb orb3"></div></div>
+  <div class="login-card">
+    <div class="login-emoji">⚡</div>
+    <h1 class="login-title">자비스</h1>
+    <p class="login-sub">AI 기반 갓생 대시보드</p>
+    <div class="login-features">
+      <span>📅 구글 캘린더</span><span>✅ 구글 할일</span>
+      <span>🥗 식단 기록</span><span>✅ 습관 관리</span>
+      <span>✍️ 체크리스트</span><span>☁️ 기기간 동기화</span>
+    </div>
+    <button id="btnGoogleLogin" class="btn-google-login">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66 2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+      Google로 로그인
+    </button>
+    <button id="btnOfflineMode" class="btn-offline">오프라인 모드로 시작</button>
+    <p class="login-note">캘린더·할일·Drive 권한이 필요합니다</p>
+  </div>
 </div>
 
+<!-- App -->
 <div id="app" style="display:none">
-  <div class="wrap">
-    <header>
-      <div class="eyebrow">MARKET TERMINAL</div>
-      <div class="mast">
-        <h1>내 시세</h1>
-        <div class="right">
-          <div class="upd" id="upd"></div>
-          <button class="ico" onclick="refreshPrices()" aria-label="새로고침">⟳</button>
-          <button class="ico" onclick="openSettings()" aria-label="설정">⚙</button>
+
+  <div class="header-sticky-group">
+  <header class="header" style="position:static;box-shadow:none;">
+    <div class="h-left">
+      <a href="/" class="h-logo" style="text-decoration:none;display:flex;flex-direction:column;align-items:center;gap:1px"><img src="icons/icon-192.png" style="width:34px;height:34px;border-radius:8px"><span style="font-size:10px;font-weight:700;color:var(--accent);letter-spacing:0.5px">자비스</span></a>
+      <div class="h-date">
+        <div id="hDate" class="h-date-main"></div>
+        <div id="hDay" class="h-date-sub"></div>
+      </div>
+    </div>
+    <div class="h-right">
+      <div id="hWeather" class="h-weather-wrap"></div>
+      <div id="hUser" class="h-user" style="display:none" onclick="App.toggleProfileMenu()">
+        <img id="hAvatar" src="" alt="" class="h-avatar">
+      </div>
+      <div id="profileMenu" class="profile-menu hidden">
+        <div class="profile-menu-item" style="font-size:11px;color:var(--text3);cursor:default;padding:6px 16px;border-bottom:1px solid var(--border)">v26.05.25.0116 업데이트</div>
+        <div class="profile-menu-item" onclick="Notifications.showSettings()">🔔 알림 설정</div>
+        <div class="profile-menu-item" onclick="App.toggleDarkMode()"><span id="darkModeLabel">🌙 다크 모드</span></div>
+        <div class="profile-menu-item" onclick="App.toggleSound()"><span id="soundLabel">🔔 사운드 켜짐</span></div>
+        <div class="profile-menu-item" onclick="Auth.logout()">🚪 로그아웃</div>
+      </div>
+    </div>
+  </header>
+
+  <div id="statsBanner" class="stats-banner"></div>
+  </div>
+
+  <div class="dashboard">
+
+    <!-- 할일 -->
+    <section class="card card-tasks">
+      <div class="card-head">
+        <span class="card-title">📋 할일</span>
+        <div class="card-acts">
+          <button class="btn-sm" id="btnSync" title="동기화">🔄</button>
+          <button class="btn-sm" id="btnShowCompleted" title="완료됨 보기">✓</button>
+          <button class="btn-sm" id="btnShowHidden" title="숨김 보기">🙈</button>
+          <button class="btn-sm accent" id="btnAddTask">+ 추가</button>
         </div>
       </div>
-      <div class="rule"></div>
-    </header>
-    <nav>
-      <button id="t-main" class="on" onclick="tab('main')">메인</button>
-      <button id="t-watch" onclick="tab('watch')">관심종목</button>
-      <button id="t-charts" onclick="tab('charts')">차트</button>
-    </nav>
-    <main>
-      <div id="tab-main"></div>
-      <div id="tab-watch" style="display:none"></div>
-      <div id="tab-charts" style="display:none"></div>
-    </main>
+      <div id="taskFilters" class="task-filter-wrap"></div>
+      <div class="task-form hidden" id="taskForm">
+        <input type="text" id="taskInput" placeholder="할일 입력..." class="inp">
+        <div class="task-form-row">
+          <select id="taskListSel" class="inp inp-sm"></select>
+          <input type="date" id="taskDue" class="inp inp-sm">
+        </div>
+        <div class="task-form-btns">
+          <button id="btnSaveTask" class="btn-sm accent">저장</button>
+          <button id="btnCancelTask" class="btn-sm">취소</button>
+        </div>
+      </div>
+      <div id="tasksContainer" class="tasks-wrap"><p class="empty">🔄 불러오는 중...</p></div>
+    </section>
+
+    <!-- 캘린더 -->
+    <section class="card card-calendar">
+      <div class="card-head">
+        <span class="card-title">📅 캘린더</span>
+        <div class="card-acts">
+          <button class="btn-sm" id="btnCalSettings" title="캘린더 설정">⚙️</button>
+          <button class="btn-sm accent" id="btnAddEvent">+ 일정</button>
+        </div>
+      </div>
+      <div id="miniCal" class="mini-cal"></div>
+      <div class="cal-panel-tabs">
+        <button class="cal-panel-tab active" onclick="App.setCalPanel('today',this)">오늘</button>
+        <button class="cal-panel-tab" onclick="App.setCalPanel('week',this)">이번 주</button>
+        <button class="cal-panel-tab" onclick="App.setCalPanel('month',this)">이번 달</button>
+      </div>
+      <div id="eventsWrap" class="events-wrap"></div>
+    </section>
+
+    <!-- 체크리스트 -->
+    <section class="card card-checklist">
+      <div class="card-head">
+        <span class="card-title">✍️ 체크리스트</span>
+        <button class="btn-sm" id="btnClReorder" onclick="Checklist.toggleReorderMode()" title="편집 모드">⚙️</button>
+      </div>
+      <div id="checklistWrap" class="checklist-wrap"></div>
+    </section>
+
+    <!-- 습관 -->
+    <section class="card card-habits">
+      <div class="card-head">
+        <span class="card-title">✅ 오늘의 습관</span>
+        <button class="btn-sm" id="btnHabitReorder" onclick="Habits.toggleReorderMode()" title="편집 모드">⚙️</button>
+      </div>
+      <div id="habitsWrap" class="habits-wrap"></div>
+      <div id="habitsFooter" class="habits-footer"></div>
+    </section>
+
+    <!-- 식단 -->
+    <section class="card card-diet">
+      <div class="card-head">
+        <span class="card-title">🥗 식단 기록</span>
+        <span id="dietBadge" class="badge"></span>
+      </div>
+      <div id="dietWrap" class="diet-wrap"></div>
+    </section>
+
+    <!-- 메모 -->
+    <section class="card card-memo">
+      <div class="card-head">
+        <span class="card-title">📝 메모</span>
+        <button class="btn-sm" id="btnMemoReorder" onclick="Memo.toggleReorderMode()" title="편집 모드">⚙️</button>
+      </div>
+      <div id="memoWrap" class="memo-wrap"></div>
+    </section>
+
   </div>
 </div>
 
-<div id="toast"></div>
-<div class="ov" id="ov"><div class="sheet" id="sheet"></div></div>
-<div id="chart">
-  <div style="display:flex;flex-direction:column;height:100%;width:100%">
-    <div class="bar"><b id="c-name"></b><button class="ico" onclick="closeChart()" aria-label="닫기">✕</button></div>
-    <div id="tvbox"></div>
-  </div>
-</div>
-
-<script src="https://s3.tradingview.com/tv.js"></script>
-<script>
-const LS=localStorage;
-let GH={owner:LS.getItem('gh_owner'),repo:LS.getItem('gh_repo'),branch:LS.getItem('gh_branch')||'main',token:LS.getItem('gh_token')};
-let CONFIG={move_pct:10,favorites:[],watchlists:[]}, SHA=null, PRICES={}, PREV={}, TICKERS=[], TAB='main', activeList=null, chartScope='fav', chartMode='combined', saveTimer=null;
-
-const TYPE={kr:'국내',us:'해외',exchange:'환율',metal:'금'};
-const unitFor=t=>t==='us'?'$':t==='metal'?'원/g':'원';
-const keyOf=it=>it.type+':'+it.code;
-const uid=()=>'w'+Date.now().toString(36)+Math.floor(Math.random()*1e3).toString(36);
-const b64utf8=s=>btoa(unescape(encodeURIComponent(s)));
-const utf8b64=b=>decodeURIComponent(escape(atob(b.replace(/\n/g,''))));
-function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1500);}
-
-function start(){
-  if(!GH.owner||!GH.repo||!GH.token){openSetup();return;}
-  document.getElementById('setup').style.display='none';
-  document.getElementById('app').style.display='block';
-  loadTickers();
-  loadConfig().then(()=>{if(CONFIG.watchlists[0])activeList=CONFIG.watchlists[0].id;refreshPrices();render();});
-  setInterval(refreshPrices,30000);
-}
-function openSetup(){
-  document.getElementById('app').style.display='none';
-  const s=document.getElementById('setup');s.style.display='block';
-  for(const[k,id]of[['owner','s-owner'],['repo','s-repo'],['branch','s-branch'],['token','s-token']])if(GH[k])document.getElementById(id).value=GH[k];
-}
-function saveSetup(){
-  GH={owner:val('s-owner'),repo:val('s-repo'),branch:val('s-branch')||'main',token:val('s-token')};
-  if(!GH.owner||!GH.repo||!GH.token){alert('사용자명, 저장소, 토큰을 모두 입력하세요.');return;}
-  LS.setItem('gh_owner',GH.owner);LS.setItem('gh_repo',GH.repo);LS.setItem('gh_branch',GH.branch);LS.setItem('gh_token',GH.token);
-  start();
-}
-const val=id=>document.getElementById(id).value.trim();
-
-const rawUrl=f=>`https://raw.githubusercontent.com/${GH.owner}/${GH.repo}/${GH.branch}/${f}?t=`+Date.now();
-const apiUrl=()=>`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/config.json`;
-const ghH=()=>({'Authorization':'Bearer '+GH.token,'Accept':'application/vnd.github+json'});
-
-async function loadTickers(){try{TICKERS=await(await fetch(rawUrl('tickers.json'))).json();}catch(e){TICKERS=[];}}
-async function loadConfig(){
-  try{
-    const r=await fetch(apiUrl()+'?ref='+GH.branch,{headers:ghH()});
-    if(r.status===401){toast('토큰 오류 — 설정 확인');openSetup();return;}
-    if(r.status===404){SHA=null;return;}
-    const j=await r.json();SHA=j.sha;const c=JSON.parse(utf8b64(j.content));
-    if(!c.watchlists){const old=c.watchlist||[];c.watchlists=old.length?[{id:uid(),name:'관심종목',items:old}]:[];}
-    CONFIG={move_pct:c.move_pct??10,favorites:c.favorites||[],watchlists:c.watchlists,report_time:c.report_time||'08:00'};
-    CONFIG.favorites.forEach(f=>{if(f.alert===undefined)f.alert=true;});
-    CONFIG.watchlists.forEach(w=>{if(w.alert===undefined)w.alert=false;});
-  }catch(e){toast('설정 불러오기 실패');}
-}
-async function refreshPrices(){
-  try{
-    const j=await(await fetch(rawUrl('prices.json'))).json();
-    PREV=PRICES;PRICES=j.items||{};
-    document.getElementById('upd').textContent=j.updated?('업데이트 '+j.updated.replace('T',' ').slice(5,16)):'첫 시세 대기 중';
-    const ae=document.activeElement;
-    const typing=ae&&(ae.id==='wsearch'||ae.id==='fsearch'||(ae.classList&&ae.classList.contains('floor')));
-    if(TAB!=='charts'&&!typing)render();
-  }catch(e){}
-}
-function queueSave(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveConfig(0),700);}
-async function fetchSha(){
-  try{
-    const r=await fetch(apiUrl()+'?ref='+GH.branch,{headers:ghH()});
-    if(r.ok)return (await r.json()).sha;
-    if(r.status===404)return null;
-  }catch(e){}
-  return SHA;
-}
-async function saveConfig(attempt){
-  attempt=attempt||0;
-  try{
-    const body={message:'config update',content:b64utf8(JSON.stringify(CONFIG,null,2)),branch:GH.branch};
-    if(SHA)body.sha=SHA;
-    const r=await fetch(apiUrl(),{method:'PUT',headers:ghH(),body:JSON.stringify(body)});
-    if((r.status===409||r.status===422)&&attempt<4){
-      SHA=await fetchSha();            // 내 변경은 그대로 두고 최신 sha만 갱신
-      await new Promise(res=>setTimeout(res,250*(attempt+1)));
-      return saveConfig(attempt+1);
-    }
-    if(r.status===401){toast('토큰 오류 — 설정 확인');return;}
-    if(!r.ok){toast('저장 실패 ('+r.status+')');return;}
-    SHA=(await r.json()).content.sha;toast('저장됨');
-  }catch(e){toast('저장 실패');}
-}
-
-function fmtPrice(it,p){if(p==null)return '—';if(it.type==='us')return '$'+p.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});if(it.type==='exchange')return p.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2})+(it.unit||'원');return Math.round(p).toLocaleString('ko-KR')+(it.unit||'');}
-function deltaHtml(pct){if(pct==null)return '<div class="delta flat">—</div>';const c=pct>0?'up':pct<0?'dn':'flat';const a=pct>0?'▲':pct<0?'▼':'–';return `<div class="delta ${c} tnum">${a} ${Math.abs(pct).toFixed(2)}%</div>`;}
-function flashClass(it){const k=keyOf(it),a=PRICES[k],b=PREV[k];if(!a||!b||a.price===b.price)return '';return a.price>b.price?'fl-up':'fl-dn';}
-
-function priceCard(it,ctx){
-  const q=PRICES[keyOf(it)]||{};
-  return `<div class="card" data-sort="${keyOf(it)}">
-    <div class="ctop">
-      <div><div class="nm">${esc(it.name)}<span class="badge">${TYPE[it.type]||''}</span></div><div class="meta">${esc(it.code)}</div></div>
-      <div class="pwrap"><div class="price tnum ${flashClass(it)}">${fmtPrice(it,q.price)}</div>${deltaHtml(q.pct)}</div>
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modalTitle"></h3>
+      <button id="btnModalClose" class="modal-close">✕</button>
     </div>
-    <div class="cbot">
-      <label>알림가</label>
-      <input class="floor tnum" type="number" placeholder="없음" value="${it.floor??''}" onchange="setFloor('${ctx}','${keyOf(it)}',this.value)">
-      <button class="chip-btn dir ${it.floorDir==='above'?'dir-up':'dir-dn'}" onclick="cycleDir('${ctx}','${keyOf(it)}')" title="이상/이하 전환">${it.floorDir==='above'?'이상':'이하'}</button>
-      ${ctx==='F'?`<label class="sw"><input type="checkbox" ${it.alert!==false?'checked':''} onchange="toggleFavAlert('${keyOf(it)}',this.checked)"><span></span></label><label>알림</label>`:''}
-      <span class="sp"></span>
-      <button class="chip-btn" onclick='openChart(${attr(it)})'>차트</button>
-      <button class="chip-btn rm" onclick="removeItem('${ctx}','${keyOf(it)}')">삭제</button>
-    </div></div>`;
-}
-const esc=s=>String(s).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
-const attr=o=>JSON.stringify(o).replace(/'/g,'&#39;').replace(/"/g,'&quot;');
+    <div id="modalBody" class="modal-body"></div>
+  </div>
+</div>
+<div id="toast" class="toast hidden"></div>
 
-function enableSort(container,arr,rerender){
-  if(!container)return;
-  container.querySelectorAll('[data-sort]').forEach(card=>{
-    let timer=null,startY=0,dragging=false;
-    card.addEventListener('pointerdown',e=>{
-      if(e.target.closest('input,button,.sw,a'))return;
-      startY=e.clientY;
-      timer=setTimeout(()=>begin(e.pointerId),280);
-    });
-    card.addEventListener('pointermove',e=>{if(!dragging&&Math.abs(e.clientY-startY)>8)clearTimeout(timer);});
-    card.addEventListener('pointerup',()=>clearTimeout(timer));
-    card.addEventListener('pointercancel',()=>clearTimeout(timer));
-    function begin(pid){
-      dragging=true;card.classList.add('drag');
-      if(navigator.vibrate)try{navigator.vibrate(12);}catch(_){}
-      try{card.setPointerCapture(pid);}catch(_){}
-      const move=ev=>{ev.preventDefault();const a=getAfter(container,ev.clientY,card);if(a==null)container.appendChild(card);else container.insertBefore(card,a);};
-      const up=()=>{
-        dragging=false;card.classList.remove('drag');
-        document.removeEventListener('pointermove',move);
-        const order=[...container.querySelectorAll('[data-sort]')].map(x=>x.dataset.sort);
-        arr.sort((a,b)=>order.indexOf(keyOf(a))-order.indexOf(keyOf(b)));
-        queueSave();rerender();
-      };
-      document.addEventListener('pointermove',move,{passive:false});
-      document.addEventListener('pointerup',up,{once:true});
-    }
-  });
-}
-function getAfter(c,y,drag){
-  let best=null,bo=-Infinity;
-  for(const ch of c.querySelectorAll('[data-sort]')){if(ch===drag)continue;const b=ch.getBoundingClientRect();const off=y-b.top-b.height/2;if(off<0&&off>bo){bo=off;best=ch;}}
-  return best;
-}
-function render(){
-  if(TAB==='main')renderMain();else if(TAB==='watch')renderWatch();else if(TAB==='charts')renderCharts();
-}
-function renderMain(){
-  let h=`<input class="wsearch" id="fsearch" placeholder="즐겨찾기에 추가 — 검색 (금, 삼성, NVDA, KODEX)" oninput="fSearch(this.value)"><div id="fresults"></div>`;
-  h+=CONFIG.favorites.length
-    ?'<div id="mainItems">'+CONFIG.favorites.map(it=>priceCard(it,'F')).join('')+'</div>'
-    :'<div class="empty"><span class="big">메인이 비어 있어요</span>위 검색창에서 종목을 찾아 ★를 누르면<br>여기에 실시간으로 표시되고 알림도 와요</div>';
-  document.getElementById('tab-main').innerHTML=h;
-  enableSort(document.getElementById('mainItems'),CONFIG.favorites,renderMain);
-}
-function fSearch(v){
-  const box=document.getElementById('fresults');if(!box)return;v=v.trim();
-  if(!v){box.innerHTML='';return;}
-  const code=/^[0-9A-Za-z]{6}$/.test(v)?v.toUpperCase():'';
-  const head=`<div class="res" style="border-style:dashed;cursor:pointer" onclick='manualSheet("F","${code}")'><div style="flex:1"><div class="rn" style="color:var(--gold)">＋ 코드로 직접 추가</div><div class="rc">검색에 없는 ETF 등 (예: 0173Y0)</div></div></div>`;
-  box.innerHTML=head+rank(v).slice(0,8).map(e=>{
-    const it={name:e.n,code:e.c,type:e.t,tv:e.tv,unit:unitFor(e.t),floor:null,alert:true};
-    return `<div class="res"><div style="flex:1"><div class="rn">${esc(e.n)}</div><div class="rc">${esc(e.c)} · ${TYPE[e.t]||''}</div></div><button class="add star" onclick='fAdd(${attr(it)})'>★ 추가</button></div>`;
-  }).join('');
-}
-function fAdd(it){addFav(it);}
-function renderWatch(){
-  const el=document.getElementById('tab-watch');
-  let h='<div class="lists">';
-  CONFIG.watchlists.forEach(w=>{h+=`<button class="lchip ${w.id===activeList?'on':''}" onclick="selList('${w.id}')">${esc(w.name)}</button>`;});
-  h+='<button class="lchip add" onclick="newList()">＋ 새 리스트</button></div>';
-  const wl=CONFIG.watchlists.find(w=>w.id===activeList);
-  if(!CONFIG.watchlists.length){h+='<div class="empty"><span class="big">관심종목 리스트를 만들어 보세요</span>예: 반도체, AI, 배당주처럼<br>주제별로 여러 개를 만들 수 있어요</div>';}
-  else if(wl){
-    h+=`<div class="lhead"><span class="t">${esc(wl.name)}</span>
-        <label class="sw"><input type="checkbox" ${wl.alert?'checked':''} onchange="toggleListAlert('${wl.id}',this.checked)"><span></span></label><span style="font-size:12px;color:var(--ink2);font-weight:600">알림</span>
-        <button class="ico" onclick="renameList('${wl.id}')" aria-label="이름변경" style="width:32px;height:32px;font-size:13px">✎</button>
-        <button class="ico" onclick="deleteList('${wl.id}')" aria-label="리스트삭제" style="width:32px;height:32px;font-size:13px">🗑</button></div>`;
-    h+=`<input class="wsearch" id="wsearch" placeholder="이 리스트에 종목 추가 — 검색 (삼성, NVDA)" oninput="wSearch(this.value)"><div id="wresults"></div>`;
-    h+=wl.items.length?'<div id="watchItems">'+wl.items.map(it=>priceCard(it,'L:'+wl.id)).join('')+'</div>'
-      :'<div class="empty"><span class="big">이 리스트가 비어 있어요</span>위 검색창에서 종목을 담아보세요<br>리스트 알림을 켜면 담긴 종목 전체에 알림이 와요</div>';
-  }
-  el.innerHTML=h;
-  const aw=CONFIG.watchlists.find(w=>w.id===activeList);
-  if(aw&&aw.items.length)enableSort(document.getElementById('watchItems'),aw.items,renderWatch);
-}
-function renderCharts(){
-  const el=document.getElementById('tab-charts');
-  let h='<div class="lists"><button class="lchip '+(chartScope==='fav'?'on':'')+'" onclick="chScope(\'fav\')">즐겨찾기</button>';
-  CONFIG.watchlists.forEach(w=>{h+=`<button class="lchip ${chartScope===w.id?'on':''}" onclick="chScope('${w.id}')">${esc(w.name)}</button>`;});
-  h+='</div>';
-  h+=`<div class="seg2"><button class="${chartMode==='combined'?'on':''}" onclick="chMode('combined')">함께 보기</button><button class="${chartMode==='separate'?'on':''}" onclick="chMode('separate')">따로 보기</button></div>`;
-  const items=chartScope==='fav'?CONFIG.favorites:(CONFIG.watchlists.find(w=>w.id===chartScope)?.items||[]);
-  if(!items.length){el.innerHTML=h+'<div class="empty"><span class="big">표시할 종목이 없어요</span>먼저 종목을 담아주세요</div>';return;}
-  if(chartMode==='combined'){
-    el.innerHTML=h+'<div id="combo"></div>';
-    comboChart('combo',items);
-  }else{
-    h+='<div class="grid">'+items.map((it,i)=>{
-      const q=PRICES[keyOf(it)]||{};
-      return `<div class="gcard"><div class="gtop" onclick='openChart(${attr(it)})'>
-        <div><div class="nm" style="font-size:14px">${esc(it.name)}</div><div class="meta">${TYPE[it.type]||''}</div></div>
-        <div class="pwrap"><div class="price tnum" style="font-size:15px">${fmtPrice(it,q.price)}</div>${deltaHtml(q.pct)}</div>
-        </div><div class="gtv" id="g${i}"></div></div>`;
-    }).join('')+'</div>';
-    el.innerHTML=h;
-    if(window.TradingView)items.forEach((it,i)=>miniChart('g'+i,it.tv||('KRX:'+it.code)));
-  }
-}
-function chMode(m){chartMode=m;renderCharts();}
-function symFor(it){
-  const base=it.tv||('KRX:'+it.code);
-  return it.type==='us' ? (base+'*FX_IDC:USDKRW') : base;   // 해외주식: 달러×환율 = 원화
-}
-function comboChart(wrapId,items){
-  const wrap=document.getElementById(wrapId);if(!wrap)return;
-  wrap.innerHTML='<div class="combo" id="cbmain"></div>';
-  if(!window.TradingView)return;
-  try{new TradingView.widget({container_id:'cbmain',symbol:symFor(items[0]),interval:'D',
-    theme:'light',style:'2',locale:'kr',timezone:'Asia/Seoul',autosize:true,withdateranges:true,
-    hide_side_toolbar:true,allow_symbol_change:false,
-    compareSymbols:items.slice(1).map(it=>({symbol:symFor(it),position:'SameScale'}))});}catch(e){}
-}
-function miniChart(cid,sym){
-  try{new TradingView.widget({container_id:cid,symbol:sym,interval:'D',theme:'light',style:'2',locale:'kr',
-    timezone:'Asia/Seoul',autosize:true,hide_top_toolbar:true,hide_side_toolbar:true,hide_legend:true,
-    allow_symbol_change:false,save_image:false,withdateranges:false,backgroundColor:'#FFFFFF'});}catch(e){}
-}
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script src="js/config.js"></script>
+<script src="js/user-store.js"></script>
+<script src="js/sounds.js"></script>
+<script src="js/notifications.js"></script>
 
-function tab(t){TAB=t;['main','watch','charts'].forEach(x=>{document.getElementById('tab-'+x).style.display=x===t?'block':'none';document.getElementById('t-'+x).classList.toggle('on',x===t);});render();}
-
-function rank(q){
-  q=q.toLowerCase();const o=[];
-  for(const e of TICKERS){const n=e.n.toLowerCase(),c=e.c.toLowerCase();let s=-1;
-    if(c===q)s=0;else if(n.startsWith(q))s=1;else if(c.startsWith(q))s=2;else if(n.includes(q))s=3;else if(c.includes(q))s=4;
-    if(s>=0)o.push([s,e.n.length,e]);}
-  o.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);return o.slice(0,40).map(x=>x[2]);
-}
-const inList=(arr,it)=>arr.some(x=>keyOf(x)===keyOf(it));
-function addFav(it){if(inList(CONFIG.favorites,it)){toast('이미 즐겨찾기에 있어요');return;}CONFIG.favorites.push(Object.assign({alert:true},it));queueSave();toast('★ 즐겨찾기 추가');if(TAB==='main')renderMain();}
-function _addTo(lid,it){const w=CONFIG.watchlists.find(x=>x.id===lid);if(!w)return;if(inList(w.items,it)){toast('이미 담겨 있어요');return;}w.items.push(Object.assign({},it));queueSave();toast(w.name+'에 담음');if(TAB==='watch')renderWatch();}
-
-function newList(){askText('새 리스트 이름','예: 배당주',name=>{if(!name)return;const w={id:uid(),name,alert:false,items:[]};CONFIG.watchlists.push(w);activeList=w.id;queueSave();renderWatch();});}
-function renameList(lid){const w=CONFIG.watchlists.find(x=>x.id===lid);if(!w)return;askText('리스트 이름 변경',w.name,name=>{if(!name)return;w.name=name;queueSave();render();},w.name);}
-function deleteList(lid){const w=CONFIG.watchlists.find(x=>x.id===lid);if(!w)return;
-  openSheet(`<h3>'${esc(w.name)}' 리스트를 삭제할까요?</h3><div class="rowb"><button onclick="closeOv()">취소</button><button class="go" onclick="_delList('${lid}')">삭제</button></div>`);}
-function _delList(lid){CONFIG.watchlists=CONFIG.watchlists.filter(w=>w.id!==lid);if(activeList===lid)activeList=CONFIG.watchlists[0]?.id||null;queueSave();closeOv();renderWatch();}
-function selList(lid){activeList=lid;renderWatch();}
-function chScope(s){chartScope=s;renderCharts();}
-function wSearch(v){
-  const box=document.getElementById('wresults');if(!box)return;v=v.trim();
-  if(!v){box.innerHTML='';return;}
-  const code=/^[0-9A-Za-z]{6}$/.test(v)?v.toUpperCase():'';
-  const head=`<div class="res" style="border-style:dashed;cursor:pointer" onclick='manualSheet("${activeList}","${code}")'><div style="flex:1"><div class="rn" style="color:var(--gold)">＋ 코드로 직접 추가</div><div class="rc">검색에 없는 ETF 등 (예: 0173Y0)</div></div></div>`;
-  box.innerHTML=head+rank(v).slice(0,8).map(e=>{
-    const it={name:e.n,code:e.c,type:e.t,tv:e.tv,unit:unitFor(e.t),floor:null};
-    return `<div class="res"><div style="flex:1"><div class="rn">${esc(e.n)}</div><div class="rc">${esc(e.c)} · ${TYPE[e.t]||''}</div></div><button class="add" onclick='wAdd(${attr(it)})'>＋ 담기</button></div>`;
-  }).join('');
-}
-function wAdd(it){if(!activeList)return;_addTo(activeList,it);}
-function manualSheet(target,code){
-  openSheet(`<h3>코드로 직접 추가</h3>
-    <input id="m-name" placeholder="표시 이름 (예: KODEX 반도체)">
-    <input id="m-code" placeholder="종목 코드 (예: 0173Y0)" value="${code?esc(code):''}">
-    <p class="hint" style="margin:0 0 12px">국내 종목·ETF용이에요. 해외주식은 검색으로 추가하세요.</p>
-    <div class="rowb"><button onclick="closeOv()">취소</button><button class="go" onclick="manualDo('${target}')">추가</button></div>`);
-  setTimeout(()=>{const f=document.getElementById(code?'m-name':'m-code');f&&f.focus();},60);
-}
-function manualDo(target){
-  const name=val2('m-name'),code=val2('m-code').toUpperCase();
-  if(!name||!code){toast('이름과 코드를 입력하세요');return;}
-  const it={name,code,type:'kr',tv:'KRX:'+code,unit:'원',floor:null};
-  closeOv();
-  if(target==='F')addFav(Object.assign({alert:true},it));else _addTo(target,it);
-}
-const val2=id=>{const e=document.getElementById(id);return e?e.value.trim():'';};
-
-function removeItem(ctx,k){
-  if(ctx==='F'){CONFIG.favorites=CONFIG.favorites.filter(x=>keyOf(x)!==k);queueSave();renderMain();return;}
-  const lid=ctx.slice(2);const w=CONFIG.watchlists.find(x=>x.id===lid);if(w){w.items=w.items.filter(x=>keyOf(x)!==k);queueSave();renderWatch();}
-}
-function findItem(ctx,k){return ctx==='F'?CONFIG.favorites.find(x=>keyOf(x)===k):(CONFIG.watchlists.find(w=>w.id===ctx.slice(2))?.items||[]).find(x=>keyOf(x)===k);}
-function setFloor(ctx,k,v){const it=findItem(ctx,k);if(it){it.floor=v===''?null:parseFloat(v);queueSave();}}
-function cycleDir(ctx,k){const it=findItem(ctx,k);if(it){it.floorDir=it.floorDir==='above'?'below':'above';queueSave();ctx==='F'?renderMain():renderWatch();}}
-function toggleFavAlert(k,on){const it=CONFIG.favorites.find(x=>keyOf(x)===k);if(it){it.alert=on;queueSave();}}
-function toggleListAlert(lid,on){const w=CONFIG.watchlists.find(x=>x.id===lid);if(w){w.alert=on;queueSave();}}
-
-function openSettings(){
-  openSheet(`<h3>알림 설정</h3>
-    <label style="font-size:12px;color:var(--ink2);font-weight:600">매일 리포트 받을 시간</label>
-    <input id="set-time" type="time" value="${CONFIG.report_time||'08:00'}">
-    <label style="font-size:12px;color:var(--ink2);font-weight:600">급변동 알림 기준 (%)</label>
-    <input id="set-move" type="number" value="${CONFIG.move_pct||10}">
-    <div class="rowb"><button onclick="closeOv();openSetup()">GitHub 연결 변경</button><button class="go" onclick="saveSettings()">저장</button></div>`);
-}
-function saveSettings(){
-  CONFIG.report_time=val2('set-time')||'08:00';
-  CONFIG.move_pct=parseFloat(val2('set-move'))||10;
-  queueSave();closeOv();toast('설정 저장됨');
-}
-function openSheet(html){document.getElementById('sheet').innerHTML=html;document.getElementById('ov').classList.add('on');}
-function closeOv(){document.getElementById('ov').classList.remove('on');}
-function askText(title,ph,cb,init){
-  openSheet(`<h3>${title}</h3><input id="askin" placeholder="${ph}" value="${init?esc(init):''}"><div class="rowb"><button onclick="closeOv()">취소</button><button class="go" id="askok">확인</button></div>`);
-  const i=document.getElementById('askin');i.focus();i.select&&i.select();
-  document.getElementById('askok').onclick=()=>{const v=i.value.trim();closeOv();cb(v);};
-  i.onkeydown=e=>{if(e.key==='Enter'){const v=i.value.trim();closeOv();cb(v);}};
-}
-document.getElementById('ov').addEventListener('click',e=>{if(e.target.id==='ov')closeOv();});
-
-function openChart(it){
-  document.getElementById('c-name').textContent=it.name;
-  document.getElementById('chart').classList.add('on');
-  document.getElementById('tvbox').innerHTML='<div id="tvfull" style="height:100%"></div>';
-  if(window.TradingView){new TradingView.widget({container_id:'tvfull',symbol:it.tv||('KRX:'+it.code),interval:'D',
-    theme:'light',style:'1',locale:'kr',timezone:'Asia/Seoul',autosize:true,withdateranges:true,
-    hide_side_toolbar:true,allow_symbol_change:false});}
-  else document.getElementById('tvbox').innerHTML='<div class="empty">차트를 불러오지 못했어요</div>';
-}
-function closeChart(){document.getElementById('chart').classList.remove('on');document.getElementById('tvbox').innerHTML='';}
-
-start();
+<script src="js/reorder.js"></script>
+<script src="js/google-auth.js"></script>
+<script src="js/google-calendar.js"></script>
+<script src="js/google-tasks.js"></script>
+<script src="js/firebase-sync.js"></script>
+<script src="js/calendar-ui.js"></script>
+<script src="js/fitness.js"></script>
+<script src="js/diet.js"></script>
+<script src="js/habits.js"></script>
+<script src="js/checklist.js"></script>
+<script src="js/memo.js"></script>
+<script src="js/weather.js"></script>
+<script src="js/app.js"></script>
+<script src="js/jarvis.js"></script>
+<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});</script>
+<!-- Firebase compat SDK for FCM -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
+<script>
+window.addEventListener('load', function() {
+  try {
+    if(!firebase.apps.length) firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
+    const _msg = firebase.messaging();
+    window._fcmGetToken = async function() {
+      try {
+        // sw.js (기존 서비스워커) 사용
+        const swReg = await navigator.serviceWorker.ready;
+        const token = await _msg.getToken({
+          vapidKey: CONFIG.FCM_VAPID_KEY,
+          serviceWorkerRegistration: swReg,
+        });
+        console.log('[FCM] 토큰:', token ? '성공 '+token.slice(0,15)+'...' : 'null');
+        return token || null;
+      } catch(e) { console.error('[FCM] 오류:', e.code||'', e.message); return null; }
+    };
+    console.log('[FCM] SDK 준비완료');
+  } catch(e) { console.error('[FCM] init 실패:', e.message); }
+});
 </script>
 </body>
 </html>
