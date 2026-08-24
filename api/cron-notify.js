@@ -3,16 +3,8 @@
 const https = require('https');
 const crypto = require('crypto');
 
-// Firebase DB
-function fbGet(path) {
-  return new Promise((resolve, reject) => {
-    const url = new URL(`${process.env.FIREBASE_DB_URL}${path}`);
-    https.get({ hostname:url.hostname, path:url.pathname+url.search }, res => {
-      let d=''; res.on('data',c=>d+=c);
-      res.on('end',()=>{ try{resolve(JSON.parse(d));}catch{resolve(null);} });
-    }).on('error', reject);
-  });
-}
+// Firebase DB — 서비스 계정으로 인증해서 읽는다 (규칙을 잠근 뒤에도 동작)
+const { fbGet } = require('../lib/fb-admin');
 
 // VAPID 서명
 function urlBase64ToBuffer(base64) {
@@ -203,6 +195,23 @@ async function processUser(uid, tokenData) {
 module.exports = async (req, res) => {
   const auth = req.headers.authorization;
   if(auth && auth!==`Bearer ${process.env.CRON_SECRET}`) { res.status(401).json({error:'Unauthorized'}); return; }
+
+  // ?check=1 — 알림을 보내지 않고 DB 인증만 점검한다 (배포 검증용)
+  if (req.query?.check === '1') {
+    try {
+      const tokens = await fbGet('/fcm_tokens.json');
+      const uids   = tokens ? Object.keys(tokens) : [];
+      const fresh  = {};
+      for (const u of uids) {
+        try { fresh[u.slice(0,6)+'…'] = await fbGet(`/users/${u}/_savedAt.json`); }
+        catch (e) { fresh[u.slice(0,6)+'…'] = 'ERR: '+e.message; }
+      }
+      res.status(200).json({ ok:true, auth:'service-account', 등록수:uids.length, savedAt:fresh });
+    } catch (e) {
+      res.status(500).json({ ok:false, error:e.message });
+    }
+    return;
+  }
 
   const forceAll = req.query?.force === '1';
 
