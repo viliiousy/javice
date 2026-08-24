@@ -130,7 +130,7 @@
     <section class="card card-habits">
       <div class="card-head">
         <span class="card-title">✅ 오늘의 습관</span>
-        <button class="btn-sm" id="btnHabitReorder" onclick="Habits.toggleReorderMode()" title="편집 모드">⚙️</button>
+        <button class="btn-sm" id="btnHabitReorder" onclick="Habits.toggleReorderMode('life')" title="편집 모드">⚙️</button>
       </div>
       <div id="habitsWrap" class="habits-wrap"></div>
       <div id="habitsFooter" class="habits-footer"></div>
@@ -143,6 +143,16 @@
         <span id="dietBadge" class="badge"></span>
       </div>
       <div id="dietWrap" class="diet-wrap"></div>
+    </section>
+
+    <!-- 자기개발 -->
+    <section class="card card-dev">
+      <div class="card-head">
+        <span class="card-title">📚 자기개발</span>
+        <button class="btn-sm" id="btnDevReorder" onclick="Habits.toggleReorderMode('dev')" title="편집 모드">⚙️</button>
+      </div>
+      <div id="devWrap" class="habits-wrap"></div>
+      <div id="devFooter" class="habits-footer"></div>
     </section>
 
     <!-- 인바디 -->
