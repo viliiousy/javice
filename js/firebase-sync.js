@@ -1,7 +1,9 @@
 // js/firebase-sync.js — Firebase 동기화 (명시적 호출 방식)
 
 const FirebaseSync = {
-  _uid:        null,
+  _uid:        null,   // 실제 저장 경로 (Firebase 로그인 성공 시 Firebase UID)
+  _legacyUid:  null,   // 구버전 경로 (구글 sub) — 마이그레이션용
+  _authed:     false,  // Firebase 인증 성공 여부
   _dbUrl:      null,
   _saveTimer:  null,
   _syncing:    false,
@@ -11,12 +13,81 @@ const FirebaseSync = {
 
   init(normalizedUid, dbUrl) {
     if (!normalizedUid || !dbUrl || dbUrl.includes('YOUR_FIREBASE')) return;
-    this._uid   = normalizedUid;
-    this._dbUrl = dbUrl.replace(/\/$/, '');
+    this._uid       = normalizedUid;
+    this._legacyUid = normalizedUid;
+    this._dbUrl     = dbUrl.replace(/\/$/, '');
     console.log('[FB] 초기화:', this._uid);
   },
 
   ready() { return !!(this._uid && this._dbUrl); },
+
+  // ── Firebase 인증 ───────────────────────
+  // 구글 액세스 토큰으로 Firebase에도 로그인한다.
+  // 실패하면 인증 없이 기존 경로를 그대로 쓰므로 앱은 계속 동작한다.
+  async signIn(accessToken) {
+    if (!accessToken) return false;
+    if (typeof firebase === 'undefined' || !firebase.auth) {
+      console.warn('[FB] Auth SDK 없음 — 인증 없이 진행');
+      return false;
+    }
+    try {
+      if (!firebase.apps.length) firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
+      const cred = firebase.auth.GoogleAuthProvider.credential(null, accessToken);
+      const res  = await firebase.auth().signInWithCredential(cred);
+      this._uid    = res.user.uid;
+      this._authed = true;
+      console.log('[FB] 인증 완료, uid:', this._uid);
+      await this._migrateLegacy();
+      return true;
+    } catch (e) {
+      console.error('[FB] 인증 실패 — 인증 없이 진행:', e.code || e.message);
+      this._authed = false;
+      return false;
+    }
+  },
+
+  // 요청에 붙일 ?auth=<idToken> (인증 안 됐으면 빈 문자열)
+  async _q() {
+    if (!this._authed) return '';
+    try {
+      const u = firebase.auth().currentUser;
+      if (!u) return '';
+      const t = await u.getIdToken();   // 만료 시 자동 갱신됨
+      return t ? `?auth=${encodeURIComponent(t)}` : '';
+    } catch { return ''; }
+  },
+
+  // 구버전 경로(구글 sub) → 새 경로(Firebase UID) 1회 이전
+  async _migrateLegacy() {
+    if (!this._legacyUid || this._legacyUid === this._uid) return;
+    const q = await this._q();
+    try {
+      const curRes = await fetch(`${this._dbUrl}/users/${this._uid}/_savedAt.json${q}`);
+      if (!curRes.ok) throw new Error(`새 경로 확인 ${curRes.status}`);
+      if (await curRes.json()) return;   // 새 경로에 이미 데이터 있음 → 이전 불필요
+
+      const oldRes = await fetch(`${this._dbUrl}/users/${this._legacyUid}.json${q}`);
+      if (!oldRes.ok) throw new Error(`구 경로 조회 ${oldRes.status}`);
+      const old = await oldRes.json();
+      // 구 경로가 정말로 비어 있으면 신규 사용자 → 이전할 것 없이 새 경로 사용
+      if (!old || typeof old !== 'object' || !Object.keys(old).length) {
+        console.log('[FB] 이전할 구버전 데이터 없음 — 새 경로 사용');
+        return;
+      }
+
+      const res = await fetch(`${this._dbUrl}/users/${this._uid}.json${q}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(old),
+      });
+      if (!res.ok) throw new Error(`PUT ${res.status}`);
+      console.log('[FB] 구버전 데이터 이전 완료:', Object.keys(old).length + '개 키');
+    } catch (e) {
+      // 이전 실패 → 새 경로를 쓰면 데이터가 빈 것처럼 보이므로 구경로를 계속 사용
+      console.warn('[FB] 이전 실패 — 기존 경로 유지:', e.message);
+      this._uid = this._legacyUid;
+    }
+  },
 
   _collectData() {
     const data   = UserStore.getAllData();
@@ -40,7 +111,7 @@ const FirebaseSync = {
   async load() {
     if (!this.ready()) return false;
     try {
-      const res  = await fetch(`${this._dbUrl}/users/${this._uid}.json`);
+      const res  = await fetch(`${this._dbUrl}/users/${this._uid}.json${await this._q()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data && typeof data==='object' && Object.keys(data).length > 0) {
@@ -72,7 +143,7 @@ const FirebaseSync = {
         this._syncing = false;
         return;
       }
-      const res  = await fetch(`${this._dbUrl}/users/${this._uid}.json`, {
+      const res  = await fetch(`${this._dbUrl}/users/${this._uid}.json${await this._q()}`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(data),
@@ -112,7 +183,7 @@ const FirebaseSync = {
     if (Date.now() - this._lastEditTs < 2000) return; // 편집 중 스킵
     if (Date.now() - this._lastSaveTs  < 3000) return; // 방금 저장 스킵
     try {
-      const res = await fetch(`${this._dbUrl}/users/${this._uid}/_savedAt.json`);
+      const res = await fetch(`${this._dbUrl}/users/${this._uid}/_savedAt.json${await this._q()}`);
       if (!res.ok) return;
       const remoteTs = parseInt(await res.json()||'0',10);
       if (remoteTs > this._lastSaveTs + 1000) {
