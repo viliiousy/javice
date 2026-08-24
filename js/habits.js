@@ -11,6 +11,15 @@ const Habits = {
   ],
   DAYS_KO: ['일','월','화','수','목','금','토'],
 
+  // 카테고리 — 기존 습관은 cat 필드가 없으므로 전부 'life'로 취급된다
+  CATS: {
+    life: { label:'일상',     icon:'✅', wrap:'habitsWrap', foot:'habitsFooter',
+            titleSel:'.card-habits .card-title', btn:'btnHabitReorder', addLbl:'+ 습관 추가' },
+    dev:  { label:'자기개발', icon:'📚', wrap:'devWrap',    foot:'devFooter',
+            titleSel:'.card-dev .card-title',    btn:'btnDevReorder',   addLbl:'+ 자기개발 추가' },
+  },
+  _catOf(h) { return (h && h.cat === 'dev') ? 'dev' : 'life'; },
+
   _lk(k) { return UserStore.key(k); },
 
   getList() {
@@ -27,10 +36,12 @@ const Habits = {
   getChecked(date=new Date()) { return JSON.parse(UserStore.get(this._dateKey(date))||'[]'); },
   setChecked(v,date=new Date()) { UserStore.set(this._dateKey(date), JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
 
-  getHabitsForDate(date=new Date()) {
+  // cat 을 넘기지 않으면 전체 카테고리를 반환한다 (스탯 배너 등 기존 호출 호환)
+  getHabitsForDate(date=new Date(), cat=null) {
     const dow     = new Date(date).getDay();
     const dateStr = this._dateStr(date);
     return this.getList().filter(h => {
+      if(cat && this._catOf(h) !== cat) return false;
       if(h.createdAt  && dateStr < h.createdAt)  return false; // 생성 전
       if(h.deletedFrom && dateStr >= h.deletedFrom) return false; // 삭제 후
       return !h.days || h.days.length===0 || h.days.includes(dow);
@@ -53,14 +64,25 @@ const Habits = {
   init(date=new Date()) { this.render(date); },
 
   render(date=new Date()) {
-    const wrap=document.getElementById('habitsWrap'); if(!wrap) return;
-    const list=this.getHabitsForDate(date);
+    Object.keys(this.CATS).forEach(cat => this._renderCard(cat, date));
+  },
+
+  _renderCard(cat, date=new Date()) {
+    const C=this.CATS[cat]; if(!C) return;
+    const wrap=document.getElementById(C.wrap); if(!wrap) return;
+    const list=this.getHabitsForDate(date, cat);
     const chk=this.getChecked(date);
     const isToday=this._dateStr(date)===this._dateStr(new Date());
     const done=list.filter(h=>chk.includes(h.id)).length;
+    const reorder=this._reorderMode===cat;
 
-    const titleEl=document.querySelector('.card-habits .card-title');
-    if(titleEl) titleEl.textContent=isToday?'✅ 오늘의 습관':`✅ ${new Date(date).toLocaleDateString('ko-KR',{month:'short',day:'numeric'})} 습관`;
+    const titleEl=document.querySelector(C.titleSel);
+    if(titleEl){
+      const dLbl=new Date(date).toLocaleDateString('ko-KR',{month:'short',day:'numeric'});
+      titleEl.textContent = cat==='life'
+        ? (isToday?'✅ 오늘의 습관':`✅ ${dLbl} 습관`)
+        : (isToday?'📚 자기개발'  :`📚 ${dLbl} 자기개발`);
+    }
 
     wrap.innerHTML=list.map(h=>{
       const isDone=chk.includes(h.id);
@@ -71,20 +93,23 @@ const Habits = {
       else if(_d.length===5&&[1,2,3,4,5].every(x=>_d.includes(x))) daysLabel='<span class="habit-days">평일</span>';
       else if(_d.length===2&&[0,6].every(x=>_d.includes(x))) daysLabel='<span class="habit-days">주말</span>';
       else daysLabel=`<span class="habit-days">${_d.map(d=>this.DAYS_KO[d]).join('')}</span>`;
-      const idx=list.indexOf(h);
-      return `<div class="habit-item${isDone?' done':''}${Habits._reorderMode?' reorder-mode':''}"
+      return `<div class="habit-item${isDone?' done':''}${reorder?' reorder-mode':''}"
         data-reorderable="${h.id}"
         onclick="Habits._handleTap('${h.id}','${Habits._dateStr(date)}')">
-        ${Habits._reorderMode?`<div class="reorder-handle" onclick="event.stopPropagation()" title="꾹 눌러서 순서 변경">⠿</div>`:''}
+        ${reorder?`<div class="reorder-handle" onclick="event.stopPropagation()" title="꾹 눌러서 순서 변경">⠿</div>`:''}
         <div class="habit-chk">${isDone?'✓':''}</div>
-        <span class="habit-name">${esc(h.name)}${daysLabel}</span>
-        ${st>0&&!Habits._reorderMode?`<span class="habit-streak">🔥${st}</span>`:''}
-        ${Habits._reorderMode?`<button class="cl-del-btn edit-del-btn" onclick="event.stopPropagation();Habits._delFrom('${h.id}','${Habits._dateStr(date)}')" title="삭제">✕</button>`:''}
+        <span class="habit-name">${h.emoji?esc(h.emoji)+' ':''}${esc(h.name)}${daysLabel}</span>
+        ${st>0&&!reorder?`<span class="habit-streak">🔥${st}</span>`:''}
+        ${reorder?`<button class="cl-del-btn edit-del-btn" onclick="event.stopPropagation();Habits._delFrom('${h.id}','${Habits._dateStr(date)}')" title="삭제">✕</button>`:''}
       </div>`;
     }).join('')
-    +`<div class="habit-add-btn" onclick="Habits.showInlineAdd(App?.S?.selDate)">+ 습관 추가</div>`;
+    + (list.length ? '' : `<p class="empty">${cat==='dev'?'독서·강의·외국어 같은 자기개발 습관을 추가해보세요':'습관이 없습니다'}</p>`)
+    + `<div class="habit-add-btn" onclick="Habits.showInlineAdd(App?.S?.selDate,'${cat}')">${C.addLbl}</div>`;
 
-    document.getElementById('habitsFooter').innerHTML=`${isToday?'오늘':'해당 날짜'} <strong>${done}/${list.length}</strong> 완료 ${done===list.length&&list.length>0?'🏆 퍼펙트!':''}`;
+    const foot=document.getElementById(C.foot);
+    if(foot) foot.innerHTML = list.length
+      ? `${isToday?'오늘':'해당 날짜'} <strong>${done}/${list.length}</strong> 완료 ${done===list.length?'🏆 퍼펙트!':''}`
+      : '';
   },
 
   // ── 탭/클릭 ──────────────────────────
@@ -146,33 +171,45 @@ const Habits = {
     } else { Sounds?.uncheck(); }
   },
 
-  _reorderMode: false,
+  // 편집 모드는 한 번에 한 카테고리만 (null | 'life' | 'dev')
+  _reorderMode: null,
 
-  toggleReorderMode() {
-    this._reorderMode = !this._reorderMode;
-    const btn = document.getElementById('btnHabitReorder');
-    if (btn) {
-      btn.style.background = this._reorderMode ? 'var(--accent)' : '';
-      btn.style.color = this._reorderMode ? 'white' : '';
-    }
+  toggleReorderMode(cat='life') {
+    if (!this.CATS[cat]) return;
+    this._reorderMode = (this._reorderMode === cat) ? null : cat;
+
+    // 모든 카테고리 버튼 상태 갱신
+    Object.entries(this.CATS).forEach(([c, C]) => {
+      const btn = document.getElementById(C.btn);
+      if (!btn) return;
+      const on = this._reorderMode === c;
+      btn.style.background = on ? 'var(--accent)' : '';
+      btn.style.color      = on ? 'white' : '';
+    });
+
     // 현재 선택된 날짜 컨텍스트 유지 (App.S.selDate가 없으면 오늘)
     this.render(App?.S?.selDate || new Date());
-    if (this._reorderMode) {
-      // render 후 Reorder 모듈 활성화
-      setTimeout(() => {
-        const wrap = document.getElementById('habitsWrap');
-        if (wrap && typeof Reorder !== 'undefined') {
-          Reorder.enable(wrap, (newOrder) => {
-            const list = this.getList();
-            const sorted = newOrder.map(id => list.find(h => h.id === id)).filter(Boolean);
-            // 순서에 없는 항목 뒤에 추가
-            list.forEach(h => { if (!sorted.find(x => x.id === h.id)) sorted.push(h); });
-            this.saveList(sorted);
-            Sounds?.click();
-          });
-        }
-      }, 50);
-    }
+
+    const active = this._reorderMode;
+    if (!active) return;
+
+    // render 후 Reorder 모듈 활성화
+    setTimeout(() => {
+      const wrap = document.getElementById(this.CATS[active].wrap);
+      if (!wrap || typeof Reorder === 'undefined') return;
+      Reorder.enable(wrap, (newOrder) => {
+        const list  = this.getList();
+        const inCat = list.filter(h => this._catOf(h) === active);
+        // 새 순서대로 정렬하되, 순서에 없는 항목은 뒤에 붙인다
+        const ordered = newOrder.map(id => inCat.find(h => h.id === id)).filter(Boolean);
+        inCat.forEach(h => { if (!ordered.includes(h)) ordered.push(h); });
+        // 다른 카테고리 항목의 자리는 그대로 두고 해당 카테고리 자리만 교체
+        let qi = 0;
+        const sorted = list.map(h => this._catOf(h) === active ? ordered[qi++] : h);
+        this.saveList(sorted);
+        Sounds?.click();
+      });
+    }, 50);
   },
 
   _del(id) {
@@ -225,10 +262,25 @@ const Habits = {
   },
 
   _pendingAddDate: null, // showInlineAdd 호출 시 기준 날짜 저장
+  _pendingAddCat: 'life',
 
-  showInlineAdd(baseDate) {
+  // 카테고리 선택 UI (추가/편집 모달 공용)
+  _catPickerHtml(selected, name) {
+    return `<div class="cat-picker">` + Object.entries(this.CATS).map(([c,C]) =>
+      `<label class="cat-pick-btn${c===selected?' on':''}">
+         <input type="radio" name="${name}" value="${c}" ${c===selected?'checked':''}
+                onchange="Habits._syncCatPicker(this)"> ${C.icon} ${C.label}
+       </label>`).join('') + `</div>`;
+  },
+  _syncCatPicker(input) {
+    input.closest('.cat-picker')?.querySelectorAll('.cat-pick-btn')
+      .forEach(l => l.classList.toggle('on', l.querySelector('input')?.checked));
+  },
+
+  showInlineAdd(baseDate, cat='life') {
     // baseDate 미전달 시 현재 선택된 날짜 사용, 없으면 오늘
     this._pendingAddDate = baseDate || App?.S?.selDate || new Date();
+    this._pendingAddCat  = this.CATS[cat] ? cat : 'life';
     const baseDateStr = this._dateStr(this._pendingAddDate);
     const today = this._dateStr(new Date());
     const dateLabel = baseDateStr !== today
@@ -239,9 +291,12 @@ const Habits = {
       '<input type="checkbox" value="' + i + '" checked class="hday-chk"> ' + d +
       '</label>'
     ).join('');
-    App.openModal('✅ 습관 추가',
+    App.openModal(`${this.CATS[this._pendingAddCat].icon} ${this.CATS[this._pendingAddCat].label} 습관 추가`,
       '<div class="modal-row"><label class="modal-lbl">습관 이름 *</label>' +
-      '<input id="habitName" type="text" placeholder="예: 물 2L 마시기" class="inp"></div>' +
+      '<input id="habitName" type="text" placeholder="' +
+        (this._pendingAddCat==='dev' ? '예: 독서 30분' : '예: 물 2L 마시기') + '" class="inp"></div>' +
+      '<div class="modal-row"><label class="modal-lbl">분류</label>' +
+      this._catPickerHtml(this._pendingAddCat, 'hAddCat') + '</div>' +
       '<div class="modal-row"><label class="modal-lbl">반복 요일</label>' +
       '<div class="day-picker">' + dayBtns + '</div></div>' +
       `<div style="font-size:11px;color:var(--text3);margin-bottom:8px">시작일: ${baseDateStr}${dateLabel}</div>` +
@@ -267,10 +322,13 @@ const Habits = {
       ? this._dateStr(this._pendingAddDate)
       : this._dateStr(new Date());
     this._pendingAddDate = null;
+    const cat = document.querySelector('input[name="hAddCat"]:checked')?.value
+             || this._pendingAddCat || 'life';
     list.push({
       id: 'h'+Date.now(),
       name,
       emoji: '',
+      cat: this.CATS[cat] ? cat : 'life',
       days: days.length ? days : [0,1,2,3,4,5,6],
       createdAt,  // 선택한 날짜부터 습관 시작
     });
@@ -289,7 +347,9 @@ const Habits = {
       <div class="modal-row"><label class="modal-lbl">이름</label>
         <input id="hEditName" type="text" value="${esc(h.name)}" class="inp"></div>
       <div class="modal-row"><label class="modal-lbl">이모지</label>
-        <input id="hEditEmoji" type="text" value="${h.emoji}" class="inp" style="width:80px" maxlength="2"></div>
+        <input id="hEditEmoji" type="text" value="${h.emoji||''}" class="inp" style="width:80px" maxlength="2"></div>
+      <div class="modal-row"><label class="modal-lbl">분류</label>
+        ${this._catPickerHtml(this._catOf(h),'hEditCat')}</div>
       <div class="modal-row"><label class="modal-lbl">반복 요일</label>
         <div class="day-picker">
           ${this.DAYS_KO.map((d,i)=>`<label class="day-pick-btn"><input type="checkbox" value="${i}" ${(h.days||[]).includes(i)?'checked':''} class="day-edit-chk"> ${d}</label>`).join('')}
@@ -306,9 +366,13 @@ const Habits = {
     const list=this.getList(); const h=list.find(x=>x.id===id); if(!h) return;
     h.name=document.getElementById('hEditName')?.value.trim()||h.name;
     h.emoji=document.getElementById('hEditEmoji')?.value.trim()||h.emoji;
+    const cat=document.querySelector('input[name="hEditCat"]:checked')?.value;
+    if(this.CATS[cat]) h.cat=cat;
     const days=[...document.querySelectorAll('.day-edit-chk:checked')].map(c=>parseInt(c.value));
     h.days=days.length?days:[0,1,2,3,4,5,6];
-    this.saveList(list); this.render(); App.closeModal(); App.showToast('저장됨 ✓','success');
+    this.saveList(list);
+    this.render(App?.S?.selDate||new Date());
+    App.closeModal(); App.showToast('저장됨 ✓','success');
   },
 
   showManageModal() { this.showInlineAdd(); },
