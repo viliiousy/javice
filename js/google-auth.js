@@ -1,8 +1,15 @@
 // js/google-auth.js — Google Identity Services (자동 토큰 갱신)
 
+// 반드시 필요한 스코프 (동의 화면에서 체크 해제되면 조용히 빠지므로 검증 필요)
+const REQUIRED_SCOPES = [
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/tasks',
+];
+
 const Auth = {
   accessToken:   null,
   tokenExpiry:   null,
+  grantedScope:  '',
   tokenClient:   null,
   userInfo:      null,
   _refreshTimer: null,
@@ -19,8 +26,13 @@ const Auth = {
       prompt:    '',
       callback:  async (resp) => {
         if (resp.error) {
-          // 자동 갱신 실패 시만 에러 표시 (수동 로그인이면 항상 표시)
-          if (!this._refreshing) {
+          if (this._refreshing) {
+            // 자동 갱신 실패 — OAuth 앱이 '테스트' 게시 상태면 동의 후 7일마다 권한이 만료된다.
+            // 조용히 넘기지 말고 재로그인을 안내한다.
+            console.warn('[Auth] 자동 갱신 실패:', resp.error);
+            App.showToast('구글 권한이 만료되었습니다. 다시 로그인해주세요.', 'error');
+            this._promptRelogin();
+          } else {
             App.showToast('로그인 실패: ' + resp.error, 'error');
           }
           this._refreshing = false;
@@ -29,10 +41,21 @@ const Auth = {
         const isRefresh = this._refreshing;
         this._refreshing = false;
 
-        this.accessToken = resp.access_token;
+        this.accessToken  = resp.access_token;
         this.tokenExpiry  = Date.now() + resp.expires_in * 1000;
+        this.grantedScope = resp.scope || '';
         localStorage.setItem('gl_token',  this.accessToken);
         localStorage.setItem('gl_expiry', String(this.tokenExpiry));
+        localStorage.setItem('gl_scope',  this.grantedScope);
+
+        // ── 부분 동의(partial consent) 검사 ──
+        // 사용자가 동의 화면에서 '캘린더'/'할일' 체크를 해제하면 토큰은 정상 발급되지만
+        // 해당 API는 403 insufficient scopes 로 실패한다. 조용히 0개로 보이지 않도록 여기서 잡는다.
+        const missing = this.missingScopes();
+        if (missing.length) {
+          console.warn('[Auth] 누락된 권한:', missing);
+          App.showToast('캘린더·할일 권한이 허용되지 않았습니다. 다시 로그인해 모든 항목에 체크해주세요.', 'error');
+        }
 
         // 다음 갱신 예약 (만료 5분 전)
         this._scheduleRefresh(resp.expires_in);
@@ -51,12 +74,16 @@ const Auth = {
     const t = localStorage.getItem('gl_token');
     const e = localStorage.getItem('gl_expiry');
     if (t && e && Date.now() < parseInt(e, 10)) {
-      this.accessToken = t;
+      this.accessToken  = t;
       this.tokenExpiry  = parseInt(e, 10);
+      this.grantedScope = localStorage.getItem('gl_scope') || '';
       // 남은 시간 기반으로 갱신 예약
       const remaining = (parseInt(e, 10) - Date.now()) / 1000;
       this._scheduleRefresh(remaining);
       this._fetchUserInfo(true);
+      if (this.missingScopes().length) {
+        setTimeout(() => App.showToast('캘린더·할일 권한이 없습니다. 로그아웃 후 다시 로그인해 모든 항목에 체크해주세요.', 'error'), 1500);
+      }
     }
   },
 
@@ -107,7 +134,37 @@ const Auth = {
     this._refreshing  = false;
     localStorage.removeItem('gl_token');
     localStorage.removeItem('gl_expiry');
+    localStorage.removeItem('gl_scope');
     location.reload();
+  },
+
+  // 발급된 토큰에 없는 필수 스코프 목록
+  missingScopes() {
+    const granted = (this.grantedScope || '').split(' ').filter(Boolean);
+    if (!granted.length) return [];   // 스코프 정보를 모르는 경우는 판단 보류
+    return REQUIRED_SCOPES.filter(s => !granted.includes(s));
+  },
+
+  // 저장된 세션을 버리고 로그인 화면으로 되돌린다
+  _promptRelogin() {
+    clearTimeout(this._refreshTimer);
+    this.accessToken  = null;
+    this.tokenExpiry  = null;
+    this.grantedScope = '';
+    localStorage.removeItem('gl_token');
+    localStorage.removeItem('gl_expiry');
+    localStorage.removeItem('gl_scope');
+    const ls = document.getElementById('loginScreen');
+    const ap = document.getElementById('app');
+    if (ls) ls.style.display = 'flex';
+    if (ap) ap.style.display = 'none';
+  },
+
+  // 부족한 권한을 다시 요청 (동의 화면 강제 표시)
+  reconsent() {
+    if (!this.tokenClient) return;
+    this._refreshing = false;
+    this.tokenClient.requestAccessToken({ prompt: 'consent' });
   },
 
   isLoggedIn() {

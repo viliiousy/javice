@@ -30,9 +30,17 @@ const GoogleCalendar = {
 
   // ── 캘린더 목록 가져오기 ───────────────
   async fetchCalendarList() {
-    const res  = await Auth.fetch(`${this.BASE}/users/me/calendarList?maxResults=50`);
-    const data = await res.json();
+    const res  = await Auth.fetch(`${this.BASE}/users/me/calendarList?maxResults=250`);
+    const data = await res.json().catch(()=>({}));
+    if (!res.ok) {
+      const msg = data?.error?.message || `HTTP ${res.status}`;
+      if (res.status === 403 && /scope|permission/i.test(msg)) {
+        throw new Error('캘린더 권한이 없습니다 — 로그아웃 후 재로그인하여 캘린더 권한에 체크해주세요.');
+      }
+      throw new Error('캘린더 목록 조회 실패: ' + msg);
+    }
     this._allCalendars = (data.items||[]).filter(c=>c.selected!==false);
+    if (!this._allCalendars.length) console.warn('[Calendar] 캘린더 목록이 비어 있습니다', data);
     return this._allCalendars;
   },
 
@@ -52,7 +60,8 @@ const GoogleCalendar = {
     const results = await Promise.allSettled(
       visible.map(async cal => {
         const res  = await Auth.fetch(`${this.BASE}/calendars/${encodeURIComponent(cal.id)}/events?${p}`);
-        const data = await res.json();
+        const data = await res.json().catch(()=>({}));
+        if (!res.ok) throw new Error(`[${cal.summary}] ${data?.error?.message || res.status}`);
         return (data.items||[]).map(ev=>({
           ...ev,
           _calId:    cal.id,
@@ -63,7 +72,9 @@ const GoogleCalendar = {
     );
 
     const all = [];
-    results.forEach(r=>{ if(r.status==='fulfilled') all.push(...r.value); });
+    const failed = [];
+    results.forEach(r=>{ if(r.status==='fulfilled') all.push(...r.value); else failed.push(r.reason?.message||r.reason); });
+    if (failed.length) console.error('[Calendar] 일부 캘린더 조회 실패:', failed);
     all.sort((a,b)=>new Date(a.start?.dateTime||a.start?.date)-new Date(b.start?.dateTime||b.start?.date));
     console.log(`[Calendar] ${visible.length}개 캘린더, ${all.length}개 이벤트`);
     return all;

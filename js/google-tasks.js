@@ -20,14 +20,22 @@ const GoogleTasks = {
 
   async fetchTaskLists() {
     const res  = await Auth.fetch(`${this.BASE}/users/@me/lists?maxResults=20`);
-    const data = await res.json();
+    const data = await res.json().catch(()=>({}));
+    if (!res.ok) {
+      const msg = data?.error?.message || `HTTP ${res.status}`;
+      if (res.status === 403 && /scope|permission/i.test(msg)) {
+        throw new Error('할일(Tasks) 권한이 없습니다 — 로그아웃 후 재로그인하여 할일 권한에 체크해주세요.');
+      }
+      throw new Error('할일 목록 조회 실패: ' + msg);
+    }
     return data.items || [];
   },
 
   async fetchTasks(listId) {
     const p = new URLSearchParams({ showCompleted:'true', showHidden:'false', maxResults:'100' });
     const res  = await Auth.fetch(`${this.BASE}/lists/${enc(listId)}/tasks?${p}`);
-    const data = await res.json();
+    const data = await res.json().catch(()=>({}));
+    if (!res.ok) throw new Error('할일 조회 실패: ' + (data?.error?.message || res.status));
     const items = data.items || [];
     // notes 필드에서 별표 마커 감지 → _apiStarred 플래그 설정 후 마커 제거
     items.forEach(t => {
