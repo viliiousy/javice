@@ -669,6 +669,7 @@ textarea.inp{ resize:vertical; min-height:64px; }
   .card-habits  { grid-column:1; grid-row:auto; }
   .card-diet    { grid-column:2; grid-row:auto; }
   .card-memo    { grid-column:1/3; grid-row:auto; }
+  .card-inbody  { grid-column:1/3; grid-row:auto; }
 }
 
 /* ═══════════════════════════════════════
@@ -680,7 +681,10 @@ textarea.inp{ resize:vertical; min-height:64px; }
     grid-template-columns:1fr; gap:10px; padding:10px;
   }
   .card-tasks,.card-calendar,.card-checklist,
-  .card-habits,.card-diet,.card-memo{ grid-column:1; grid-row:auto; }
+  .card-habits,.card-diet,.card-memo,.card-inbody{ grid-column:1; grid-row:auto; }
+
+  /* 인바디 타일 2열로 */
+  .ib-summary{ grid-template-columns:1fr 1fr; }
 
   /* 헤더 모바일 */
   .header{ padding:10px 14px; }
@@ -1448,3 +1452,78 @@ html.dark .reorder-dragging { background: var(--card) !important; }
   cursor: pointer;
 }
 .edit-del-btn:hover { background: #dc2626 !important; }
+
+/* ── 인바디 ──────────────────────────── */
+.card-inbody    { grid-column:1/3; grid-row:4; }
+
+.ib-summary{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:10px; }
+.ib-tile{
+  background:var(--card2); border:1px solid var(--border);
+  border-radius:var(--r-sm); padding:8px 6px; text-align:center;
+}
+.ib-tile-lbl{ font-size:10px; color:var(--text3); margin-bottom:3px; }
+.ib-tile-val{
+  font-size:16px; font-weight:700; color:var(--text);
+  font-variant-numeric:tabular-nums; line-height:1.2;
+}
+.ib-tile-unit{ font-size:10px; font-weight:500; color:var(--text3); margin-left:1px; }
+.ib-delta{ display:block; font-size:10px; font-weight:600; margin-top:2px; }
+.ib-delta-good{ color:var(--green); }
+.ib-delta-bad{ color:var(--red); }
+.ib-bmr{
+  font-size:11px; color:var(--text2); text-align:center;
+  padding:6px; background:var(--card2); border-radius:var(--r-xs); margin-bottom:10px;
+}
+.ib-bmr b{ color:var(--text); font-variant-numeric:tabular-nums; }
+
+.ib-tabs{ display:flex; gap:4px; margin-bottom:8px; }
+.ib-tab{
+  flex:1; padding:6px 4px; font-size:11px; font-weight:600; cursor:pointer;
+  background:var(--bg); border:1px solid var(--border); border-radius:var(--r-xs);
+  color:var(--text3); font-family:inherit; transition:all .15s;
+}
+.ib-tab:hover{ color:var(--text2); border-color:var(--border2); }
+.ib-tab.active{ color:var(--ib-c); border-color:var(--ib-c); background:var(--card); }
+.ib-tab:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+
+.ib-chart{ margin-bottom:10px; }
+.ib-chart svg{ display:block; width:100%; height:auto; max-height:190px; }
+.ib-grid{ stroke:var(--border); stroke-width:1; stroke-dasharray:2 3; }
+.ib-axis{ fill:var(--text3); font-size:13px; font-family:inherit; }
+.ib-chart-foot{
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:10px; color:var(--text3); margin-top:2px;
+}
+.ib-chart-empty{
+  padding:20px 12px; text-align:center; font-size:11px; color:var(--text3);
+  background:var(--card2); border-radius:var(--r-sm); margin-bottom:10px;
+}
+
+.ib-list{ border-top:1px solid var(--border); }
+.ib-row{
+  display:grid; grid-template-columns:1.3fr 1fr 1fr 1fr; gap:4px; align-items:center;
+  padding:7px 4px; border-bottom:1px solid var(--border); font-size:12px; cursor:pointer;
+}
+.ib-row:hover:not(.ib-row-head){ background:var(--card2); }
+.ib-row-head{
+  font-size:10px; color:var(--text3); cursor:default; font-weight:600;
+  text-align:center; padding:5px 4px;
+}
+.ib-row-head span:first-child{ text-align:left; }
+.ib-row-dt{ color:var(--text2); font-variant-numeric:tabular-nums; }
+.ib-row-v{ text-align:center; font-variant-numeric:tabular-nums; font-weight:600; }
+.ib-row-v i{ font-style:normal; font-size:9px; color:var(--text3); font-weight:400; margin-left:1px; }
+.ib-more{ font-size:10px; color:var(--text3); text-align:center; padding:6px; }
+
+.ib-import-link{
+  margin-top:10px; text-align:center; font-size:11px; color:var(--accent);
+  cursor:pointer; text-decoration:underline; text-underline-offset:2px;
+}
+.ib-code{
+  background:var(--bg); padding:1px 5px; border-radius:4px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; color:var(--text);
+}
+html.dark .ib-tile,
+html.dark .ib-bmr,
+html.dark .ib-chart-empty{ background:var(--card2); }
+html.dark .ib-tab:not(.active){ background:var(--card2); }
