@@ -7,7 +7,7 @@ module.exports = async (req, res) => {
   if(req.method !== 'POST') { res.status(405).json({ error:'Method not allowed' }); return; }
 
   try {
-    const { uid, token, settings } = req.body;
+    const { uid, token, settings, prevUid } = req.body;
     if(!uid || !token) { res.status(400).json({ error:'uid and token required' }); return; }
 
     const dbUrl = process.env.FIREBASE_DB_URL;
@@ -22,7 +22,18 @@ module.exports = async (req, res) => {
 
     const result = await response.json();
     console.log('[subscribe] Firebase 응답:', response.status, JSON.stringify(result).slice(0,100));
-    res.status(200).json({ success: true, status: response.status });
+
+    // 구경로에 남은 등록분 제거 (안 지우면 크론이 오래된 데이터로 중복 알림을 보낸다)
+    let removed = null;
+    if (response.ok && prevUid && prevUid !== uid) {
+      try {
+        const del = await fetch(`${dbUrl}/fcm_tokens/${prevUid}.json`, { method: 'DELETE' });
+        removed = del.ok;
+        console.log('[subscribe] 구 uid 정리:', prevUid, del.status);
+      } catch(e) { console.warn('[subscribe] 구 uid 정리 실패:', e.message); }
+    }
+
+    res.status(200).json({ success: true, status: response.status, removedPrev: removed });
   } catch(e) {
     console.error('[subscribe] 오류:', e.message);
     res.status(500).json({ error: e.message });
