@@ -670,6 +670,7 @@ textarea.inp{ resize:vertical; min-height:64px; }
   .card-diet    { grid-column:2; grid-row:auto; }
   .card-memo    { grid-column:1/3; grid-row:auto; }
   .card-inbody  { grid-column:1/3; grid-row:auto; }
+  .card-dev     { grid-column:1/3; grid-row:auto; }
 }
 
 /* ═══════════════════════════════════════
@@ -681,7 +682,7 @@ textarea.inp{ resize:vertical; min-height:64px; }
     grid-template-columns:1fr; gap:10px; padding:10px;
   }
   .card-tasks,.card-calendar,.card-checklist,
-  .card-habits,.card-diet,.card-memo,.card-inbody{ grid-column:1; grid-row:auto; }
+  .card-habits,.card-diet,.card-memo,.card-inbody,.card-dev{ grid-column:1; grid-row:auto; }
 
   /* 인바디 타일 2열로 */
   .ib-summary{ grid-template-columns:1fr 1fr; }
@@ -1455,6 +1456,7 @@ html.dark .reorder-dragging { background: var(--card) !important; }
 
 /* ── 인바디 ──────────────────────────── */
 .card-inbody    { grid-column:1/3; grid-row:4; }
+.card-dev       { grid-column:3;   grid-row:4; }
 
 .ib-summary{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:10px; }
 .ib-tile{
@@ -1527,3 +1529,21 @@ html.dark .ib-tile,
 html.dark .ib-bmr,
 html.dark .ib-chart-empty{ background:var(--card2); }
 html.dark .ib-tab:not(.active){ background:var(--card2); }
+
+/* ── 습관 분류 선택 ────────────────────── */
+.cat-picker{ display:flex; gap:6px; }
+.cat-pick-btn{
+  flex:1; display:flex; align-items:center; justify-content:center; gap:5px;
+  padding:9px 8px; font-size:13px; font-weight:500; cursor:pointer;
+  background:var(--bg); border:1px solid var(--border); border-radius:var(--r-xs);
+  color:var(--text2); transition:all .15s; user-select:none;
+}
+.cat-pick-btn:hover{ border-color:var(--border2); }
+.cat-pick-btn.on{
+  background:var(--accent-bg); border-color:var(--accent);
+  color:var(--accent); font-weight:600;
+}
+.cat-pick-btn input{ accent-color:var(--accent); }
+.cat-pick-btn:focus-within{ outline:2px solid var(--accent); outline-offset:1px; }
+html.dark .cat-pick-btn{ background:var(--card2); }
+html.dark .cat-pick-btn.on{ background:var(--accent-bg); }
