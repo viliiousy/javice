@@ -201,6 +201,8 @@ const Auth = {
           !CONFIG.FIREBASE_DB_URL.includes('YOUR_FIREBASE')) {
         FirebaseSync.init(normalizedUid, CONFIG.FIREBASE_DB_URL);
         App.showToast('데이터 불러오는 중...', '');
+        // 구글 액세스 토큰으로 Firebase에도 로그인 (실패해도 계속 진행)
+        await FirebaseSync.signIn(this.accessToken);
         const loaded = await FirebaseSync.load();
         FirebaseSync.startPolling();
         if (loaded) App.showToast('동기화 완료 ✓', 'success');
