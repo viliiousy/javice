@@ -1,4 +1,6 @@
 // api/subscribe.js
+const { fbFetch } = require('../lib/fb-admin');
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -10,11 +12,9 @@ module.exports = async (req, res) => {
     const { uid, token, settings, prevUid } = req.body;
     if(!uid || !token) { res.status(400).json({ error:'uid and token required' }); return; }
 
-    const dbUrl = process.env.FIREBASE_DB_URL;
-    const data  = JSON.stringify({ token, settings: settings||{}, updatedAt: Date.now() });
-    const url   = `${dbUrl}/fcm_tokens/${uid}.json`;
+    const data = JSON.stringify({ token, settings: settings||{}, updatedAt: Date.now() });
 
-    const response = await fetch(url, {
+    const response = await fbFetch(`/fcm_tokens/${uid}.json`, {
       method:  'PUT',
       headers: { 'Content-Type': 'application/json' },
       body:    data,
@@ -27,7 +27,7 @@ module.exports = async (req, res) => {
     let removed = null;
     if (response.ok && prevUid && prevUid !== uid) {
       try {
-        const del = await fetch(`${dbUrl}/fcm_tokens/${prevUid}.json`, { method: 'DELETE' });
+        const del = await fbFetch(`/fcm_tokens/${prevUid}.json`, { method: 'DELETE' });
         removed = del.ok;
         console.log('[subscribe] 구 uid 정리:', prevUid, del.status);
       } catch(e) { console.warn('[subscribe] 구 uid 정리 실패:', e.message); }
