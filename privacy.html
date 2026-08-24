@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>개인정보처리방침 · 자비스</title>
+<meta name="description" content="자비스(bashy.app) 개인정보처리방침 — 수집하는 정보, 구글 사용자 데이터 취급, 제3자 전송, 보관 및 삭제.">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f0f2f5; --card:#fff; --card2:#f8f9fb; --border:#e2e8f0;
+  --text:#0f172a; --text2:#475569; --text3:#94a3b8;
+  --accent:#4f46e5; --accent-bg:#eef2ff; --warn-bg:#fffbeb; --warn-bd:#fcd34d; --warn-tx:#92400e;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0f1117; --card:#1a2035; --card2:#1e2640; --border:#2a3550;
+    --text:#e2e8f0; --text2:#94a3b8; --text3:#64748b;
+    --accent:#818cf8; --accent-bg:#1e1b4b; --warn-bg:#2b2413; --warn-bd:#7c5e12; --warn-tx:#fcd34d;
+  }
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--text); font-family:'Noto Sans KR',-apple-system,'Segoe UI',sans-serif;
+  font-size:15px; line-height:1.75; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:820px; margin:0 auto; padding:0 20px 80px}
+header{padding:36px 0 20px; border-bottom:1px solid var(--border); margin-bottom:28px}
+.brand{display:inline-flex; align-items:center; gap:8px; text-decoration:none; color:var(--text); font-weight:700; font-size:15px}
+.brand .z{font-size:20px}
+h1{font-size:26px; font-weight:700; margin:18px 0 6px; letter-spacing:-.01em}
+.meta{font-size:13px; color:var(--text3)}
+.langs{float:right; display:flex; gap:4px; margin-top:2px}
+.langs button{
+  padding:5px 12px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit;
+  background:var(--card); border:1px solid var(--border); border-radius:6px; color:var(--text3);
+}
+.langs button.on{background:var(--accent-bg); border-color:var(--accent); color:var(--accent)}
+.langs button:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+h2{font-size:18px; font-weight:700; margin:32px 0 10px; letter-spacing:-.01em}
+h3{font-size:15px; font-weight:700; margin:20px 0 6px}
+p{margin:0 0 12px; color:var(--text2)}
+ul{margin:0 0 12px 20px; color:var(--text2)}
+li{margin-bottom:6px}
+strong{color:var(--text); font-weight:700}
+a{color:var(--accent)}
+code{background:var(--card2); padding:1px 6px; border-radius:4px; font-size:13px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.tw{overflow-x:auto; margin:14px 0; border:1px solid var(--border); border-radius:10px; background:var(--card)}
+table{border-collapse:collapse; width:100%; min-width:520px; font-size:14px}
+th,td{text-align:left; padding:11px 14px; border-bottom:1px solid var(--border); vertical-align:top; color:var(--text2)}
+th{background:var(--card2); color:var(--text); font-weight:700; font-size:13px; white-space:nowrap}
+tbody tr:last-child td{border-bottom:none}
+.box{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px 18px; margin:14px 0}
+.box.hi{background:var(--accent-bg); border-color:var(--accent)}
+.box.warn{background:var(--warn-bg); border-color:var(--warn-bd)}
+.box.warn p, .box.warn li{color:var(--warn-tx)}
+.box p:last-child{margin-bottom:0}
+footer{margin-top:48px; padding-top:20px; border-top:1px solid var(--border); font-size:13px; color:var(--text3)}
+footer a{margin-right:14px}
+[data-lang]{display:none}
+[data-lang].show{display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="langs">
+    <button id="bKo" class="on" onclick="setLang('ko')">한국어</button>
+    <button id="bEn" onclick="setLang('en')">English</button>
+  </div>
+  <a class="brand" href="./"><span class="z">⚡</span> 자비스 · bashy.app</a>
+  <h1 id="pgTitle">개인정보처리방침</h1>
+  <p class="meta" id="pgMeta">시행일 2026년 8월 24일 · 최종 수정 2026년 8월 24일</p>
+</header>
+
+<!-- ══════════ 한국어 ══════════ -->
+<div data-lang="ko" class="show">
+
+<p>자비스(이하 "본 서비스", <a href="https://bashy.app">bashy.app</a>)는 개인이 만들어 운영하는 무료 개인 일정·습관 관리 대시보드입니다. 본 방침은 본 서비스가 어떤 정보를 어떻게 다루는지 설명합니다.</p>
+
+<div class="box hi">
+  <p><strong>요약</strong> — 본 서비스는 이용자의 데이터를 <strong>판매하지 않으며, 광고에 사용하지 않고, 광고 목적으로 제3자에게 제공하지 않습니다.</strong> 구글 계정 데이터는 이용자 본인에게 기능을 제공하기 위해서만 사용됩니다.</p>
+</div>
+
+<h2>1. 수집·이용하는 정보</h2>
+
+<h3>1.1 구글 계정을 통해 접근하는 정보</h3>
+<p>이용자가 구글 로그인 시 아래 권한에 동의한 경우에만 해당 정보에 접근합니다.</p>
+<div class="tw"><table>
+  <thead><tr><th>구글 권한 범위</th><th>접근하는 정보</th><th>사용 목적</th></tr></thead>
+  <tbody>
+    <tr><td><code>auth/calendar</code></td><td>캘린더 목록, 일정의 제목·시간·설명·장소</td><td>대시보드와 달력에 일정 표시. 앱에서 만든 일정의 생성·삭제</td></tr>
+    <tr><td><code>auth/tasks</code></td><td>할일 목록과 각 할일의 제목·기한·완료 여부·메모</td><td>할일 표시 및 추가·수정·완료·삭제</td></tr>
+    <tr><td><code>userinfo.profile</code></td><td>이름, 프로필 사진</td><td>화면 상단에 표시</td></tr>
+    <tr><td><code>userinfo.email</code></td><td>이메일 주소</td><td>계정 식별 및 계정별 데이터 분리</td></tr>
+  </tbody>
+</table></div>
+<p>본 서비스는 위 범위 외의 구글 데이터(메일, 드라이브 파일, 연락처 등)에 접근하지 않습니다.</p>
+
+<h3>1.2 이용자가 직접 입력하는 정보</h3>
+<ul>
+  <li>습관 항목과 체크 기록</li>
+  <li>식단 기록 (음식명, 칼로리, 영양소)</li>
+  <li>운동 기록, 체크리스트, 메모</li>
+  <li>인바디 기록 (체중, 근육량, 체지방률, 기초대사량)</li>
+</ul>
+
+<h3>1.3 기기·기술 정보</h3>
+<ul>
+  <li>푸시 알림 토큰 (알림 기능을 켠 경우)</li>
+  <li>다크 모드, 알림 시간 등 화면 설정값</li>
+</ul>
+<p>본 서비스는 접속 로그를 별도로 수집하거나 분석 도구로 이용자를 추적하지 않습니다.</p>
+
+<h2>2. 정보의 저장 위치</h2>
+<ul>
+  <li><strong>이용자 브라우저(localStorage)</strong> — 오프라인에서도 쓸 수 있도록 기기에 저장됩니다.</li>
+  <li><strong>Firebase Realtime Database</strong> (Google Cloud, 아시아 남동부 리전) — 기기 간 동기화를 위해 저장되며, 구글 계정 식별자별로 분리된 경로에 보관됩니다.</li>
+</ul>
+<p>모든 통신은 HTTPS로 암호화됩니다.</p>
+
+<h2>3. 제3자 전송</h2>
+<p>본 서비스는 아래의 경우에 한해 외부 서비스와 통신합니다.</p>
+
+<div class="box warn">
+  <p><strong>AI 비서 기능 (Groq)</strong> — 이 기능은 <strong>이용자가 설정에서 본인의 Groq API 키를 직접 입력한 경우에만 동작</strong>하며, 기본값은 꺼져 있습니다.</p>
+  <p>활성화한 경우, 이용자가 AI 비서에게 질문할 때 아래 정보가 <code>api.groq.com</code>으로 전송됩니다: <strong>오늘 일정의 제목과 시간, 미완료 할일의 제목과 기한, 습관 이름과 완료 여부, 식단 칼로리 요약, 체크리스트·메모 제목, 이용자가 입력한 메시지.</strong> 음식 사진 분석을 사용하면 해당 사진도 전송됩니다.</p>
+  <p>AI 비서를 쓰지 않거나 API 키를 입력하지 않으면 구글 데이터는 Groq로 전송되지 않습니다. 이 기능을 끄려면 설정에서 API 키를 비워두면 됩니다.</p>
+</div>
+
+<ul>
+  <li><strong>Open-Meteo</strong> — 날씨 표시를 위해 위도·경도만 전송합니다. 개인 식별 정보는 포함되지 않습니다.</li>
+  <li><strong>ipapi.co</strong> — 위치를 자동 추정하는 경우에 한해 이용자의 IP 주소가 전송됩니다.</li>
+  <li><strong>Firebase Cloud Messaging / Telegram</strong> — 이용자가 켠 알림을 발송하기 위해 사용됩니다.</li>
+</ul>
+<p>이 외에 이용자 데이터를 제3자에게 판매·대여·양도하지 않습니다. 법령에 따른 적법한 요구가 있는 경우에만 예외적으로 제공될 수 있습니다.</p>
+
+<h2>4. 구글 사용자 데이터 정책 준수</h2>
+<div class="box hi">
+  <p>자비스가 구글 API로부터 받은 정보의 사용 및 다른 앱으로의 전송은 <strong>Limited Use requirements를 포함한 <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a></strong>를 준수합니다.</p>
+  <p>구체적으로, 본 서비스는 구글 사용자 데이터를 (가) 이용자에게 보이는 기능을 제공하는 목적으로만 사용하고, (나) 광고 목적으로 사용하거나 판매하지 않으며, (다) 일반화된 AI/ML 모델의 학습에 사용하지 않고, (라) 사람이 열람하지 않습니다. 다만 이용자가 명시적으로 동의했거나, 보안 목적, 법령 준수를 위해 필요한 경우는 예외입니다.</p>
+</div>
+
+<h2>5. 보관 기간과 삭제</h2>
+<ul>
+  <li>데이터는 이용자가 삭제하거나 계정 삭제를 요청할 때까지 보관됩니다.</li>
+  <li><strong>기기에서 삭제</strong> — 앱에서 로그아웃하면 해당 브라우저에 저장된 데이터가 지워집니다.</li>
+  <li><strong>구글 권한 철회</strong> — <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>에서 자비스의 액세스 권한을 삭제하면 즉시 구글 데이터 접근이 중단됩니다.</li>
+  <li><strong>서버 데이터 완전 삭제</strong> — 아래 이메일로 요청하시면 Firebase에 저장된 해당 계정의 데이터를 삭제해 드립니다.</li>
+</ul>
+
+<h2>6. 이용자의 권리</h2>
+<p>이용자는 언제든지 본인 데이터의 열람·정정·삭제·처리 정지를 요청할 수 있으며, 구글 권한 동의를 철회할 수 있습니다.</p>
+
+<h2>7. 아동의 개인정보</h2>
+<p>본 서비스는 만 14세 미만 아동을 대상으로 하지 않으며, 아동의 개인정보를 알면서 수집하지 않습니다.</p>
+
+<h2>8. 방침의 변경</h2>
+<p>본 방침이 변경되는 경우 이 페이지에 수정된 내용과 시행일을 게시합니다. 중요한 변경이 있을 경우 앱 내에서 안내합니다.</p>
+
+<h2>9. 문의</h2>
+<p>개인정보 처리에 관한 문의 및 삭제 요청: <a href="mailto:yanggnay119@gmail.com">yanggnay119@gmail.com</a></p>
+
+</div>
+
+<!-- ══════════ English ══════════ -->
+<div data-lang="en">
+
+<p>Jarvis ("the Service", <a href="https://bashy.app">bashy.app</a>) is a free personal schedule and habit dashboard built and operated by an individual developer. This policy explains what information the Service handles and how.</p>
+
+<div class="box hi">
+  <p><strong>Summary</strong> — The Service <strong>does not sell your data, does not use it for advertising, and does not share it with third parties for advertising purposes.</strong> Google account data is used solely to provide features to you, the user.</p>
+</div>
+
+<h2>1. Information We Access</h2>
+
+<h3>1.1 Google account data</h3>
+<p>The Service accesses the following only if you grant the corresponding permission during Google sign-in.</p>
+<div class="tw"><table>
+  <thead><tr><th>Google scope</th><th>Data accessed</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><code>auth/calendar</code></td><td>Calendar list; event title, time, description, location</td><td>Display events on the dashboard and calendar; create and delete events you make in the app</td></tr>
+    <tr><td><code>auth/tasks</code></td><td>Task lists; task title, due date, status, notes</td><td>Display tasks and let you add, edit, complete and delete them</td></tr>
+    <tr><td><code>userinfo.profile</code></td><td>Name, profile picture</td><td>Shown in the app header</td></tr>
+    <tr><td><code>userinfo.email</code></td><td>Email address</td><td>Identify the account and keep each user's data separate</td></tr>
+  </tbody>
+</table></div>
+<p>The Service does not access any other Google data such as Gmail, Drive files, or Contacts.</p>
+
+<h3>1.2 Information you enter</h3>
+<ul>
+  <li>Habits and daily check records</li>
+  <li>Meal logs (food names, calories, macros)</li>
+  <li>Workout logs, checklists, notes</li>
+  <li>Body composition records (weight, muscle mass, body fat percentage, BMR)</li>
+</ul>
+
+<h3>1.3 Device and technical information</h3>
+<ul>
+  <li>Push notification token, if you enable notifications</li>
+  <li>Preferences such as dark mode and notification times</li>
+</ul>
+<p>The Service does not collect separate access logs and does not track users with analytics tools.</p>
+
+<h2>2. Where Data Is Stored</h2>
+<ul>
+  <li><strong>Your browser (localStorage)</strong> — stored on your device so the app works offline.</li>
+  <li><strong>Firebase Realtime Database</strong> (Google Cloud, Asia Southeast region) — used for cross-device sync, stored under a path scoped to your Google account identifier.</li>
+</ul>
+<p>All communication is encrypted over HTTPS.</p>
+
+<h2>3. Third-Party Transfers</h2>
+<p>The Service communicates with external services only in the following cases.</p>
+
+<div class="box warn">
+  <p><strong>AI assistant (Groq)</strong> — This feature works <strong>only if you enter your own Groq API key in settings</strong>. It is off by default.</p>
+  <p>When enabled, asking the AI assistant a question sends the following to <code>api.groq.com</code>: <strong>titles and times of today's events, titles and due dates of pending tasks, habit names and completion status, a calorie summary, checklist and note titles, and the message you typed.</strong> If you use food photo analysis, the photo is also sent.</p>
+  <p>If you do not use the AI assistant or do not enter an API key, no Google data is sent to Groq. To disable it, clear the API key in settings.</p>
+</div>
+
+<ul>
+  <li><strong>Open-Meteo</strong> — receives only latitude and longitude to show weather. No personally identifying information is included.</li>
+  <li><strong>ipapi.co</strong> — receives your IP address only when location is estimated automatically.</li>
+  <li><strong>Firebase Cloud Messaging / Telegram</strong> — used to deliver notifications you have turned on.</li>
+</ul>
+<p>We do not otherwise sell, rent, or transfer user data to third parties. Disclosure may occur only where required by applicable law.</p>
+
+<h2>4. Compliance with Google API Services User Data Policy</h2>
+<div class="box hi">
+  <p>Jarvis's use and transfer of information received from Google APIs to any other app will adhere to the <strong><a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements.</strong></p>
+  <p>Specifically, the Service (a) uses Google user data only to provide or improve user-facing features, (b) does not use it for advertising and does not sell it, (c) does not use it to develop, improve, or train generalized AI and/or ML models, and (d) does not allow humans to read it — except with your explicit consent, for security purposes, or to comply with applicable law.</p>
+</div>
+
+<h2>5. Retention and Deletion</h2>
+<ul>
+  <li>Data is retained until you delete it or request account deletion.</li>
+  <li><strong>Delete on device</strong> — signing out of the app clears the data stored in that browser.</li>
+  <li><strong>Revoke Google access</strong> — remove Jarvis at <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a> to immediately stop all Google data access.</li>
+  <li><strong>Delete server data</strong> — email the address below and the data stored in Firebase for your account will be deleted.</li>
+</ul>
+
+<h2>6. Your Rights</h2>
+<p>You may request access to, correction of, deletion of, or suspension of processing of your data at any time, and you may withdraw your Google permission grant at any time.</p>
+
+<h2>7. Children's Privacy</h2>
+<p>The Service is not directed to children under 14 and does not knowingly collect personal information from children.</p>
+
+<h2>8. Changes to This Policy</h2>
+<p>If this policy changes, the revised text and its effective date will be posted on this page. Material changes will also be announced in the app.</p>
+
+<h2>9. Contact</h2>
+<p>Questions and deletion requests: <a href="mailto:yanggnay119@gmail.com">yanggnay119@gmail.com</a></p>
+
+</div>
+
+<footer>
+  <a href="./">앱으로 돌아가기 / Back to app</a>
+  <a href="terms.html">이용약관 / Terms</a>
+</footer>
+
+</div>
+
+<script>
+function setLang(l){
+  document.querySelectorAll('[data-lang]').forEach(function(el){
+    el.classList.toggle('show', el.getAttribute('data-lang')===l);
+  });
+  document.getElementById('bKo').classList.toggle('on', l==='ko');
+  document.getElementById('bEn').classList.toggle('on', l==='en');
+  document.documentElement.lang = l;
+  document.getElementById('pgTitle').textContent = l==='ko' ? '개인정보처리방침' : 'Privacy Policy';
+  document.getElementById('pgMeta').textContent  = l==='ko'
+    ? '시행일 2026년 8월 24일 · 최종 수정 2026년 8월 24일'
+    : 'Effective August 24, 2026 · Last updated August 24, 2026';
+  try{ localStorage.setItem('bashy_lang', l); }catch(e){}
+}
+try{
+  var saved = localStorage.getItem('bashy_lang');
+  if(saved==='en') setLang('en');
+  else if(!saved && !/^ko/i.test(navigator.language||'')) setLang('en');
+}catch(e){}
+</script>
+</body>
+</html>
