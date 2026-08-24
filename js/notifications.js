@@ -28,11 +28,33 @@ const Notifications = {
     }
     try {
       this._swReg = await navigator.serviceWorker.ready;
+      this._syncUid();   // 저장 경로가 바뀌었으면 서버 등록 uid도 맞춰준다
       return true;
     } catch (e) {
       console.warn('[Notif] SW 준비 실패:', e);
       return false;
     }
+  },
+
+  // 알림 등록에 쓸 uid — Firebase 인증이 됐으면 Firebase UID, 아니면 기존 uid
+  // (크론이 users/<uid> 를 읽으므로 앱이 실제로 저장하는 경로와 반드시 같아야 한다)
+  _effectiveUid() {
+    try {
+      if (typeof FirebaseSync !== 'undefined' && FirebaseSync._authed && FirebaseSync._uid) {
+        return FirebaseSync._uid;
+      }
+    } catch {}
+    return UserStore.getUser();
+  },
+
+  // 이미 발급된 토큰이 구경로 uid로 등록돼 있으면 새 uid로 옮긴다
+  async _syncUid() {
+    const token = UserStore.get('gl_fcm_token');
+    if (!token) return;
+    const want = this._effectiveUid();
+    if (UserStore.get('gl_fcm_uid') === want) return;
+    console.log('[Notif] 등록 uid 갱신 →', want);
+    await this._registerToken(token);
   },
 
   // 알림 권한 요청 + FCM 토큰 발급
@@ -90,15 +112,19 @@ const Notifications = {
 
   // 서버에 토큰 등록
   async _registerToken(token) {
-    const uid = UserStore.getUser();
+    const uid      = this._effectiveUid();
+    const prev     = UserStore.get('gl_fcm_uid') || UserStore.getUser();
     const settings = this.getSettings();
+    const body     = { uid, token, settings };
+    if (prev && prev !== uid) body.prevUid = prev;   // 구경로 등록분 삭제 요청
     try {
       const res = await fetch('/api/subscribe', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ uid, token, settings }),
+        body:    JSON.stringify(body),
       });
       const data = await res.json();
+      if (res.ok) UserStore.set('gl_fcm_uid', uid);
       console.log('[Notif] 토큰 등록:', data);
     } catch (e) {
       console.warn('[Notif] 토큰 등록 실패:', e);
