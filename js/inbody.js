@@ -1,6 +1,7 @@
 // js/inbody.js — 인바디 (체성분 기록 + 추이 그래프)
 // god_life(갓생일지)의 인바디 탭을 javice 모듈 규약으로 이식
-// 데이터: [{ dt:'YYYY-MM-DD', wt, ms, bf, bmr }]  (dt 오름차순 정렬 유지)
+// 데이터: [{ dt:'YYYY-MM-DD', wt, ms, bf, bmr, lbm, bmi }]  (dt 오름차순 정렬 유지)
+// wt/bf/lbm/bmi 는 애플 헬스에서 자동 유입(api/inbody.js), ms/bmr 은 수동 입력
 
 const InBody = {
   KEY: 'gl_inbody_v1',
@@ -11,6 +12,8 @@ const InBody = {
     wt: { label:'체중',     unit:'kg', color:'#3b82f6', good:'down' },
     ms: { label:'근육량',   unit:'kg', color:'#059669', good:'up'   },
     bf: { label:'체지방률', unit:'%',  color:'#ea580c', good:'down' },
+    lbm:{ label:'제지방량', unit:'kg', color:'#7c3aed', good:'up'   },
+    bmi:{ label:'BMI',      unit:'',   color:'#0891b2', good:'down' },
   },
 
   // ── 데이터 ─────────────────────────────
@@ -113,6 +116,8 @@ const InBody = {
       ${tile('근육량',   la.ms || '—',              'kg', 'ms')}
       ${tile('체지방률', la.bf || '—',              '%',  'bf')}
       ${tile('체지방량', fatMass ? fatMass.toFixed(1) : '—', 'kg', null)}
+      ${tile('제지방량', la.lbm || '—',            'kg', 'lbm')}
+      ${tile('BMI',      la.bmi || '—',            '',   'bmi')}
     </div>
     ${la.bmr ? `<div class="ib-bmr">기초대사량 <b>${la.bmr}</b> kcal</div>` : ''}`;
   },
@@ -211,6 +216,12 @@ const InBody = {
           <input id="ibBf" type="number" step="0.1" inputmode="decimal" class="inp" value="${v('bf')}"></div>
         <div><label class="modal-lbl">기초대사량 (kcal)</label>
           <input id="ibBmr" type="number" inputmode="numeric" class="inp" value="${v('bmr')}"></div>
+      </div>
+      <div class="modal-grid2">
+        <div><label class="modal-lbl">제지방량 (kg)</label>
+          <input id="ibLbm" type="number" step="0.1" inputmode="decimal" class="inp" value="${v('lbm')}"></div>
+        <div><label class="modal-lbl">BMI</label>
+          <input id="ibBmi" type="number" step="0.1" inputmode="decimal" class="inp" value="${v('bmi')}"></div>
       </div>`;
   },
 
@@ -257,6 +268,8 @@ const InBody = {
       ms:  keep(num('ibMs'),  'ms'),
       bf:  keep(num('ibBf'),  'bf'),
       bmr: Math.round(keep(num('ibBmr'), 'bmr')),
+      lbm: keep(num('ibLbm'), 'lbm'),
+      bmi: keep(num('ibBmi'), 'bmi'),
     });
     this.saveRecords(recs);
     this.render();
@@ -314,6 +327,8 @@ const InBody = {
         ms:  Number(r.ms)  || 0,
         bf:  Number(r.bf)  || 0,
         bmr: Math.round(Number(r.bmr) || 0),
+        lbm: Number(r.lbm) || 0,
+        bmi: Number(r.bmi) || 0,
       });
       added++;
     });
@@ -325,3 +340,4 @@ const InBody = {
     App.showToast(`${added}건 가져왔습니다 ✓`, 'success');
   },
 };
+인바디에제지방량·추가애플헬스에는골격근량이없고제지방체중만있다둘은다른값이라기존에넣으면추이가망가지므로을새필드로둔다도함께받는다요약타일개와그래프탭개가늘고수동입력폼과갓생일지가져오기에도반영했다은헬스에없어계속수동입력이다
