@@ -56,8 +56,9 @@ module.exports = async (req, res) => {
       const v = num(body[k], spec);
       if (v !== null) incoming[k] = v;
     }
-    if (!incoming.wt) {
-      res.status(400).json({ error: '체중(wt)이 없거나 범위를 벗어났습니다', 받은값: body.wt });
+    // 지표별로 단축어를 나눠 쓰면 체중 없이 오는 요청도 있다. 하나라도 있으면 받는다.
+    if (!Object.keys(incoming).length) {
+      res.status(400).json({ error: 'wt/bf/lbm/bmi 중 최소 하나는 있어야 합니다', 받은값: body });
       return;
     }
 
