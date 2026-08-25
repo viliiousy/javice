@@ -193,8 +193,11 @@ async function processUser(uid, tokenData) {
 }
 
 module.exports = async (req, res) => {
-  const auth = req.headers.authorization;
-  if(auth && auth!==`Bearer ${process.env.CRON_SECRET}`) { res.status(401).json({error:'Unauthorized'}); return; }
+  // 비밀키를 반드시 요구한다. 예전에는 `auth &&` 때문에 헤더가 아예 없으면 통과했다.
+  const auth   = req.headers.authorization;
+  const secret = process.env.CRON_SECRET;
+  if(!secret) { res.status(500).json({error:'CRON_SECRET 미설정'}); return; }
+  if(auth !== `Bearer ${secret}`) { res.status(401).json({error:'Unauthorized'}); return; }
 
   // ?check=1 — 알림을 보내지 않고 DB 인증만 점검한다 (배포 검증용)
   if (req.query?.check === '1') {
