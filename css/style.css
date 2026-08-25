@@ -1471,6 +1471,16 @@ html.dark .reorder-dragging { background: var(--card) !important; }
 .ib-delta{ display:block; font-size:10px; font-weight:600; margin-top:2px; }
 .ib-delta-good{ color:var(--green); }
 .ib-delta-bad{ color:var(--red); }
+
+/* 추정값 표식 — 실측과 한눈에 구분되게. (파일 끝이 아니라 인바디 블록 안에 둔다) */
+.ib-est{
+  display:inline-block; margin-left:3px; padding:0 3px;
+  font-size:8px; font-weight:700; line-height:1.5; letter-spacing:-0.2px;
+  color:var(--yellow); border:1px solid var(--yellow); border-radius:3px;
+  vertical-align:1px; opacity:.85;
+}
+.ib-est-v{ color:var(--text2); }
+.ib-est-note{ color:var(--yellow); font-weight:600; }
 .ib-bmr{
   font-size:11px; color:var(--text2); text-align:center;
   padding:6px; background:var(--card2); border-radius:var(--r-xs); margin-bottom:10px;
