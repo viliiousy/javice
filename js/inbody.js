@@ -1,7 +1,9 @@
 // js/inbody.js — 인바디 (체성분 기록 + 추이 그래프)
 // god_life(갓생일지)의 인바디 탭을 javice 모듈 규약으로 이식
-// 데이터: [{ dt:'YYYY-MM-DD', wt, ms, bf, bmr, lbm, bmi }]  (dt 오름차순 정렬 유지)
-// wt/bf/lbm/bmi 는 애플 헬스에서 자동 유입(api/inbody.js), ms/bmr 은 수동 입력
+// 데이터: [{ dt:'YYYY-MM-DD', wt, ms, bf, bmr, lbm, bmi, msEst? }]  (dt 오름차순 정렬 유지)
+// wt/bf/lbm/bmi 는 애플 헬스에서 자동 유입(api/inbody.js), bmr 은 수동 입력
+// ms(골격근량)는 헬스에 없어 서버가 과거 실측으로 추정한다. 추정치는 msEst:true 로 표시하고
+// 화면에서 실측과 구분한다 — 추정을 실측처럼 보이게 하지 않는다.
 
 const InBody = {
   KEY: 'gl_inbody_v1',
@@ -103,17 +105,22 @@ const InBody = {
     return `<span class="ib-delta ${cls}">${up?'▲':'▼'}${Math.abs(d).toFixed(1)}</span>`;
   },
 
+  // 추정치 표식 — 실측과 섞이지 않도록 항상 눈에 보이게 한다
+  _estBadge() {
+    return `<span class="ib-est" title="과거 실측 기록으로 계산한 추정값입니다">추정</span>`;
+  },
+
   _summaryHtml(la) {
     const fatMass = (la.wt && la.bf) ? (la.wt * la.bf / 100) : 0;
-    const tile = (label, val, unit, deltaKey) => `
+    const tile = (label, val, unit, deltaKey, est) => `
       <div class="ib-tile">
-        <div class="ib-tile-lbl">${label}</div>
+        <div class="ib-tile-lbl">${label}${est?this._estBadge():''}</div>
         <div class="ib-tile-val">${val}<span class="ib-tile-unit">${unit}</span>${deltaKey?this._deltaHtml(deltaKey):''}</div>
       </div>`;
 
     return `<div class="ib-summary">
       ${tile('체중',     la.wt || '—',              'kg', 'wt')}
-      ${tile('근육량',   la.ms || '—',              'kg', 'ms')}
+      ${tile('근육량',   la.ms || '—',              'kg', 'ms', la.ms && la.msEst)}
       ${tile('체지방률', la.bf || '—',              '%',  'bf')}
       ${tile('체지방량', fatMass ? fatMass.toFixed(1) : '—', 'kg', null)}
       ${tile('제지방량', la.lbm || '—',            'kg', 'lbm')}
@@ -155,6 +162,12 @@ const InBody = {
     const lastV = vals[vals.length-1];
     const fmt   = n => (Math.round(n*10)/10).toFixed(1);
 
+    // 골격근량 그래프에서는 추정 지점을 속 빈 점으로 따로 찍는다
+    const estIdx  = key === 'ms' ? pts.map((r,i) => r.msEst ? i : -1).filter(i => i >= 0) : [];
+    const estDots = estIdx.map(i =>
+      `<circle cx="${x(i).toFixed(1)}" cy="${y(vals[i]).toFixed(1)}" r="3.5"
+               fill="var(--card)" stroke="${m.color}" stroke-width="1.5"/>`).join('');
+
     return `<div class="ib-chart">
       <svg viewBox="0 0 ${W} ${H}" width="100%" role="img"
            aria-label="${m.label} 추이 그래프">
@@ -172,12 +185,14 @@ const InBody = {
         <path d="${area}" fill="url(#${gid})"/>
         <path d="${line}" fill="none" stroke="${m.color}" stroke-width="2"
               stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        ${estDots}
         <circle cx="${x(pts.length-1).toFixed(1)}" cy="${y(lastV).toFixed(1)}" r="5"
-                fill="${m.color}" stroke="var(--card)" stroke-width="3"/>
+                fill="${estIdx.includes(pts.length-1) ? 'var(--card)' : m.color}"
+                stroke="${m.color}" stroke-width="3"/>
       </svg>
       <div class="ib-chart-foot">
         <span>${pts[0].dt.slice(5).replace('-','/')}</span>
-        <span>${pts.length}회 · ${m.label}(${m.unit})</span>
+        <span>${pts.length}회 · ${m.label}(${m.unit})${estIdx.length?` · <b class="ib-est-note">○ 추정 ${estIdx.length}</b>`:''}</span>
         <span>${pts[pts.length-1].dt.slice(5).replace('-','/')}</span>
       </div>
     </div>`;
@@ -188,7 +203,7 @@ const InBody = {
       <div class="ib-row" onclick="InBody.showEdit('${r.dt}')">
         <span class="ib-row-dt">${r.dt.slice(2).replace(/-/g,'.')}</span>
         <span class="ib-row-v">${r.wt}<i>kg</i></span>
-        <span class="ib-row-v">${r.ms ? r.ms+'<i>kg</i>' : '<i>—</i>'}</span>
+        <span class="ib-row-v${r.ms && r.msEst ? ' ib-est-v' : ''}">${r.ms ? (r.msEst?'~':'')+r.ms+'<i>kg</i>' : '<i>—</i>'}</span>
         <span class="ib-row-v">${r.bf ? r.bf+'<i>%</i>' : '<i>—</i>'}</span>
       </div>`).join('');
 
@@ -208,8 +223,9 @@ const InBody = {
       <div class="modal-grid2">
         <div><label class="modal-lbl">체중 * (kg)</label>
           <input id="ibWt" type="number" step="0.1" inputmode="decimal" class="inp" value="${v('wt')}"></div>
-        <div><label class="modal-lbl">근육량 (kg)</label>
-          <input id="ibMs" type="number" step="0.1" inputmode="decimal" class="inp" value="${v('ms')}"></div>
+        <div><label class="modal-lbl">근육량 (kg)${r && r.msEst ? this._estBadge() : ''}</label>
+          <input id="ibMs" type="number" step="0.1" inputmode="decimal" class="inp" value="${v('ms')}"
+                 ${r && r.msEst ? 'title="추정값입니다. 인바디에서 잰 수치를 넣으면 실측으로 바뀝니다."' : ''}></div>
       </div>
       <div class="modal-grid2">
         <div><label class="modal-lbl">체지방률 (%)</label>
@@ -262,10 +278,16 @@ const InBody = {
     const prev = origDt ? null : all.find(r => r.dt === dt);
     const keep = (v, k) => (v > 0 || !prev) ? v : (Number(prev[k]) || 0);
 
+    const base = all.find(r => r.dt === (origDt || dt));
+    const ms   = keep(num('ibMs'), 'ms');
+    // 추정치를 그대로 두고 저장하면 추정 표시를 유지하고,
+    // 값을 바꾸면(=인바디에서 잰 수치를 넣으면) 실측으로 승격한다
+    const msEst = !!(base && base.msEst && ms > 0 && Math.abs(ms - Number(base.ms)) < 0.05);
+
     const recs = all.filter(r => r.dt !== origDt && r.dt !== dt);
     recs.push({
-      dt, wt,
-      ms:  keep(num('ibMs'),  'ms'),
+      dt, wt, ms,
+      ...(msEst ? { msEst: true } : {}),
       bf:  keep(num('ibBf'),  'bf'),
       bmr: Math.round(keep(num('ibBmr'), 'bmr')),
       lbm: keep(num('ibLbm'), 'lbm'),
