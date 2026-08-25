@@ -128,8 +128,8 @@ function dateStr(offsetHours=9) {
 
 async function processUser(uid, tokenData) {
   const { token, settings } = tokenData;
-  if(!token || !settings?.enabled) return 0;
-  if(token.startsWith('local_')) return 0;
+  if(!token || !settings?.enabled) return { sent:0, failed:0, detail:[`${uid.slice(0,8)}… 알림 꺼짐/토큰 없음`] };
+  if(token.startsWith('local_')) return { sent:0, failed:0, detail:[`${uid.slice(0,8)}… local_ 토큰(무시)`] };
 
   const now    = new Date(Date.now() + 9*3600000);
   const hour   = now.getUTCHours();
@@ -174,10 +174,16 @@ async function processUser(uid, tokenData) {
     fcmToken = token;
   }
 
+  // 어느 칸에 어떤 형태가 등록돼 있는지 응답에 남긴다 (비밀값은 싣지 않는다)
+  const shape = token.startsWith('{')
+    ? `구버전JSON(${(()=>{ try { return new URL(JSON.parse(token).endpoint).host; } catch { return '?'; } })()})`
+    : `문자열(${token.length}자)`;
+  const tag = `${uid.slice(0,8)}… 토큰=${shape}`;
+
   console.log('[cron] fcmToken:', fcmToken ? fcmToken.slice(0,20)+'...' : 'NULL');
   if(!fcmToken) {
     console.log('[cron] 유효한 FCM 토큰 없음, uid:', uid);
-    return 0;
+    return { sent:0, failed:1, detail:[`${tag} → FCM 토큰 추출 불가`] };
   }
 
   const push = async (title, body) => {
@@ -238,7 +244,7 @@ async function processUser(uid, tokenData) {
   }
 
   return { sent: ok.length, failed: fail.length,
-           detail: results.map(r => `${r.title}: ${r.ok ? 'OK' : (r.status+' '+(r.reason||''))}`) };
+           detail: [tag, ...results.map(r => `  ${r.title}: ${r.ok ? 'OK' : (r.status+' '+(r.reason||''))}`)] };
 }
 
 module.exports = async (req, res) => {
