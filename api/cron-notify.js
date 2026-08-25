@@ -121,75 +121,70 @@ function findPrefix(userData) {
   return null;
 }
 
+// 등록 형태는 두 가지다.
+//   신규: { settings, devices: { <기기id>: { token, ua, updatedAt } } }
+//   구버전: { token, settings }            ← 기기 하나만 담을 수 있어 PC·폰이 서로 덮어썼다
+function deviceList(data) {
+  const out = [];
+  if (data.devices && typeof data.devices === 'object') {
+    for (const [id, d] of Object.entries(data.devices)) {
+      if (d && typeof d.token === 'string' && d.token) out.push({ id, token: d.token, ua: d.ua || '' });
+    }
+  }
+  if (typeof data.token === 'string' && data.token) out.push({ id: 'legacy', token: data.token, ua: '' });
+  return out;
+}
+
+// 문자열 FCM 토큰, 또는 구버전 PushSubscription JSON 에서 토큰을 뽑는다
+function toFcmToken(token) {
+  if (token.startsWith('local_')) return null;
+  if (token.startsWith('{')) {
+    try {
+      const sub = JSON.parse(token);
+      if (sub.endpoint?.includes('fcm.googleapis.com')) {
+        const last = sub.endpoint.split('/').pop();
+        if (last && last.length > 30) return last;
+      }
+    } catch {}
+    return null;   // 애플(web.push.apple.com) 엔드포인트는 FCM v1으로 못 보낸다
+  }
+  return token.length > 30 ? token : null;
+}
+
+function tokenShape(token) {
+  if (token.startsWith('{')) {
+    let host = '?';
+    try { host = new URL(JSON.parse(token).endpoint).host; } catch {}
+    return `구버전JSON(${host})`;
+  }
+  return `문자열(${token.length}자)`;
+}
+
 function dateStr(offsetHours=9) {
   const d = new Date(Date.now() + offsetHours*3600000);
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
 }
 
 async function processUser(uid, tokenData) {
-  const { token, settings } = tokenData;
-  if(!token || !settings?.enabled) return { sent:0, failed:0, detail:[`${uid.slice(0,8)}… 알림 꺼짐/토큰 없음`] };
-  if(token.startsWith('local_')) return { sent:0, failed:0, detail:[`${uid.slice(0,8)}… local_ 토큰(무시)`] };
+  const settings = tokenData.settings;
+  const tag = uid.slice(0,8) + '…';
+  if(!settings?.enabled) return { sent:0, failed:0, detail:[`${tag} 알림 꺼짐`] };
+
+  const devices = deviceList(tokenData);
+  if(!devices.length) return { sent:0, failed:0, detail:[`${tag} 등록된 기기 없음`] };
 
   const now    = new Date(Date.now() + 9*3600000);
   const hour   = now.getUTCHours();
   const min    = now.getUTCMinutes();
   const today  = dateStr();
   const userData = await fbGet(`/users/${uid}.json`);
-  if(!userData) { console.log('[cron] 사용자 데이터 없음, uid:', uid); return 0; }
+  if(!userData) return { sent:0, failed:0, detail:[`${tag} 사용자 데이터 없음`] };
 
   const prefix = findPrefix(userData);
   if(!prefix) {
-    // 키가 하나도 없거나 형식이 바뀐 경우. 조용히 0건으로 넘기면 또 못 보고 지나친다.
     console.error('[cron] 키 접두사를 찾지 못함, uid:', uid, '키샘플:', Object.keys(userData).slice(0,3));
-    return 0;
+    return { sent:0, failed:1, detail:[`${tag} 키 접두사 못 찾음`] };
   }
-  console.log('[cron] uid:', uid, 'prefix:', prefix, '키:', Object.keys(userData).length);
-
-  const sends = [];
-
-  console.log('[cron] processUser uid:', uid, 'token:', token?.slice(0,20), 'force:', tokenData.force);
-  console.log('[cron] settings:', JSON.stringify(settings).slice(0,100));
-
-  // 토큰 파싱 (문자열 FCM 토큰 또는 구버전 Web Push JSON 구독 객체 처리)
-  let fcmToken = null;
-  if(token.startsWith('{')) {
-    // 구버전: JSON.stringify(PushSubscription) 형태
-    try {
-      const sub = JSON.parse(token);
-      if(sub.endpoint?.includes('fcm.googleapis.com')) {
-        // FCM endpoint URL 끝에서 토큰 추출
-        // e.g. https://fcm.googleapis.com/fcm/send/TOKEN
-        const parts = sub.endpoint.split('/');
-        const candidate = parts[parts.length - 1];
-        if(candidate && candidate.length > 30) {
-          fcmToken = candidate;
-        }
-      }
-    } catch(e) {
-      console.error('[cron] 토큰 JSON 파싱 실패:', e.message);
-    }
-  } else if(token && !token.startsWith('local_') && token.length > 30) {
-    // 신규: Firebase SDK getToken()이 반환한 순수 FCM 토큰 문자열
-    fcmToken = token;
-  }
-
-  // 어느 칸에 어떤 형태가 등록돼 있는지 응답에 남긴다 (비밀값은 싣지 않는다)
-  const shape = token.startsWith('{')
-    ? `구버전JSON(${(()=>{ try { return new URL(JSON.parse(token).endpoint).host; } catch { return '?'; } })()})`
-    : `문자열(${token.length}자)`;
-  const tag = `${uid.slice(0,8)}… 토큰=${shape}`;
-
-  console.log('[cron] fcmToken:', fcmToken ? fcmToken.slice(0,20)+'...' : 'NULL');
-  if(!fcmToken) {
-    console.log('[cron] 유효한 FCM 토큰 없음, uid:', uid);
-    return { sent:0, failed:1, detail:[`${tag} → FCM 토큰 추출 불가`] };
-  }
-
-  const push = async (title, body) => {
-    const r = await sendFCM(fcmToken, title, body);
-    return { title, ...r };
-  };
 
   const force = tokenData.force === true;
 
@@ -200,19 +195,21 @@ async function processUser(uid, tokenData) {
     return hour === hh && min >= mm && min < mm + 5;
   }
 
+  // 보낼 메시지를 먼저 다 만든 뒤, 등록된 모든 기기에 같은 내용을 보낸다
+  const msgs = [];
   if(settings.habits?.enabled) {
     if(force || timeMatches(settings.habits.time, hour, min)) {
       const list = JSON.parse(userData[`${prefix}gl_habits_list`]||'[]');
       const done = JSON.parse(userData[`${prefix}gl_habits_${today}`]||'[]');
       const miss = list.filter(h=>!done.includes(h.id));
-      if(miss.length>0) sends.push(push('✅ 습관 리마인더',`${miss.length}개 남았어요: ${miss.slice(0,2).map(h=>h.name).join(', ')}`));
+      if(miss.length>0) msgs.push({title:'✅ 습관 리마인더', body:`${miss.length}개 남았어요: ${miss.slice(0,2).map(h=>h.name).join(', ')}`});
     }
   }
   if(settings.diet?.enabled) {
     for(const [meal,t] of Object.entries({아침:settings.diet.아침||'09:00',점심:settings.diet.점심||'13:00',저녁:settings.diet.저녁||'19:00'})) {
       if(force || timeMatches(t, hour, min)) {
         const diet=JSON.parse(userData[`${prefix}gl_diet_${today}`]||'{}');
-        if(!(diet[meal]?.length)) sends.push(push(`🥗 ${meal} 식단 기록`,`${meal}을 아직 기록하지 않으셨어요!`));
+        if(!(diet[meal]?.length)) msgs.push({title:`🥗 ${meal} 식단 기록`, body:`${meal}을 아직 기록하지 않으셨어요!`});
       }
     }
   }
@@ -223,28 +220,42 @@ async function processUser(uid, tokenData) {
         if(!k.startsWith(prefix)) return;
         try { const arr=JSON.parse(v); if(Array.isArray(arr)) arr.filter(t=>t.status==='needsAction'&&t.due?.startsWith(today)).forEach(t=>due.push(t.title)); } catch {}
       });
-      if(due.length>0) sends.push(push('📋 오늘 마감 할일',`${due.length}개: ${due.slice(0,2).join(', ')}`));
+      if(due.length>0) msgs.push({title:'📋 오늘 마감 할일', body:`${due.length}개: ${due.slice(0,2).join(', ')}`});
     }
   }
 
-  const results = await Promise.all(sends);
-  const ok   = results.filter(r => r.ok);
-  const fail = results.filter(r => !r.ok);
+  if(!msgs.length) return { sent:0, failed:0, detail:[`${tag} 지금 보낼 알림 없음 (기기 ${devices.length}대)`] };
 
-  for (const f of fail) console.error('[cron] 발송 실패:', f.title, f.status, f.reason);
-
-  // 토큰이 죽었으면 표시만 해둔다. 지우면 사용자가 다시 켤 때까지 흔적이 사라지고,
-  // 계속 시도하면 매시간 같은 실패를 반복한다. 앱이 재등록하면 이 레코드가 통째로 교체된다.
-  const dead = fail.find(f => f.status === 404 || f.reason === 'UNREGISTERED' || f.reason === 'INVALID_ARGUMENT');
-  if (dead) {
-    await fbFetch(`/fcm_tokens/${uid}/invalid.json`, {
-      method:'PUT', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ at: Date.now(), status: dead.status, reason: dead.reason || null }),
-    }).catch(()=>{});
+  let sent=0, failed=0; const detail=[];
+  for (const dev of devices) {
+    const shape = tokenShape(dev.token);
+    const fcm   = toFcmToken(dev.token);
+    if(!fcm) {
+      failed++;
+      detail.push(`${tag}/${dev.id} ${shape} → FCM으로 보낼 수 없는 형식`);
+      continue;
+    }
+    const results = await Promise.all(msgs.map(m => sendFCM(fcm, m.title, m.body).then(r => ({...r, title:m.title}))));
+    const ok   = results.filter(r=>r.ok);
+    const fail = results.filter(r=>!r.ok);
+    sent += ok.length; failed += fail.length;
+    detail.push(`${tag}/${dev.id} ${shape} → 성공 ${ok.length} / 실패 ${fail.length}`);
+    for (const f of fail) {
+      console.error('[cron] 발송 실패:', dev.id, f.title, f.status, f.reason);
+      detail.push(`    ${f.title}: ${f.status} ${f.reason||''}`);
+    }
+    // 죽은 기기는 그 기기 칸에만 표시한다. 지우지 않는 이유는 재등록 시 통째로 교체되기 때문.
+    const dead = fail.find(f => f.status === 404 || f.reason === 'UNREGISTERED' || f.reason === 'INVALID_ARGUMENT');
+    if (dead) {
+      const path = dev.id === 'legacy'
+        ? `/fcm_tokens/${uid}/invalid.json`
+        : `/fcm_tokens/${uid}/devices/${dev.id}/invalid.json`;
+      await fbFetch(path, { method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ at: Date.now(), status: dead.status, reason: dead.reason || null }) }).catch(()=>{});
+    }
   }
 
-  return { sent: ok.length, failed: fail.length,
-           detail: [tag, ...results.map(r => `  ${r.title}: ${r.ok ? 'OK' : (r.status+' '+(r.reason||''))}`)] };
+  return { sent, failed, detail };
 }
 
 module.exports = async (req, res) => {
