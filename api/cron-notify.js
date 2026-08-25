@@ -4,7 +4,7 @@ const https = require('https');
 const crypto = require('crypto');
 
 // Firebase DB — 서비스 계정으로 인증해서 읽는다 (규칙을 잠근 뒤에도 동작)
-const { fbGet } = require('../lib/fb-admin');
+const { fbGet, fbFetch } = require('../lib/fb-admin');
 
 // VAPID 서명
 function urlBase64ToBuffer(base64) {
@@ -34,6 +34,8 @@ async function getVapidHeaders(subscription, subject, publicKey, privateKey, pay
   };
 }
 
+// ⚠️ 현재 어디서도 호출하지 않는다. 애플(web.push.apple.com) 엔드포인트로 보내려면
+// VAPID 서명 + aes128gcm 암호화가 필요한데 아래 구현은 그렇지 않다. 되살릴 땐 새로 써야 한다.
 async function sendWebPush(subscriptionStr, title, body) {
   let sub;
   try { sub = JSON.parse(subscriptionStr); } catch { return null; }
@@ -90,8 +92,21 @@ async function sendFCM(fcmToken, title, body) {
   return new Promise((resolve)=>{
     const opts={hostname:'fcm.googleapis.com',path:`/v1/projects/${sa.project_id}/messages:send`,method:'POST',
       headers:{'Content-Type':'application/json','Authorization':`Bearer ${accessToken}`,'Content-Length':Buffer.byteLength(payload)}};
-    const r=https.request(opts,resp=>{let d='';resp.on('data',c=>d+=c);resp.on('end',()=>{try{resolve(JSON.parse(d));}catch{resolve(null);}});});
-    r.on('error',e=>resolve({error:e.message})); r.write(payload); r.end();
+    const r=https.request(opts,resp=>{
+      let d='';
+      resp.on('data',c=>d+=c);
+      resp.on('end',()=>{
+        let body=null; try{ body=JSON.parse(d); }catch{}
+        const err = body?.error;
+        resolve({
+          ok:     resp.statusCode>=200 && resp.statusCode<300,
+          status: resp.statusCode,
+          // FCM은 죽은 토큰에 404 UNREGISTERED, 형식이 틀리면 400 INVALID_ARGUMENT 를 준다
+          reason: err ? (err.details?.find(x=>x.errorCode)?.errorCode || err.status || err.message) : null,
+        });
+      });
+    });
+    r.on('error',e=>resolve({ok:false,status:0,reason:e.message})); r.write(payload); r.end();
   });
 }
 
@@ -166,7 +181,8 @@ async function processUser(uid, tokenData) {
   }
 
   const push = async (title, body) => {
-    return sendFCM(fcmToken, title, body);
+    const r = await sendFCM(fcmToken, title, body);
+    return { title, ...r };
   };
 
   const force = tokenData.force === true;
@@ -205,8 +221,24 @@ async function processUser(uid, tokenData) {
     }
   }
 
-  await Promise.all(sends);
-  return sends.length;
+  const results = await Promise.all(sends);
+  const ok   = results.filter(r => r.ok);
+  const fail = results.filter(r => !r.ok);
+
+  for (const f of fail) console.error('[cron] 발송 실패:', f.title, f.status, f.reason);
+
+  // 토큰이 죽었으면 표시만 해둔다. 지우면 사용자가 다시 켤 때까지 흔적이 사라지고,
+  // 계속 시도하면 매시간 같은 실패를 반복한다. 앱이 재등록하면 이 레코드가 통째로 교체된다.
+  const dead = fail.find(f => f.status === 404 || f.reason === 'UNREGISTERED' || f.reason === 'INVALID_ARGUMENT');
+  if (dead) {
+    await fbFetch(`/fcm_tokens/${uid}/invalid.json`, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ at: Date.now(), status: dead.status, reason: dead.reason || null }),
+    }).catch(()=>{});
+  }
+
+  return { sent: ok.length, failed: fail.length,
+           detail: results.map(r => `${r.title}: ${r.ok ? 'OK' : (r.status+' '+(r.reason||''))}`) };
 }
 
 module.exports = async (req, res) => {
@@ -237,12 +269,19 @@ module.exports = async (req, res) => {
 
   try {
     const tokens = await fbGet('/fcm_tokens.json');
-    if(!tokens) { res.status(200).json({sent:0}); return; }
-    let total=0;
+    if(!tokens) { res.status(200).json({success:true,sent:0,failed:0,detail:['등록된 기기 없음']}); return; }
+    let sent=0, failed=0; const detail=[];
     for(const [uid,data] of Object.entries(tokens)) {
-      try { total += await processUser(uid, forceAll ? {...data, force:true} : data); } catch(e) { console.error(uid,e.message); }
+      try {
+        const r = await processUser(uid, forceAll ? {...data, force:true} : data);
+        if (typeof r === 'number') { sent += r; continue; }   // 아무것도 보낼 게 없던 경우
+        sent += r.sent; failed += r.failed; detail.push(...r.detail);
+      } catch(e) { failed++; detail.push(`${uid}: 예외 ${e.message}`); console.error(uid,e.message); }
     }
-    res.status(200).json({success:true,sent:total,time:new Date().toISOString()});
+    // 실패를 조용히 넘기지 않는다 — 예전에는 시도 횟수를 성공으로 보고했고,
+    // 워크플로는 HTTP 200만 보므로 계속 초록불이었다. 실패가 있으면 200을 주지 않는다.
+    res.status(failed ? 500 : 200)
+       .json({success:failed===0, sent, failed, detail, time:new Date().toISOString()});
   } catch(e) {
     console.error('[cron]',e);
     res.status(500).json({error:e.message});
