@@ -131,7 +131,7 @@ module.exports = async (req, res) => {
 
     const prefix = await findPrefix(uid);
     if (!prefix) {
-      res.status(409).json({ error: '앱 데이터를 찾지 ꫻했습니다. 앱에서 한 번 로그인한 뒤 다시 시도하세요.' });
+      res.status(409).json({ error: '앱 데이터를 찾지 못했습니다. 앱에서 한 번 로그인한 뒤 다시 시도하세요.' });
       return;
     }
     const path = `/users/${uid}/${prefix}${RAW_KEY}.json`;
