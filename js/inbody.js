@@ -27,7 +27,7 @@ const InBody = {
 
   saveRecords(v) {
     const clean = (v || [])
-      .filter(r => r && r.dt && r.wt)
+      .filter(r => r && r.dt && (r.wt || r.ms || r.bf || r.bmr || r.lbm || r.bmi))
       .sort((a,b) => String(a.dt).localeCompare(String(b.dt)));
     UserStore.set(this.KEY, JSON.stringify(clean));
     FirebaseSync?.scheduleSave();
@@ -340,4 +340,3 @@ const InBody = {
     App.showToast(`${added}건 가져왔습니다 ✓`, 'success');
   },
 };
-인바디에제지방량·추가애플헬스에는골격근량이없고제지방체중만있다둘은다른값이라기존에넣으면추이가망가지므로을새필드로둔다도함께받는다요약타일개와그래프탭개가늘고수동입력폼과갓생일지가져오기에도반영했다은헬스에없어계속수동입력이다
