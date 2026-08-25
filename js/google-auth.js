@@ -14,6 +14,8 @@ const Auth = {
   userInfo:      null,
   _refreshTimer: null,
   _refreshing:   false,
+  _pendingLogin: false,   // GIS 로딩 전에 누른 로그인 요청
+  _loginPrompt:  '',      // 이번 로그인 시도의 prompt 값
 
   init() {
     if (typeof google === 'undefined' || !google.accounts) return;
@@ -32,6 +34,13 @@ const Auth = {
             console.warn('[Auth] 자동 갱신 실패:', resp.error);
             App.showToast('구글 권한이 만료되었습니다. 다시 로그인해주세요.', 'error');
             this._promptRelogin();
+          } else if (this._loginPrompt !== 'consent') {
+            // 조용한 로그인 실패 (동의 이력 없음/세션 만료) → 동의 화면으로 재시도
+            console.log('[Auth] 조용한 로그인 실패, 동의 화면으로 재시도:', resp.error);
+            this._refreshing  = false;
+            this._loginPrompt = 'consent';
+            this.tokenClient.requestAccessToken({ prompt: 'consent' });
+            return;
           } else {
             App.showToast('로그인 실패: ' + resp.error, 'error');
           }
@@ -69,6 +78,12 @@ const Auth = {
         }
       },
     });
+
+    // GIS 로딩 전에 로그인을 눌렀다면 이제 이어서 진행 (다시 누를 필요 없음)
+    if (this._pendingLogin) {
+      this._pendingLogin = false;
+      setTimeout(() => this.login(), 0);
+    }
 
     // 세션 복원
     const t = localStorage.getItem('gl_token');
@@ -113,13 +128,25 @@ const Auth = {
     }
   },
 
-  login() {
+  login(forceConsent = false) {
     if (!this.tokenClient) {
-      App.showToast('Google 로딩 중입니다. 1초 후 다시 눌러주세요.', '');
+      // 아직 GIS 로딩 중 — 요청을 기억해뒀다가 준비되면 자동으로 이어간다
+      this._pendingLogin = true;
+      App.showToast('Google 로그인 준비 중...', '');
+      setTimeout(() => {
+        if (this._pendingLogin && !this.tokenClient) {
+          this._pendingLogin = false;
+          App.showToast('Google 로그인을 불러오지 못했습니다. 새로고침해주세요.', 'error');
+        }
+      }, 9000);
       return;
     }
     this._refreshing = false;
-    this.tokenClient.requestAccessToken({ prompt: 'consent' });
+    // prompt:'' → 이미 동의한 계정이면 동의·경고 화면 없이 통과한다.
+    // 'consent'를 매번 강제하면 재로그인마다 전체 동의 절차를 다시 밟게 된다.
+    // 조용한 시도가 실패하면 콜백에서 consent로 한 번 재시도한다.
+    this._loginPrompt = forceConsent ? 'consent' : '';
+    this.tokenClient.requestAccessToken({ prompt: this._loginPrompt });
   },
 
   logout() {
