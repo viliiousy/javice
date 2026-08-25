@@ -95,6 +95,17 @@ async function sendFCM(fcmToken, title, body) {
   });
 }
 
+// 앱은 localStorage 키를 `u_<구글ID>_<키>` 로 저장하고 그대로 Firebase에 올린다.
+// 이 접두사는 경로의 Firebase UID와 다른 값이다 — 추측하지 말고 실제 키에서 찾아낸다.
+// (2026-08-24 경로 이전 때 이걸 놓쳐서 습관·식단·할일 알림이 조용히 0건이 됐었다)
+function findPrefix(userData) {
+  for (const k of Object.keys(userData)) {
+    const m = k.match(/^(u_.+?_)gl_/);
+    if (m) return m[1];
+  }
+  return null;
+}
+
 function dateStr(offsetHours=9) {
   const d = new Date(Date.now() + offsetHours*3600000);
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
@@ -109,10 +120,16 @@ async function processUser(uid, tokenData) {
   const hour   = now.getUTCHours();
   const min    = now.getUTCMinutes();
   const today  = dateStr();
-  const prefix = `u_${uid}_`;
   const userData = await fbGet(`/users/${uid}.json`);
-  console.log('[cron] userData keys:', userData ? Object.keys(userData).filter(k=>k.includes('habit')).join(',') : 'NULL');
-  if(!userData) return 0;
+  if(!userData) { console.log('[cron] 사용자 데이터 없음, uid:', uid); return 0; }
+
+  const prefix = findPrefix(userData);
+  if(!prefix) {
+    // 키가 하나도 없거나 형식이 바뀐 경우. 조용히 0건으로 넘기면 또 못 보고 지나친다.
+    console.error('[cron] 키 접두사를 찾지 못함, uid:', uid, '키샘플:', Object.keys(userData).slice(0,3));
+    return 0;
+  }
+  console.log('[cron] uid:', uid, 'prefix:', prefix, '키:', Object.keys(userData).length);
 
   const sends = [];
 
