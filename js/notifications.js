@@ -1,8 +1,27 @@
 // js/notifications.js — 알림 설정 및 FCM 구독 관리
+//
+// 토큰은 기기마다 다르다. 예전에는 UserStore(기기 간 동기화 대상)에 넣어서
+// PC와 폰이 서로 토큰을 덮어썼고, 결국 한 기기만 알림을 받을 수 있었다.
+// 이제 토큰과 기기 id 는 그 기기의 localStorage 에만 둔다(동기화하지 않는다).
 
 const Notifications = {
   _swReg:   null,
   _token:   null,
+
+  // ── 기기 로컬 저장소 (UserStore 를 거치지 않는다 = 동기화 안 됨) ──
+  TOKEN_KEY:  'gl_fcm_token_dev',
+  DEVICE_KEY: 'gl_device_id',
+
+  deviceId() {
+    let id = localStorage.getItem(this.DEVICE_KEY);
+    if (!id) {
+      id = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+      localStorage.setItem(this.DEVICE_KEY, id);
+    }
+    return id;
+  },
+  localToken()      { return localStorage.getItem(this.TOKEN_KEY); },
+  setLocalToken(t)  { localStorage.setItem(this.TOKEN_KEY, t); },
 
   // 기본 설정
   DEFAULT_SETTINGS: {
@@ -49,10 +68,10 @@ const Notifications = {
 
   // 이미 발급된 토큰이 구경로 uid로 등록돼 있으면 새 uid로 옮긴다
   async _syncUid() {
-    const token = UserStore.get('gl_fcm_token');
+    const token = this.localToken();
     if (!token) return;
     const want = this._effectiveUid();
-    if (UserStore.get('gl_fcm_uid') === want) return;
+    if (localStorage.getItem('gl_fcm_uid_dev') === want) return;
     console.log('[Notif] 등록 uid 갱신 →', want);
     await this._registerToken(token);
   },
@@ -98,9 +117,14 @@ const Notifications = {
 
       console.log('[Notif] FCM 토큰 발급 성공:', token.slice(0,20)+'...');
       this._token = token;
-      UserStore.set('gl_fcm_token', token);
-      FirebaseSync?.scheduleSave();
-      await this._registerToken(token);
+      this.setLocalToken(token);   // 이 기기에만 저장 (동기화하지 않는다)
+
+      // 서버 등록이 실패하면 알림은 오지 않는다. 성공했다고 말하지 않는다.
+      const reg = await this._registerToken(token);
+      if (!reg.ok) {
+        App.showToast('알림 등록 실패: ' + reg.error, 'error');
+        return false;
+      }
       App.showToast('✅ 백그라운드 알림 활성화됨', 'success');
       return true;
     } catch (e) {
@@ -110,24 +134,28 @@ const Notifications = {
     }
   },
 
-  // 서버에 토큰 등록
+  // 서버에 토큰 등록. 성공 여부를 반드시 돌려준다 — 실패를 조용히 넘기면
+  // 화면에는 '활성화됨'이 뜨는데 알림은 영영 오지 않는다.
   async _registerToken(token) {
     const uid      = this._effectiveUid();
-    const prev     = UserStore.get('gl_fcm_uid') || UserStore.getUser();
+    const prev     = localStorage.getItem('gl_fcm_uid_dev');
     const settings = this.getSettings();
-    const body     = { uid, token, settings };
+    const body     = { uid, token, settings, deviceId: this.deviceId(), ua: navigator.userAgent };
     if (prev && prev !== uid) body.prevUid = prev;   // 구경로 등록분 삭제 요청
     try {
-      const res = await fetch('/api/subscribe', {
+      const res  = await fetch('/api/subscribe', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(body),
       });
-      const data = await res.json();
-      if (res.ok) UserStore.set('gl_fcm_uid', uid);
-      console.log('[Notif] 토큰 등록:', data);
+      const data = await res.json().catch(() => ({}));
+      console.log('[Notif] 토큰 등록:', res.status, data);
+      if (!res.ok || !data.success) return { ok:false, error: data.error || ('HTTP ' + res.status) };
+      localStorage.setItem('gl_fcm_uid_dev', uid);
+      return { ok:true, data };
     } catch (e) {
       console.warn('[Notif] 토큰 등록 실패:', e);
+      return { ok:false, error: e.message };
     }
   },
 
@@ -150,7 +178,7 @@ const Notifications = {
   // 알림 설정 모달
   showSettings() {
     const s   = this.getSettings();
-    const sub = UserStore.get('gl_fcm_token');
+    const sub = this.localToken();   // 이 기기 기준 (다른 기기 등록과 무관)
     App.openModal('🔔 알림 설정', `
       <div style="margin-bottom:14px">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--card2);border-radius:10px;margin-bottom:8px">
@@ -233,7 +261,7 @@ const Notifications = {
     this.saveSettings(s);
     const btn  = document.getElementById('notifToggle');
     if (btn) { btn.textContent=s.enabled?'켜짐':'끄기'; btn.className=`btn-sm ${s.enabled?'accent':''}`; }
-    if (s.enabled && !UserStore.get('gl_fcm_token')) this.subscribe();
+    if (s.enabled && !this.localToken()) this.subscribe();
     FirebaseSync?.scheduleSave();
   },
 
@@ -255,9 +283,11 @@ const Notifications = {
 
   _saveAll() {
     App.showToast('알림 설정 저장됨 ✓', 'success');
-    // 서버에 설정 업데이트
-    const token = UserStore.get('gl_fcm_token');
-    if (token) this._registerToken(token);
+    // 서버에 설정 업데이트 (이 기기 토큰 기준)
+    const token = this.localToken();
+    if (token) this._registerToken(token).then(r => {
+      if (!r.ok) App.showToast('설정 서버 반영 실패: ' + r.error, 'error');
+    });
     FirebaseSync?.scheduleSave();
   },
 
