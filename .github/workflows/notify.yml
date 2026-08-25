@@ -12,6 +12,14 @@ jobs:
     steps:
       - name: Trigger notification cron
         run: |
-          curl -X GET \
-            "https://javice.vercel.app/api/cron-notify" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+          # bashy.app 을 직접 호출한다.
+          # javice.vercel.app 은 308 리다이렉트라 curl 이 따라가지 않고,
+          # -L 을 붙여도 호스트가 바뀌면 Authorization 헤더가 빠진다.
+          # 그래서 크론이 아무 일도 안 한 채 초록불로 끝나 버렸다.
+          code=$(curl -sS -o /tmp/cron.json -w '%{http_code}' \
+            "https://bashy.app/api/cron-notify" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          echo "HTTP $code"
+          cat /tmp/cron.json; echo
+          # 실패를 초록불로 넘기지 않는다
+          [ "$code" = "200" ] || exit 1
