@@ -129,7 +129,15 @@ const Econ = {
   // ── 시세 ────────────────────────────────────────────
   async refresh() {
     try {
-      const r = await fetch(this.raw('prices.json'), { cache:'no-store' });
+      // 예전엔 레포의 prices.json 을 raw 로 읽었다. 그런데 raw 는 max-age=300 이고
+      // 쿼리스트링을 무시한다 — 1분마다 갱신되는 시세가 최대 5분 늦게 보였다.
+      // (실측: 같은 값이 4분 넘게 고정) 그래서 서버가 Firebase 에서 바로 준다.
+      const idToken = await Auth._firebaseIdToken();
+      if (!idToken) throw new Error('로그인이 필요합니다');
+      const r = await fetch('/api/econ-data', {
+        headers: { Authorization: 'Bearer ' + idToken }, cache: 'no-store',
+      });
+      if (r.status === 404) throw new Error('아직 수집된 시세가 없습니다');
       if (!r.ok) throw new Error('시세 ' + r.status);
       const j = await r.json();
       this.PREV = this.PRICES;
@@ -145,7 +153,9 @@ const Econ = {
   _paint() {
     const upd = document.getElementById('econUpd');
     if (upd) {
-      upd.textContent = this._err ? '시세 불러오기 실패' :
+      // 실패 사유를 그대로 보여준다. '불러오기 실패' 한 줄이면 로그인 문제인지
+      // 수집이 멈춘 건지 구분이 안 된다.
+      upd.textContent = this._err ? this._err :
         (this._updatedAt ? '업데이트 ' + this._updatedAt.replace('T',' ').slice(5,16) : '시세 대기 중');
       upd.classList.toggle('ec-err', !!this._err);
     }
