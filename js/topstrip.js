@@ -43,12 +43,29 @@ const TopStrip = {
   },
 
   // ── 시세 ────────────────────────────
-  // 보유 주식 평가액·수익률은 아직 없다. 있으면 그걸, 없으면 즐겨찾기 시세를 보여준다.
+  // 보유가 있으면 평가액·수익률을 먼저 보여준다. 시세 나열보다 이게 알고 싶은 숫자다.
   // 없는 걸 0원이라고 쓰지 않는다 — 0원과 '아직 안 넣음'은 다르다.
   _econ() {
     if (typeof Econ === 'undefined') return '';
     let c;
     try { c = Econ.cfg(); } catch { return ''; }
+
+    const hs = (c && c.holdings) || [];
+    if (hs.length && typeof Econ.holdSummary === 'function') {
+      const s = Econ.holdSummary();
+      if (s.cost > 0) {
+        const cls  = s.profit > 0 ? 'ts-up' : s.profit < 0 ? 'ts-dn' : 'ts-flat';
+        const sign = s.profit > 0 ? '+' : s.profit < 0 ? '-' : '';
+        const won  = v => Math.round(v).toLocaleString('ko-KR');
+        const body =
+          `<span class="ts-v"><b>${won(s.value)}</b><i>원</i></span>` +
+          `<span class="ts-v"><b class="${cls}">${sign}${won(Math.abs(s.profit))}</b><i>원</i></span>` +
+          `<span class="ts-v"><b class="${cls}">${
+            s.pct == null ? '—' : (s.pct > 0 ? '+' : '') + s.pct.toFixed(2) + '%'}</b></span>`;
+        return this._cell('tsEcon', '💰', `보유 <em>${hs.length}종목</em>`, body, "Econ.open('hold')");
+      }
+    }
+
     const favs = (c && c.favorites) || [];
     if (!favs.length) return '';
 
