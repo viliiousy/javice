@@ -73,21 +73,25 @@ const Fitness = {
       badge.className=allEx.length?'badge badge-accent':'badge';
     }
 
+    // 탭: 요일별 — 휴식일이어도 반드시 남는다.
+    // 예전엔 휴식일이면 탭 없이 return 해서, 일요일(휴무)을 누르는 순간
+    // 다른 요일로 돌아갈 방법이 사라졌다. 카드가 막다른 길이 됐다.
+    const DOW=['일','월','화','수','목','금','토'];
+    const tabs=DOW.map((d,i)=>`<button class="fit-tab${i===dow?' active':''}" onclick="Fitness.render(new Date('${Fitness._dateStr(date)}T00:00:00'),${i})">${d}</button>`).join('');
+
     const container = document.getElementById('fitnessWrap');
     if (!allEx.length) {
-      container.innerHTML=`<div style="text-align:center;padding:24px 16px;color:var(--text2)">
-        <div style="font-size:48px;margin-bottom:10px">😴</div>
-        <p>휴식일입니다.<br><span style="color:var(--text3);font-size:12px">잘 쉬어주세요!</span></p>
+      container.innerHTML=`
+      <div class="fit-tabs">${tabs}</div>
+      <div style="text-align:center;padding:20px 16px;color:var(--text2)">
+        <div style="font-size:44px;margin-bottom:8px">😴</div>
+        <p>${plan.name} — 휴식일입니다.<br><span style="color:var(--text3);font-size:12px">다른 요일을 눌러 계획을 볼 수 있어요</span></p>
       </div>${isToday?'<div class="habit-add-btn" onclick="Fitness.showInlineAdd()">+ 운동 추가</div>':''}`;
       return;
     }
 
-    const DOW=['일','월','화','수','목','금','토'];
     const done=allEx.filter((_,i)=>chk.includes(i)).length;
     const pct=Math.round(done/allEx.length*100);
-
-    // 탭: 요일별
-    const tabs=DOW.map((d,i)=>`<button class="fit-tab${i===dow?' active':''}" onclick="Fitness.render(new Date('${Fitness._dateStr(date)}T00:00:00'),${i})">${d}</button>`).join('');
 
     container.innerHTML=`
       <div class="fit-tabs">${tabs}</div>
