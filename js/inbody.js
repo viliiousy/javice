@@ -7,15 +7,24 @@
 
 const InBody = {
   KEY: 'gl_inbody_v1',
-  VIEW_KEY: 'gl_inbody_view',
-  MAX_POINTS: 30,
+  VIEW_KEY:   'gl_inbody_view',
+  PERIOD_KEY: 'gl_inbody_period',
+  MAX_POINTS: 60,
+  PAGE:       8,          // 목록 한 번에 보여줄 줄 수
 
+  // 제지방량은 뺐다. 체지방량과 함께 체중·체지방률에서 바로 나오는 파생값이라
+  // 탭과 타일만 늘리고 새로 알려주는 게 없었다. 지표 4개면 탭이 한 줄에 들어간다.
   METRICS: {
     wt: { label:'체중',     unit:'kg', color:'#3b82f6', good:'down' },
     ms: { label:'근육량',   unit:'kg', color:'#059669', good:'up'   },
     bf: { label:'체지방률', unit:'%',  color:'#ea580c', good:'down' },
-    lbm:{ label:'제지방량', unit:'kg', color:'#7c3aed', good:'up'   },
     bmi:{ label:'BMI',      unit:'',   color:'#0891b2', good:'down' },
+  },
+
+  PERIODS: {
+    '7d':  { label:'일주일', days: 7   },
+    '30d': { label:'한달',   days: 30  },
+    'all': { label:'전체',   days: null },
   },
 
   // ── 데이터 ─────────────────────────────
@@ -78,11 +87,13 @@ const InBody = {
     }
 
     const view = this._view();
+    const inP = this._inPeriod(recs);
     wrap.innerHTML =
       this._summaryHtml(la) +
       this._tabsHtml(view) +
-      this._chartHtml(recs, view) +
-      this._listHtml(recs) +
+      this._periodHtml() +
+      this._chartHtml(inP, view) +
+      this._listHtml(inP, recs.length) +
       `<div class="habit-add-btn" onclick="InBody.showAdd()">+ 인바디 기록</div>`;
 
     this._renderBadge(la);
@@ -110,6 +121,32 @@ const InBody = {
     return `<span class="ib-est" title="과거 실측 기록으로 계산한 추정값입니다">추정</span>`;
   },
 
+  // ── 기간 ───────────────────────────────
+  _period() {
+    const p = UserStore.get(this.PERIOD_KEY);
+    return this.PERIODS[p] ? p : '7d';        // 기본은 일주일
+  },
+  setPeriod(p) {
+    if (!this.PERIODS[p]) return;
+    UserStore.set(this.PERIOD_KEY, p);
+    this._shown = this.PAGE;                  // 기간을 바꾸면 더보기도 처음부터
+    this.render();
+  },
+  // 기간 안의 기록만. 'all' 이면 그대로.
+  _inPeriod(recs) {
+    const days = this.PERIODS[this._period()].days;
+    if (!days) return recs;
+    const from = new Date(Date.now() + 9*3600000 - (days-1)*86400000)
+      .toISOString().slice(0,10);
+    return recs.filter(r => r.dt >= from);
+  },
+  _periodHtml() {
+    const cur = this._period();
+    return `<div class="ib-periods">` + Object.entries(this.PERIODS).map(([k,p]) =>
+      `<button class="ib-period${k===cur?' active':''}" onclick="InBody.setPeriod('${k}')">${p.label}</button>`
+    ).join('') + `</div>`;
+  },
+
   _summaryHtml(la) {
     const fatMass = (la.wt && la.bf) ? (la.wt * la.bf / 100) : 0;
     const tile = (label, val, unit, deltaKey, est) => `
@@ -118,15 +155,14 @@ const InBody = {
         <div class="ib-tile-val">${val}<span class="ib-tile-unit">${unit}</span>${deltaKey?this._deltaHtml(deltaKey):''}</div>
       </div>`;
 
+    // 한 줄에 다섯 칸. 체지방량·제지방량은 뺐다 (체중·체지방률에서 바로 나오는 값).
     return `<div class="ib-summary">
-      ${tile('체중',     la.wt || '—',              'kg', 'wt')}
-      ${tile('근육량',   la.ms || '—',              'kg', 'ms', la.ms && la.msEst)}
-      ${tile('체지방률', la.bf || '—',              '%',  'bf')}
-      ${tile('체지방량', fatMass ? fatMass.toFixed(1) : '—', 'kg', null)}
-      ${tile('제지방량', la.lbm || '—',            'kg', 'lbm')}
-      ${tile('BMI',      la.bmi || '—',            '',   'bmi')}
-    </div>
-    ${la.bmr ? `<div class="ib-bmr">기초대사량 <b>${la.bmr}</b> kcal</div>` : ''}`;
+      ${tile('체중',     la.wt  || '—', 'kg',   'wt')}
+      ${tile('근육량',   la.ms  || '—', 'kg',   'ms', la.ms && la.msEst)}
+      ${tile('체지방률', la.bf  || '—', '%',    'bf')}
+      ${tile('BMI',      la.bmi || '—', '',     'bmi')}
+      ${tile('기초대사', la.bmr || '—', 'kcal', null)}
+    </div>`;
   },
 
   _tabsHtml(view) {
@@ -142,7 +178,8 @@ const InBody = {
     const pts  = recs.filter(r => Number(r[key]) > 0).slice(-this.MAX_POINTS);
 
     if (pts.length < 2) {
-      return `<div class="ib-chart-empty">${m.label} 기록이 2개 이상이면 추이가 표시됩니다</div>`;
+      const pl = this.PERIODS[this._period()].label;
+      return `<div class="ib-chart-empty">${pl} 안에 ${m.label} 기록이 ${pts.length}개입니다 · 2개 이상이면 추이가 표시됩니다</div>`;
     }
 
     const W = 640, H = 150, PX = 46, PY = 18;
@@ -198,8 +235,13 @@ const InBody = {
     </div>`;
   },
 
-  _listHtml(recs) {
-    const rows = recs.slice().reverse().slice(0, 8).map(r => `
+  _shown: 0,
+  showMore() { this._shown = (this._shown || this.PAGE) + this.PAGE; this.render(); },
+
+  _listHtml(recs, totalAll) {
+    const limit = this._shown || this.PAGE;
+    const all   = recs.slice().reverse();
+    const rows  = all.slice(0, limit).map(r => `
       <div class="ib-row" onclick="InBody.showEdit('${r.dt}')">
         <span class="ib-row-dt">${r.dt.slice(2).replace(/-/g,'.')}</span>
         <span class="ib-row-v">${r.wt}<i>kg</i></span>
@@ -207,10 +249,19 @@ const InBody = {
         <span class="ib-row-v">${r.bf ? r.bf+'<i>%</i>' : '<i>—</i>'}</span>
       </div>`).join('');
 
+    const pl   = this.PERIODS[this._period()].label;
+    const rest = all.length - Math.min(limit, all.length);
+    if (!all.length) {
+      return `<div class="ib-list"><div class="ib-chart-empty">${pl} 안에 기록이 없습니다${
+        totalAll ? ` · 전체 ${totalAll}건` : ''}</div></div>`;
+    }
     return `<div class="ib-list">
       <div class="ib-row ib-row-head"><span>날짜</span><span>체중</span><span>근육</span><span>체지방</span></div>
       ${rows}
-      ${recs.length > 8 ? `<div class="ib-more">외 ${recs.length-8}건</div>` : ''}
+      ${rest > 0
+        ? `<button class="ib-more ib-more-btn" onclick="InBody.showMore()">더보기 (${rest}건 남음)</button>`
+        : (this._period() !== 'all' && totalAll > all.length
+            ? `<div class="ib-more">${pl} 기록 ${all.length}건 전부 · 전체는 ${totalAll}건</div>` : '')}
     </div>`;
   },
 
