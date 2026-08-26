@@ -19,7 +19,7 @@ const Econ = {
   POLL:   60000,          // 수집 크론이 30분 주기라 1분이면 충분하다
 
   DEF: {
-    move_pct: 10, favorites: [], watchlists: [],
+    move_pct: 10, favorites: [], watchlists: [], holdings: [],
     report_times: ['08:00'],
     market_alerts: { kr_open:false, kr_close:false, us_open:false, us_close:false },
   },
@@ -39,6 +39,7 @@ const Econ = {
     this.C = Object.assign({}, this.DEF, c);
     this.C.favorites  = this.C.favorites  || [];
     this.C.watchlists = this.C.watchlists || [];
+    this.C.holdings   = this.C.holdings   || [];
     if (!this.C.report_times || !this.C.report_times.length) this.C.report_times = ['08:00'];
     this.C.market_alerts = Object.assign({}, this.DEF.market_alerts, this.C.market_alerts || {});
     this.C.favorites.forEach(f => { if (f.alert === undefined) f.alert = true; });
@@ -102,6 +103,7 @@ const Econ = {
 
   // 카드에는 즐겨찾기만 간단히 보여준다. 전체 터미널은 모달에서 연다.
   render() {
+    this._paintHold();
     const wrap = document.getElementById('econWrap');
     if (!wrap) return;
     const c = this.cfg();
@@ -173,6 +175,8 @@ const Econ = {
       const d = w.querySelector('.ec-delta');
       if (d) d.outerHTML = this.delta(q.pct);
     });
+    this._paintHold();
+    if (typeof TopStrip !== 'undefined') { try { TopStrip.render(); } catch {} }
   },
   _startPoll() { this._stopPoll(); this._poll = setInterval(() => this.refresh(), this.POLL); },
   _stopPoll()  { if (this._poll) { clearInterval(this._poll); this._poll = null; } },
@@ -182,7 +186,7 @@ const Econ = {
     this.view = view || 'main';
     App.openModal('📈 시세', `
       <div class="ec-nav">
-        ${[['main','메인'],['watch','관심종목'],['charts','차트']].map(([v,l]) =>
+        ${[['main','메인'],['hold','보유'],['watch','관심종목'],['charts','차트']].map(([v,l]) =>
           `<button class="${this.view===v?'on':''}" onclick="Econ.tab('${v}')">${l}</button>`).join('')}
         <button class="ec-gear" onclick="Econ.settings()" title="알림 설정">⚙</button>
       </div>
@@ -198,6 +202,7 @@ const Econ = {
            event?.target?.classList.add('on'); this._draw(); },
   _draw() {
     if (this.view === 'main')   return this._drawMain();
+    if (this.view === 'hold')   return this._drawHold();
     if (this.view === 'watch')  return this._drawWatch();
     if (this.view === 'charts') return this._drawCharts();
   },
@@ -270,7 +275,7 @@ const Econ = {
     return this.TICKERS;
   },
   async search(v, where) {
-    const box = document.getElementById(where === 'F' ? 'ecFRes' : 'ecLRes');
+    const box = document.getElementById({ F:'ecFRes', L:'ecLRes', H:'ecHRes' }[where]);
     if (!box) return;
     v = v.trim();
     if (!v) { box.innerHTML = ''; return; }
@@ -293,11 +298,20 @@ const Econ = {
         const it = { name:e.n, code:e.c, type:e.t, tv:e.tv, unit:this.unitFor(e.t), floor:null };
         return `<div class="ec-res"><div><div class="ec-nm">${esc(e.n)}</div>
           <div class="ec-meta">${esc(e.c)} · ${this.TYPE[e.t]||''}</div></div>
-          <button class="btn-sm accent" onclick='Econ.add("${where}",${this.attr(it)})'>${where==='F'?'★ 추가':'＋ 담기'}</button></div>`;
+          <button class="btn-sm accent" onclick='Econ.add("${where}",${this.attr(it)})'>${where==='F'?'★ 추가':where==='H'?'＋ 보유':'＋ 담기'}</button></div>`;
       }).join('');
   },
   add(where, it) {
     const c = this.cfg(), k = this.keyOf(it);
+    if (where === 'H') {
+      if (it.type === 'exchange') { App.showToast('환율은 보유로 담을 수 없어요','error'); return; }
+      c.holdings = c.holdings || [];
+      if (c.holdings.some(x => this.keyOf(x) === k)) { App.showToast('이미 보유 목록에 있어요'); return; }
+      c.holdings.push(Object.assign({ qty:0, avg:0 }, it));
+      this.queueSave(); App.showToast('보유에 추가 — 수량과 평단을 입력하세요','success');
+      this._drawHold(); this._paintHold();
+      return;
+    }
     if (where === 'F') {
       if (c.favorites.some(x => this.keyOf(x) === k)) { App.showToast('이미 즐겨찾기에 있어요'); return; }
       c.favorites.push(Object.assign({ alert:true }, it));
@@ -328,6 +342,110 @@ const Econ = {
     if (!name || !code) { App.showToast('이름과 코드를 입력하세요','error'); return; }
     this.open(this.view);
     this.add(where, { name, code, type:'kr', tv:'KRX:'+code, unit:'원', floor:null });
+  },
+
+  // ── 보유 (수동 입력 + 자동 평가) ────────────────────
+  // 증권사 API 는 개인에게 열려 있지 않다(계좌 조회는 마이데이터 허가 사항).
+  // 그래서 수량·평단만 손으로 넣고, 현재가는 이미 1분마다 돌고 있는 수집
+  // 파이프라인에서 그대로 가져와 곱한다. 나중에 API 어댑터가 생기면
+  // holdings 의 qty/avg 를 그쪽 값으로 덮어쓰기만 하면 화면은 그대로 산다.
+  fx() { const q = this.PRICES['exchange:FX_USDKRW']; return q && q.price ? q.price : null; },
+  toKRW(it, p) {
+    if (p == null) return null;
+    if (it.type === 'us') { const f = this.fx(); return f ? p * f : null; }   // 환율 없으면 '모름'
+    return p;
+  },
+  _won(v) { return Math.round(v).toLocaleString('ko-KR') + '원'; },
+  holdSummary() {
+    const hs = this.cfg().holdings || [];
+    let cost = 0, value = 0, miss = 0;
+    for (const h of hs) {
+      const q   = this.PRICES[this.keyOf(h)] || {};
+      const cur = this.toKRW(h, q.price);
+      const avg = this.toKRW(h, h.avg);
+      // 시세나 평단이 없는 종목은 0 으로 치지 않고 빼고 센다. 0원과 '모름'은 다르다.
+      if (cur == null || avg == null || !h.qty) { miss++; continue; }
+      cost  += avg * h.qty;
+      value += cur * h.qty;
+    }
+    const profit = value - cost;
+    return { n: hs.length, miss, cost, value, profit, pct: cost > 0 ? profit / cost * 100 : null };
+  },
+  holdHtml() {
+    const s = this.holdSummary();
+    if (!s.n) return '';
+    const cls = s.profit > 0 ? 'ec-up' : s.profit < 0 ? 'ec-dn' : 'ec-flat';
+    const sg  = s.profit > 0 ? '+' : s.profit < 0 ? '-' : '';
+    return `<div class="ec-hold" onclick="Econ.open('hold')" title="보유 종목 편집">
+      <span class="ec-hold-lb">보유 ${s.n}종목</span>
+      <span class="ec-hold-v">${s.cost ? this._won(s.value) : '수량·평단 입력 필요'}</span>
+      ${s.cost ? `<span class="ec-hold-p ${cls}">${sg}${this._won(Math.abs(s.profit))}
+        · ${s.pct == null ? '—' : (s.pct > 0 ? '+' : '') + s.pct.toFixed(2) + '%'}</span>` : ''}
+      ${s.miss ? `<span class="ec-hold-miss">미집계 ${s.miss}</span>` : ''}
+    </div>`;
+  },
+  _paintHold() {
+    const el = document.getElementById('econHold');
+    if (el) el.innerHTML = this.holdHtml();
+  },
+  _drawHold() {
+    const b = this._body(); if (!b) return;
+    const hs = this.cfg().holdings || [], s = this.holdSummary();
+    let h = `<input class="inp ec-search" placeholder="보유 종목 추가 — 검색 (삼성전자, NVDA …)"
+        oninput="Econ.search(this.value,'H')"><div id="ecHRes"></div>`;
+    if (!hs.length) {
+      h += `<p class="empty">보유 종목이 없습니다<br><span class="ec-hint">증권사 계좌 조회 API 는 개인에게 열려 있지 않습니다(마이데이터 허가 사항). 수량·평단만 직접 넣으면 현재가·평가액·수익률은 자동으로 계산됩니다.</span></p>`;
+    } else {
+      const cls = s.profit >= 0 ? 'ec-up' : 'ec-dn';
+      h += `<div class="ec-hold-sum">
+        <div><span>평가액</span><b>${this._won(s.value)}</b></div>
+        <div><span>매입액</span><b>${this._won(s.cost)}</b></div>
+        <div class="${cls}"><span>평가손익</span><b>${(s.profit >= 0 ? '+' : '-') + this._won(Math.abs(s.profit))}</b></div>
+        <div class="${cls}"><span>수익률</span><b>${s.pct == null ? '—' : (s.pct > 0 ? '+' : '') + s.pct.toFixed(2) + '%'}</b></div>
+      </div>`;
+      if (s.miss) h += `<p class="ec-hint">${s.miss}종목은 아직 계산에 넣지 않았습니다 — 수량·평단이 비었거나 시세가 아직 수집되지 않았습니다.</p>`;
+      h += `<div class="ec-grid">${hs.map(it => this._holdCard(it)).join('')}</div>`;
+    }
+    b.innerHTML = h;
+  },
+  _holdCard(it) {
+    const k = this.keyOf(it), q = this.PRICES[k] || {};
+    const cur = this.toKRW(it, q.price), avg = this.toKRW(it, it.avg);
+    const val = (cur == null || !it.qty) ? null : cur * it.qty;
+    const pf  = (cur == null || avg == null || !it.qty) ? null : (cur - avg) * it.qty;
+    const pct = (pf == null || !avg) ? null : (cur - avg) / avg * 100;
+    const cls = pf == null ? '' : pf >= 0 ? 'ec-up' : 'ec-dn';
+    return `<div class="ec-item">
+      <div class="ec-item-top">
+        <div><div class="ec-nm">${esc(it.name)}<span class="ec-badge">${this.TYPE[it.type]||''}</span></div>
+             <div class="ec-meta">${esc(it.code)}</div></div>
+        <div class="ec-row-r" data-pk="${k}" data-ptype="${it.type}" data-punit="${it.unit||''}">
+          <div class="ec-price">${this.fmt(it,q.price)}</div>${this.delta(q.pct)}</div>
+      </div>
+      <div class="ec-item-bot">
+        <label>수량</label>
+        <input class="inp inp-sm" type="number" step="any" min="0" value="${it.qty ?? ''}"
+          onchange="Econ.holdSet('${k}','qty',this.value)">
+        <label>평단${it.type === 'us' ? '($)' : ''}</label>
+        <input class="inp inp-sm" type="number" step="any" min="0" value="${it.avg ?? ''}"
+          onchange="Econ.holdSet('${k}','avg',this.value)">
+        <span class="ec-sp"></span>
+        <span class="ec-meta ${cls}">${val == null ? '수량·평단 입력' : this._won(val)}${
+          pf == null ? '' : ` · ${pf >= 0 ? '+' : '-'}${this._won(Math.abs(pf))} (${pct == null ? '—' : (pct > 0 ? '+' : '') + pct.toFixed(2) + '%'})`}</span>
+        <button class="btn-sm ec-rm" onclick="Econ.holdRemove('${k}')">삭제</button>
+      </div></div>`;
+  },
+  holdSet(k, f, v) {
+    const it = (this.cfg().holdings || []).find(x => this.keyOf(x) === k);
+    if (!it) return;
+    const n = parseFloat(v);
+    it[f] = (isNaN(n) || n < 0) ? 0 : n;
+    this.queueSave(); this._drawHold(); this._paintHold();
+  },
+  holdRemove(k) {
+    const c = this.cfg();
+    c.holdings = (c.holdings || []).filter(x => this.keyOf(x) !== k);
+    this.queueSave(); this._drawHold(); this._paintHold();
   },
 
   // ── 항목 조작 ───────────────────────────────────────
