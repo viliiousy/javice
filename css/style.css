@@ -184,7 +184,8 @@ html,body{
 .card-memo      { grid-column:3; grid-row:3; }
 .card-inbody    { grid-column:1/3; grid-row:4; }
 .card-dev       { grid-column:3;   grid-row:4; }
-.card-econ      { grid-column:1/4; grid-row:5; }
+.card-fitness   { grid-column:1;   grid-row:5; }
+.card-econ      { grid-column:2/4; grid-row:5; }
 
 /* ── 카드 ────────────────────────────── */
 .card{
@@ -674,6 +675,7 @@ textarea.inp{ resize:vertical; min-height:64px; }
   .card-memo    { grid-column:1/3; grid-row:auto; }
   .card-inbody  { grid-column:1/3; grid-row:auto; }
   .card-dev     { grid-column:1/3; grid-row:auto; }
+  .card-fitness { grid-column:1/3; grid-row:auto; }
   .card-econ    { grid-column:1/3; grid-row:auto; }
 }
 
@@ -686,7 +688,7 @@ textarea.inp{ resize:vertical; min-height:64px; }
     grid-template-columns:1fr; gap:10px; padding:10px;
   }
   .card-tasks,.card-calendar,.card-checklist,
-  .card-habits,.card-diet,.card-memo,.card-inbody,.card-dev,
+  .card-habits,.card-diet,.card-memo,.card-inbody,.card-dev,.card-fitness,
   .card-econ{ grid-column:1; grid-row:auto; }
 
   /* 인바디 타일 2열로 */
@@ -1863,3 +1865,61 @@ html.dark .login-scope{ background:rgba(255,255,255,0.04); }
   /* 좁으면 두 칸이 나란히 있기 어렵다. 세로로 쌓되 각 칸은 여전히 한 줄. */
   .top-strip{ flex-direction:column; }
 }
+
+/* ═══════════════════════════════════════
+   운동 — 종목 고르기 (부위 칩 + 검색 + 장바구니)
+   ═══════════════════════════════════════ */
+.ex-yt{
+  flex:none; text-decoration:none; font-size:11px; line-height:1;
+  color:var(--text4); padding:2px 4px; border-radius:4px;
+}
+.ex-yt:hover{ color:var(--accent); background:var(--accent-bg); }
+
+.ex-parts{ display:flex; flex-wrap:wrap; gap:5px; margin-bottom:9px; }
+.ex-part{
+  padding:5px 9px; border:1px solid var(--border2); border-radius:999px;
+  background:var(--card); color:var(--text2); font-size:12px; font-family:inherit; cursor:pointer;
+}
+.ex-part:hover{ border-color:var(--accent); color:var(--accent); }
+.ex-part.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+
+.ex-results{ max-height:300px; overflow-y:auto; margin-top:10px; }
+.ex-results:not(:empty){ border:1px solid var(--border); border-radius:var(--r-sm); }
+.ex-row{
+  display:flex; align-items:center; gap:6px;
+  padding:7px 9px; border-bottom:1px solid var(--border);
+}
+.ex-row:last-child{ border-bottom:none; }
+.ex-row:hover{ background:var(--card2); }
+.ex-row-main{ flex:1; min-width:0; display:flex; align-items:baseline; gap:6px; cursor:pointer; }
+.ex-row-nm{ font-size:13.5px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ex-row-part{ flex:none; font-size:11px; color:var(--text3); }
+.ex-fav{
+  flex:none; width:24px; height:24px; padding:0; cursor:pointer;
+  background:transparent; border:none; font-size:14px; color:var(--text4); font-family:inherit;
+}
+.ex-fav.on,.ex-fav:hover{ color:var(--yellow); }
+
+.ex-cart{
+  border:1px solid var(--accent); border-radius:var(--r-sm);
+  background:var(--accent-bg); padding:8px 10px; margin-top:10px;
+}
+.ex-cart-hd{ font-size:11px; font-weight:700; color:var(--accent); margin-bottom:6px; }
+.ex-cart-row{
+  display:flex; align-items:center; gap:8px; padding:5px 0;
+  border-top:1px solid var(--border);
+}
+.ex-cart-row:first-of-type{ border-top:none; }
+.ex-cart-nm{
+  flex:1; min-width:0; font-size:13px; color:var(--text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.ex-cart-sets{ flex:none; width:72px; text-align:center; }
+.ex-cart-del{
+  flex:none; width:22px; height:22px; padding:0; cursor:pointer;
+  background:transparent; border:none; color:var(--text4); font-size:12px; font-family:inherit;
+}
+.ex-cart-del:hover{ color:var(--red); }
+
+.ex-hint{ font-size:11.5px; color:var(--text3); margin:8px 0 0; text-align:center; }
+.ex-empty{ font-size:12px; color:var(--text3); padding:14px; text-align:center; }
