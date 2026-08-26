@@ -23,6 +23,7 @@ const Icons = {
     chart:    '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12.5" y="8" width="3" height="10" rx="1"/><rect x="18" y="14" width="3" height="4" rx="1"/>',
     trend:    '<path d="m4 16 5-5 3.5 3.5L20 7"/><path d="M15 7h5v5"/>',
     memo:     '<path d="M5 4a1 1 0 0 1 1-1h9l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4Z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>',
+    moon:     '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/>',
     sun:      '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   },
 
@@ -30,6 +31,19 @@ const Icons = {
     const d = this.P[name];
     if (!d) return '';                       // 이름을 잘못 쓰면 조용히 빈칸. 깨진 네모보다 낫다.
     return `<svg class="ic${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+  },
+
+  // 빈 화면 한가운데 놓는 큰 아이콘.
+  big(name) { return this.svg(name, 'ic-empty'); },
+
+  // 카드 머리글을 렌더할 때마다 통째로 다시 쓰는 모듈이 있다(운동·습관).
+  // 거기서 textContent 를 쓰면 아이콘이 같이 지워진다. 그래서 제목을 바꾸는 길을
+  // 여기 하나로 모은다 — 아이콘과 글자를 늘 함께 놓는다.
+  title(el, name, text) {
+    if (!el) return;
+    const esc = String(text).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    el.innerHTML = this.svg(name) + esc;
+    el.dataset.icOn = '1';
   },
 
   // index.html 의 <span class="card-title" data-ic="tasks">할일</span> 을 채운다.
