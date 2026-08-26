@@ -69,6 +69,7 @@ const App = {
     try { Checklist.render(); }     catch(e){ console.warn('Checklist render',e); }
     try { Memo.render(); }          catch(e){ console.warn('Memo render',e); }
     try { InBody.init(); }          catch(e){ console.warn('InBody init',e); }
+    try { Econ.init(); }            catch(e){ console.warn('Econ init',e); }
     try { CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,[],this.S.selDate); } catch(e){ console.warn('Cal render',e); }
     this._updateStatsBanner();
     await this.sync();
@@ -85,6 +86,7 @@ const App = {
     try{ Checklist.render(); }catch{}
     try{ Memo.render(); }catch{}
     try{ InBody.init(); }catch{}
+    try{ Econ.init(); }catch{}
     try{ CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,[],this.S.selDate); }catch{}
     document.getElementById('eventsWrap').innerHTML='<p class="empty">오프라인 모드</p>';
     document.getElementById('tasksContainer').innerHTML='<p class="empty">로그인 시 동기화됩니다</p>';
