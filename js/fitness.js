@@ -178,6 +178,8 @@ const Fitness = {
     return out.slice(0,60).map(x=>[x[2],x[3]]);
   },
   _paintPick(){
+    document.querySelectorAll('.ex-part').forEach(b=>
+      b.classList.toggle('on', b.dataset.part === this._part));
     const box=document.getElementById('exResults');
     if(box) box.innerHTML=this._pickHtml();
     const cart=document.getElementById('exCart');
@@ -237,7 +239,7 @@ const Fitness = {
     const n=parts.reduce((a,p)=>a+EX_DB[p].length,0);
     App.openModal('💪 운동 추가', `
       <div class="ex-parts">
-        ${parts.map(p=>`<button class="ex-part" onclick="Fitness.setPart('${p}')">${p}</button>`).join('')}
+        ${parts.map(p=>`<button class="ex-part" data-part="${p}" onclick="Fitness.setPart('${p}')">${p}</button>`).join('')}
       </div>
       <input id="exSearch" class="inp" autocomplete="off"
         placeholder="운동 검색 — 초성도 됩니다 (예: ㅅㅋㅌ)" oninput="Fitness.setQ(this.value)">
