@@ -961,21 +961,48 @@ const App = {
     },0);
   },
 
-  // ── 다크 모드 ─────────────────────────
-  get _darkMode(){ return localStorage.getItem('gl_dark')==='true'; },
-  set _darkMode(v){ localStorage.setItem('gl_dark',v?'true':'false'); },
+  // ── 테마 ──────────────────────────────
+  // 시스템 / 밝게 / 어둡게 3단계. 기본은 '시스템'이다 —
+  // 폰 다크모드를 켜둔 사람에게 앱만 하얗게 빛나면 이질감이 크다.
+  // (첫 페인트 전 적용은 index.html <head> 의 부트스트랩이 맡는다. 여기서 하면 늦다.)
+  THEMES: ['system','light','dark'],
+  THEME_LBL: { system:'🖥️ 테마: 시스템', light:'☀️ 테마: 밝게', dark:'🌙 테마: 어둡게' },
+
+  get _theme(){
+    const v = localStorage.getItem('gl_theme');
+    if (this.THEMES.includes(v)) return v;
+    return localStorage.getItem('gl_dark')==='true' ? 'dark' : 'system';   // 예전 설정 승계
+  },
+  set _theme(v){ localStorage.setItem('gl_theme', v); },
+
+  _resolveDark(t){
+    if (t==='dark')  return true;
+    if (t==='light') return false;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
+  },
+
+  _applyTheme() {
+    document.documentElement.classList.toggle('dark', this._resolveDark(this._theme));
+    this._updateDarkLabel();
+  },
 
   initDarkMode() {
-    if(this._darkMode) document.documentElement.classList.add('dark');
-    this._updateDarkLabel();
+    this._applyTheme();
+    // 시스템 설정을 따라가는 중이면 OS 가 바뀔 때 같이 바뀌어야 한다
+    if (window.matchMedia) {
+      const mq = matchMedia('(prefers-color-scheme: dark)');
+      const onChange = () => { if (this._theme==='system') this._applyTheme(); };
+      mq.addEventListener ? mq.addEventListener('change', onChange) : mq.addListener(onChange);
+    }
     setTimeout(()=>this._updateSoundLabel(),100);
   },
 
   toggleDarkMode() {
-    this._darkMode=!this._darkMode;
-    document.documentElement.classList.toggle('dark',this._darkMode);
-    this._updateDarkLabel();
+    const i = this.THEMES.indexOf(this._theme);
+    this._theme = this.THEMES[(i+1) % this.THEMES.length];
+    this._applyTheme();
     document.getElementById('profileMenu')?.classList.add('hidden');
+    this.showToast(this.THEME_LBL[this._theme].replace('테마: ',''), 'success');
   },
 
   toggleSound() {
@@ -995,7 +1022,7 @@ const App = {
 
   _updateDarkLabel() {
     const el=document.getElementById('darkModeLabel');
-    if(el) el.textContent=this._darkMode?'☀️ 라이트 모드':'🌙 다크 모드';
+    if(el) el.textContent=this.THEME_LBL[this._theme] || this.THEME_LBL.system;
   },
 
   _showCatColorPicker(listId, listName) {
