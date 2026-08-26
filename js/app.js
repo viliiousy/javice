@@ -205,7 +205,8 @@ const App = {
       <div class="stat-chip ${hDone===hList.length&&hList.length>0?'stat-green':''}" data-s="habits">✅ 습관 ${hDone}/${hList.length}</div>
       <div class="stat-chip ${calPct>=80?'stat-green':calPct>=50?'stat-yellow':''}" data-s="diet">🥗 ${dt.cal}/${ds.calorieGoal}kcal</div>
       ${pending>0?`<div class="stat-chip" data-s="tasks">📋 할일 ${pending}개</div>`:''}
-      ${clItems.length>0?`<div class="stat-chip" data-s="checklist">✍️ ${clItems.length}개</div>`:''}`;
+      ${clItems.length>0?`<div class="stat-chip" data-s="checklist">✍️ ${clItems.length}개</div>`:''}
+      ${typeof TopStrip!=='undefined'?TopStrip.chips():''}`;
 
     // 이번주 일정/할일 - 날짜 포함, 3개씩 줄바꿈
     const upcomingHTML=upcoming.length?`
@@ -1004,6 +1005,12 @@ const App = {
     this._applyTheme();
     document.getElementById('profileMenu')?.classList.add('hidden');
     this.showToast(this.THEME_LBL[this._theme].replace('테마: ',''), 'success');
+  },
+
+  // 메인에 어떤 카드를 둘지 — 설정은 Tabs 가 들고 있다 (카드 보이기/숨기기를 이미 다루는 곳)
+  showCardSettings() {
+    document.getElementById('profileMenu')?.classList.add('hidden');
+    if (typeof Tabs !== 'undefined') Tabs.openSettings();
   },
 
   toggleSound() {
