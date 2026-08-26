@@ -185,8 +185,8 @@ html,body{
 .card-diet      { grid-column:2; grid-row:3; }
 .card-memo      { grid-column:3; grid-row:3; }
 .card-inbody    { grid-column:1/3; grid-row:4; }
-.card-dev       { grid-column:3;   grid-row:4; }
-.card-fitness   { grid-column:1;   grid-row:5; }
+.card-fitness   { grid-column:3;   grid-row:4; }
+.card-dev       { grid-column:1;   grid-row:5; }
 .card-econ      { grid-column:2/4; grid-row:5; }
 
 /* ── 카드 ────────────────────────────── */
