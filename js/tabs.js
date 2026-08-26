@@ -10,11 +10,13 @@
 // 각 모듈의 render() 를 하나도 건드리지 않기 위해서다.
 
 const Tabs = {
+  // icon 은 js/icons.js 의 이름표다. 이모지를 직접 넣지 않는다 —
+  // 기기마다 그림이 달라지고, 색이 제각각이라 지금 눌러둔 탭이 어느 건지 흐려졌다.
   DEF: [
-    { id:'today', label:'오늘', icon:'☀️' },
-    { id:'plan',  label:'계획', icon:'🗓️' },
-    { id:'body',  label:'몸',   icon:'💪' },
-    { id:'money', label:'자산', icon:'📈' },
+    { id:'today', label:'오늘', icon:'sun'      },
+    { id:'plan',  label:'계획', icon:'calendar' },
+    { id:'body',  label:'몸',   icon:'dumbbell' },
+    { id:'money', label:'자산', icon:'trend'    },
   ],
   // 카드 → 탭 · 이름 (설정 화면에서도 이 목록을 쓴다)
   CARDS: [
@@ -54,7 +56,7 @@ const Tabs = {
     if (!bar) return;
     bar.innerHTML = this.DEF.map(t =>
       `<button class="tab-btn" data-t="${t.id}" onclick="Tabs.set('${t.id}')" aria-label="${t.label}">
-        <span class="tab-ic">${t.icon}</span><span class="tab-lb">${t.label}</span>
+        ${Icons.svg(t.icon, 'tab-ic')}<span class="tab-lb">${t.label}</span>
       </button>`).join('');
   },
 
@@ -107,7 +109,7 @@ const Tabs = {
     const byTab = this.DEF.map(t => ({ t, list: this.CARDS.filter(c => c.tab === t.id) }));
     b.innerHTML = byTab.map(({ t, list }) => `
       <div class="cardset-grp">
-        <div class="cardset-hd">${t.icon} ${t.label}</div>
+        <div class="cardset-hd">${Icons.svg(t.icon)} ${t.label}</div>
         ${list.map(c => {
           const on = !off.includes(c.cls);
           return `<label class="cardset-row">
