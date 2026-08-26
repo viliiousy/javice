@@ -66,6 +66,7 @@ const App = {
     try { Habits.init(new Date()); } catch(e){ console.warn('Habits init',e); }
     try { Notifications.init(); } catch(e){ console.warn('Notifications init',e); }
     try { Diet.render(new Date()); } catch(e){ console.warn('Diet render',e); }
+    try { Fitness.render(new Date()); } catch(e){ console.warn('Fitness render',e); }
     try { Checklist.render(); }     catch(e){ console.warn('Checklist render',e); }
     try { Memo.render(); }          catch(e){ console.warn('Memo render',e); }
     try { InBody.init(); }          catch(e){ console.warn('InBody init',e); }
@@ -84,6 +85,7 @@ const App = {
     this._updateHeaderDate(new Date());
     try{ Habits.init(new Date()); }catch{}
     try{ Diet.render(new Date()); }catch{}
+    try{ Fitness.render(new Date()); }catch{}
     try{ Checklist.render(); }catch{}
     try{ Memo.render(); }catch{}
     try{ InBody.init(); }catch{}
@@ -263,6 +265,7 @@ const App = {
     this._renderCalPanel();
     try{ Habits.render(date); }catch{}
     try{ Diet.render(date); }catch{}
+    try{ Fitness.render(date); }catch{}
     this._updateHeaderDate(date);
   },
 
