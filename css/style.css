@@ -2098,3 +2098,27 @@ html.dark .ec-fav.on, html.dark .diet-food-fav.on { color:#fbbf24; }
 .cardset-nm{ font-size:13.5px; color:var(--text); }
 
 html.dark .cardset-row{ background:var(--card2); border-color:var(--border); }
+
+/* ── 아이콘 ──────────────────────────────
+   카드 머리글과 하단 탭의 이모지를 선 아이콘으로 바꿨다.
+   이모지는 기기가 그리는 그림이라 아이폰·안드로이드·윈도우가 전부 달랐고,
+   색이 제각각이라 정작 봐야 할 숫자보다 아이콘이 먼저 눈에 들어왔다.
+   굵기·크기·색을 여기 한 곳에서만 정한다. */
+.ic{
+  width:18px; height:18px; flex:none;
+  fill:none; stroke:currentColor; stroke-width:1.5;
+  stroke-linecap:round; stroke-linejoin:round;
+}
+.card-title{ display:inline-flex; align-items:center; gap:7px; }
+.card-title .ic{ color:var(--text3); }
+
+/* 하단 탭 — grayscale/opacity 는 이모지 색을 죽이려고 뒀던 것이라 이제 필요 없다.
+   강조색은 지금 눌러둔 탭 하나에만 남는다. */
+@media (max-width:900px){
+  .tab-ic{ width:21px; height:21px; filter:none; opacity:1; color:var(--text3); }
+  .tab-btn.on .tab-ic{ color:var(--accent); opacity:1; }
+}
+
+/* 메인 카드 설정의 묶음 머리글 */
+.cardset-hd{ display:flex; align-items:center; gap:6px; }
+.cardset-hd .ic{ width:15px; height:15px; }
