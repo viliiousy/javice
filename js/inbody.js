@@ -25,7 +25,7 @@ const InBody = {
   // 인바디는 매일 재는 게 아니라서 '일주일'을 고르면 그 안에 기록이 1건뿐이라
   // 추이가 안 그려지는 일이 잦았다. 최근 N회는 언제 재든 항상 선이 그려진다.
   PERIODS: {
-    'r5':  { label:'기본',   count: 5  },
+    'r5':  { label:'최근',   count: 5  },
     '7d':  { label:'일주일', days: 7   },
     '30d': { label:'한달',   days: 30  },
     'all': { label:'전체',   days: null },
@@ -60,10 +60,23 @@ const InBody = {
     return Number(r[r.length-1][key]) - Number(r[r.length-2][key]);
   },
 
-  _view() { return UserStore.get(this.VIEW_KEY) || 'wt'; },
-  setView(k) {
+  // 지표를 여러 개 겹쳐 볼 수 있다. 기본은 체중 하나.
+  // 예전엔 하나만 골라졌는데, 체중이 줄었는지 근육이 줄었는지는 둘을 같이 봐야 안다.
+  _views() {
+    const ks = (UserStore.get(this.VIEW_KEY) || 'wt').split(',').filter(k => this.METRICS[k]);
+    return ks.length ? ks : ['wt'];
+  },
+  toggleView(k) {
     if (!this.METRICS[k]) return;
-    UserStore.set(this.VIEW_KEY, k);
+    let ks = this._views();
+    if (ks.includes(k)) {
+      if (ks.length === 1) return;      // 마지막 하나는 못 끈다 — 빈 차트가 남는다
+      ks = ks.filter(x => x !== k);
+    } else {
+      // METRICS 정의 순서를 지킨다. 켠 순서대로 넣으면 범례와 색 자리가 매번 달라진다.
+      ks = Object.keys(this.METRICS).filter(x => ks.includes(x) || x === k);
+    }
+    UserStore.set(this.VIEW_KEY, ks.join(','));
     this.render();
   },
 
@@ -76,12 +89,18 @@ const InBody = {
   init() { this._migratePeriod(); this.render(); },
 
   // 예전 기본값은 '일주일'이었다. 인바디를 매일 재는 게 아니라 그 안에 기록이
-  // 1건뿐인 날이 많았고, 그러면 추이가 아예 안 그려졌다. 새 기본값('최근 5회')으로
-  // 한 번만 옮겨준다. 직접 '일주일'을 고른 사람과 구분할 방법이 없어서 이사는 딱 한 번이다.
+  // 1건뿐인 날이 많았고, 그러면 추이가 아예 안 그려졌다.
+  //
+  // v2 이사는 init() 에서 한 번만 돌았는데, 파이어베이스 load() 가 그 뒤에 끝나면서
+  // 클라우드에 있던 '7d' 와 '이사 완료' 표식을 같이 되돌려 놨다. 그래서 이사가
+  // 끝난 것처럼 보이는데 화면은 계속 일주일이었다.
+  // 이번엔 (1) 조건 없이 새 기본값으로 맞추고 (2) 읽는 시점마다 확인한다.
+  // 파이어베이스가 나중에 덮어써도 다음 읽기에서 다시 잡히고, 저장이 한 번 올라가면 멈춘다.
   _migratePeriod() {
-    if (UserStore.get('gl_inbody_period_v2')) return;
-    UserStore.set('gl_inbody_period_v2', '1');
-    if (UserStore.get(this.PERIOD_KEY) === '7d') UserStore.set(this.PERIOD_KEY, 'r5');
+    if (UserStore.get('gl_inbody_period_v3')) return;
+    UserStore.set('gl_inbody_period_v3', '1');
+    UserStore.set(this.PERIOD_KEY, 'r5');
+    try { FirebaseSync?.scheduleSave(); } catch {}
   },
 
   render() {
@@ -93,19 +112,19 @@ const InBody = {
 
     if (!recs.length) {
       wrap.innerHTML = `
-        <p class="empty">아직 기록이 없습니다<br><span style="font-size:11px">체중만 입력해도 추이를 볼 수 있어요</span></p>
+        <p class="empty">${Icons.big('chart')}아직 기록이 없습니다<br><span style="font-size:11px">체중만 입력해도 추이를 볼 수 있어요</span></p>
         <div class="habit-add-btn" onclick="InBody.showAdd()">+ 인바디 기록</div>`;
       this._renderBadge(null);
       return;
     }
 
-    const view = this._view();
+    const views = this._views();
     const inP = this._inPeriod(recs);
     wrap.innerHTML =
       this._summaryHtml(la) +
-      this._tabsHtml(view) +
+      this._tabsHtml(views) +
       this._periodHtml() +
-      this._chartHtml(inP, view) +
+      this._chartHtml(inP, views) +
       this._listHtml(inP, recs.length) +
       `<div class="habit-add-btn" onclick="InBody.showAdd()">+ 인바디 기록</div>`;
 
@@ -136,6 +155,7 @@ const InBody = {
 
   // ── 기간 ───────────────────────────────
   _period() {
+    this._migratePeriod();                    // 읽는 시점에 확인한다 (위 주석 참고)
     const p = UserStore.get(this.PERIOD_KEY);
     return this.PERIODS[p] ? p : 'r5';        // 기본은 최근 5회
   },
@@ -186,74 +206,183 @@ const InBody = {
     </div>`;
   },
 
-  _tabsHtml(view) {
-    return `<div class="ib-tabs">` + Object.entries(this.METRICS).map(([k,m]) =>
-      `<button class="ib-tab${k===view?' active':''}" onclick="InBody.setView('${k}')"
-        style="${k===view?`--ib-c:${m.color}`:''}">${m.label}</button>`
-    ).join('') + `</div>`;
+  // 여러 개를 켤 수 있으니 라디오가 아니라 토글이다. 앞의 점 색이 차트의 선 색이다.
+  _tabsHtml(views) {
+    return `<div class="ib-tabs">` + Object.entries(this.METRICS).map(([k,m]) => {
+      const on = views.includes(k);
+      return `<button class="ib-tab${on?' active':''}" aria-pressed="${on}"
+        onclick="InBody.toggleView('${k}')" style="--ib-c:${m.color}"
+        ><i class="ib-dot" style="border-color:${m.color};background:${on?m.color:'transparent'}"></i>${m.label}</button>`;
+    }).join('') + `</div>`;
   },
 
   // ── 인라인 SVG 추이 그래프 (외부 라이브러리 없음) ──
-  _chartHtml(recs, key) {
-    const m    = this.METRICS[key];
-    const pts  = recs.filter(r => Number(r[key]) > 0).slice(-this.MAX_POINTS);
+  //
+  // 지표를 여러 개 겹쳐 그린다. 다만 kg 과 % 를 같은 눈금에 올릴 수는 없어서
+  // 선마다 자기 범위로 정규화한다. 그래서 두 개 이상 켜면 왼쪽 눈금 숫자를 지운다 —
+  // 두 단위에 동시에 맞는 눈금은 없고, 있는 척하면 그건 거짓말이 된다.
+  // 정확한 값은 짚었을 때 툴팁이 보여준다. 눈금은 '모양', 툴팁은 '값' 을 맡는다.
+  _chartHtml(recsAll, keys) {
+    const recs = recsAll.slice(-this.MAX_POINTS);
+    const n    = recs.length;
 
-    if (pts.length < 2) {
-      return `<div class="ib-chart-empty">${this._periodPhrase()} ${m.label} 기록이 ${pts.length}개입니다 · 2개 이상이면 추이가 표시됩니다</div>`;
+    const series = keys.map(k => {
+      const m = this.METRICS[k], at = {};
+      let cnt = 0;
+      recs.forEach((r, i) => {
+        const v = Number(r[k]);
+        if (v > 0) { at[i] = { v }; cnt++; }
+      });
+      return { k, m, at, cnt };
+    });
+
+    const drawable = series.filter(s => s.cnt >= 2);
+    if (!drawable.length) {
+      this._chart = null;
+      const lbl  = keys.map(k => this.METRICS[k].label).join('·');
+      const most = Math.max(0, ...series.map(s => s.cnt));
+      return `<div class="ib-chart-empty">${this._periodPhrase()} ${lbl} 기록이 ${most}개입니다 · 2개 이상이면 추이가 표시됩니다</div>`;
     }
 
-    const W = 640, H = 150, PX = 46, PY = 18;
-    const vals = pts.map(r => Number(r[key]));
-    let min = Math.min(...vals), max = Math.max(...vals);
-    if (max - min < 0.1) { min -= 0.5; max += 0.5; }   // 평평한 데이터도 보이게
-    const pad  = (max - min) * 0.12;
-    min -= pad; max += pad;
+    const single = drawable.length === 1;
+    const W = 640, H = 150, PX = single ? 46 : 16, PY = 18;
+    const step = n > 1 ? (W - PX - 14) / (n - 1) : 0;
+    const xOf  = i => PX + i * step;
 
-    const x = i => PX + i * (W - PX - 14) / (pts.length - 1);
-    const y = v => H - PY - (v - min) / (max - min) * (H - PY * 2);
+    let defs = '', fills = '', lines = '', dots = '', axis = '';
+    const meta = [];
 
-    const line = vals.map((v,i) => `${i?'L':'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-    const area = `${line} L${x(pts.length-1).toFixed(1)},${H-PY} L${x(0).toFixed(1)},${H-PY} Z`;
-    const gid  = `ibg_${key}`;
+    for (const s of drawable) {
+      const vals = Object.values(s.at).map(p => p.v);
+      let min = Math.min(...vals), max = Math.max(...vals);
+      if (max - min < 0.1) { min -= 0.5; max += 0.5; }   // 평평한 데이터도 보이게
+      const pad = (max - min) * 0.12;
+      min -= pad; max += pad;
+      const yOf = v => H - PY - (v - min) / (max - min) * (H - PY * 2);
 
-    const lastV = vals[vals.length-1];
-    const fmt   = n => (Math.round(n*10)/10).toFixed(1);
+      const idx = Object.keys(s.at).map(Number).sort((a, b) => a - b);
+      idx.forEach(i => { s.at[i].y = yOf(s.at[i].v); });
 
-    // 골격근량 그래프에서는 추정 지점을 속 빈 점으로 따로 찍는다
-    const estIdx  = key === 'ms' ? pts.map((r,i) => r.msEst ? i : -1).filter(i => i >= 0) : [];
-    const estDots = estIdx.map(i =>
-      `<circle cx="${x(i).toFixed(1)}" cy="${y(vals[i]).toFixed(1)}" r="3.5"
-               fill="var(--card)" stroke="${m.color}" stroke-width="1.5"/>`).join('');
+      const line = idx.map((i, j) => `${j?'L':'M'}${xOf(i).toFixed(1)},${s.at[i].y.toFixed(1)}`).join(' ');
+      const first = idx[0], last = idx[idx.length-1];
+
+      // 면 채우기와 눈금 숫자는 한 개만 켰을 때만. 겹쳐 그리면 서로를 가린다.
+      if (single) {
+        const gid = `ibg_${s.k}`;
+        defs  = `<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="${s.m.color}" stop-opacity="0.22"/>
+            <stop offset="100%" stop-color="${s.m.color}" stop-opacity="0"/>
+          </linearGradient>`;
+        fills = `<path d="${line} L${xOf(last).toFixed(1)},${H-PY} L${xOf(first).toFixed(1)},${H-PY} Z" fill="url(#${gid})"/>`;
+        const f = v => (Math.round(v*10)/10).toFixed(1);
+        axis  = `<text x="${PX-8}" y="${PY+4}"   class="ib-axis" text-anchor="end">${f(max)}</text>
+                 <text x="${PX-8}" y="${H-PY+4}" class="ib-axis" text-anchor="end">${f(min)}</text>`;
+      }
+
+      lines += `<path d="${line}" fill="none" stroke="${s.m.color}" stroke-width="2"
+                 stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;
+
+      // 골격근량은 추정 지점을 속 빈 점으로 따로 찍는다 — 추정을 실측처럼 보이게 하지 않는다
+      let est = 0;
+      if (s.k === 'ms') {
+        idx.forEach(i => {
+          if (!recs[i].msEst) return;
+          est++;
+          dots += `<circle cx="${xOf(i).toFixed(1)}" cy="${s.at[i].y.toFixed(1)}" r="3.5"
+                    fill="var(--card)" stroke="${s.m.color}" stroke-width="1.5"/>`;
+        });
+      }
+      dots += `<circle cx="${xOf(last).toFixed(1)}" cy="${s.at[last].y.toFixed(1)}" r="5"
+                fill="${s.k === 'ms' && recs[last].msEst ? 'var(--card)' : s.m.color}"
+                stroke="${s.m.color}" stroke-width="3"/>`;
+
+      meta.push({ k:s.k, label:s.m.label, unit:s.m.unit, color:s.m.color, at:s.at, est });
+    }
+
+    // 툴팁이 쓸 좌표를 남겨 둔다. 화면을 다시 그릴 때마다 갈아 끼운다.
+    this._chart  = { W, H, PX, PY, n, step, series: meta,
+                     dts: recs.map(r => r.dt.slice(2).replace(/-/g, '.')) };
+    this._hoverI = -1;
+
+    const foot = meta.map(m => `<b style="color:${m.color}">${m.label}</b>${m.unit?`(${m.unit})`:''}`).join(' · ');
+    const estN = meta.reduce((a, m) => a + m.est, 0);
 
     return `<div class="ib-chart">
       <svg viewBox="0 0 ${W} ${H}" width="100%" role="img"
-           aria-label="${m.label} 추이 그래프">
-        <defs>
-          <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stop-color="${m.color}" stop-opacity="0.22"/>
-            <stop offset="100%" stop-color="${m.color}" stop-opacity="0"/>
-          </linearGradient>
-        </defs>
-        <line x1="${PX}" y1="${PY}"     x2="${W-14}" y2="${PY}"     class="ib-grid"/>
-        <line x1="${PX}" y1="${(PY+H-PY)/2}" x2="${W-14}" y2="${(PY+H-PY)/2}" class="ib-grid"/>
-        <line x1="${PX}" y1="${H-PY}"   x2="${W-14}" y2="${H-PY}"   class="ib-grid"/>
-        <text x="${PX-8}" y="${PY+4}"   class="ib-axis" text-anchor="end">${fmt(max)}</text>
-        <text x="${PX-8}" y="${H-PY+4}" class="ib-axis" text-anchor="end">${fmt(min)}</text>
-        <path d="${area}" fill="url(#${gid})"/>
-        <path d="${line}" fill="none" stroke="${m.color}" stroke-width="2"
-              stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
-        ${estDots}
-        <circle cx="${x(pts.length-1).toFixed(1)}" cy="${y(lastV).toFixed(1)}" r="5"
-                fill="${estIdx.includes(pts.length-1) ? 'var(--card)' : m.color}"
-                stroke="${m.color}" stroke-width="3"/>
+           aria-label="${meta.map(m => m.label).join(', ')} 추이 그래프">
+        <defs>${defs}</defs>
+        <line x1="${PX}" y1="${PY}"   x2="${W-14}" y2="${PY}"   class="ib-grid"/>
+        <line x1="${PX}" y1="${H/2}"  x2="${W-14}" y2="${H/2}"  class="ib-grid"/>
+        <line x1="${PX}" y1="${H-PY}" x2="${W-14}" y2="${H-PY}" class="ib-grid"/>
+        ${axis}${fills}${lines}${dots}
+        <g id="ibHoverG"></g>
+        <rect x="0" y="0" width="${W}" height="${H}" fill="transparent" class="ib-hit"
+              onpointermove="InBody._hover(event)" onpointerdown="InBody._hover(event)"
+              onpointerleave="InBody._hoverOut()"/>
       </svg>
+      <div class="ib-tip" id="ibTip" hidden></div>
       <div class="ib-chart-foot">
-        <span>${pts[0].dt.slice(5).replace('-','/')}</span>
-        <span>${pts.length}회 · ${m.label}(${m.unit})${estIdx.length?` · <b class="ib-est-note">○ 추정 ${estIdx.length}</b>`:''}</span>
-        <span>${pts[pts.length-1].dt.slice(5).replace('-','/')}</span>
+        <span>${this._chart.dts[0]}</span>
+        <span>${n}회 · ${foot}${estN?` · <b class="ib-est-note">○ 추정 ${estN}</b>`:''}</span>
+        <span>${this._chart.dts[n-1]}</span>
       </div>
     </div>`;
   },
+
+  // ── 차트 툴팁 ──────────────────────────
+  // 선만 있으면 "언제 얼마였는지" 를 읽을 수 없다. 짚은 자리의 날짜와 값을 그대로 보여준다.
+  // 마우스와 손가락 둘 다 pointer 이벤트 하나로 받는다.
+  _hover(e) {
+    const c = this._chart;
+    if (!c || !c.n) return;
+    const svg = e.currentTarget.ownerSVGElement;
+    if (!svg) return;
+    const r = svg.getBoundingClientRect();
+    if (!r.width) return;
+    const vx = (e.clientX - r.left) / r.width * c.W;       // 화면 px → viewBox 좌표
+    let i = c.step ? Math.round((vx - c.PX) / c.step) : 0;
+    i = Math.max(0, Math.min(c.n - 1, i));
+    if (i === this._hoverI) return;                        // 같은 지점이면 다시 그리지 않는다
+    this._hoverI = i;
+    this._paintHover(i);
+  },
+
+  _paintHover(i) {
+    const c   = this._chart;
+    const g   = document.getElementById('ibHoverG');
+    const tip = document.getElementById('ibTip');
+    if (!c || !g || !tip) return;
+
+    const x = c.PX + i * c.step;
+    let marks = `<line x1="${x.toFixed(1)}" y1="${c.PY}" x2="${x.toFixed(1)}" y2="${c.H-c.PY}" class="ib-guide"/>`;
+    const rows = [];
+    for (const s of c.series) {
+      const pt = s.at[i];
+      if (!pt) continue;                                   // 그날 그 지표를 안 쟀으면 건너뛴다
+      marks += `<circle cx="${x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="4.5"
+                 fill="var(--card)" stroke="${s.color}" stroke-width="2.5"/>`;
+      rows.push(`<span><i style="background:${s.color}"></i>${s.label} <b>${this._num(pt.v)}${s.unit}</b></span>`);
+    }
+    g.innerHTML = marks;
+    if (!rows.length) { tip.hidden = true; return; }
+
+    tip.innerHTML = `<em>${c.dts[i]}</em>${rows.join('')}`;
+    // 짚은 점 위에 상자를 얹으면 정작 보려던 지점이 가려진다. 반대쪽으로 비켜 세운다.
+    const pct  = x / c.W * 100;
+    const left = pct < 50;
+    tip.style.left      = pct + '%';
+    tip.style.transform = left ? 'translateX(10px)' : 'translateX(calc(-100% - 10px))';
+    tip.hidden = false;
+  },
+
+  _hoverOut() {
+    this._hoverI = -1;
+    const g = document.getElementById('ibHoverG'); if (g) g.innerHTML = '';
+    const t = document.getElementById('ibTip');    if (t) t.hidden = true;
+  },
+
+  // 82 는 "82", 82.5 는 "82.5". 소수점 뒤 0 은 붙이지 않는다.
+  _num(v) { return String(Math.round(Number(v) * 10) / 10); },
 
   _shown: 0,
   showMore() { this._shown = (this._shown || this.PAGE) + this.PAGE; this.render(); },
