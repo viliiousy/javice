@@ -19,49 +19,29 @@ async function hevy(path) {
   });
   const text = await r.text();
   let body = null;
-  try { body = JSON.parse(text); } catch {}
-  // 실패했을 때 본문 앞부분만 남긴다. 통째로 흘리면 거기에 뭐가 섞여 있을지 모른다.
-  return { status: r.status, body, head: text.slice(0, 200) };
-}
-
-module.exports = async (req, res) => {
-  if (!process.env.HEVY_API_KEY) {
-    res.status(500).json({ error: 'HEVY_API_KEY 미설정' });
-    return;
-  }
-  // 켜져 있지 않으면 그냥 없는 주소처럼 굴게 한다. 401 은 '여기 뭔가 있다' 는 신호가 된다.
-  if (process.env.HEVY_PROBE !== '1') {
-    res.status(404).json({ error: 'not found' });
-    return;
-  }
-
   try {
-    const r = await hevy('/workouts?page=1&pageSize=5');
-    if (r.status !== 200) {
-      res.status(502).json({ error: 'Hevy 응답 ' + r.status, head: r.head });
-      return;
+    // 페이지를 끝까지 돌며 '종목 이름' 만 모은다. 기록 내용(중량·횟수·날짜)은 모으지 않는다.
+    // 알고 싶은 건 "번역해야 할 이름이 몇 개냐" 하나다.
+    const seen = new Map();
+    let workouts = 0, pages = 1;
+    for (let p = 1; p <= pages && p <= 30; p++) {
+      const r = await hevy('/workouts?page=' + p + '&pageSize=10');
+      if (r.status !== 200) {
+        res.status(502).json({ error: 'Hevy 응답 ' + r.status, head: r.head, page: p });
+        return;
+      }
+      pages = (r.body && r.body.page_count) || 1;
+      for (const w of (r.body && r.body.workouts) || []) {
+        workouts++;
+        for (const e of w.exercises || []) {
+          const k = e.exercise_template_id;
+          if (!seen.has(k)) seen.set(k, { id: k, title: e.title, n: 0 });
+          seen.get(k).n++;
+        }
+      }
     }
-
-    const list = (r.body && r.body.workouts) || [];
-    const w  = list[0] || null;
-    const ex = w && w.exercises && w.exercises[0];
-
-    res.status(200).json({
-      ok: true,
-      page_count: (r.body && r.body.page_count) != null ? r.body.page_count : null,
-      workouts_in_page: list.length,
-      // 스키마가 문서와 같은지 확인한다. 키 이름만 본다.
-      workoutKeys:  w  ? Object.keys(w)  : [],
-      exerciseKeys: ex ? Object.keys(ex) : [],
-      setKeys:      ex && ex.sets && ex.sets[0] ? Object.keys(ex.sets[0]) : [],
-      // 이름의 '언어' 와 세트가 실제로 채워져 오는지만 본다.
-      titles: ((w && w.exercises) || []).slice(0, 12).map(e => ({
-        title:     e.title,
-        sets:      (e.sets || []).length,
-        hasWeight: (e.sets || []).some(s => s.weight_kg != null),
-        hasReps:   (e.sets || []).some(s => s.reps != null),
-      })),
-    });
+    const list = [...seen.values()].sort((a, b) => b.n - a.n);
+    res.status(200).json({ ok: true, pages, workouts, distinct: list.length, exercises: list });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
