@@ -73,7 +73,16 @@ const InBody = {
   },
 
   // ── 렌더 ───────────────────────────────
-  init() { this.render(); },
+  init() { this._migratePeriod(); this.render(); },
+
+  // 예전 기본값은 '일주일'이었다. 인바디를 매일 재는 게 아니라 그 안에 기록이
+  // 1건뿐인 날이 많았고, 그러면 추이가 아예 안 그려졌다. 새 기본값('최근 5회')으로
+  // 한 번만 옮겨준다. 직접 '일주일'을 고른 사람과 구분할 방법이 없어서 이사는 딱 한 번이다.
+  _migratePeriod() {
+    if (UserStore.get('gl_inbody_period_v2')) return;
+    UserStore.set('gl_inbody_period_v2', '1');
+    if (UserStore.get(this.PERIOD_KEY) === '7d') UserStore.set(this.PERIOD_KEY, 'r5');
+  },
 
   render() {
     const wrap = document.getElementById('inbodyWrap');
