@@ -1740,3 +1740,28 @@ html.dark .login-scope{ background:rgba(255,255,255,0.04); }
   .ec-grid, .ec-cgrid{ grid-template-columns:1fr; }
   .ec-combo{ height:250px; }
 }
+
+/* ═══════════════════════════════════════
+   식단 음식 검색 — js/food-db.js 프리셋 + 초성 검색
+   ═══════════════════════════════════════ */
+.diet-search{ width:100%; margin-bottom:8px; }
+#dietSearchRes{ max-height:280px; overflow-y:auto; margin-bottom:12px; }
+#dietSearchRes:not(:empty){ border:1px solid var(--border); border-radius:var(--r-sm); }
+.diet-food{
+  display:flex; align-items:center; gap:8px;
+  padding:8px 10px; border-bottom:1px solid var(--border); cursor:pointer;
+}
+.diet-food:last-child{ border-bottom:none; }
+.diet-food:hover{ background:var(--card2); }
+.diet-food-main{ flex:1; min-width:0; display:flex; align-items:baseline; gap:6px; }
+.diet-food-nm{ font-size:13.5px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.diet-food-u{ font-size:11px; color:var(--text3); flex:none; }
+.diet-food-cal{ font-size:12.5px; font-weight:700; color:var(--text2); font-variant-numeric:tabular-nums; flex:none; }
+.diet-food-cal i{ font-size:10px; font-weight:500; color:var(--text3); font-style:normal; margin-left:1px; }
+.diet-food-fav{
+  flex:none; width:24px; height:24px; padding:0; cursor:pointer;
+  background:transparent; border:none; font-size:14px; color:var(--text4); font-family:inherit;
+}
+.diet-food-fav.on{ color:var(--yellow); }
+.diet-food-fav:hover{ color:var(--yellow); }
+.diet-empty-hint{ font-size:12px; color:var(--text3); padding:12px; text-align:center; }
