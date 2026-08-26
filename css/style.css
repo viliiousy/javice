@@ -1407,6 +1407,18 @@ html.dark .reorder-dragging { background: var(--card) !important; }
   padding: 4px 6px !important;
   font-size: 12px !important;
 }
+/* 크론이 매시 정각에만 돈다는 제약을 모달에서 바로 보이게 하는 안내줄.
+   (파일 끝에 넣으면 아래 미디어쿼리를 덮어써서 모바일이 깨진다 — 여기 유지) */
+.notif-hint {
+  margin: 10px 0 0;
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: var(--bg2);
+  color: var(--text2);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.notif-hint b { color: var(--text); }
 
 
 /* ═══════════════════════════════════════
