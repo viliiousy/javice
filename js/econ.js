@@ -1,0 +1,531 @@
+// js/econ.js — 경제(시세) — viliiousy/economy 대시보드를 흡수한 것
+//
+// 원래 이 화면은 viliiousy.github.io/economy 라는 별도 페이지였고,
+// GitHub PAT 를 localStorage 에 넣어 두고 그 토큰으로 레포에 config.json 을 직접 커밋했다.
+// 그 페이지는 서드파티 CDN 스크립트를 불러오므로, CDN 이 한 번 오염되거나 XSS 가 나면
+// repo 쓰기 권한이 통째로 넘어간다. 그래서 여기로 옮겼다.
+//
+//   설정(관심종목 등) → UserStore('gl_econ_config') → 기존 /users/<uid> 경로로 동기화
+//                       price_watch.py 는 /api/econ-config 로 이 값을 읽어 간다
+//   시세·차트 데이터   → 공개 레포의 정적 파일. raw.githubusercontent.com 은
+//                       Access-Control-Allow-Origin: * 이라 토큰 없이 읽힌다 (캐시 5분).
+//
+// PAT 는 이제 어디에도 없다.
+
+const Econ = {
+  REPO:   'viliiousy/economy',
+  BRANCH: 'main',
+  KEY:    'gl_econ_config',
+  POLL:   60000,          // 수집 크론이 30분 주기라 1분이면 충분하다
+
+  DEF: {
+    move_pct: 10, favorites: [], watchlists: [],
+    report_times: ['08:00'],
+    market_alerts: { kr_open:false, kr_close:false, us_open:false, us_close:false },
+  },
+  TYPE: { kr:'국내', us:'해외', exchange:'환율', metal:'금' },
+
+  C: null, PRICES: {}, PREV: {}, TICKERS: null,
+  HIST: { items:{} }, HIST_AT: 0,
+  _poll: null, _saveT: null, _lwLoading: null,
+  view: 'main', activeList: null,
+  chartScope: 'fav', chartMode: 'combined', chartTF: 'd',
+
+  // ── 설정 ────────────────────────────────────────────
+  cfg() {
+    if (this.C) return this.C;
+    let c = {};
+    try { c = JSON.parse(UserStore.get(this.KEY) || '{}'); } catch {}
+    this.C = Object.assign({}, this.DEF, c);
+    this.C.favorites  = this.C.favorites  || [];
+    this.C.watchlists = this.C.watchlists || [];
+    if (!this.C.report_times || !this.C.report_times.length) this.C.report_times = ['08:00'];
+    this.C.market_alerts = Object.assign({}, this.DEF.market_alerts, this.C.market_alerts || {});
+    this.C.favorites.forEach(f => { if (f.alert === undefined) f.alert = true; });
+    this.C.watchlists.forEach(w => { if (w.alert === undefined) w.alert = false; });
+    if (!this.activeList && this.C.watchlists[0]) this.activeList = this.C.watchlists[0].id;
+    return this.C;
+  },
+  save() {
+    UserStore.set(this.KEY, JSON.stringify(this.C));
+    if (typeof FirebaseSync !== 'undefined') FirebaseSync.scheduleSave?.();
+  },
+  queueSave() { clearTimeout(this._saveT); this._saveT = setTimeout(() => this.save(), 700); },
+
+  // ── 유틸 ────────────────────────────────────────────
+  raw(f)     { return `https://raw.githubusercontent.com/${this.REPO}/${this.BRANCH}/${f}?t=${Date.now()}`; },
+  keyOf(it)  { return it.type + ':' + it.code; },
+  unitFor(t) { return t === 'us' ? '$' : t === 'metal' ? '원/g' : '원'; },
+  uid()      { return 'w' + Date.now().toString(36) + Math.floor(Math.random()*1e3).toString(36); },
+  attr(o)    { return JSON.stringify(o).replace(/'/g,'&#39;').replace(/"/g,'&quot;'); },
+
+  fmt(it, p) {
+    if (p == null) return '—';
+    if (it.type === 'us')       return '$' + p.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    if (it.type === 'exchange') return p.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2}) + (it.unit||'원');
+    return Math.round(p).toLocaleString('ko-KR') + (it.unit || '');
+  },
+  delta(pct) {
+    if (pct == null) return '<div class="ec-delta ec-flat">—</div>';
+    const c = pct > 0 ? 'ec-up' : pct < 0 ? 'ec-dn' : 'ec-flat';
+    const a = pct > 0 ? '▲' : pct < 0 ? '▼' : '–';
+    return `<div class="ec-delta ${c}">${a} ${Math.abs(pct).toFixed(2)}%</div>`;
+  },
+
+  // ── 초기화 ──────────────────────────────────────────
+  init() {
+    const had = UserStore.get(this.KEY);
+    this.cfg();
+    this.render();
+    if (!had) this._seed().then(() => this.refresh());
+    else this.refresh();
+  },
+
+  // PAT 시절 설정은 공개 레포의 config.json 에 있었다. 처음 한 번만 가져와 옮긴다.
+  // (옮기고 나면 그 파일은 레포에서 지운다 — 관심종목이 공개돼 있을 이유가 없다)
+  async _seed() {
+    try {
+      const r = await fetch(this.raw('config.json'), { cache:'no-store' });
+      if (!r.ok) return;
+      const j = await r.json();
+      if (!j || (!(j.favorites||[]).length && !(j.watchlists||[]).length)) return;
+      UserStore.set(this.KEY, JSON.stringify(j));
+      this.C = null; this.cfg();
+      this.save();
+      this.render();
+      App.showToast('이전 관심종목 설정을 가져왔습니다 ✓','success');
+    } catch {}
+  },
+
+  // 카드에는 즐겨찾기만 간단히 보여준다. 전체 터미널은 모달에서 연다.
+  render() {
+    const wrap = document.getElementById('econWrap');
+    if (!wrap) return;
+    const c = this.cfg();
+    const upd = document.getElementById('econUpd');
+    if (upd) upd.textContent = this._updatedAt ? '업데이트 ' + this._updatedAt.replace('T',' ').slice(5,16) : '시세 대기 중';
+
+    if (!c.favorites.length) {
+      wrap.innerHTML = `<p class="empty">즐겨찾기가 비어 있어요<br><span class="ec-hint">「전체 보기」에서 종목을 ★ 하면 여기에 표시됩니다</span></p>`;
+      return;
+    }
+    wrap.innerHTML = c.favorites.map(it => {
+      const q = this.PRICES[this.keyOf(it)] || {};
+      return `<div class="ec-row" onclick='Econ.openChart(${this.attr(it)})'>
+        <div class="ec-row-l">
+          <div class="ec-nm">${esc(it.name)}</div>
+          <div class="ec-meta">${esc(it.code)} · ${this.TYPE[it.type]||''}</div>
+        </div>
+        <div class="ec-row-r" data-pk="${this.keyOf(it)}" data-ptype="${it.type}" data-punit="${it.unit||''}">
+          <div class="ec-price">${this.fmt(it, q.price)}</div>${this.delta(q.pct)}
+        </div>
+      </div>`;
+    }).join('');
+  },
+
+  // ── 시세 ────────────────────────────────────────────
+  async refresh() {
+    try {
+      const r = await fetch(this.raw('prices.json'), { cache:'no-store' });
+      if (!r.ok) throw new Error('시세 ' + r.status);
+      const j = await r.json();
+      this.PREV = this.PRICES;
+      this.PRICES = j.items || {};
+      this._updatedAt = j.updated || '';
+      this._err = null;
+    } catch (e) {
+      // 조용히 옛 시세를 계속 보여주면 멈춘 걸 모른다 → 카드에 표시한다
+      this._err = e.message;
+    }
+    this._paint();
+  },
+  _paint() {
+    const upd = document.getElementById('econUpd');
+    if (upd) {
+      upd.textContent = this._err ? '시세 불러오기 실패' :
+        (this._updatedAt ? '업데이트 ' + this._updatedAt.replace('T',' ').slice(5,16) : '시세 대기 중');
+      upd.classList.toggle('ec-err', !!this._err);
+    }
+    document.querySelectorAll('[data-pk]').forEach(w => {
+      const it = { type:w.dataset.ptype, unit:w.dataset.punit };
+      const q  = this.PRICES[w.dataset.pk] || {}, p = this.PREV[w.dataset.pk] || {};
+      const pe = w.querySelector('.ec-price');
+      if (pe) {
+        if (q.price != null && p.price != null && q.price !== p.price) {
+          pe.classList.remove('ec-fl-up','ec-fl-dn'); void pe.offsetWidth;
+          pe.classList.add(q.price > p.price ? 'ec-fl-up' : 'ec-fl-dn');
+        }
+        pe.textContent = this.fmt(it, q.price);
+      }
+      const d = w.querySelector('.ec-delta');
+      if (d) d.outerHTML = this.delta(q.pct);
+    });
+  },
+  _startPoll() { this._stopPoll(); this._poll = setInterval(() => this.refresh(), this.POLL); },
+  _stopPoll()  { if (this._poll) { clearInterval(this._poll); this._poll = null; } },
+
+  // ── 터미널 (모달) ───────────────────────────────────
+  open(view) {
+    this.view = view || 'main';
+    App.openModal('📈 시세', `
+      <div class="ec-nav">
+        ${[['main','메인'],['watch','관심종목'],['charts','차트']].map(([v,l]) =>
+          `<button class="${this.view===v?'on':''}" onclick="Econ.tab('${v}')">${l}</button>`).join('')}
+        <button class="ec-gear" onclick="Econ.settings()" title="알림 설정">⚙</button>
+      </div>
+      <div id="ecBody"></div>`);
+    document.querySelector('#modal .modal-box')?.classList.add('wide');
+    this._boundClose = this._boundClose || (() => { this._stopPoll(); document.querySelector('#modal .modal-box')?.classList.remove('wide'); });
+    document.getElementById('btnModalClose')?.addEventListener('click', this._boundClose, { once:true });
+    this._draw();
+    this.refresh();
+    this._startPoll();
+  },
+  tab(v) { this.view = v; document.querySelectorAll('.ec-nav button').forEach(b => b.classList.remove('on'));
+           event?.target?.classList.add('on'); this._draw(); },
+  _draw() {
+    if (this.view === 'main')   return this._drawMain();
+    if (this.view === 'watch')  return this._drawWatch();
+    if (this.view === 'charts') return this._drawCharts();
+  },
+
+  _card(it, ctx) {
+    const q = this.PRICES[this.keyOf(it)] || {}, k = this.keyOf(it);
+    return `<div class="ec-item">
+      <div class="ec-item-top">
+        <div><div class="ec-nm">${esc(it.name)}<span class="ec-badge">${this.TYPE[it.type]||''}</span></div>
+             <div class="ec-meta">${esc(it.code)}</div></div>
+        <div class="ec-row-r" data-pk="${k}" data-ptype="${it.type}" data-punit="${it.unit||''}">
+          <div class="ec-price">${this.fmt(it,q.price)}</div>${this.delta(q.pct)}</div>
+      </div>
+      <div class="ec-item-bot">
+        <label>알림가</label>
+        <input class="inp inp-sm ec-floor" type="number" placeholder="없음" value="${it.floor??''}"
+          onchange="Econ.setFloor('${ctx}','${k}',this.value)">
+        <button class="btn-sm ${it.floorDir==='above'?'ec-dir-up':'ec-dir-dn'}"
+          onclick="Econ.cycleDir('${ctx}','${k}')" title="이상/이하 전환">${it.floorDir==='above'?'이상':'이하'}</button>
+        ${ctx==='F' ? `<label class="ec-sw"><input type="checkbox" ${it.alert!==false?'checked':''}
+          onchange="Econ.favAlert('${k}',this.checked)"><span></span></label><label>알림</label>` : ''}
+        <span class="ec-sp"></span>
+        <button class="btn-sm" onclick='Econ.openChart(${this.attr(it)})'>차트</button>
+        <button class="btn-sm ec-rm" onclick="Econ.remove('${ctx}','${k}')">삭제</button>
+      </div></div>`;
+  },
+
+  _body() { return document.getElementById('ecBody'); },   // 모달이 닫혀 있으면 null
+
+  _drawMain() {
+    const c = this.cfg();
+    const b = this._body(); if (!b) return;
+    b.innerHTML =
+      `<input class="inp ec-search" id="ecFSearch" placeholder="즐겨찾기에 추가 — 검색 (금, 삼성, NVDA, KODEX)"
+         oninput="Econ.search(this.value,'F')"><div id="ecFRes"></div>` +
+      (c.favorites.length
+        ? `<div class="ec-grid">${c.favorites.map(it => this._card(it,'F')).join('')}</div>`
+        : `<p class="empty">메인이 비어 있어요<br><span class="ec-hint">위에서 종목을 찾아 ★ 하면 여기에 표시되고 알림도 옵니다</span></p>`);
+  },
+
+  _drawWatch() {
+    if (!this._body()) return;
+    const c = this.cfg();
+    let h = `<div class="ec-lists">` +
+      c.watchlists.map(w => `<button class="ec-chip ${w.id===this.activeList?'on':''}" onclick="Econ.selList('${w.id}')">${esc(w.name)}</button>`).join('') +
+      `<button class="ec-chip ec-add" onclick="Econ.newList()">＋ 새 리스트</button></div>`;
+    const wl = c.watchlists.find(w => w.id === this.activeList);
+    if (!c.watchlists.length) {
+      h += `<p class="empty">관심종목 리스트를 만들어 보세요<br><span class="ec-hint">반도체·AI·배당주처럼 주제별로 여러 개 가능합니다</span></p>`;
+    } else if (wl) {
+      h += `<div class="ec-lhead"><span class="ec-lt">${esc(wl.name)}</span>
+        <label class="ec-sw"><input type="checkbox" ${wl.alert?'checked':''} onchange="Econ.listAlert('${wl.id}',this.checked)"><span></span></label>
+        <span class="ec-meta">알림</span>
+        <button class="btn-sm" onclick="Econ.renameList('${wl.id}')">✎</button>
+        <button class="btn-sm ec-rm" onclick="Econ.delList('${wl.id}')">🗑</button></div>
+        <input class="inp ec-search" placeholder="이 리스트에 종목 추가 — 검색" oninput="Econ.search(this.value,'L')"><div id="ecLRes"></div>`;
+      h += wl.items.length
+        ? `<div class="ec-grid">${wl.items.map(it => this._card(it,'L:'+wl.id)).join('')}</div>`
+        : `<p class="empty">이 리스트가 비어 있어요<br><span class="ec-hint">리스트 알림을 켜면 담긴 종목 전체에 알림이 옵니다</span></p>`;
+    }
+    const b = this._body(); if (!b) return;
+    b.innerHTML = h;
+  },
+
+  // ── 종목 검색 (tickers.json 1.3MB — 처음 검색할 때만 받는다) ──
+  async _tickers() {
+    if (this.TICKERS) return this.TICKERS;
+    try { this.TICKERS = await (await fetch(this.raw('tickers.json'))).json(); }
+    catch { this.TICKERS = []; App.showToast('종목 목록을 불러오지 못했습니다','error'); }
+    return this.TICKERS;
+  },
+  async search(v, where) {
+    const box = document.getElementById(where === 'F' ? 'ecFRes' : 'ecLRes');
+    if (!box) return;
+    v = v.trim();
+    if (!v) { box.innerHTML = ''; return; }
+    const list = await this._tickers();
+    const q = v.toLowerCase(), out = [];
+    for (const e of list) {
+      const n = e.n.toLowerCase(), cd = e.c.toLowerCase();
+      let s = -1;
+      if (cd === q) s = 0; else if (n.startsWith(q)) s = 1; else if (cd.startsWith(q)) s = 2;
+      else if (n.includes(q)) s = 3; else if (cd.includes(q)) s = 4;
+      if (s >= 0) out.push([s, e.n.length, e]);
+    }
+    out.sort((a,b) => a[0]-b[0] || a[1]-b[1]);
+    const code = /^[0-9A-Za-z]{6}$/.test(v) ? v.toUpperCase() : '';
+    box.innerHTML =
+      `<div class="ec-res ec-manual" onclick="Econ.manual('${where}','${code}')">
+        <div><div class="ec-nm ec-gold">＋ 코드로 직접 추가</div><div class="ec-meta">검색에 없는 ETF 등 (예: 0173Y0)</div></div></div>` +
+      out.slice(0,8).map(x => {
+        const e = x[2];
+        const it = { name:e.n, code:e.c, type:e.t, tv:e.tv, unit:this.unitFor(e.t), floor:null };
+        return `<div class="ec-res"><div><div class="ec-nm">${esc(e.n)}</div>
+          <div class="ec-meta">${esc(e.c)} · ${this.TYPE[e.t]||''}</div></div>
+          <button class="btn-sm accent" onclick='Econ.add("${where}",${this.attr(it)})'>${where==='F'?'★ 추가':'＋ 담기'}</button></div>`;
+      }).join('');
+  },
+  add(where, it) {
+    const c = this.cfg(), k = this.keyOf(it);
+    if (where === 'F') {
+      if (c.favorites.some(x => this.keyOf(x) === k)) { App.showToast('이미 즐겨찾기에 있어요'); return; }
+      c.favorites.push(Object.assign({ alert:true }, it));
+      this.queueSave(); App.showToast('★ 즐겨찾기 추가','success'); this._drawMain(); this.render();
+    } else {
+      const w = c.watchlists.find(x => x.id === this.activeList);
+      if (!w) return;
+      if (w.items.some(x => this.keyOf(x) === k)) { App.showToast('이미 담겨 있어요'); return; }
+      w.items.push(Object.assign({}, it));
+      this.queueSave(); App.showToast(w.name + '에 담음','success'); this._drawWatch();
+    }
+  },
+  manual(where, code) {
+    App.openModal('코드로 직접 추가', `
+      <div class="modal-row"><label class="modal-lbl">표시 이름</label>
+        <input id="ecMName" class="inp" placeholder="예: KODEX 반도체"></div>
+      <div class="modal-row"><label class="modal-lbl">종목 코드</label>
+        <input id="ecMCode" class="inp" placeholder="예: 0173Y0" value="${code?esc(code):''}"></div>
+      <p class="ec-hint">국내 종목·ETF용입니다. 해외주식은 검색으로 추가하세요.</p>
+      <div class="modal-btns">
+        <button class="btn-sm accent" onclick="Econ.manualDo('${where}')">추가</button>
+        <button class="btn-sm" onclick="Econ.open('${this.view}')">취소</button>
+      </div>`);
+  },
+  manualDo(where) {
+    const name = document.getElementById('ecMName')?.value.trim();
+    const code = (document.getElementById('ecMCode')?.value || '').trim().toUpperCase();
+    if (!name || !code) { App.showToast('이름과 코드를 입력하세요','error'); return; }
+    this.open(this.view);
+    this.add(where, { name, code, type:'kr', tv:'KRX:'+code, unit:'원', floor:null });
+  },
+
+  // ── 항목 조작 ───────────────────────────────────────
+  _find(ctx, k) {
+    const c = this.cfg();
+    if (ctx === 'F') return c.favorites.find(x => this.keyOf(x) === k);
+    return (c.watchlists.find(w => w.id === ctx.slice(2))?.items || []).find(x => this.keyOf(x) === k);
+  },
+  remove(ctx, k) {
+    const c = this.cfg();
+    if (ctx === 'F') { c.favorites = c.favorites.filter(x => this.keyOf(x) !== k); this.queueSave(); this._drawMain(); this.render(); return; }
+    const w = c.watchlists.find(x => x.id === ctx.slice(2));
+    if (w) { w.items = w.items.filter(x => this.keyOf(x) !== k); this.queueSave(); this._drawWatch(); }
+  },
+  setFloor(ctx, k, v) { const it = this._find(ctx,k); if (it) { it.floor = v === '' ? null : parseFloat(v); this.queueSave(); } },
+  cycleDir(ctx, k)    { const it = this._find(ctx,k); if (it) { it.floorDir = it.floorDir === 'above' ? 'below' : 'above'; this.queueSave(); ctx==='F'?this._drawMain():this._drawWatch(); } },
+  favAlert(k, on)     { const it = this.cfg().favorites.find(x => this.keyOf(x) === k); if (it) { it.alert = on; this.queueSave(); } },
+  listAlert(id, on)   { const w = this.cfg().watchlists.find(x => x.id === id); if (w) { w.alert = on; this.queueSave(); } },
+  selList(id)         { this.activeList = id; this._drawWatch(); },
+  newList() {
+    const name = prompt('새 리스트 이름 (예: 배당주)');
+    if (!name || !name.trim()) return;
+    const w = { id:this.uid(), name:name.trim(), alert:false, items:[] };
+    this.cfg().watchlists.push(w); this.activeList = w.id; this.queueSave(); this._drawWatch();
+  },
+  renameList(id) {
+    const w = this.cfg().watchlists.find(x => x.id === id); if (!w) return;
+    const name = prompt('리스트 이름 변경', w.name);
+    if (!name || !name.trim()) return;
+    w.name = name.trim(); this.queueSave(); this._drawWatch();
+  },
+  delList(id) {
+    const c = this.cfg(), w = c.watchlists.find(x => x.id === id); if (!w) return;
+    if (!confirm(`'${w.name}' 리스트를 삭제할까요?`)) return;
+    c.watchlists = c.watchlists.filter(x => x.id !== id);
+    if (this.activeList === id) this.activeList = c.watchlists[0]?.id || null;
+    this.queueSave(); this._drawWatch();
+  },
+
+  // ── 알림 설정 ───────────────────────────────────────
+  settings() {
+    const c = this.cfg();
+    this._times = c.report_times.slice();
+    this._renderSettings();
+  },
+  _renderSettings() {
+    const c = this.cfg(), ma = c.market_alerts;
+    const rows = this._times.map((t,i) =>
+      `<div class="ec-time-row"><input type="time" class="inp inp-sm" value="${t}" onchange="Econ._times[${i}]=this.value">
+       <button class="btn-sm ec-rm" onclick="Econ._times.splice(${i},1);Econ._renderSettings()">삭제</button></div>`).join('');
+    const mk = (k,l) => `<label class="ec-toggle-row"><span>${l}</span>
+      <span class="ec-sw"><input type="checkbox" ${ma[k]?'checked':''} onchange="Econ.cfg().market_alerts['${k}']=this.checked"><span></span></span></label>`;
+    App.openModal('📈 시세 알림 설정', `
+      <label class="modal-lbl">매일 리포트 받을 시간 (여러 개 가능)</label>
+      <div>${rows || '<p class="ec-hint">시간을 추가하세요</p>'}</div>
+      <button class="btn-sm" onclick="Econ._times.push('08:00');Econ._renderSettings()">＋ 시간 추가</button>
+      <label class="modal-lbl" style="margin-top:16px">장 시작·마감 시세 알림</label>
+      ${mk('kr_open','🇰🇷 한국 장 시작 (09:00)')}
+      ${mk('kr_close','🇰🇷 한국 장 마감 (15:30)')}
+      ${mk('us_open','🇺🇸 미국 장 시작 (밤 22:30경)')}
+      ${mk('us_close','🇺🇸 미국 장 마감 (새벽 05:00경)')}
+      <p class="ec-hint">켜면 그 시각에 메인 + 알림 켠 리스트 시세를 텔레그램으로 보냅니다.</p>
+      <div class="modal-row" style="margin-top:14px"><label class="modal-lbl">급변동 알림 기준 (%)</label>
+        <input id="ecMove" type="number" class="inp inp-sm" value="${c.move_pct||10}"></div>
+      <div class="modal-btns">
+        <button class="btn-sm accent" onclick="Econ.saveSettings()">저장</button>
+        <button class="btn-sm" onclick="Econ.open('${this.view}')">뒤로</button>
+      </div>`);
+  },
+  saveSettings() {
+    const c = this.cfg();
+    const times = [...new Set(this._times.filter(t => /^\d\d:\d\d$/.test(t)))].sort();
+    c.report_times = times.length ? times : ['08:00'];
+    delete c.report_time;
+    c.move_pct = parseFloat(document.getElementById('ecMove')?.value) || 10;
+    this.save();
+    App.showToast('설정 저장됨 ✓','success');
+    this.open(this.view);
+  },
+
+  // ── 차트 ────────────────────────────────────────────
+  // lightweight-charts 는 200KB 가 넘는다. 카드만 보는 사람에게 매번 받게 하지 않는다.
+  _lw() {
+    if (window.LightweightCharts) return Promise.resolve(true);
+    if (this._lwLoading) return this._lwLoading;
+    this._lwLoading = new Promise(res => {
+      const s = document.createElement('script');
+      s.src = 'https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js';
+      s.onload  = () => res(true);
+      s.onerror = () => { this._lwLoading = null; res(false); };
+      document.head.appendChild(s);
+    });
+    return this._lwLoading;
+  },
+  async _history() {
+    if (Object.keys(this.HIST.items||{}).length && Date.now() - this.HIST_AT < 60000) return true;
+    try {
+      const j = await (await fetch(this.raw('history.json'), { cache:'no-store' })).json();
+      if (j && j.items) { this.HIST = j; this.HIST_AT = Date.now(); return true; }
+    } catch {}
+    return false;
+  },
+  _ser(it) { const h = this.HIST.items[this.keyOf(it)]; return (h && h[this.chartTF]) || null; },
+
+  _drawCharts() {
+    const c = this.cfg();
+    const TF = [['1','1분'],['30','30분'],['60','1시간'],['d','일'],['w','주'],['mo','월']];
+    let h = `<div class="ec-lists"><button class="ec-chip ${this.chartScope==='fav'?'on':''}" onclick="Econ.chScope('fav')">즐겨찾기</button>` +
+      c.watchlists.map(w => `<button class="ec-chip ${this.chartScope===w.id?'on':''}" onclick="Econ.chScope('${w.id}')">${esc(w.name)}</button>`).join('') + `</div>
+      <div class="ec-seg">
+        <button class="${this.chartMode==='combined'?'on':''}" onclick="Econ.chMode('combined')">함께 보기</button>
+        <button class="${this.chartMode==='separate'?'on':''}" onclick="Econ.chMode('separate')">따로 보기</button></div>
+      <div class="ec-seg ec-tf">${TF.map(([v,l]) => `<button class="${this.chartTF===v?'on':''}" onclick="Econ.chTF('${v}')">${l}</button>`).join('')}</div>`;
+    const b = this._body(); if (!b) return;
+    const items = this.chartScope === 'fav' ? c.favorites : (c.watchlists.find(w => w.id === this.chartScope)?.items || []);
+    if (!items.length) { b.innerHTML = h + '<p class="empty">표시할 종목이 없어요</p>'; return; }
+    b.innerHTML = h + '<div id="ecChartArea"><p class="empty">차트 불러오는 중…</p></div>';
+    Promise.all([this._lw(), this._history()]).then(([lw, hist]) => {
+      if (this.view !== 'charts') return;
+      const area = document.getElementById('ecChartArea');
+      if (!area) return;
+      // 조용히 빈 차트를 보여주지 않는다 — 왜 안 나오는지 적는다
+      if (!lw)   { area.innerHTML = '<p class="empty">차트 라이브러리를 불러오지 못했습니다</p>'; return; }
+      if (!hist) { area.innerHTML = '<p class="empty">차트 데이터를 불러오지 못했습니다</p>'; return; }
+      this.chartMode === 'combined' ? this._combined(area, items) : this._separate(area, items);
+    });
+  },
+  chScope(s) { this.chartScope = s; this._drawCharts(); },
+  chMode(m)  { this.chartMode  = m; this._drawCharts(); },
+  chTF(v)    { this.chartTF    = v; this._drawCharts(); },
+
+  _opts(h) {
+    const dark = document.documentElement.classList.contains('dark');
+    return { height:h, layout:{ background:{color:'transparent'}, textColor: dark?'#94a3b8':'#475569',
+             fontFamily:'inherit', attributionLogo:false },
+      grid:{ vertLines:{visible:false}, horzLines:{ color: dark?'#1e293b':'#eef1f6' } },
+      rightPriceScale:{ borderVisible:false }, timeScale:{ borderVisible:false },
+      crosshair:{ mode:1 }, localization:{ locale:'ko-KR' } };
+  },
+  UP: '#dc2626', DN: '#3b82f6',
+  PAL: ['#3b82f6','#dc2626','#059669','#9333ea','#d97706','#0891b2','#db2777','#65a30d','#e11d48','#4f46e5'],
+  _candles(a) { return a.map(r => ({ time:r[0], open:r[1], high:r[2], low:r[3], close:r[4] })); },
+
+  _separate(area, items) {
+    area.innerHTML = '<div class="ec-cgrid"></div>';
+    const grid = area.querySelector('.ec-cgrid');
+    items.forEach((it,i) => {
+      const q = this.PRICES[this.keyOf(it)] || {};
+      const d = document.createElement('div');
+      d.className = 'ec-gcard';
+      d.innerHTML = `<div class="ec-gtop" onclick='Econ.openChart(${this.attr(it)})'>
+          <div><div class="ec-nm">${esc(it.name)}</div><div class="ec-meta">${this.TYPE[it.type]||''}</div></div>
+          <div class="ec-row-r"><div class="ec-price">${this.fmt(it,q.price)}</div>${this.delta(q.pct)}</div>
+        </div><div class="ec-gtv" id="ecLw${i}"></div>`;
+      grid.appendChild(d);
+      const ser = this._ser(it), box = document.getElementById('ecLw'+i);
+      if (!ser || !ser.length) {
+        box.innerHTML = `<div class="ec-miss">${it.type==='metal'?'차트 미지원':'데이터 준비 중 (20분 내 수집)'}</div>`;
+        return;
+      }
+      const ch = LightweightCharts.createChart(box, Object.assign(this._opts(150), { handleScroll:false, handleScale:false }));
+      ch.addCandlestickSeries({ upColor:this.UP, downColor:this.DN, borderVisible:false,
+        wickUpColor:this.UP, wickDownColor:this.DN }).setData(this._candles(ser));
+      ch.timeScale().fitContent();
+    });
+  },
+  _combined(area, items) {
+    const has = it => { const s = this._ser(it); return s && s.length; };
+    const groups = [
+      { label:'한국 (원)',  list: items.filter(it => it.type==='kr' && has(it)) },
+      { label:'해외 ($)',   list: items.filter(it => it.type==='us' && has(it)) },
+      { label:'환율·지표',  list: items.filter(it => it.type==='exchange' && has(it)) },
+    ].filter(g => g.list.length);
+    if (!groups.length) { area.innerHTML = '<p class="empty">차트 데이터 준비 중<br><span class="ec-hint">종목을 담으면 20분 내 자동 수집됩니다</span></p>'; return; }
+    area.innerHTML = '';
+    groups.forEach((g,gi) => {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = `<div class="ec-glabel">${g.label}</div><div class="ec-combo" id="ecCb${gi}"></div><div class="ec-legend" id="ecLg${gi}"></div>`;
+      area.appendChild(wrap);
+      const ch = LightweightCharts.createChart(document.getElementById('ecCb'+gi), this._opts(320));
+      let leg = '';
+      g.list.forEach((it,i) => {
+        const col = this.PAL[i % this.PAL.length];
+        ch.addLineSeries({ color:col, lineWidth:2, priceLineVisible:false, lastValueVisible:true,
+          priceFormat:{ type:'price', precision: it.type==='us'?2:0, minMove: it.type==='us'?0.01:1 } })
+          .setData(this._ser(it).map(r => ({ time:r[0], value:r[4] })));
+        const q = this.PRICES[this.keyOf(it)] || {};
+        leg += `<span class="ec-lgi"><i style="background:${col}"></i>${esc(it.name)} <b>${this.fmt(it,q.price)}</b></span>`;
+      });
+      ch.timeScale().fitContent();
+      document.getElementById('ecLg'+gi).innerHTML = leg;
+    });
+  },
+
+  async openChart(it) {
+    App.openModal('📈 ' + it.name, '<div id="ecOne" class="ec-one"><p class="empty">차트 불러오는 중…</p></div>');
+    document.querySelector('#modal .modal-box')?.classList.add('wide');
+    const [lw, hist] = await Promise.all([this._lw(), this._history()]);
+    const box = document.getElementById('ecOne');
+    if (!box) return;
+    const ser = this._ser(it);
+    if (!lw)              { box.innerHTML = '<p class="empty">차트 라이브러리를 불러오지 못했습니다</p>'; return; }
+    if (!hist)            { box.innerHTML = '<p class="empty">차트 데이터를 불러오지 못했습니다</p>'; return; }
+    if (!ser || !ser.length) {
+      box.innerHTML = `<p class="empty">${it.type==='metal'?'이 항목은 차트를 지원하지 않습니다':'차트 데이터 준비 중입니다 (20분 내 수집)'}</p>`;
+      return;
+    }
+    box.innerHTML = '';
+    const ch = LightweightCharts.createChart(box, Object.assign(this._opts(box.clientHeight || 360), { autoSize:true }));
+    ch.addCandlestickSeries({ upColor:this.UP, downColor:this.DN, borderVisible:false,
+      wickUpColor:this.UP, wickDownColor:this.DN }).setData(this._candles(ser));
+    ch.timeScale().fitContent();
+  },
+};
