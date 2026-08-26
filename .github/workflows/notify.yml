@@ -29,3 +29,23 @@ jobs:
           cat /tmp/cron.json; echo
           # 실패를 초록불로 넘기지 않는다
           [ "$code" = "200" ] || exit 1
+
+      - name: Sync Hevy workouts
+        if: always()
+        run: |
+          # Hevy 연동의 안전망이다. 평소엔 웹후크가 운동 저장 순간에 바로 넣어 주고,
+          # 이 단계는 그게 한 번 실패했을 때 한 시간 안에 메우는 역할만 한다.
+          # 그래서 크론을 새로 만들지 않고 이미 도는 이 워크플로에 얹었다 —
+          # 2026-08-26 에 1분 크론 하나 때문에 실패 메일이 쏟아진 걸 겪었다.
+          for i in 1 2 3; do
+            code=$(curl -sS -o /tmp/hevy.json -w '%{http_code}' \
+              "https://bashy.app/api/hevy" \
+              -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+            echo "시도 $i → HTTP $code"
+            cat /tmp/hevy.json; echo
+            [ "$code" = "200" ] && exit 0
+            sleep 5
+          done
+          # 세 번 다 실패하면 드러낸다. 조용히 넘기면 기록이 며칠씩 안 들어와도 초록불이다.
+          echo "Hevy 동기화 3회 모두 실패"
+          exit 1
