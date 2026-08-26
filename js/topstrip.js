@@ -87,6 +87,9 @@ const TopStrip = {
   go(cls) {
     const card = document.querySelector('.' + cls);
     if (!card) return;
+    // 모바일에서는 그 카드가 다른 탭에 있을 수 있다. 탭부터 맞추지 않으면
+    // scrollIntoView 가 '숨겨진 요소'를 향해 스크롤해서 아무 일도 안 일어난다.
+    if (typeof Tabs !== 'undefined') Tabs.set(Tabs.tabOf(cls), true);
     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     card.classList.remove('ts-flash');
     void card.offsetWidth;
