@@ -89,6 +89,9 @@ const Econ = {
       if (!r.ok) return;
       const j = await r.json();
       if (!j || (!(j.favorites||[]).length && !(j.watchlists||[]).length)) return;
+      // fetch 하는 사이에 Firebase 동기화가 값을 채웠을 수 있다. 그러면 그 쪽이 최신이다.
+      // 이 확인이 없으면 폰에서 처음 열 때 옛 config.json 이 새 설정을 덮어쓴다.
+      if (UserStore.get(this.KEY)) return;
       UserStore.set(this.KEY, JSON.stringify(j));
       this.C = null; this.cfg();
       this.save();
