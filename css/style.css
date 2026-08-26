@@ -184,6 +184,7 @@ html,body{
 .card-memo      { grid-column:3; grid-row:3; }
 .card-inbody    { grid-column:1/3; grid-row:4; }
 .card-dev       { grid-column:3;   grid-row:4; }
+.card-econ      { grid-column:1/4; grid-row:5; }
 
 /* ── 카드 ────────────────────────────── */
 .card{
@@ -673,6 +674,7 @@ textarea.inp{ resize:vertical; min-height:64px; }
   .card-memo    { grid-column:1/3; grid-row:auto; }
   .card-inbody  { grid-column:1/3; grid-row:auto; }
   .card-dev     { grid-column:1/3; grid-row:auto; }
+  .card-econ    { grid-column:1/3; grid-row:auto; }
 }
 
 /* ═══════════════════════════════════════
@@ -684,7 +686,8 @@ textarea.inp{ resize:vertical; min-height:64px; }
     grid-template-columns:1fr; gap:10px; padding:10px;
   }
   .card-tasks,.card-calendar,.card-checklist,
-  .card-habits,.card-diet,.card-memo,.card-inbody,.card-dev{ grid-column:1; grid-row:auto; }
+  .card-habits,.card-diet,.card-memo,.card-inbody,.card-dev,
+  .card-econ{ grid-column:1; grid-row:auto; }
 
   /* 인바디 타일 2열로 */
   .ib-summary{ grid-template-columns:1fr 1fr; }
@@ -1596,4 +1599,119 @@ html.dark .login-card{ background:rgba(26,32,53,0.95); }
 html.dark .login-scope{ background:rgba(255,255,255,0.04); }
 @media (max-width:640px){
   .login-card{ padding:32px 22px; }
+}
+
+/* ═══════════════════════════════════════
+   경제(시세) — js/econ.js
+   원래 viliiousy.github.io/economy 였던 화면. 클래스는 전부 .ec- 로 격리한다
+   (원본의 .card / .price / .meta 는 여기 대시보드 클래스와 이름이 겹친다).
+   ═══════════════════════════════════════ */
+.ec-upd{ font-size:11px; color:var(--text3); white-space:nowrap; }
+.ec-upd.ec-err{ color:var(--red); font-weight:600; }
+.ec-hint{ font-size:11.5px; color:var(--text3); line-height:1.6; }
+.ec-gold{ color:var(--yellow); }
+.ec-sp{ flex:1; }
+
+.ec-nm{ font-size:14px; font-weight:700; color:var(--text); }
+.ec-meta{ font-size:11.5px; color:var(--text3); margin-top:2px; }
+.ec-badge{
+  display:inline-block; font-size:10px; font-weight:700; color:var(--text2);
+  background:var(--card2); border:1px solid var(--border);
+  border-radius:5px; padding:1px 5px; margin-left:6px; vertical-align:middle;
+}
+.ec-price{ font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--text); }
+.ec-delta{ font-size:12px; font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums; }
+/* 한국식: 상승 빨강, 하락 파랑 */
+.ec-up{ color:var(--red); } .ec-dn{ color:var(--blue); } .ec-flat{ color:var(--text3); }
+@keyframes ecFlUp{ 0%{ background:rgba(220,38,38,0.14); } 100%{ background:transparent; } }
+@keyframes ecFlDn{ 0%{ background:rgba(59,130,246,0.14); } 100%{ background:transparent; } }
+.ec-fl-up{ animation:ecFlUp 1s ease; } .ec-fl-dn{ animation:ecFlDn 1s ease; }
+
+/* 카드 안 요약 목록 */
+.ec-row{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:9px 12px; border-bottom:1px solid var(--border); cursor:pointer;
+}
+.ec-row:last-child{ border-bottom:none; }
+.ec-row:hover{ background:var(--card2); }
+.ec-row-r{ text-align:right; flex:none; }
+
+/* 터미널(모달) */
+.modal-box.wide{ max-width:min(980px, 100%); }
+.ec-nav{ display:flex; gap:5px; margin-bottom:12px; }
+.ec-nav button{
+  flex:1; padding:8px 0; border:1px solid transparent; background:transparent;
+  color:var(--text2); font-size:13.5px; font-weight:600; cursor:pointer;
+  border-radius:var(--r-sm); font-family:inherit;
+}
+.ec-nav button.on{ color:var(--text); background:var(--card2); border-color:var(--border); }
+.ec-nav .ec-gear{ flex:0 0 38px; }
+.ec-search{ width:100%; margin-bottom:10px; }
+
+.ec-res{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:9px 12px; background:var(--card2); border:1px solid var(--border);
+  border-radius:var(--r-sm); margin-bottom:6px;
+}
+.ec-res.ec-manual{ border-style:dashed; cursor:pointer; }
+
+.ec-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:start; margin-top:10px; }
+.ec-item{ background:var(--card2); border:1px solid var(--border); border-radius:var(--r-sm); padding:11px 12px; }
+.ec-item-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.ec-item-bot{
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+  margin-top:10px; padding-top:9px; border-top:1px solid var(--border);
+}
+.ec-item-bot label{ font-size:11px; color:var(--text3); font-weight:600; }
+.ec-floor{ width:92px !important; }
+.ec-rm{ color:var(--red); }
+.ec-dir-up{ color:var(--red); } .ec-dir-dn{ color:var(--blue); }
+
+.ec-lists{ display:flex; gap:6px; overflow-x:auto; padding:2px 0 10px; }
+.ec-lists::-webkit-scrollbar{ display:none; }
+.ec-chip{
+  flex:none; border:1px solid var(--border2); background:var(--card);
+  color:var(--text2); border-radius:20px; padding:6px 13px;
+  font-size:12.5px; font-weight:600; cursor:pointer; white-space:nowrap; font-family:inherit;
+}
+.ec-chip.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
+.ec-chip.ec-add{ color:var(--yellow); border-style:dashed; }
+.ec-lhead{ display:flex; align-items:center; gap:8px; margin:2px 0 10px; }
+.ec-lt{ font-size:15px; font-weight:700; flex:1; color:var(--text); }
+
+.ec-toggle-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; font-size:13.5px; }
+.ec-time-row{ display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+.ec-time-row input{ flex:1; }
+.ec-sw{ position:relative; width:38px; height:22px; flex:none; display:inline-block; }
+.ec-sw input{ position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer; z-index:2; }
+.ec-sw span{ position:absolute; inset:0; background:var(--border2); border-radius:12px; transition:0.18s; }
+.ec-sw span:before{
+  content:""; position:absolute; top:3px; left:3px; width:16px; height:16px;
+  background:#fff; border-radius:50%; transition:0.18s; box-shadow:0 1px 2px rgba(0,0,0,0.2);
+}
+.ec-sw input:checked+span{ background:var(--accent); }
+.ec-sw input:checked+span:before{ transform:translateX(16px); }
+
+/* 차트 */
+.ec-seg{ display:inline-flex; background:var(--card2); border:1px solid var(--border); border-radius:var(--r-sm); padding:3px; margin-bottom:10px; }
+.ec-seg button{ border:none; background:transparent; color:var(--text2); font-family:inherit;
+  font-size:12.5px; font-weight:600; padding:6px 14px; border-radius:var(--r-xs); cursor:pointer; }
+.ec-seg button.on{ background:var(--accent); color:#fff; }
+.ec-seg.ec-tf{ display:flex; width:100%; }
+.ec-seg.ec-tf button{ flex:1; padding:6px 4px; font-size:12px; }
+.ec-cgrid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.ec-gcard{ background:var(--card2); border:1px solid var(--border); border-radius:var(--r-sm); overflow:hidden; }
+.ec-gtop{ display:flex; align-items:center; justify-content:space-between; padding:10px 12px; cursor:pointer; }
+.ec-gtv{ height:150px; border-top:1px solid var(--border); }
+.ec-miss{ display:flex; align-items:center; justify-content:center; height:150px; color:var(--text3); font-size:12px; }
+.ec-glabel{ font-size:12px; font-weight:700; color:var(--text2); margin:10px 2px 5px; }
+.ec-combo{ height:320px; background:var(--card2); border:1px solid var(--border); border-radius:var(--r-sm); overflow:hidden; }
+.ec-legend{ display:flex; flex-wrap:wrap; gap:8px 14px; margin:8px 2px 4px; font-size:12.5px; color:var(--text); }
+.ec-lgi{ display:inline-flex; align-items:center; gap:5px; }
+.ec-lgi i{ width:13px; height:3px; border-radius:2px; display:inline-block; }
+.ec-one{ height:min(62vh, 460px); }
+
+@media (max-width:640px){
+  .ec-grid, .ec-cgrid{ grid-template-columns:1fr; }
+  .ec-combo{ height:250px; }
 }
