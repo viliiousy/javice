@@ -690,7 +690,12 @@ textarea.inp{ resize:vertical; min-height:64px; }
   .card-econ{ grid-column:1; grid-row:auto; }
 
   /* 인바디 타일 2열로 */
-  .ib-summary{ grid-template-columns:1fr 1fr; }
+  /* 모바일에서도 한 줄을 유지한다. 두 줄이 되면 카드가 길어져 스크롤이 늘어난다. */
+  .ib-summary{ grid-template-columns:repeat(5,1fr); gap:3px; }
+  .ib-tile{ padding:6px 2px; }
+  .ib-tile-lbl{ font-size:9px; }
+  .ib-tile-val{ font-size:14px; }
+  .ib-tile-unit{ font-size:9px; }
 
   /* 헤더 모바일 */
   .header{ padding:10px 14px; }
@@ -1472,7 +1477,8 @@ html.dark .reorder-dragging { background: var(--card) !important; }
 .edit-del-btn:hover { background: #dc2626 !important; }
 
 /* ── 인바디 ──────────────────────────── */
-.ib-summary{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:10px; }
+/* 다섯 칸 한 줄. 예전엔 6칸을 4열에 넣어 두 줄이 됐다. */
+.ib-summary{ display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:10px; }
 .ib-tile{
   background:var(--card2); border:1px solid var(--border);
   border-radius:var(--r-sm); padding:8px 6px; text-align:center;
@@ -1540,6 +1546,25 @@ html.dark .reorder-dragging { background: var(--card) !important; }
 .ib-row-v{ text-align:center; font-variant-numeric:tabular-nums; font-weight:600; }
 .ib-row-v i{ font-style:normal; font-size:9px; color:var(--text3); font-weight:400; margin-left:1px; }
 .ib-more{ font-size:10px; color:var(--text3); text-align:center; padding:6px; }
+
+/* 기간 선택 — 차트와 목록이 같은 기간을 본다 */
+.ib-periods{ display:flex; gap:4px; margin:0 0 8px; }
+.ib-period{
+  flex:1; padding:5px 0; font-size:11.5px; font-weight:600; cursor:pointer;
+  color:var(--text3); background:var(--card2);
+  border:1px solid var(--border); border-radius:var(--r-xs); font-family:inherit;
+}
+.ib-period:hover{ color:var(--text2); }
+.ib-period.active{ color:#fff; background:var(--accent); border-color:var(--accent); }
+.ib-period:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+
+.ib-more-btn{
+  display:block; width:100%; cursor:pointer; font-weight:600;
+  color:var(--text2); background:var(--card2);
+  border:1px solid var(--border); border-top:none;
+  border-radius:0 0 var(--r-sm) var(--r-sm); font-family:inherit; font-size:11.5px; padding:8px;
+}
+.ib-more-btn:hover{ color:var(--text); background:var(--bg2); }
 
 .ib-import-link{
   margin-top:10px; text-align:center; font-size:11px; color:var(--accent);
