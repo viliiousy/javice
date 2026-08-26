@@ -92,14 +92,21 @@ const Fitness = {
       return;
     }
 
-    const done=allEx.filter((_,i)=>chk.includes(i)).length;
+    // Hevy 에 같은 이름의 기록이 있으면 손으로 안 눌러도 체크된 것으로 본다.
+    // 운동하고 와서 앱에 또 체크하는 일이 없어지는 게 연동의 실질적 이득이다.
+    // 다만 저장소는 건드리지 않는다 — 자동 판정은 화면에서만 하고, 손으로 누른 것과 구분해 표시한다.
+    const ds  = Fitness._dateStr(date);
+    const auto = i => !chk.includes(i) && typeof Hevy !== 'undefined' && Hevy.isDone(allEx[i].name, ds);
+    const on  = i => chk.includes(i) || auto(i);
+
+    const done=allEx.filter((_,i)=>on(i)).length;
     const pct=Math.round(done/allEx.length*100);
 
     container.innerHTML=`
       <div class="fit-tabs">${tabs}</div>
       ${allEx.map((ex,i)=>`
-        <div class="ex-item${chk.includes(i)?' done':''}" onclick="Fitness.toggle(${i},'${Fitness._dateStr(date)}')">
-          <div class="ex-chk">${chk.includes(i)?'✓':''}</div>
+        <div class="ex-item${on(i)?' done':''}${auto(i)?' ex-auto':''}" onclick="Fitness.toggle(${i},'${Fitness._dateStr(date)}')">
+          <div class="ex-chk"${auto(i)?' title="Hevy 기록에서 자동 체크"':''}>${on(i)?'✓':''}</div>
           <span class="ex-name">${esc(ex.name)}</span>
           <a class="ex-yt" href="${Fitness.ytUrl(ex.name)}" target="_blank" rel="noopener"
              onclick="event.stopPropagation()" title="자세 영상 검색">▶</a>
@@ -107,6 +114,7 @@ const Fitness = {
           ${i>=plan.exercises.length&&isToday?`<button class="task-del" onclick="event.stopPropagation();Fitness._delCustom(${i-plan.exercises.length},'${Fitness._dateStr(date)}')">✕</button>`:''}
         </div>`).join('')}
       ${isToday?'<div class="habit-add-btn" onclick="Fitness.showInlineAdd()">+ 운동 추가</div>':''}
+      ${typeof Hevy!=='undefined'?Hevy.html(ds):''}
       <div class="fit-progress">
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
         <span class="progress-txt">${done}/${allEx.length} (${pct}%)</span>
