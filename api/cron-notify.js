@@ -6,6 +6,9 @@ const crypto = require('crypto');
 // Firebase DB — 서비스 계정으로 인증해서 읽는다 (규칙을 잠근 뒤에도 동작)
 const { fbGet, fbFetch } = require('../lib/fb-admin');
 
+// 오늘 일정 조회 (서버에 보관된 리프레시 토큰 사용 — 앱을 열 필요가 없다)
+const { todayEvents } = require('../lib/gcal');
+
 // VAPID 서명
 function urlBase64ToBuffer(base64) {
   const padding = '='.repeat((4 - base64.length%4)%4);
@@ -121,6 +124,14 @@ function findPrefix(userData) {
   return null;
 }
 
+// 접두사는 `u_<구글 계정 id>_` 이고, 그 id는 js/google-auth.js 의 userInfo.id — 곧 OAuth sub 다.
+// 리프레시 토큰이 /google_refresh/<sub> 에 있으므로 그대로 열쇠로 쓸 수 있다.
+// 다만 로그인 때 id를 못 받으면 이메일이 대신 들어간다. 그건 sub가 아니므로 숫자일 때만 신뢰한다.
+function googleSubFromPrefix(prefix) {
+  const m = /^u_(\d{6,})_$/.exec(prefix || '');
+  return m ? m[1] : null;
+}
+
 // 등록 형태는 두 가지다.
 //   신규: { settings, devices: { <기기id>: { token, ua, updatedAt } } }
 //   구버전: { token, settings }            ← 기기 하나만 담을 수 있어 PC·폰이 서로 덮어썼다
@@ -196,7 +207,9 @@ async function processUser(uid, tokenData) {
   }
 
   // 보낼 메시지를 먼저 다 만든 뒤, 등록된 모든 기기에 같은 내용을 보낸다
-  const msgs = [];
+  const msgs  = [];
+  const notes = [];        // 발송과 별개로 로그에 남길 설명 (조용히 사라지지 않게)
+  let   quiet = 0;         // 알림은 못 만들었지만 "고장"인 경우의 수
   if(settings.habits?.enabled) {
     if(force || timeMatches(settings.habits.time, hour, min)) {
       const list = JSON.parse(userData[`${prefix}gl_habits_list`]||'[]');
@@ -223,10 +236,47 @@ async function processUser(uid, tokenData) {
       if(due.length>0) msgs.push({title:'📋 오늘 마감 할일', body:`${due.length}개: ${due.slice(0,2).join(', ')}`});
     }
   }
+  // 📅 오늘 일정 — 구글 캘린더를 서버에서 직접 읽는다.
+  // 예전 설정에 있던 minutesBefore(몇 분 전)는 구현된 적이 없다. 크론이 매시 정각에만 도니
+  // 분 단위 예고를 지킬 수 없어서, 지정한 시각에 오늘 일정을 묶어 보내는 방식으로 바꿨다.
+  if(settings.calendar?.enabled) {
+    const calTime = settings.calendar.time || '08:00';
+    if(force || timeMatches(calTime, hour, min)) {
+      const sub = googleSubFromPrefix(prefix);
+      if(!sub) {
+        notes.push(`${tag} 캘린더: 접두사에서 구글 ID를 못 읽음 (${prefix})`);
+        quiet++;
+      } else {
+        try {
+          const r = await todayEvents(sub);
+          if(r.needConsent) {
+            // 버그가 아니라 사용자 조치 사항이다 → 실패로 세지 않되 로그에는 반드시 남긴다
+            notes.push(`${tag} 캘린더: 서버 동의 없음 (${r.reason}) — 앱에서 캘린더 접근을 다시 허용해야 합니다`);
+          } else if(r.error) {
+            notes.push(`${tag} 캘린더: ${r.error} ${r.detail||''}`);
+            quiet++;
+          } else if(!r.events.length) {
+            notes.push(`${tag} 캘린더: 오늘(${r.date}) 일정 없음`);
+          } else {
+            const head = r.events.slice(0,3).map(e=>`${e.time} ${e.title}`).join(' · ');
+            msgs.push({
+              title: `📅 오늘 일정 ${r.events.length}개`,
+              body:  r.events.length>3 ? `${head} 외 ${r.events.length-3}건` : head,
+            });
+          }
+        } catch(e) {
+          notes.push(`${tag} 캘린더: 예외 ${e.message}`);
+          quiet++;
+        }
+      }
+    }
+  }
 
-  if(!msgs.length) return { sent:0, failed:0, detail:[`${tag} 지금 보낼 알림 없음 (기기 ${devices.length}대)`] };
+  if(!msgs.length) {
+    return { sent:0, failed:quiet, detail:[...notes, `${tag} 지금 보낼 알림 없음 (기기 ${devices.length}대)`] };
+  }
 
-  let sent=0, failed=0; const detail=[];
+  let sent=0, failed=quiet; const detail=[...notes];
   for (const dev of devices) {
     const shape = tokenShape(dev.token);
     const fcm   = toFcmToken(dev.token);
