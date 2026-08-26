@@ -176,7 +176,6 @@ const Econ = {
       if (d) d.outerHTML = this.delta(q.pct);
     });
     this._paintHold();
-    if (typeof TopStrip !== 'undefined') { try { TopStrip.render(); } catch {} }
   },
   _startPoll() { this._stopPoll(); this._poll = setInterval(() => this.refresh(), this.POLL); },
   _stopPoll()  { if (this._poll) { clearInterval(this._poll); this._poll = null; } },
@@ -387,6 +386,8 @@ const Econ = {
   _paintHold() {
     const el = document.getElementById('econHold');
     if (el) el.innerHTML = this.holdHtml();
+    // 보유가 바뀌면 맨 위 한 줄도 같이 바뀌어야 한다. 1분 뒤 시세 폴링까지 기다릴 일이 아니다.
+    if (typeof TopStrip !== 'undefined') { try { TopStrip.render(); } catch {} }
   },
   _drawHold() {
     const b = this._body(); if (!b) return;
