@@ -30,7 +30,7 @@ const Notifications = {
     diet:     { enabled: true,  아침: '09:00', 점심: '13:00', 저녁: '19:00' },
     tasks:    { enabled: true,  time: '09:00' },
     checklist:{ enabled: true,  time: '09:00' },
-    calendar: { enabled: true,  minutesBefore: 30 },
+    calendar: { enabled: true,  time: '08:00' },
   },
 
   getSettings() {
@@ -242,12 +242,17 @@ const Notifications = {
             onchange="Notifications._toggle('calendar',this.checked)">
         </div>
         <div class="notif-time-row" id="nr_calendar" ${!s.calendar?.enabled?'style="display:none"':''}>
-          <span class="notif-time-lbl">몇 분 전</span>
-          <select class="inp inp-sm" onchange="Notifications._setTime('calendar','minutesBefore',parseInt(this.value))">
-            ${[10,15,30,60].map(m=>`<option value="${m}" ${s.calendar?.minutesBefore===m?'selected':''}>${m}분 전</option>`).join('')}
+          <span class="notif-time-lbl">오늘 일정 요약</span>
+          <select class="inp inp-sm" onchange="Notifications._setTime('calendar','time',this.value)">
+            ${Array.from({length:24},(_,h)=>{
+              const v = String(h).padStart(2,'0')+':00';
+              return `<option value="${v}" ${(s.calendar?.time||'08:00')===v?'selected':''}>${v}</option>`;
+            }).join('')}
           </select>
         </div>
       </div>
+
+      <p class="notif-hint">⏱ 알림 크론은 <b>매시 정각</b>에만 돌아갑니다. 분은 무시되니 시(時)만 맞춰 주세요.</p>
 
       <div class="modal-btns" style="margin-top:16px">
         <button onclick="Notifications.sendTest()" class="btn-sm">🔔 테스트 알림</button>
