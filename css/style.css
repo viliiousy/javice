@@ -1765,3 +1765,26 @@ html.dark .login-scope{ background:rgba(255,255,255,0.04); }
 .diet-food-fav.on{ color:var(--yellow); }
 .diet-food-fav:hover{ color:var(--yellow); }
 .diet-empty-hint{ font-size:12px; color:var(--text3); padding:12px; text-align:center; }
+
+/* 선택한 음식 + 수량 스테퍼 — 추가를 눌러야 담긴다 */
+.diet-sel{
+  border:1px solid var(--accent); border-radius:var(--r-sm);
+  background:var(--accent-bg); padding:10px 12px; margin-bottom:10px;
+}
+.diet-sel-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.diet-sel-nm{ font-size:14px; font-weight:700; color:var(--text); min-width:0;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.diet-sel-sub{ font-size:12px; color:var(--text2); margin-top:5px; font-variant-numeric:tabular-nums; }
+.diet-sel-sub b{ font-size:14px; color:var(--text); }
+.diet-sel-btns{ display:flex; gap:8px; margin-top:10px; }
+.diet-sel-btns button{ flex:1; padding:9px; font-size:13.5px; }
+.diet-qty{ display:flex; align-items:center; gap:2px; flex:none;
+  background:var(--card); border:1px solid var(--border2); border-radius:var(--r-sm); }
+.diet-qty button{
+  width:32px; height:32px; padding:0; cursor:pointer; font-size:17px; font-weight:600;
+  background:transparent; border:none; color:var(--accent); font-family:inherit; line-height:1;
+}
+.diet-qty button:disabled{ color:var(--text4); cursor:default; }
+.diet-qty button:not(:disabled):hover{ background:var(--accent-bg); }
+.diet-qty-n{ min-width:26px; text-align:center; font-size:14px; font-weight:700;
+  color:var(--text); font-variant-numeric:tabular-nums; }
