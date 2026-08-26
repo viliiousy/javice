@@ -173,6 +173,95 @@ const Diet = {
     this.render(date);
   },
 
+  // ── 음식 검색 ─────────────────────────
+  // 초성 테이블. god_life 에는 초성 검색이 없었다 — 새로 넣는다.
+  CHO: ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'],
+  _cho(str){
+    let out='';
+    for(const ch of String(str)){
+      const c=ch.charCodeAt(0)-0xAC00;
+      out += (c>=0 && c<11172) ? this.CHO[Math.floor(c/588)] : ch;
+    }
+    return out;
+  },
+  // 프리셋 + 내가 직접 입력했던 음식을 한 목록으로. 프리셋이 먼저, 중복 이름은 프리셋 우선.
+  _allFoods(){
+    const db = (typeof FOOD_DB!=='undefined' ? FOOD_DB : [])
+      .map(([e,n,u,c]) => ({ e, n, u, c, p:0, cb:0, ft:0 }));
+    const seen = new Set(db.map(f=>f.n));
+    const hist = this.getHistory()
+      .filter(f => f && f.name && !seen.has(f.name))
+      .map(f => ({ e:'🍴', n:f.name, u:'', c:f.cal||0, p:f.protein||0, cb:f.carb||0, ft:f.fat||0 }));
+    return db.concat(hist);
+  },
+  _search(q){
+    q = String(q||'').trim();
+    if(!q) return [];
+    const lower  = q.toLowerCase();
+    const isCho  = /^[ㄱ-ㅎ]+$/.test(q);          // 전부 초성이면 초성 검색
+    const favs   = this.getFavs();
+    const scored = [];
+    for(const f of this._allFoods()){
+      const nm = f.n.toLowerCase();
+      let rank = -1;
+      if(isCho){
+        const ch = this._cho(f.n);
+        if(ch.startsWith(q))      rank = 1;
+        else if(ch.includes(q))   rank = 3;
+      } else {
+        if(nm === lower)          rank = 0;
+        else if(nm.startsWith(lower)) rank = 1;
+        else if(nm.includes(lower))   rank = 2;
+        else if(this._cho(f.n).includes(q)) rank = 4;   // 한글 자모가 섞여도 잡아준다
+      }
+      if(rank < 0) continue;
+      // 즐겨찾기는 무조건 위로 (god_life 의 favs.concat(rest) 와 같은 규칙)
+      scored.push([favs.includes(f.n) ? -1 : rank, f.n.length, f]);
+    }
+    scored.sort((a,b)=>a[0]-b[0] || a[1]-b[1]);
+    return scored.slice(0,30).map(x=>x[2]);
+  },
+  searchFood(q, meal, ds){
+    const box=document.getElementById('dietSearchRes'); if(!box) return;
+    const hits=this._search(q);
+    this._hits=hits;
+    if(!String(q||'').trim()){ box.innerHTML=''; return; }
+    if(!hits.length){
+      box.innerHTML=`<div class="diet-empty-hint">「${esc(q)}」 결과가 없습니다 · 아래에서 직접 입력하세요</div>`;
+      return;
+    }
+    const favs=this.getFavs();
+    box.innerHTML=hits.map((f,i)=>{
+      const fv=favs.includes(f.n);
+      return `<div class="diet-food">
+        <button class="diet-food-fav${fv?' on':''}" title="즐겨찾기"
+          onclick="event.stopPropagation();Diet.favFromSearch(${i},'${meal}','${ds}')">${fv?'★':'☆'}</button>
+        <div class="diet-food-main" onclick="Diet.addFromSearch(${i},'${meal}','${ds}')">
+          <span class="diet-food-nm">${f.e} ${esc(f.n)}</span>
+          ${f.u?`<span class="diet-food-u">${esc(f.u)}</span>`:''}
+        </div>
+        <span class="diet-food-cal">${f.c}<i>kcal</i></span>
+      </div>`;
+    }).join('');
+  },
+  favFromSearch(i, meal, ds){
+    const f=(this._hits||[])[i]; if(!f) return;
+    this.toggleFav(f.n);
+    const q=document.getElementById('dietSearch')?.value||'';
+    this.searchFood(q, meal, ds);      // 즐겨찾기가 위로 올라가는 게 바로 보이도록 다시 그린다
+  },
+  addFromSearch(i, meal, ds){
+    const f=(this._hits||[])[i]; if(!f) return;
+    const data=this.getData(new Date(ds+'T00:00:00'));
+    if(!data[meal]) data[meal]=[];
+    const item={ name:f.n, cal:Number(f.c)||0, protein:Number(f.p)||0, carb:Number(f.cb)||0, fat:Number(f.ft)||0 };
+    data[meal].push(item);
+    this.saveData(data, new Date(ds+'T00:00:00'));
+    this.addToHistory(item);
+    App.showToast(`${f.n} 추가됨 ✓`,'success');
+    this.render(new Date(ds+'T00:00:00'));
+  },
+
   // ── 음식 추가 모달 ─────────────────────
   showAdd(meal=null,dateStr=null){
     if(!meal) meal=this._suggestMeal();
@@ -200,9 +289,15 @@ const Diet = {
         </div>
       </div>`:'';
 
+    const dbN = (typeof FOOD_DB!=='undefined' ? FOOD_DB.length : 0);
     App.openModal(`${this.EMOJIS[meal]} ${meal} 추가`,`
+      <input id="dietSearch" class="inp diet-search" autocomplete="off"
+        placeholder="음식 검색 — 초성도 됩니다 (예: ㄷㄱㅅㅅ)"
+        oninput="Diet.searchFood(this.value,'${meal}','${ds}')">
+      <div id="dietSearchRes"></div>
       ${quickHTML}
-      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">직접 입력</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">직접 입력${
+        dbN?` <span style="color:var(--text4)">· 프리셋 ${dbN}개에 없을 때</span>`:''}</div>
       <div class="modal-row"><label class="modal-lbl">음식 이름 *</label>
         <input id="fName" type="text" placeholder="예: 닭가슴살 100g" class="inp"></div>
       <div class="modal-grid2">
