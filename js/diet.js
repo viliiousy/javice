@@ -127,8 +127,8 @@ const Diet = {
         <div class="meal-items">
           ${items.map((item,idx)=>`
             <div class="meal-food">
-              <button class="diet-fav-btn${this.isFav(item.name)?' is-fav':''}"
-                onclick="Diet._clickFav('${item.name.replace(/'/g,'&#39;')}','${meal}','${ds}')" title="즐겨찾기">★</button>
+              <button class="diet-fav-btn${this.isFav(item.base||item.name)?' is-fav':''}"
+                onclick="Diet._clickFav('${(item.base||item.name).replace(/'/g,'&#39;')}','${meal}','${ds}')" title="즐겨찾기">★</button>
               <span>${esc(item.name)}</span>
               <span class="meal-food-cal">${item.cal}kcal
                 <button class="btn-del-food" onclick="Diet.remove('${meal}',${idx},'${ds}')">✕</button>
@@ -236,7 +236,7 @@ const Diet = {
       return `<div class="diet-food">
         <button class="diet-food-fav${fv?' on':''}" title="즐겨찾기"
           onclick="event.stopPropagation();Diet.favFromSearch(${i},'${meal}','${ds}')">${fv?'★':'☆'}</button>
-        <div class="diet-food-main" onclick="Diet.addFromSearch(${i},'${meal}','${ds}')">
+        <div class="diet-food-main" onclick="Diet.selectFood(${i},'${meal}','${ds}')">
           <span class="diet-food-nm">${f.e} ${esc(f.n)}</span>
           ${f.u?`<span class="diet-food-u">${esc(f.u)}</span>`:''}
         </div>
@@ -250,20 +250,95 @@ const Diet = {
     const q=document.getElementById('dietSearch')?.value||'';
     this.searchFood(q, meal, ds);      // 즐겨찾기가 위로 올라가는 게 바로 보이도록 다시 그린다
   },
-  addFromSearch(i, meal, ds){
+  // ── 선택 + 수량 ───────────────────────
+  // 검색 결과를 누르면 바로 담지 않는다. 예전엔 그래서 「닭가슴살 200g」을 넣으려면
+  // 두 번 눌러야 했고 100g 짜리가 두 줄로 따로 쌓였다. 이제 수량을 정하고 추가한다.
+  //
+  // 단위에 붙은 숫자를 수량만큼 곱한다. "100g"×2 → "200g", "1인분"×2 → "2인분".
+  // 숫자로 시작하지 않으면(예: "반개", "M") 곱하지 않고 ×N 을 붙인다.
+  _scaleUnit(u, q){
+    if(q <= 1) return u || '';
+    if(!u) return `×${q}`;
+    const m = /^(\d+(?:\.\d+)?)(.*)$/.exec(u);
+    if(!m) return `${u} ×${q}`;
+    const n = Number(m[1]) * q;
+    return `${Number.isInteger(n) ? n : n.toFixed(1)}${m[2]}`;
+  },
+  _paintSel(meal, ds){
+    const el=document.getElementById('dietSel');
+    if(el) el.innerHTML=this._selHtml(meal, ds);
+  },
+  _selHtml(meal, ds){
+    const s=this._sel;
+    if(!s) return '';
+    const u   = this._scaleUnit(s.u, s.qty);
+    const cal = Math.round(s.c * s.qty);
+    const hasMacro = s.p || s.cb || s.ft;
+    return `<div class="diet-sel">
+      <div class="diet-sel-top">
+        <span class="diet-sel-nm">${s.e} ${esc(s.n)}</span>
+        <div class="diet-qty">
+          <button onclick="Diet.qty(-1,'${meal}','${ds}')" ${s.qty<=1?'disabled':''} aria-label="줄이기">−</button>
+          <span class="diet-qty-n">${s.qty}</span>
+          <button onclick="Diet.qty(1,'${meal}','${ds}')" aria-label="늘리기">+</button>
+        </div>
+      </div>
+      <div class="diet-sel-sub">${u?esc(u)+' · ':''}<b>${cal}</b>kcal${
+        hasMacro?` · 단 ${(s.p*s.qty).toFixed(0)}g 탄 ${(s.cb*s.qty).toFixed(0)}g 지 ${(s.ft*s.qty).toFixed(0)}g`:''}</div>
+      <div class="diet-sel-btns">
+        <button class="btn-sm accent" onclick="Diet.commitSel('${meal}','${ds}')">추가</button>
+        <button class="btn-sm" onclick="Diet.clearSel('${meal}','${ds}')">취소</button>
+      </div>
+    </div>`;
+  },
+  selectFood(i, meal, ds){
     const f=(this._hits||[])[i]; if(!f) return;
-    const data=this.getData(new Date(ds+'T00:00:00'));
+    this._sel={ ...f, qty:1 };
+    this._paintSel(meal, ds);
+  },
+  selectRecent(name, meal, ds){
+    const f=this.getHistory().find(x=>x.name===name); if(!f) return;
+    this._sel={ e:'🍴', n:f.name, u:f.unit||'', c:f.cal||0,
+                p:f.protein||0, cb:f.carb||0, ft:f.fat||0, qty:1 };
+    this._paintSel(meal, ds);
+  },
+  qty(d, meal, ds){
+    if(!this._sel) return;
+    this._sel.qty = Math.min(99, Math.max(1, this._sel.qty + d));
+    this._paintSel(meal, ds);
+  },
+  clearSel(meal, ds){ this._sel=null; this._paintSel(meal, ds); },
+  commitSel(meal, ds){
+    const s=this._sel; if(!s) return;
+    const u   = this._scaleUnit(s.u, s.qty);
+    const date= new Date(ds+'T00:00:00');
+    const item={
+      name:    u ? `${s.n} ${u}` : s.n,   // 목록에 보이는 이름 — 수량이 반영된다
+      base:    s.n,                        // 즐겨찾기·히스토리 키는 항상 기본 이름
+      unit:    s.u || '',
+      qty:     s.qty,
+      cal:     Math.round(s.c * s.qty),
+      protein: +(s.p  * s.qty).toFixed(1),
+      carb:    +(s.cb * s.qty).toFixed(1),
+      fat:     +(s.ft * s.qty).toFixed(1),
+    };
+    const data=this.getData(date);
     if(!data[meal]) data[meal]=[];
-    const item={ name:f.n, cal:Number(f.c)||0, protein:Number(f.p)||0, carb:Number(f.cb)||0, fat:Number(f.ft)||0 };
     data[meal].push(item);
-    this.saveData(data, new Date(ds+'T00:00:00'));
-    this.addToHistory(item);
-    App.showToast(`${f.n} 추가됨 ✓`,'success');
-    this.render(new Date(ds+'T00:00:00'));
+    this.saveData(data, date);
+    // 히스토리는 1개분으로 남긴다. 그래야 다음에 꺼낼 때 수량을 다시 고를 수 있다.
+    this.addToHistory({ name:s.n, unit:s.u||'', cal:s.c, protein:s.p, carb:s.cb, fat:s.ft });
+    this._sel=null;
+    const q=document.getElementById('dietSearch'); if(q) q.value='';
+    const box=document.getElementById('dietSearchRes'); if(box) box.innerHTML='';
+    this._paintSel(meal, ds);
+    App.showToast(`${item.name} 추가됨 ✓`,'success');
+    this.render(date);      // 모달은 열어 둔다 — 한 끼에 여러 개 담는 경우가 많다
   },
 
   // ── 음식 추가 모달 ─────────────────────
   showAdd(meal=null,dateStr=null){
+    this._sel=null; this._hits=null;   // 지난번 선택이 남아 있으면 안 된다
     if(!meal) meal=this._suggestMeal();
     const ds=dateStr||this._localDateStr();
     const favs=this.getFavs();
@@ -294,6 +369,7 @@ const Diet = {
       <input id="dietSearch" class="inp diet-search" autocomplete="off"
         placeholder="음식 검색 — 초성도 됩니다 (예: ㄷㄱㅅㅅ)"
         oninput="Diet.searchFood(this.value,'${meal}','${ds}')">
+      <div id="dietSel"></div>
       <div id="dietSearchRes"></div>
       ${quickHTML}
       <div style="font-size:11px;color:var(--text3);margin-bottom:6px">직접 입력${
@@ -313,19 +389,8 @@ const Diet = {
     setTimeout(()=>document.getElementById('fName')?.focus(),50);
   },
 
-  _quickAdd(name,meal,dateStr){
-    const h=this.getHistory();
-    const food=h.find(f=>f.name===name);
-    if(!food) return;
-    const date=new Date(dateStr+'T00:00:00');
-    const data=this.getData(date);
-    data[meal].push({name:food.name,cal:food.cal||0,protein:food.protein||0,carb:food.carb||0,fat:food.fat||0});
-    this.saveData(data,date);
-    this.addToHistory(food);
-    this.render(date);
-    App.closeModal();
-    App.showToast(`${name} 추가됨 ✓`,'success');
-  },
+  // 빠른 추가도 검색과 같은 흐름을 탄다 — 누르면 선택되고, 수량을 정한 뒤 추가한다.
+  _quickAdd(name,meal,dateStr){ this.selectRecent(name, meal, dateStr); },
 
   saveFood(meal,dateStr=null){
     const name=document.getElementById('fName').value.trim();
