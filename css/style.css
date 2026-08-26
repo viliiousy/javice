@@ -1811,3 +1811,55 @@ html.dark .login-scope{ background:rgba(255,255,255,0.04); }
 .diet-qty button:not(:disabled):hover{ background:var(--accent-bg); }
 .diet-qty-n{ min-width:22px; text-align:center; font-size:13.5px; font-weight:700;
   color:var(--text); font-variant-numeric:tabular-nums; }
+
+/* ═══════════════════════════════════════
+   상단 요약 스트립 — js/topstrip.js
+   카드가 아홉 개가 되면서 스크롤 없이는 상태를 못 봤다. 자주 보는 숫자만 위로 올린다.
+   ═══════════════════════════════════════ */
+.top-strip{
+  display:flex; gap:10px; max-width:1440px; margin:0 auto;
+  padding:0 16px 4px; align-items:stretch;
+}
+.ts-cell{
+  flex:1; min-width:0; display:flex; flex-direction:column; gap:4px;
+  padding:9px 13px; cursor:pointer; text-align:left; font-family:inherit;
+  background:var(--card); border:1px solid var(--border);
+  border-radius:var(--r-sm); box-shadow:var(--shadow-sm);
+  transition:border-color 0.15s, box-shadow 0.15s;
+}
+.ts-cell:hover{ border-color:var(--accent); box-shadow:var(--shadow); }
+.ts-cell:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+.ts-lbl{ font-size:10.5px; font-weight:700; color:var(--text3); white-space:nowrap; }
+.ts-lbl em{ font-style:normal; font-weight:500; color:var(--text4); margin-left:3px; }
+.ts-body{ display:flex; gap:12px; align-items:baseline; min-width:0; overflow:hidden; }
+.ts-v{ white-space:nowrap; font-variant-numeric:tabular-nums; }
+.ts-v b{ font-size:15px; font-weight:700; color:var(--text); }
+.ts-v i{ font-style:normal; font-size:10px; color:var(--text3); margin-left:1px; }
+.ts-v u{
+  text-decoration:none; font-size:8.5px; font-weight:700; color:var(--yellow);
+  background:rgba(217,119,6,0.12); border-radius:3px; padding:1px 3px; margin-left:3px;
+}
+.ts-tick{ font-size:11px; color:var(--text2); }
+.ts-tick b{ font-size:12.5px; margin-left:2px; }
+/* 한국식: 상승 빨강, 하락 파랑 */
+.ts-up{ color:var(--red) !important; } .ts-dn{ color:var(--blue) !important; }
+.ts-flat{ color:var(--text3) !important; }
+.ts-more{ font-size:10.5px; color:var(--text4); align-self:center; }
+
+/* 스크롤만 하면 어디로 갔는지 모른다 — 잠깐 테두리를 밝힌다 */
+@keyframes tsFlash{
+  0%,100%{ border-color:var(--border); box-shadow:var(--shadow-sm); }
+  30%,60%{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-bg); }
+}
+.ts-flash{ animation:tsFlash 1.4s ease; }
+
+@media (max-width:860px){
+  .top-strip{ padding:0 10px 4px; gap:6px; }
+  .ts-cell{ padding:7px 10px; }
+  .ts-body{ gap:8px; }
+  .ts-v b{ font-size:13.5px; }
+}
+@media (max-width:560px){
+  /* 좁으면 두 칸이 나란히 있기 어렵다. 세로로 쌓되 각 칸은 여전히 한 줄. */
+  .top-strip{ flex-direction:column; }
+}
