@@ -56,9 +56,17 @@ module.exports = async (req, res) => {
         res.status(400).json({ error: 'prices.items 가 없습니다' }); return;
       }
 
+      // items 를 그대로 넣으면 안 된다. RTDB 는 키에 . $ # [ ] / 를 금지하는데
+      // 티커에 점이 들어간다 (us:NVDA.O, us:TSLA.O …) → PUT 이 400 으로 거절된다.
+      // 키를 인코딩하면 파이썬·JS 양쪽에서 규칙을 맞춰야 하므로, 통째로 문자열로 넣는다.
+      // 페이로드가 1KB 미만이라 비용도 없다.
       const r = await fbFetch(`/econ_prices/${uid}.json`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...prices, savedAt: Date.now() }),
+        body: JSON.stringify({
+          updated:   prices.updated || null,
+          itemsJson: JSON.stringify(prices.items),
+          savedAt:   Date.now(),
+        }),
       });
       // 저장 실패를 200 으로 넘기면 크론은 성공했다고 믿고 화면은 옛 시세를 계속 보여준다
       if (!r.ok) { res.status(502).json({ error: `Firebase 저장 실패 ${r.status}` }); return; }
@@ -75,8 +83,15 @@ module.exports = async (req, res) => {
 
       const data = await fbGet(`/econ_prices/${uid}.json`);
       if (!data) { res.status(404).json({ error: '아직 수집된 시세가 없습니다' }); return; }
+      let items = {};
+      if (typeof data.itemsJson === 'string') {
+        try { items = JSON.parse(data.itemsJson); }
+        catch (e) { res.status(500).json({ error: '저장된 시세를 읽지 못했습니다: ' + e.message }); return; }
+      } else if (data.items) {
+        items = data.items;               // 혹시 남아 있을 옛 형태
+      }
       res.setHeader('Cache-Control', 'no-store');   // 이걸 캐시하면 옮긴 의미가 없다
-      res.status(200).json({ ok: true, updated: data.updated || null, items: data.items || {} });
+      res.status(200).json({ ok: true, updated: data.updated || null, items });
       return;
     }
 
