@@ -18,6 +18,7 @@ const App = {
     this._updateHeaderDate(new Date());
     this.initDarkMode();
     this._setupListeners();
+    if (typeof Tabs !== 'undefined') Tabs.init();
     setTimeout(()=>{ if(typeof JARVIS!=='undefined') JARVIS.init(); },500);
     const waitGIS=setInterval(()=>{ if(typeof google!=='undefined'&&google.accounts){ clearInterval(waitGIS); Auth.init(); } },150); setTimeout(()=>clearInterval(waitGIS),8000);
   },
