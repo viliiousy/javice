@@ -117,7 +117,7 @@ const Econ = {
     if (upd) upd.textContent = this._updatedAt ? '업데이트 ' + this._updatedAt.replace('T',' ').slice(5,16) : '시세 대기 중';
 
     if (!c.favorites.length) {
-      wrap.innerHTML = `<p class="empty">즐겨찾기가 비어 있어요<br><span class="ec-hint">「전체 보기」에서 종목을 ★ 하면 여기에 표시됩니다</span></p>`;
+      wrap.innerHTML = `<p class="empty">${Icons.big('trend')}즐겨찾기가 비어 있어요<br><span class="ec-hint">「전체 보기」에서 종목을 ★ 하면 여기에 표시됩니다</span></p>`;
       return;
     }
     const all = c.favorites;
