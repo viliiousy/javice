@@ -2040,3 +2040,61 @@ html.dark .ec-fav.on, html.dark .diet-food-fav.on { color:#fbbf24; }
 @media (max-width:900px) and (min-width:641px){
   .dashboard{ grid-template-columns:1fr 1fr; }
 }
+
+/* ═══════════════════════════════════════
+   상단 칩 줄 — 인바디·경제도 여기 들어온다
+   ═══════════════════════════════════════ */
+/* 예전엔 바로 아래에 비슷하게 생긴 줄이 하나 더 있었다. 윗쪽에 줄이 둘이면
+   어느 쪽을 봐야 하는지 매번 판단해야 한다. 한 줄로 합쳤다. */
+.stat-chip.stat-ts{
+  display:inline-flex; align-items:baseline; gap:0;
+  padding:3px 11px; cursor:pointer; font-variant-numeric:tabular-nums;
+}
+.stat-chip.stat-ts:hover{ border-color:var(--accent); color:var(--accent); }
+.stat-chip.stat-ts b{ font-weight:700; color:var(--text); }
+.stat-chip.stat-ts i{ font-style:normal; font-size:11px; color:var(--text3); margin-left:1px; }
+.stat-chip.stat-ts u{
+  text-decoration:none; font-size:11px; font-weight:700; color:var(--yellow);
+  margin-left:2px;
+}
+/* 값 사이 얇은 구분선. 가운뎃점보다 숫자 덩어리가 또렷하게 갈린다. */
+.stat-chip.stat-ts s{
+  text-decoration:none; display:inline-block;
+  width:1px; height:9px; margin:0 7px; background:var(--border2); opacity:.8;
+}
+.stat-chip.stat-ts .ts-up{ color:var(--red); }
+.stat-chip.stat-ts .ts-dn{ color:var(--blue); }
+
+/* 다가오는 일정: 한 줄만. 두 줄이 되면 배너가 화면 위쪽을 계속 잡아먹는다.
+   넘치는 건 옆으로 밀어서 본다 — 잘라 없애지는 않는다. */
+.stats-upcoming{
+  flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden;
+  scrollbar-width:none; -webkit-overflow-scrolling:touch;
+}
+.stats-upcoming::-webkit-scrollbar{ display:none; }
+.stats-upcoming-chip{
+  flex:0 0 auto; max-width:190px;
+}
+
+/* 메인에서 끈 카드 */
+.card-off{ display:none !important; }
+
+/* 경제 카드: 종목이 많으면 접어 둔다 */
+.ec-more{
+  padding:8px; text-align:center; cursor:pointer;
+  font-size:12px; font-weight:600; color:var(--text3);
+  border-top:1px dashed var(--border);
+}
+.ec-more:hover{ color:var(--accent); }
+
+/* 메인 카드 설정 */
+.cardset-grp{ margin-bottom:12px; }
+.cardset-hd{ font-size:11px; font-weight:700; color:var(--text3); margin-bottom:5px; }
+.cardset-row{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:8px 10px; margin-bottom:4px; cursor:pointer;
+  border:1px solid var(--border); border-radius:var(--r-sm); background:var(--card2);
+}
+.cardset-nm{ font-size:13.5px; color:var(--text); }
+
+html.dark .cardset-row{ background:var(--card2); border-color:var(--border); }
