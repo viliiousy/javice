@@ -250,9 +250,9 @@ const Diet = {
     const q=document.getElementById('dietSearch')?.value||'';
     this.searchFood(q, meal, ds);      // 즐겨찾기가 위로 올라가는 게 바로 보이도록 다시 그린다
   },
-  // ── 선택 + 수량 ───────────────────────
-  // 검색 결과를 누르면 바로 담지 않는다. 예전엔 그래서 「닭가슴살 200g」을 넣으려면
-  // 두 번 눌러야 했고 100g 짜리가 두 줄로 따로 쌓였다. 이제 수량을 정하고 추가한다.
+  // ── 담은 목록 (장바구니) ───────────────
+  // 누르면 바로 담기지 않는다. 여러 개를 담아 두고 맨 아래 「추가」로 한 번에 넣는다.
+  // 예전엔 하나를 고르면 이전 선택이 사라져서 닭가슴살+햇반을 같이 못 넣었다.
   //
   // 단위에 붙은 숫자를 수량만큼 곱한다. "100g"×2 → "200g", "1인분"×2 → "2인분".
   // 숫자로 시작하지 않으면(예: "반개", "M") 곱하지 않고 ×N 을 붙인다.
@@ -264,81 +264,116 @@ const Diet = {
     const n = Number(m[1]) * q;
     return `${Number.isInteger(n) ? n : n.toFixed(1)}${m[2]}`;
   },
-  _paintSel(meal, ds){
-    const el=document.getElementById('dietSel');
-    if(el) el.innerHTML=this._selHtml(meal, ds);
+  _cartCal(){ return (this._cart||[]).reduce((a,s)=>a+Math.round(s.c*s.qty),0); },
+  _paintCart(meal, ds){
+    const box=document.getElementById('dietCart');
+    if(box) box.innerHTML=this._cartHtml(meal, ds);
+    const btn=document.getElementById('dietCommit');
+    if(btn){
+      const n=(this._cart||[]).length;
+      btn.disabled = !n;
+      btn.textContent = n ? `추가 (${n}개 · ${this._cartCal()}kcal)` : '담은 음식 없음';
+    }
   },
-  _selHtml(meal, ds){
-    const s=this._sel;
-    if(!s) return '';
-    const u   = this._scaleUnit(s.u, s.qty);
-    const cal = Math.round(s.c * s.qty);
-    const hasMacro = s.p || s.cb || s.ft;
-    return `<div class="diet-sel">
-      <div class="diet-sel-top">
-        <span class="diet-sel-nm">${s.e} ${esc(s.n)}</span>
-        <div class="diet-qty">
-          <button onclick="Diet.qty(-1,'${meal}','${ds}')" ${s.qty<=1?'disabled':''} aria-label="줄이기">−</button>
-          <span class="diet-qty-n">${s.qty}</span>
-          <button onclick="Diet.qty(1,'${meal}','${ds}')" aria-label="늘리기">+</button>
-        </div>
-      </div>
-      <div class="diet-sel-sub">${u?esc(u)+' · ':''}<b>${cal}</b>kcal${
-        hasMacro?` · 단 ${(s.p*s.qty).toFixed(0)}g 탄 ${(s.cb*s.qty).toFixed(0)}g 지 ${(s.ft*s.qty).toFixed(0)}g`:''}</div>
-      <div class="diet-sel-btns">
-        <button class="btn-sm accent" onclick="Diet.commitSel('${meal}','${ds}')">추가</button>
-        <button class="btn-sm" onclick="Diet.clearSel('${meal}','${ds}')">취소</button>
-      </div>
+  _cartHtml(meal, ds){
+    const cart=this._cart||[];
+    if(!cart.length) return '';
+    return `<div class="diet-cart">
+      <div class="diet-cart-hd">담은 것 ${cart.length}개</div>
+      ${cart.map((s,i)=>{
+        const u=this._scaleUnit(s.u, s.qty);
+        return `<div class="diet-cart-row">
+          <span class="diet-cart-nm">${s.e} ${esc(s.n)}${u?` <i>${esc(u)}</i>`:''}</span>
+          <div class="diet-qty">
+            <button onclick="Diet.cartQty(${i},-1,'${meal}','${ds}')" ${s.qty<=1?'disabled':''} aria-label="줄이기">−</button>
+            <span class="diet-qty-n">${s.qty}</span>
+            <button onclick="Diet.cartQty(${i},1,'${meal}','${ds}')" aria-label="늘리기">+</button>
+          </div>
+          <span class="diet-cart-cal">${Math.round(s.c*s.qty)}<i>kcal</i></span>
+          <button class="diet-cart-del" onclick="Diet.cartRemove(${i},'${meal}','${ds}')" aria-label="빼기">✕</button>
+        </div>`;
+      }).join('')}
+      <div class="diet-cart-sum">합계 <b>${this._cartCal()}</b>kcal</div>
     </div>`;
+  },
+  // 같은 음식을 또 누르면 줄을 늘리지 않고 수량만 올린다
+  addToCart(food, meal, ds){
+    if(!this._cart) this._cart=[];
+    const hit=this._cart.find(x=>x.n===food.n && x.u===food.u);
+    if(hit) hit.qty++;
+    else this._cart.push({ ...food, qty:1 });
+    this._paintCart(meal, ds);
+  },
+  cartQty(i, d, meal, ds){
+    const s=(this._cart||[])[i]; if(!s) return;
+    s.qty=Math.min(99, Math.max(1, s.qty+d));
+    this._paintCart(meal, ds);
+  },
+  cartRemove(i, meal, ds){
+    if(!this._cart) return;
+    this._cart.splice(i,1);
+    this._paintCart(meal, ds);
   },
   selectFood(i, meal, ds){
     const f=(this._hits||[])[i]; if(!f) return;
-    this._sel={ ...f, qty:1 };
-    this._paintSel(meal, ds);
+    this.addToCart({ e:f.e, n:f.n, u:f.u, c:f.c, p:f.p, cb:f.cb, ft:f.ft }, meal, ds);
   },
   selectRecent(name, meal, ds){
     const f=this.getHistory().find(x=>x.name===name); if(!f) return;
-    this._sel={ e:'🍴', n:f.name, u:f.unit||'', c:f.cal||0,
-                p:f.protein||0, cb:f.carb||0, ft:f.fat||0, qty:1 };
-    this._paintSel(meal, ds);
+    this.addToCart({ e:'🍴', n:f.name, u:f.unit||'', c:f.cal||0,
+                     p:f.protein||0, cb:f.carb||0, ft:f.fat||0 }, meal, ds);
   },
-  qty(d, meal, ds){
-    if(!this._sel) return;
-    this._sel.qty = Math.min(99, Math.max(1, this._sel.qty + d));
-    this._paintSel(meal, ds);
+  // 직접 입력은 기본으로 접어 둔다 — 프리셋 316개로 대부분 해결된다
+  toggleManual(){
+    const box=document.getElementById('dietManual');
+    const btn=document.getElementById('dietManualBtn');
+    if(!box) return;
+    const open = box.style.display==='none';
+    box.style.display = open ? '' : 'none';
+    if(btn) btn.textContent = open ? '− 직접 입력 닫기' : '＋ 직접 입력';
+    if(open) setTimeout(()=>document.getElementById('fName')?.focus(),50);
   },
-  clearSel(meal, ds){ this._sel=null; this._paintSel(meal, ds); },
-  commitSel(meal, ds){
-    const s=this._sel; if(!s) return;
-    const u   = this._scaleUnit(s.u, s.qty);
-    const date= new Date(ds+'T00:00:00');
-    const item={
-      name:    u ? `${s.n} ${u}` : s.n,   // 목록에 보이는 이름 — 수량이 반영된다
-      base:    s.n,                        // 즐겨찾기·히스토리 키는 항상 기본 이름
-      unit:    s.u || '',
-      qty:     s.qty,
-      cal:     Math.round(s.c * s.qty),
-      protein: +(s.p  * s.qty).toFixed(1),
-      carb:    +(s.cb * s.qty).toFixed(1),
-      fat:     +(s.ft * s.qty).toFixed(1),
-    };
+  addManualToCart(meal, ds){
+    const name=(document.getElementById('fName')?.value||'').trim();
+    if(!name){ App.showToast('음식 이름을 입력해주세요','error'); return; }
+    const num=id=>{ const e=document.getElementById(id); return e ? (parseFloat(e.value)||0) : 0; };
+    this.addToCart({ e:'🍴', n:name, u:'', c:Math.round(num('fCal')),
+                     p:num('fProt'), cb:num('fCarb'), ft:num('fFat') }, meal, ds);
+    ['fName','fCal','fProt','fCarb','fFat'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+    document.getElementById('fName')?.focus();
+  },
+  commitCart(meal, ds){
+    const cart=this._cart||[];
+    if(!cart.length){ App.showToast('담은 음식이 없습니다','error'); return; }
+    const date=new Date(ds+'T00:00:00');
     const data=this.getData(date);
     if(!data[meal]) data[meal]=[];
-    data[meal].push(item);
+    for(const s of cart){
+      const u=this._scaleUnit(s.u, s.qty);
+      data[meal].push({
+        name:    u ? `${s.n} ${u}` : s.n,   // 목록에 보이는 이름 — 수량이 반영된다
+        base:    s.n,                        // 즐겨찾기·히스토리 키는 항상 기본 이름
+        unit:    s.u || '',
+        qty:     s.qty,
+        cal:     Math.round(s.c * s.qty),
+        protein: +(s.p  * s.qty).toFixed(1),
+        carb:    +(s.cb * s.qty).toFixed(1),
+        fat:     +(s.ft * s.qty).toFixed(1),
+      });
+      // 히스토리는 1개분으로 남긴다. 그래야 다음에 꺼낼 때 수량을 다시 고를 수 있다.
+      this.addToHistory({ name:s.n, unit:s.u||'', cal:s.c, protein:s.p, carb:s.cb, fat:s.ft });
+    }
     this.saveData(data, date);
-    // 히스토리는 1개분으로 남긴다. 그래야 다음에 꺼낼 때 수량을 다시 고를 수 있다.
-    this.addToHistory({ name:s.n, unit:s.u||'', cal:s.c, protein:s.p, carb:s.cb, fat:s.ft });
-    this._sel=null;
-    const q=document.getElementById('dietSearch'); if(q) q.value='';
-    const box=document.getElementById('dietSearchRes'); if(box) box.innerHTML='';
-    this._paintSel(meal, ds);
-    App.showToast(`${item.name} 추가됨 ✓`,'success');
-    this.render(date);      // 모달은 열어 둔다 — 한 끼에 여러 개 담는 경우가 많다
+    const n=cart.length, kcal=this._cartCal();
+    this._cart=[];
+    App.closeModal();
+    App.showToast(`${n}개 · ${kcal}kcal 추가됨 ✓`,'success');
+    this.render(date);
   },
 
   // ── 음식 추가 모달 ─────────────────────
   showAdd(meal=null,dateStr=null){
-    this._sel=null; this._hits=null;   // 지난번 선택이 남아 있으면 안 된다
+    this._cart=[]; this._hits=null;   // 지난번에 담아둔 게 남아 있으면 안 된다
     if(!meal) meal=this._suggestMeal();
     const ds=dateStr||this._localDateStr();
     const favs=this.getFavs();
@@ -369,48 +404,33 @@ const Diet = {
       <input id="dietSearch" class="inp diet-search" autocomplete="off"
         placeholder="음식 검색 — 초성도 됩니다 (예: ㄷㄱㅅㅅ)"
         oninput="Diet.searchFood(this.value,'${meal}','${ds}')">
-      <div id="dietSel"></div>
+      <div id="dietCart"></div>
       <div id="dietSearchRes"></div>
       ${quickHTML}
-      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">직접 입력${
-        dbN?` <span style="color:var(--text4)">· 프리셋 ${dbN}개에 없을 때</span>`:''}</div>
-      <div class="modal-row"><label class="modal-lbl">음식 이름 *</label>
-        <input id="fName" type="text" placeholder="예: 닭가슴살 100g" class="inp"></div>
-      <div class="modal-grid2">
-        <div><label class="modal-lbl">칼로리 (kcal)</label><input id="fCal" type="number" min="0" placeholder="0" class="inp inp-sm"></div>
-        <div><label class="modal-lbl">단백질 (g)</label><input id="fProt" type="number" min="0" step="0.1" placeholder="0" class="inp inp-sm"></div>
-        <div><label class="modal-lbl">탄수화물 (g)</label><input id="fCarb" type="number" min="0" step="0.1" placeholder="0" class="inp inp-sm"></div>
-        <div><label class="modal-lbl">지방 (g)</label><input id="fFat" type="number" min="0" step="0.1" placeholder="0" class="inp inp-sm"></div>
+      <button id="dietManualBtn" class="diet-manual-btn" onclick="Diet.toggleManual()">＋ 직접 입력</button>
+      <div id="dietManual" style="display:none">
+        <div style="font-size:11px;color:var(--text3);margin:8px 0 6px">프리셋 ${dbN}개에 없는 음식</div>
+        <div class="modal-row"><label class="modal-lbl">음식 이름 *</label>
+          <input id="fName" type="text" placeholder="예: 엄마표 된장찌개" class="inp"></div>
+        <div class="modal-grid2">
+          <div><label class="modal-lbl">칼로리 (kcal)</label><input id="fCal" type="number" min="0" placeholder="0" class="inp inp-sm"></div>
+          <div><label class="modal-lbl">단백질 (g)</label><input id="fProt" type="number" min="0" step="0.1" placeholder="0" class="inp inp-sm"></div>
+          <div><label class="modal-lbl">탄수화물 (g)</label><input id="fCarb" type="number" min="0" step="0.1" placeholder="0" class="inp inp-sm"></div>
+          <div><label class="modal-lbl">지방 (g)</label><input id="fFat" type="number" min="0" step="0.1" placeholder="0" class="inp inp-sm"></div>
+        </div>
+        <button class="btn-sm" style="width:100%;margin-top:8px" onclick="Diet.addManualToCart('${meal}','${ds}')">담기</button>
       </div>
       <div class="modal-btns">
-        <button onclick="Diet.saveFood('${meal}','${ds}')" class="btn-sm accent">추가</button>
+        <button id="dietCommit" onclick="Diet.commitCart('${meal}','${ds}')" class="btn-sm accent" disabled>담은 음식 없음</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
       </div>`);
-    setTimeout(()=>document.getElementById('fName')?.focus(),50);
+    setTimeout(()=>{ this._paintCart(meal, ds); document.getElementById('dietSearch')?.focus(); },50);
   },
 
   // 빠른 추가도 검색과 같은 흐름을 탄다 — 누르면 선택되고, 수량을 정한 뒤 추가한다.
   _quickAdd(name,meal,dateStr){ this.selectRecent(name, meal, dateStr); },
 
-  saveFood(meal,dateStr=null){
-    const name=document.getElementById('fName').value.trim();
-    if(!name){ App.showToast('음식 이름을 입력해주세요','error'); return; }
-    const food={
-      name,
-      cal:    parseInt(document.getElementById('fCal').value)||0,
-      protein:parseFloat(document.getElementById('fProt').value)||0,
-      carb:   parseFloat(document.getElementById('fCarb').value)||0,
-      fat:    parseFloat(document.getElementById('fFat').value)||0,
-    };
-    const date=dateStr?new Date(dateStr+'T00:00:00'):new Date();
-    const data=this.getData(date);
-    data[meal].push(food);
-    this.saveData(data,date);
-    this.addToHistory(food);
-    this.render(date);
-    App.closeModal();
-    App.showToast(`${name} 추가됨 ✓`,'success');
-  },
+  // saveFood 는 장바구니(commitCart)로 대체됐다. 호출하는 곳이 없어 지운다.
 
   remove(meal,idx,dateStr=null){
     const date=dateStr?new Date(dateStr+'T00:00:00'):new Date();
