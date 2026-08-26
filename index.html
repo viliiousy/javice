@@ -98,6 +98,7 @@
       <div id="profileMenu" class="profile-menu hidden">
         <div class="profile-menu-item" style="font-size:11px;color:var(--text3);cursor:default;padding:6px 16px;border-bottom:1px solid var(--border)">v26.05.25.0116 업데이트</div>
         <div class="profile-menu-item" onclick="Notifications.showSettings()">🔔 알림 설정</div>
+        <div class="profile-menu-item" onclick="App.showCardSettings()">🧩 메인 카드</div>
         <div class="profile-menu-item" onclick="App.toggleDarkMode()"><span id="darkModeLabel">🌙 다크 모드</span></div>
         <div class="profile-menu-item" onclick="App.toggleSound()"><span id="soundLabel">🔔 사운드 켜짐</span></div>
         <div class="profile-menu-item" onclick="Auth.logout()">🚪 로그아웃</div>
@@ -107,9 +108,6 @@
 
   <div id="statsBanner" class="stats-banner"></div>
   </div>
-
-  <!-- 맨 위 한 줄 요약 — 누르면 해당 카드로 -->
-  <div id="topStrip" class="top-strip" style="display:none"></div>
 
   <div class="dashboard">
 
@@ -213,10 +211,10 @@
       <div id="inbodyWrap" class="inbody-wrap"></div>
     </section>
 
-    <!-- 시세 (경제알림 흡수) -->
+    <!-- 경제 (경제알림 흡수) -->
     <section class="card card-econ">
       <div class="card-head">
-        <span class="card-title">📈 시세</span>
+        <span class="card-title">📈 경제</span>
         <div class="card-acts">
           <span class="ec-upd" id="econUpd"></span>
           <button class="btn-sm" onclick="Econ.refresh()" title="새로고침">⟳</button>
