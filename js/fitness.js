@@ -60,16 +60,18 @@ const Fitness = {
     // 카드 타이틀
     const titleEl = document.querySelector('.card-fitness .card-title');
     if (titleEl) {
-      if (isToday) titleEl.textContent='💪 오늘의 운동';
+      // textContent 로 쓰면 머리글 아이콘까지 지워진다. Icons.title 로 통일한다.
+      if (isToday) Icons.title(titleEl,'dumbbell','오늘의 운동');
       else {
         const ds=d.toLocaleDateString('ko-KR',{month:'short',day:'numeric'});
-        titleEl.textContent=`💪 ${ds} 운동`;
+        Icons.title(titleEl,'dumbbell',`${ds} 운동`);
       }
     }
 
     const badge = document.getElementById('fitBadge');
     if (badge) {
-      badge.textContent=`${plan.emoji} ${plan.name}`;
+      // 배지에 있던 이모지는 뺐다. 바로 옆 머리글이 이미 선 아이콘이라 둘이 부딪혔다.
+      badge.textContent=plan.name;
       badge.className=allEx.length?'badge badge-accent':'badge';
     }
 
@@ -84,7 +86,7 @@ const Fitness = {
       container.innerHTML=`
       <div class="fit-tabs">${tabs}</div>
       <div style="text-align:center;padding:20px 16px;color:var(--text2)">
-        <div style="font-size:44px;margin-bottom:8px">😴</div>
+        ${Icons.big('moon')}
         <p>${plan.name} — 휴식일입니다.<br><span style="color:var(--text3);font-size:12px">다른 요일을 눌러 계획을 볼 수 있어요</span></p>
       </div>${isToday?'<div class="habit-add-btn" onclick="Fitness.showInlineAdd()">+ 운동 추가</div>':''}`;
       return;
