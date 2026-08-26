@@ -202,6 +202,10 @@ const FirebaseSync = {
       try { Diet.render(date); } catch {}
       try { Checklist.render(); } catch {}
       try { Memo.render(); } catch {}
+      // 운동·인바디도 다시 그린다. Hevy 기록과 애플 헬스 인바디는 서버가 넣어 주는 값이라
+      // 이 폴링이 유일한 도착 신호다. 여기 없으면 앱을 껐다 켜야 보였다.
+      try { Fitness.render(date); } catch {}
+      try { InBody.render(); } catch {}
       try { App._updateStatsBanner(); } catch {}
     });
     // 동기화 알림 토스트
