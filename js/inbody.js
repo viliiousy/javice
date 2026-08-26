@@ -21,7 +21,11 @@ const InBody = {
     bmi:{ label:'BMI',      unit:'',   color:'#0891b2', good:'down' },
   },
 
+  // 기간 대신 '회수'로 자르는 칸을 하나 뒀다.
+  // 인바디는 매일 재는 게 아니라서 '일주일'을 고르면 그 안에 기록이 1건뿐이라
+  // 추이가 안 그려지는 일이 잦았다. 최근 N회는 언제 재든 항상 선이 그려진다.
   PERIODS: {
+    'r5':  { label:'기본',   count: 5  },
     '7d':  { label:'일주일', days: 7   },
     '30d': { label:'한달',   days: 30  },
     'all': { label:'전체',   days: null },
@@ -124,7 +128,7 @@ const InBody = {
   // ── 기간 ───────────────────────────────
   _period() {
     const p = UserStore.get(this.PERIOD_KEY);
-    return this.PERIODS[p] ? p : '7d';        // 기본은 일주일
+    return this.PERIODS[p] ? p : 'r5';        // 기본은 최근 5회
   },
   setPeriod(p) {
     if (!this.PERIODS[p]) return;
@@ -132,13 +136,21 @@ const InBody = {
     this._shown = this.PAGE;                  // 기간을 바꾸면 더보기도 처음부터
     this.render();
   },
-  // 기간 안의 기록만. 'all' 이면 그대로.
+  // 기간(또는 회수) 안의 기록만. 'all' 이면 그대로.
   _inPeriod(recs) {
-    const days = this.PERIODS[this._period()].days;
-    if (!days) return recs;
-    const from = new Date(Date.now() + 9*3600000 - (days-1)*86400000)
+    const p = this.PERIODS[this._period()];
+    if (p.count) return recs.slice(-p.count);   // recs 는 날짜 오름차순
+    if (!p.days) return recs;
+    const from = new Date(Date.now() + 9*3600000 - (p.days-1)*86400000)
       .toISOString().slice(0,10);
     return recs.filter(r => r.dt >= from);
+  },
+  // "일주일 안에" / "최근 5회 중" / "전체 기록 중" — 문장이 어색해지지 않게 한 곳에서 만든다
+  _periodPhrase() {
+    const k = this._period(), p = this.PERIODS[k];
+    if (p.count) return `최근 ${p.count}회 중`;
+    if (!p.days) return '전체 기록 중';
+    return `${p.label} 안에`;
   },
   _periodHtml() {
     const cur = this._period();
@@ -178,8 +190,7 @@ const InBody = {
     const pts  = recs.filter(r => Number(r[key]) > 0).slice(-this.MAX_POINTS);
 
     if (pts.length < 2) {
-      const pl = this.PERIODS[this._period()].label;
-      return `<div class="ib-chart-empty">${pl} 안에 ${m.label} 기록이 ${pts.length}개입니다 · 2개 이상이면 추이가 표시됩니다</div>`;
+      return `<div class="ib-chart-empty">${this._periodPhrase()} ${m.label} 기록이 ${pts.length}개입니다 · 2개 이상이면 추이가 표시됩니다</div>`;
     }
 
     const W = 640, H = 150, PX = 46, PY = 18;
@@ -252,7 +263,7 @@ const InBody = {
     const pl   = this.PERIODS[this._period()].label;
     const rest = all.length - Math.min(limit, all.length);
     if (!all.length) {
-      return `<div class="ib-list"><div class="ib-chart-empty">${pl} 안에 기록이 없습니다${
+      return `<div class="ib-list"><div class="ib-chart-empty">${this._periodPhrase()} 기록이 없습니다${
         totalAll ? ` · 전체 ${totalAll}건` : ''}</div></div>`;
     }
     return `<div class="ib-list">
