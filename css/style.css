@@ -1997,3 +1997,46 @@ html.dark .ec-fav.on, html.dark .diet-food-fav.on { color:#fbbf24; }
 /* 숫자는 자릿수가 흔들리면 갱신될 때마다 눈에 띈다 */
 .ib-tile-v, .ib-row-v, .ec-price, .ec-hold-v, .ec-hold-p,
 .ts-v, .diet-food-cal, .kcal-num, .ec-hold-sum b { font-variant-numeric:tabular-nums; }
+
+/* ═══════════════════════════════════════
+   모바일 하단 탭
+   ═══════════════════════════════════════ */
+/* 넓은 화면에서는 존재하지 않는다. 카드 열 개가 3열로 다 보이니 나눌 이유가 없다. */
+.tabbar{ display:none; }
+
+@media (max-width:900px){
+  .tabbar{
+    display:flex; position:fixed; left:0; right:0; bottom:0; z-index:150;
+    background:var(--card); border-top:1px solid var(--border);
+    /* 아이폰 홈 인디케이터. Safari 가 툴바를 숨기면 0 을 돌려주므로 하한을 둔다. */
+    padding-bottom:max(env(safe-area-inset-bottom), 6px);
+  }
+  .tab-btn{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+    min-height:52px; padding:8px 0 6px;
+    background:transparent; border:none; cursor:pointer;
+    color:var(--text3); font-family:inherit;
+  }
+  .tab-ic{ font-size:19px; line-height:1; filter:grayscale(1); opacity:.5; transition:all .15s; }
+  .tab-lb{ font-size:12px; font-weight:600; letter-spacing:-0.02em; }
+  .tab-btn.on{ color:var(--accent); }
+  .tab-btn.on .tab-ic{ filter:none; opacity:1; }
+
+  /* 지금 탭의 카드만 보인다. 나머지는 DOM 에 그대로 있고 화면에서만 빠진다. */
+  .dashboard > .card[data-tab]{ display:none; }
+  body[data-tab="today"] .dashboard > .card[data-tab="today"],
+  body[data-tab="plan"]  .dashboard > .card[data-tab="plan"],
+  body[data-tab="body"]  .dashboard > .card[data-tab="body"],
+  body[data-tab="money"] .dashboard > .card[data-tab="money"]{ display:flex; }
+
+  /* 맨 위 한 줄 요약은 '오늘'에서만. 다른 탭에는 그 카드가 이미 펼쳐져 있다. */
+  body[data-tab]:not([data-tab="today"]) .top-strip{ display:none !important; }
+
+  /* 탭바에 마지막 카드가 가리지 않도록 */
+  .dashboard{ padding-bottom:calc(58px + max(env(safe-area-inset-bottom), 6px) + 14px); }
+}
+
+/* 태블릿 세로(641~900px)에서는 2열 유지 + 탭. 한 탭에 카드 두세 개면 딱 맞는다. */
+@media (max-width:900px) and (min-width:641px){
+  .dashboard{ grid-template-columns:1fr 1fr; }
+}
