@@ -6,16 +6,29 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)">
   <title>자비스 대시보드</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <meta name="apple-mobile-web-app-title" content="자비스">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <!-- Pretendard: 한글은 Noto Sans KR 기반이되 자간·획을 다듬었고, 숫자·영문은 Inter 계열이다.
+       체중·칼로리·시세처럼 한글 라벨 옆에 숫자가 계속 붙는 화면에서 정렬이 훨씬 안정적이다. -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link rel="stylesheet" href="css/style.css">
+  <script>
+    // 테마는 첫 페인트 전에 정해야 한다. 스크립트가 늦게 돌면 흰 화면이 한 번 번쩍인다.
+    (function(){
+      try{
+        var p = localStorage.getItem('gl_theme');
+        if(!p) p = localStorage.getItem('gl_dark')==='true' ? 'dark' : 'system';   // 예전 설정 승계
+        var dark = p==='dark' || (p==='system' && matchMedia('(prefers-color-scheme: dark)').matches);
+        if(dark) document.documentElement.classList.add('dark');
+      }catch(e){}
+    })();
+  </script>
 </head>
 <body>
 
