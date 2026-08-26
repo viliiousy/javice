@@ -755,7 +755,7 @@ const App = {
       const db=b.due?new Date(b.due):new Date('9999');
       return da-db;
     });
-    if(!all.length){ document.getElementById('tasksContainer').innerHTML=`<p class="empty">${filter==='starred'?'별표 없음 ☆':'할일 없음 🎉'}</p>`; return; }
+    if(!all.length){ document.getElementById('tasksContainer').innerHTML=`<p class="empty">${Icons.big('tasks')}${filter==='starred'?'별표한 할일이 없습니다':'할일이 없습니다'}</p>`; return; }
     const groups={};
     // 전체/날짜순 탭: 단일 목록으로 날짜순 표시
     // 특정 목록 탭: 해당 카테고리만 그룹핑
