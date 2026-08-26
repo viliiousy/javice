@@ -13,9 +13,9 @@ const Habits = {
 
   // 카테고리 — 기존 습관은 cat 필드가 없으므로 전부 'life'로 취급된다
   CATS: {
-    life: { label:'일상',     icon:'✅', wrap:'habitsWrap', foot:'habitsFooter',
+    life: { label:'일상',     icon:'✅', ic:'check', wrap:'habitsWrap', foot:'habitsFooter',
             titleSel:'.card-habits .card-title', btn:'btnHabitReorder', addLbl:'+ 습관 추가' },
-    dev:  { label:'자기개발', icon:'📚', wrap:'devWrap',    foot:'devFooter',
+    dev:  { label:'자기개발', icon:'📚', ic:'book',  wrap:'devWrap',    foot:'devFooter',
             titleSel:'.card-dev .card-title',    btn:'btnDevReorder',   addLbl:'+ 자기개발 추가' },
   },
   _catOf(h) { return (h && h.cat === 'dev') ? 'dev' : 'life'; },
@@ -79,9 +79,10 @@ const Habits = {
     const titleEl=document.querySelector(C.titleSel);
     if(titleEl){
       const dLbl=new Date(date).toLocaleDateString('ko-KR',{month:'short',day:'numeric'});
-      titleEl.textContent = cat==='life'
-        ? (isToday?'✅ 오늘의 습관':`✅ ${dLbl} 습관`)
-        : (isToday?'📚 자기개발'  :`📚 ${dLbl} 자기개발`);
+      // textContent 로 쓰면 머리글 아이콘까지 지워진다. Icons.title 로 통일한다.
+      Icons.title(titleEl, C.ic, cat==='life'
+        ? (isToday?'오늘의 습관':`${dLbl} 습관`)
+        : (isToday?'자기개발'  :`${dLbl} 자기개발`));
     }
 
     wrap.innerHTML=list.map(h=>{
@@ -103,7 +104,7 @@ const Habits = {
         ${reorder?`<button class="cl-del-btn edit-del-btn" onclick="event.stopPropagation();Habits._delFrom('${h.id}','${Habits._dateStr(date)}')" title="삭제">✕</button>`:''}
       </div>`;
     }).join('')
-    + (list.length ? '' : `<p class="empty">${cat==='dev'?'독서·강의·외국어 같은 자기개발 습관을 추가해보세요':'습관이 없습니다'}</p>`)
+    + (list.length ? '' : `<p class="empty">${Icons.big(C.ic)}${cat==='dev'?'독서·강의·외국어 같은 자기개발 습관을 추가해보세요':'습관이 없습니다'}</p>`)
     + `<div class="habit-add-btn" onclick="Habits.showInlineAdd(App?.S?.selDate,'${cat}')">${C.addLbl}</div>`;
 
     const foot=document.getElementById(C.foot);
