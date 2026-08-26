@@ -114,7 +114,7 @@
     <!-- 할일 -->
     <section class="card card-tasks">
       <div class="card-head">
-        <span class="card-title">📋 할일</span>
+        <span class="card-title" data-ic="tasks">할일</span>
         <div class="card-acts">
           <button class="btn-sm" id="btnSync" title="동기화">🔄</button>
           <button class="btn-sm" id="btnShowCompleted" title="완료됨 보기">✓</button>
@@ -140,7 +140,7 @@
     <!-- 캘린더 -->
     <section class="card card-calendar">
       <div class="card-head">
-        <span class="card-title">📅 캘린더</span>
+        <span class="card-title" data-ic="calendar">캘린더</span>
         <div class="card-acts">
           <button class="btn-sm" id="btnCalSettings" title="캘린더 설정">⚙️</button>
           <button class="btn-sm accent" id="btnAddEvent">+ 일정</button>
@@ -158,7 +158,7 @@
     <!-- 체크리스트 -->
     <section class="card card-checklist">
       <div class="card-head">
-        <span class="card-title">✍️ 체크리스트</span>
+        <span class="card-title" data-ic="pen">체크리스트</span>
         <button class="btn-sm" id="btnClReorder" onclick="Checklist.toggleReorderMode()" title="편집 모드">⚙️</button>
       </div>
       <div id="checklistWrap" class="checklist-wrap"></div>
@@ -167,7 +167,7 @@
     <!-- 습관 -->
     <section class="card card-habits">
       <div class="card-head">
-        <span class="card-title">✅ 오늘의 습관</span>
+        <span class="card-title" data-ic="check">오늘의 습관</span>
         <button class="btn-sm" id="btnHabitReorder" onclick="Habits.toggleReorderMode('life')" title="편집 모드">⚙️</button>
       </div>
       <div id="habitsWrap" class="habits-wrap"></div>
@@ -177,7 +177,7 @@
     <!-- 식단 -->
     <section class="card card-diet">
       <div class="card-head">
-        <span class="card-title">🥗 식단 기록</span>
+        <span class="card-title" data-ic="diet">식단 기록</span>
         <span id="dietBadge" class="badge"></span>
       </div>
       <div id="dietWrap" class="diet-wrap"></div>
@@ -186,7 +186,7 @@
     <!-- 자기개발 -->
     <section class="card card-dev">
       <div class="card-head">
-        <span class="card-title">📚 자기개발</span>
+        <span class="card-title" data-ic="book">자기개발</span>
         <button class="btn-sm" id="btnDevReorder" onclick="Habits.toggleReorderMode('dev')" title="편집 모드">⚙️</button>
       </div>
       <div id="devWrap" class="habits-wrap"></div>
@@ -196,7 +196,7 @@
     <!-- 운동 -->
     <section class="card card-fitness">
       <div class="card-head">
-        <span class="card-title">💪 운동</span>
+        <span class="card-title" data-ic="dumbbell">운동</span>
         <span id="fitBadge" class="badge"></span>
       </div>
       <div id="fitnessWrap" class="fitness-wrap"></div>
@@ -205,7 +205,7 @@
     <!-- 인바디 -->
     <section class="card card-inbody">
       <div class="card-head">
-        <span class="card-title">📊 인바디</span>
+        <span class="card-title" data-ic="chart">인바디</span>
         <span id="inbodyBadge" class="badge"></span>
       </div>
       <div id="inbodyWrap" class="inbody-wrap"></div>
@@ -214,7 +214,7 @@
     <!-- 경제 (경제알림 흡수) -->
     <section class="card card-econ">
       <div class="card-head">
-        <span class="card-title">📈 경제</span>
+        <span class="card-title" data-ic="trend">경제</span>
         <div class="card-acts">
           <span class="ec-upd" id="econUpd"></span>
           <button class="btn-sm" onclick="Econ.refresh()" title="새로고침">⟳</button>
@@ -228,7 +228,7 @@
     <!-- 메모 -->
     <section class="card card-memo">
       <div class="card-head">
-        <span class="card-title">📝 메모</span>
+        <span class="card-title" data-ic="memo">메모</span>
         <button class="btn-sm" id="btnMemoReorder" onclick="Memo.toggleReorderMode()" title="편집 모드">⚙️</button>
       </div>
       <div id="memoWrap" class="memo-wrap"></div>
@@ -254,6 +254,7 @@
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script src="js/config.js"></script>
 <script src="js/user-store.js"></script>
+<script src="js/icons.js"></script>
 <script src="js/sounds.js"></script>
 <script src="js/notifications.js"></script>
 
