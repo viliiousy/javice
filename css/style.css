@@ -1923,3 +1923,28 @@ html.dark .login-scope{ background:rgba(255,255,255,0.04); }
 
 .ex-hint{ font-size:11.5px; color:var(--text3); margin:8px 0 0; text-align:center; }
 .ex-empty{ font-size:12px; color:var(--text3); padding:14px; text-align:center; }
+
+/* 보유 요약 — 시세 카드 맨 위 한 줄, 누르면 보유 탭 */
+.ec-hold{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:8px 10px; margin-bottom:10px; cursor:pointer;
+  border:1px solid var(--border); border-radius:var(--r-sm); background:var(--card2);
+}
+.ec-hold:hover{ border-color:var(--accent); }
+.ec-hold-lb{ flex:none; font-size:11px; font-weight:700; color:var(--text3); }
+.ec-hold-v{ font-size:15px; font-weight:800; color:var(--text); font-variant-numeric:tabular-nums; }
+.ec-hold-p{ margin-left:auto; font-size:12.5px; font-weight:700; font-variant-numeric:tabular-nums; }
+.ec-hold-miss{ flex-basis:100%; font-size:11px; color:var(--text3); }
+
+.ec-hold-sum{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:10px 0; }
+.ec-hold-sum > div{
+  padding:8px 6px; text-align:center; color:var(--text);
+  border:1px solid var(--border); border-radius:var(--r-sm); background:var(--card2);
+}
+.ec-hold-sum span{ display:block; margin-bottom:3px; font-size:10.5px; color:var(--text3); }
+.ec-hold-sum b{ font-size:14px; font-weight:800; font-variant-numeric:tabular-nums; }
+
+@media (max-width:640px){
+  .ec-hold-sum{ grid-template-columns:1fr 1fr; }
+  .ec-hold-p{ margin-left:0; }
+}
