@@ -101,6 +101,12 @@ const Econ = {
     } catch {}
   },
 
+  // 메인 카드에 한 번에 보여줄 최대 종목 수.
+  // 훑어보는 자리라 다 늘어놓으면 카드만 길어지고 아래 카드가 밀린다.
+  MAIN_MAX: 4,
+  _expanded: false,
+  toggleMore() { this._expanded = !this._expanded; this.render(); },
+
   // 카드에는 즐겨찾기만 간단히 보여준다. 전체 터미널은 모달에서 연다.
   render() {
     this._paintHold();
@@ -114,7 +120,10 @@ const Econ = {
       wrap.innerHTML = `<p class="empty">즐겨찾기가 비어 있어요<br><span class="ec-hint">「전체 보기」에서 종목을 ★ 하면 여기에 표시됩니다</span></p>`;
       return;
     }
-    wrap.innerHTML = c.favorites.map(it => {
+    const all = c.favorites;
+    const shown = this._expanded ? all : all.slice(0, this.MAIN_MAX);
+    const rest = all.length - shown.length;
+    wrap.innerHTML = shown.map(it => {
       const q = this.PRICES[this.keyOf(it)] || {};
       return `<div class="ec-row" onclick='Econ.openChart(${this.attr(it)})'>
         <div class="ec-row-l">
@@ -125,7 +134,11 @@ const Econ = {
           <div class="ec-price">${this.fmt(it, q.price)}</div>${this.delta(q.pct)}
         </div>
       </div>`;
-    }).join('');
+    }).join('')
+    + (rest > 0
+        ? `<div class="ec-more" onclick="Econ.toggleMore()">+${rest}개 더 보기</div>`
+        : this._expanded && all.length > this.MAIN_MAX
+          ? `<div class="ec-more" onclick="Econ.toggleMore()">접기</div>` : '');
   },
 
   // ── 시세 ────────────────────────────────────────────
@@ -183,7 +196,7 @@ const Econ = {
   // ── 터미널 (모달) ───────────────────────────────────
   open(view) {
     this.view = view || 'main';
-    App.openModal('📈 시세', `
+    App.openModal('📈 경제', `
       <div class="ec-nav">
         ${[['main','메인'],['hold','보유'],['watch','관심종목'],['charts','차트']].map(([v,l]) =>
           `<button class="${this.view===v?'on':''}" onclick="Econ.tab('${v}')">${l}</button>`).join('')}
