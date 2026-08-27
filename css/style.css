@@ -2300,3 +2300,32 @@ html.dark .hm-l3 span, html.dark .hm-l4 span{ color:#0b1220; }
 html.dark .hm-l1 span, html.dark .hm-l2 span{ color:#cbd5e1; }
 /* 오늘과 '지금 보고 있는 날' 은 다르다. 과거 칸을 눌러 둘러보는 중에도 오늘이 어디였는지 남아야 한다. */
 .hm-sel{ box-shadow:0 0 0 1.5px var(--text3); }
+
+/* ── AI 음식 사전 ─────────────────────────────────────
+   프리셋에 없는 음식을 AI 로 찾는 길. 결과는 '담기 전에 고칠 수 있는 카드'로
+   보여준다 — AI 가 낸 숫자가 확인 없이 기록으로 들어가면 안 된다. */
+.diet-ai-btn{
+  width:100%; margin-top:6px; padding:9px 10px;
+  background:none; border:1px dashed var(--border); border-radius:var(--r-sm);
+  color:var(--text2); font-size:12.5px; font-weight:600; cursor:pointer;
+}
+.diet-ai-btn:hover:not(:disabled){ color:var(--accent); border-color:var(--accent); }
+.diet-ai-btn:disabled{ opacity:.6; cursor:default; }
+
+.diet-ai-card{
+  margin-top:8px; padding:10px;
+  border:1px solid var(--accent); border-radius:var(--r-sm); background:var(--accent-bg);
+}
+.diet-ai-hd{ display:flex; flex-wrap:wrap; align-items:baseline; gap:6px; margin-bottom:8px; }
+.diet-ai-nm{ font-size:13.5px; font-weight:700; color:var(--text); }
+.diet-ai-warn{ font-size:11px; color:var(--text3); }
+.diet-ai-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+/* 기준량은 "1인분 (350g)" 처럼 길다. 한 칸에 우겨넣으면 잘려서 뭘 기준으로 낸
+   숫자인지 못 읽는다 — 그게 이 카드에서 제일 중요한 정보다. */
+.diet-ai-grid label:first-child{ grid-column:1 / -1; }
+.diet-ai-grid label{
+  display:flex; flex-direction:column; gap:3px;
+  font-size:10.5px; color:var(--text3);
+}
+.diet-ai-grid .inp{ width:100%; }
+.diet-ai-add{ width:100%; margin-top:9px; padding:9px; }
