@@ -118,7 +118,7 @@ const Checklist = {
   },
 
   showAdd() {
-    App.openModal('✍️ 체크리스트 추가',`
+    App.openModal('@pen 체크리스트 추가',`
       <div class="modal-row"><label class="modal-lbl">항목 *</label>
         <input id="clTitle" type="text" placeholder="항목 입력..." class="inp"></div>
       <div class="modal-row"><label class="modal-lbl">마감 날짜 (선택)</label>
@@ -147,7 +147,7 @@ const Checklist = {
 
   showEdit(id) {
     const it=this.getItems().find(i=>i.id===id); if(!it) return;
-    App.openModal('✍️ 항목 편집',`
+    App.openModal('@pen 항목 편집',`
       <div class="modal-row"><label class="modal-lbl">항목 *</label>
         <input id="clEditTitle" type="text" value="${esc(it.title)}" class="inp"></div>
       <div class="modal-row"><label class="modal-lbl">마감 날짜</label>
