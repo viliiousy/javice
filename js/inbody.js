@@ -442,7 +442,7 @@ const InBody = {
   },
 
   showAdd() {
-    App.openModal('📊 인바디 기록', this._formHtml(null) + `
+    App.openModal('@chart 인바디 기록', this._formHtml(null) + `
       <div class="modal-btns">
         <button onclick="InBody._save(null)" class="btn-sm accent">저장</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
@@ -454,7 +454,7 @@ const InBody = {
   showEdit(dt) {
     const r = this.getRecords().find(x => x.dt === dt);
     if (!r) return;
-    App.openModal('📊 인바디 수정', this._formHtml(r) + `
+    App.openModal('@chart 인바디 수정', this._formHtml(r) + `
       <div class="modal-btns">
         <button onclick="InBody._save('${dt}')" class="btn-sm accent">저장</button>
         <button onclick="InBody.remove('${dt}')" class="btn-danger">삭제</button>
@@ -511,7 +511,7 @@ const InBody = {
   // god_life는 localStorage 'mft5' 한 키에 전부 저장한다.
   // 다른 도메인이라 자동으로 못 읽으므로 JSON을 붙여넣게 한다.
   showImport() {
-    App.openModal('📥 갓생일지 인바디 가져오기', `
+    App.openModal('@download 갓생일지 인바디 가져오기', `
       <p class="modal-lbl" style="line-height:1.6">
         갓생일지 사이트에서 개발자도구 콘솔을 열고
         <code class="ib-code">localStorage.mft5</code> 를 입력해 나온 값을
