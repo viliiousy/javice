@@ -189,11 +189,108 @@ const Diet = {
     const db = (typeof FOOD_DB!=='undefined' ? FOOD_DB : [])
       .map(([e,n,u,c]) => ({ e, n, u, c, p:0, cb:0, ft:0 }));
     const seen = new Set(db.map(f=>f.n));
+    // AI 사전이 히스토리보다 앞이다 — 영양소가 전부 들어 있다.
+    const ai = [];
+    for(const f of this.getAiFoods()){
+      if(!f || !f.n || seen.has(f.n)) continue;
+      seen.add(f.n);
+      ai.push({ e:'🤖', n:f.n, u:f.u||'', c:f.c||0, p:f.p||0, cb:f.cb||0, ft:f.ft||0 });
+    }
     const hist = this.getHistory()
       .filter(f => f && f.name && !seen.has(f.name))
       .map(f => ({ e:'🍴', n:f.name, u:'', c:f.cal||0, p:f.protein||0, cb:f.carb||0, ft:f.fat||0 }));
-    return db.concat(hist);
+    return db.concat(ai, hist);
   },
+  // ── AI 음식 사전 ──────────────────────
+  // 프리셋에 없는 음식은 AI 에게 물어서 만든다. 만든 건 저장해 둔다 —
+  // 같은 걸 두 번 물으면 숫자가 매번 조금씩 달라지고, 그때마다 또 기다려야 한다.
+  _aiKey(){ return 'gl_food_ai'; },
+  getAiFoods(){ try{ return JSON.parse(UserStore.get(this._aiKey())||'[]'); }catch{ return []; } },
+  saveAiFoods(v){ UserStore.set(this._aiKey(), JSON.stringify(v.slice(0,500))); FirebaseSync?.scheduleSave(); },
+  _rememberAi(f){
+    const list=this.getAiFoods().filter(x=>x&&x.n!==f.n);
+    list.unshift({ n:f.n, u:f.u, c:f.c, p:f.p, cb:f.cb, ft:f.ft, at:new Date().toISOString() });
+    this.saveAiFoods(list);
+  },
+  _attr(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); },
+
+  _aiBtnHtml(meal, ds){
+    return `<button class="diet-ai-btn" id="dietAiBtn" onclick="Diet.aiLookup('${meal}','${ds}')">AI 로 영양정보 찾기</button>
+      <div id="dietAiRes"></div>`;
+  },
+  async aiLookup(meal, ds){
+    const q=(document.getElementById('dietSearch')?.value||'').trim();
+    if(!q) return;
+    const key=localStorage.getItem('gl_ai_key');
+    if(!key){ App.showToast('JARVIS API 키를 먼저 설정해주세요 (⚡→🔑)','error'); return; }
+    const btn=document.getElementById('dietAiBtn');
+    const box=document.getElementById('dietAiRes');
+    if(btn){ btn.disabled=true; btn.textContent='찾는 중…'; }
+    if(box) box.innerHTML='';
+    try{
+      const f=await this._aiFood(key, q);
+      this._aiPending=f;
+      if(box) box.innerHTML=this._aiConfirmHtml(f, meal, ds);
+    }catch(err){
+      if(box) box.innerHTML=`<div class="diet-empty-hint">AI 검색 실패 · ${esc(err.message)}</div>`;
+    }
+    if(btn){ btn.disabled=false; btn.textContent='AI 로 다시 찾기'; }
+  },
+  async _aiFood(key, q){
+    const prompt = `한국에서 흔히 먹는 기준으로 「${q}」의 1회 제공량 영양정보를 알려줘.
+JSON 만 출력해. 다른 말은 붙이지 마.
+{"ok":true,"name":"음식 이름","unit":"기준량 (예: 100g, 1개, 1인분)","cal":숫자,"protein":숫자,"carb":숫자,"fat":숫자}
+음식이 아니거나 모르면 {"ok":false} 만 출력해.`;
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
+      body:JSON.stringify({ model:'llama-3.3-70b-versatile', max_tokens:300, temperature:0.2,
+        messages:[{role:'user',content:prompt}] }),
+    });
+    if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error(e.error?.message||`HTTP ${res.status}`); }
+    const data=await res.json();
+    const text=data.choices?.[0]?.message?.content||'';
+    let j=null; try{ const m=text.match(/\{[\s\S]*\}/); j=m?JSON.parse(m[0]):null; }catch{}
+    if(!j || j.ok===false) throw new Error('음식으로 못 찾았습니다');
+    const num=v=>{ const n=Number(v); return isFinite(n)&&n>=0 ? n : 0; };
+    const name=String(j.name||q).trim().slice(0,40) || q;
+    return { n:name, u:String(j.unit||'').trim().slice(0,20),
+             c:Math.round(num(j.cal)), p:num(j.protein), cb:num(j.carb), ft:num(j.fat) };
+  },
+  // AI 가 낸 숫자는 그대로 들어가지 않는다. 추정값이라고 말하고, 고칠 수 있게 두고,
+  // 누를 때 들어간다. 한번 들어간 칼로리는 나중에 틀린 걸 알아채기가 어렵다.
+  _aiConfirmHtml(f, meal, ds){
+    const A=s=>this._attr(s);
+    return `<div class="diet-ai-card">
+      <div class="diet-ai-hd">
+        <span class="diet-ai-nm">🤖 ${esc(f.n)}</span>
+        <span class="diet-ai-warn">AI 추정값 · 맞는지 보고 담으세요</span>
+      </div>
+      <div class="diet-ai-grid">
+        <label>기준량<input id="aiU"  class="inp inp-sm" value="${A(f.u)}"></label>
+        <label>kcal<input id="aiC"  type="number" class="inp inp-sm" value="${f.c}"></label>
+        <label>단백질<input id="aiP"  type="number" step="0.1" class="inp inp-sm" value="${f.p}"></label>
+        <label>탄수화물<input id="aiCb" type="number" step="0.1" class="inp inp-sm" value="${f.cb}"></label>
+        <label>지방<input id="aiFt" type="number" step="0.1" class="inp inp-sm" value="${f.ft}"></label>
+      </div>
+      <button class="btn-sm accent diet-ai-add" onclick="Diet.aiConfirm('${meal}','${ds}')">담고 사전에 저장</button>
+    </div>`;
+  },
+  aiConfirm(meal, ds){
+    const f=this._aiPending; if(!f) return;
+    const num=(id,d)=>{ const e=document.getElementById(id); if(!e) return d;
+      const n=parseFloat(e.value); return isFinite(n)&&n>=0 ? n : d; };
+    const uEl=document.getElementById('aiU');
+    const food={ e:'🤖', n:f.n, u:(uEl?uEl.value:f.u||'').trim(),
+      c:Math.round(num('aiC',f.c)), p:num('aiP',f.p), cb:num('aiCb',f.cb), ft:num('aiFt',f.ft) };
+    this._rememberAi(food);
+    this.addToCart(food, meal, ds);
+    this._aiPending=null;
+    App.showToast(`「${food.n}」 사전에 저장됨 · 다음부턴 바로 검색됩니다`,'success');
+    // 저장했으니 이제 그냥 검색된다 — 목록을 다시 그려서 그걸 보여 준다.
+    const inp=document.getElementById('dietSearch'); if(inp) inp.value=food.n;
+    this.searchFood(food.n, meal, ds);
+  },
+
   _search(q){
     q = String(q||'').trim();
     if(!q) return [];
@@ -227,7 +324,8 @@ const Diet = {
     this._hits=hits;
     if(!String(q||'').trim()){ box.innerHTML=''; return; }
     if(!hits.length){
-      box.innerHTML=`<div class="diet-empty-hint">「${esc(q)}」 결과가 없습니다 · 아래에서 직접 입력하세요</div>`;
+      box.innerHTML=`<div class="diet-empty-hint">「${esc(q)}」 결과가 없습니다</div>`
+        + this._aiBtnHtml(meal, ds);
       return;
     }
     const favs=this.getFavs();
@@ -243,6 +341,9 @@ const Diet = {
         <span class="diet-food-cal">${f.c}<i>kcal</i></span>
       </div>`;
     }).join('');
+    // 비슷한 게 나왔지만 찾던 게 아닐 수 있다. 이름이 딱 맞는 게 없으면 AI 길도 열어 둔다.
+    const exact = hits.some(f=>f.n.toLowerCase()===String(q).trim().toLowerCase());
+    if(!exact) box.innerHTML += this._aiBtnHtml(meal, ds);
   },
   favFromSearch(i, meal, ds){
     const f=(this._hits||[])[i]; if(!f) return;
