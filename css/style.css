@@ -2183,3 +2183,18 @@ html.dark .cardset-row{ background:var(--card2); border-color:var(--border); }
 /* 자동 체크는 손으로 누른 것과 구분한다 — 왜 켜졌는지 모르면 불안하다.
    진한 보라는 '내가 눌렀다', 연한 보라는 'Hevy 기록에서 왔다'. */
 .ex-item.ex-auto .ex-chk{ background:var(--accent-l); border-color:var(--accent-l); }
+
+/* ── 상단 통계 칩 ────────────────────────
+   이모지를 걷어내고 카드 머리글과 같은 선 아이콘으로 맞춘다.
+   .stat-ts(인바디·경제 칩)는 자기 정렬 규칙이 따로 있어 건드리지 않는다. */
+.stat-chip:not(.stat-ts){ display:inline-flex; align-items:center; gap:5px; }
+.chip-ic{ width:14px; height:14px; opacity:.7; }
+.stats-upcoming-chip{ display:inline-flex; align-items:center; gap:4px; }
+.stats-upcoming-chip .chip-ic{ width:12px; height:12px; }
+
+/* 목표를 넘긴 건 '잘한 것' 도 '주의' 도 아니라 넘긴 것이다. 색을 따로 준다. */
+.stat-chip.stat-red{ background:#fef2f2; border-color:#fecaca; color:var(--red); }
+html.dark .stat-chip.stat-red{ background:rgba(220,38,38,0.14); border-color:rgba(220,38,38,0.35); color:#fca5a5; }
+
+/* 다크에서 초록 칩만 배경이 하얗게 남아 있었다. 노랑은 이미 눌러 뒀는데 초록이 빠져 있었다. */
+html.dark .stat-chip.stat-green{ background:rgba(5,150,105,0.14); border-color:rgba(5,150,105,0.35); color:#6ee7b7; }
