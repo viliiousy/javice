@@ -60,6 +60,93 @@ const Hevy = {
     return false;
   },
 
+  // ── 주간 볼륨 ──────────────────────────
+  // 하루 단위로 보면 요일 구성 때문에 들쭉날쭉해서 추세가 안 보인다.
+  // 주로 묶어야 '요즘 늘고 있나' 가 읽힌다.
+  _ds(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  },
+  _monday(ds) {
+    const d = new Date(ds + 'T00:00:00');
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));   // 월요일이 주의 시작
+    return this._ds(d);
+  },
+  weeks(n) {
+    n = n || 8;
+    const by = new Map();
+    for (const w of this.all()) {
+      if (!w || !w.dt) continue;
+      const k = this._monday(w.dt);
+      const cur = by.get(k) || { vol: 0, cnt: 0 };
+      cur.vol += Number(w.vol) || 0; cur.cnt++;
+      by.set(k, cur);
+    }
+    // 기록이 없는 주도 0 으로 채운다. 빈 주를 건너뛰면 '쉰 주' 가 안 보이고,
+    // 그러면 그래프가 실제보다 성실해 보인다.
+    const out = [];
+    const thisMon = new Date(this._monday(this._ds(new Date())) + 'T00:00:00');
+    for (let i = n - 1; i >= 0; i--) {
+      const d = new Date(thisMon); d.setDate(d.getDate() - i * 7);
+      const k = this._ds(d);
+      const v = by.get(k) || { vol: 0, cnt: 0 };
+      out.push({ mon: k, vol: Math.round(v.vol), cnt: v.cnt, now: i === 0 });
+    }
+    return out;
+  },
+
+  _md(ds) { const p = ds.split('-'); return Number(p[1]) + '/' + Number(p[2]); },
+  _range(mon) {
+    const a = new Date(mon + 'T00:00:00'), b = new Date(a); b.setDate(a.getDate() + 6);
+    return this._md(mon) + '~' + this._md(this._ds(b));
+  },
+  _label(w) {
+    if (!w.cnt) return this._range(w.mon) + ' · 쉼';
+    return this._range(w.mon) + ' · ' + w.vol.toLocaleString('ko-KR') + 'kg · ' + w.cnt + '회';
+  },
+
+  weeklyHtml(n) {
+    const ws = this.weeks(n || 8);
+    // 두 주는 있어야 '추이' 다. 한 주짜리 막대 하나는 그래프가 아니라 장식이다.
+    if (ws.filter(w => w.cnt).length < 2) return '';
+
+    const max  = Math.max.apply(null, ws.map(w => w.vol).concat([1]));
+    const cur  = ws[ws.length - 1];
+    this._wk   = ws;
+
+    const bars = ws.map((w, i) => {
+      // 쉰 주는 짧은 막대가 아니라 바닥 눈금으로 둔다.
+      // 2px 짜리 막대를 남기면 '조금은 했다' 로 읽힌다. 안 한 건 안 한 거다.
+      const zero = !w.vol;
+      const h = zero ? 0 : Math.max(3, Math.round(w.vol / max * 100));
+      return '<button class="hw-col' + (w.now ? ' now' : '') + (zero ? ' zero' : '') + '" data-i="' + i + '"'
+           + ' onpointerenter="Hevy._wkHover(' + i + ')" onfocus="Hevy._wkHover(' + i + ')"'
+           + ' onpointerleave="Hevy._wkHover(-1)" onblur="Hevy._wkHover(-1)"'
+           + ' aria-label="' + this._label(w) + '">'
+           + '<span class="hw-bar" style="height:' + h + '%"></span>'
+           + '<span class="hw-lb">' + this._md(w.mon) + '</span></button>';
+    }).join('');
+
+    return '<div class="hw">'
+      + '<div class="hw-head"><span class="hw-t">주간 볼륨</span>'
+      + '<span class="hw-n">최근 ' + ws.length + '주</span></div>'
+      + '<div class="hw-bars">' + bars + '</div>'
+      + '<div class="hw-read" id="hwRead">' + this._label(cur)
+      + (cur.now ? ' <span class="hw-wip">진행 중</span>' : '') + '</div>'
+      + '</div>';
+  },
+
+  // 막대 위에 상자를 띄우지 않고 아래 한 줄을 바꾼다. 겹칠 일이 없고 손가락으로도 읽힌다.
+  _wkHover(i) {
+    const el = document.getElementById('hwRead');
+    if (!el || !this._wk) return;
+    const w = i < 0 ? this._wk[this._wk.length - 1] : this._wk[i];
+    if (!w) return;
+    el.innerHTML = this._label(w) + (w.now ? ' <span class="hw-wip">진행 중</span>' : '');
+    document.querySelectorAll('.hw-col').forEach(function (c, j) {
+      c.classList.toggle('on', i >= 0 && j === i);
+    });
+  },
+
   // ── 렌더 ───────────────────────────────
   html(ds) {
     const ws = this.byDate(ds);
