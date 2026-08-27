@@ -700,7 +700,6 @@ textarea.inp{ resize:vertical; min-height:64px; }
   .h-date-main{ font-size:12px; }
   .h-date-sub{ font-size:12px; }
   .h-name{ display:none; }
-  .w3-side{ display:none; }  /* 어제/내일 숨김 */
 
   /* 카드 헤더 */
   .card-head{ padding:11px 14px 10px; }
@@ -870,13 +869,6 @@ html.dark .stats-urgent-chip.urgent-over { background:rgba(220,38,38,0.15); }
   .stats-banner { top:49px; padding:5px 12px; }
   .stats-urgent-row { display:flex !important; }
   .stats-urgent-chip { max-width:calc(33vw - 12px); font-size:12px; padding:2px 6px; }
-  .w3-side { display:flex !important; opacity:0.75; }
-  .w3-side .w3-range { display:block !important; font-size:11px; }
-  .w3-side .w3-label { display:block !important; font-size:11px; }
-  .weather-3day { gap:3px; }
-  .w3-item { padding:2px 4px; }
-  .w3-temp { font-size:12px; }
-  .w3-today .w3-temp { font-size:13px; }
   .stats-row { gap:4px; }
 }
 
