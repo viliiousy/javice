@@ -592,7 +592,7 @@ const App = {
     const calOptions=GoogleCalendar._allCalendars.length
       ?GoogleCalendar._allCalendars.map(c=>`<option value="${c.id}"${c.id===defCal?' selected':''}>${esc(c.summary)}</option>`).join('')
       :`<option value="primary">기본 캘린더</option>`;
-    this.openModal(`➕ ${ds}`,`
+    this.openModal(`@plus ${ds}`,`
       <div class="lp-menu">
         <button class="lp-btn" onclick="App.closeModal();App._showAddEventModalForDate(new Date('${d.toDateString()}'))">📅 일정 추가</button>
         <button class="lp-btn" onclick="App.closeModal();App._showAddTaskForDate(new Date('${d.toDateString()}'))">✅ 할일 추가</button>
@@ -612,7 +612,7 @@ const App = {
     const calOptions=GoogleCalendar._allCalendars.length
       ?GoogleCalendar._allCalendars.map(c=>`<option value="${c.id}"${c.id===defCal?' selected':''}>${esc(c.summary)}</option>`).join('')
       :`<option value="primary">기본 캘린더</option>`;
-    this.openModal('📅 일정 추가',`
+    this.openModal('@calendar 일정 추가',`
       <div class="modal-row"><label class="modal-lbl">제목 *</label><input id="evT" type="text" class="inp"></div>
       <div class="modal-grid2">
         <div><label class="modal-lbl">시작</label><input id="evS" type="datetime-local" value="${fmt(base)}" class="inp inp-sm"></div>
@@ -647,7 +647,7 @@ const App = {
   _showAddTaskForDate(date) {
     if(!Auth.isLoggedIn()){ this.showToast('로그인이 필요합니다','error'); return; }
     const ds=new Date(date).toISOString().split('T')[0];
-    this.openModal('✅ 할일 추가',`
+    this.openModal('@tasks 할일 추가',`
       <div class="modal-row"><label class="modal-lbl">제목 *</label><input id="qtTitle" type="text" class="inp"></div>
       <div class="modal-row"><label class="modal-lbl">메모</label><textarea id="qtNotes" class="inp" rows="2" placeholder="(선택)"></textarea></div>
       <div class="modal-row"><label class="modal-lbl">목록</label><select id="qtList" class="inp inp-sm">${this.S.lists.map(l=>`<option value="${l.id}">${esc(l.title)}</option>`).join('')}</select></div>
@@ -679,7 +679,7 @@ const App = {
 
   _showAddChecklistForDate(date) {
     const ds=new Date(date).toISOString().split('T')[0];
-    this.openModal('✍️ 체크리스트 추가',`
+    this.openModal('@pen 체크리스트 추가',`
       <div class="modal-row"><label class="modal-lbl">항목 *</label><input id="qcTitle" type="text" class="inp"></div>
       <div class="modal-row"><label class="modal-lbl">마감</label><input id="qcDue" type="date" value="${ds}" class="inp inp-sm"></div>
       <div class="modal-btns">
@@ -706,7 +706,7 @@ const App = {
     const allDay=!e.start?.dateTime; const s=allDay?null:new Date(e.start.dateTime);
     const en=e.end?.dateTime?new Date(e.end.dateTime):null;
     const col=e._calColor||_evColor(e.colorId);
-    this.openModal('📅 일정',`
+    this.openModal('@calendar 일정',`
       <h4 style="font-size:16px;font-weight:700;margin-bottom:12px">${esc(e.summary||'(제목 없음)')}</h4>
       ${e._calName?`<p style="font-size:12px;color:${col};margin-bottom:8px">📅 ${esc(e._calName)}</p>`:''}
       <p style="color:var(--text2);font-size:13px;margin-bottom:8px">${e.start?.date||_fmtFull(s)}<br>${allDay?'종일':_fmtTime(s)+(en?' — '+_fmtTime(en):'')}</p>
@@ -839,7 +839,7 @@ const App = {
     const extra=JSON.parse(localStorage.getItem('gl_task_extra_'+taskId)||'{}');
     const listOptions=this.S.lists.map(l=>`<option value="${l.id}"${l.id===listId?' selected':''}>${esc(l.title)}</option>`).join('');
     const repeatOpts=['없음','매일','매주','매월','매년'].map(v=>`<option${extra.repeat===v?' selected':''}>${v}</option>`).join('');
-    this.openModal('📋 세부정보',`
+    this.openModal('@list 세부정보',`
       <div class="modal-row"><label class="modal-lbl">제목</label>
         <input id="tdTitle" type="text" value="${esc(t.title)}" class="inp"></div>
       <div class="modal-row"><label class="modal-lbl">메모</label>
@@ -1058,7 +1058,7 @@ const App = {
     const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
     const cur=catColors[listId]||'';
     const colors=['#4f46e5','#0891b2','#059669','#d97706','#dc2626','#7c3aed','#db2777','#64748b',''];
-    App.openModal(`🎨 "${listName}" 색상`,`
+    App.openModal(`@palette "${listName}" 색상`,`
       <p style="font-size:12px;color:var(--text2);margin-bottom:12px">카테고리 배경 색상을 선택하세요.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
         ${colors.map(c=>c
@@ -1078,8 +1078,13 @@ const App = {
     App.closeModal();
   },
 
+  // 제목 앞에 "@이름 " 을 붙이면 그 자리를 단색 아이콘으로 그린다 — "@calendar 일정 추가".
+  // 이모지를 쓰지 않는 이유는 icons.js 머리말에 적어 뒀다. 이름이 없으면 글자만 나온다.
   openModal(title,body,afterRender){
-    document.getElementById('modalTitle').textContent=title;
+    const tEl=document.getElementById('modalTitle');
+    const m=/^@([a-z]+)\s+([\s\S]+)$/.exec(String(title));
+    if(m && typeof Icons!=='undefined' && Icons.P[m[1]]) Icons.title(tEl, m[1], m[2]);
+    else tEl.textContent=title;
     document.getElementById('modalBody').innerHTML=body;
     document.getElementById('modal').classList.remove('hidden');
     if(afterRender) setTimeout(afterRender, 80);
