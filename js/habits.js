@@ -38,14 +38,90 @@ const Habits = {
 
   // cat 을 넘기지 않으면 전체 카테고리를 반환한다 (스탯 배너 등 기존 호출 호환)
   getHabitsForDate(date=new Date(), cat=null) {
+    return this._forDate(this.getList(), date, cat);
+  },
+  // 목록을 밖에서 넘길 수 있게 갈라 뒀다. 히트맵이 35일치를 도는데
+  // 날마다 getList() 를 부르면 JSON 을 35번 파싱한다.
+  _forDate(all, date, cat=null) {
     const dow     = new Date(date).getDay();
     const dateStr = this._dateStr(date);
-    return this.getList().filter(h => {
+    return all.filter(h => {
       if(cat && this._catOf(h) !== cat) return false;
       if(h.createdAt  && dateStr < h.createdAt)  return false; // 생성 전
       if(h.deletedFrom && dateStr >= h.deletedFrom) return false; // 삭제 후
       return !h.days || h.days.length===0 || h.days.includes(dow);
     });
+  },
+
+  // ── 최근 5주 히트맵 ───────────────────
+  // 하루치 체크는 '오늘 했나' 만 말한다. 다섯 주를 한 판에 깔면 '요즘 무너지고 있나' 가 보인다 —
+  // 연속 기록(🔥)이 못 보여주는 것이다. 끊긴 날은 0 이 되고 끝이지만, 여기선 자국이 남는다.
+  //
+  // 그날 할 습관이 아예 없던 날(평일 습관인데 주말)은 실패가 아니다. 빈칸으로 둔다.
+  // 0% 와 '해당 없음' 을 같은 색으로 칠하면 쉰 날이 무너진 날처럼 보인다.
+  _heat(cat, date) {
+    const all = this.getList();
+    const end = new Date(date); end.setHours(0,0,0,0);
+    const start = new Date(end);
+    start.setDate(start.getDate() - start.getDay() - 28);   // 4주 전 일요일부터
+    const out = [];
+    for(let i=0;i<35;i++){
+      const d = new Date(start); d.setDate(start.getDate()+i);
+      const ds = this._dateStr(d);
+      if(d > end){ out.push({ds, lv:-2}); continue; }        // 아직 오지 않은 날
+      const hs = this._forDate(all, d, cat);
+      if(!hs.length){ out.push({ds, lv:-1}); continue; }     // 할 습관이 없던 날
+      const chk  = this.getChecked(d);
+      const done = hs.filter(h=>chk.includes(h.id)).length;
+      const r    = done/hs.length;
+      out.push({ ds, done, total:hs.length,
+                 lv: r===0?0 : r<0.34?1 : r<0.67?2 : r<1?3 : 4 });
+    }
+    return out;
+  },
+
+  _heatHtml(cat, date) {
+    const cells = this._heat(cat, date);
+    // 기록이 아예 없으면 빈 격자만 뜬다. 그건 정보가 아니라 회색 벽이다.
+    if(!cells.some(c=>c.lv>0)) return '';
+    this._heatData = this._heatData||{}; this._heatData[cat]=cells;
+
+    const todayStr = this._dateStr(new Date());
+    const grid = cells.map((c,i)=>{
+      const cls = c.lv===-2 ? 'hm-fut' : c.lv===-1 ? 'hm-off' : 'hm-l'+c.lv;
+      return `<button class="hm-c ${cls}${c.ds===todayStr?' hm-today':''}"
+        onpointerenter="Habits._heatHover('${cat}',${i})" onfocus="Habits._heatHover('${cat}',${i})"
+        onpointerleave="Habits._heatHover('${cat}',-1)" onblur="Habits._heatHover('${cat}',-1)"
+        aria-label="${this._heatLabel(c)}"></button>`;
+    }).join('');
+
+    const days = this.DAYS_KO.map(d=>`<span>${d}</span>`).join('');
+    return `<div class="hm">
+      <div class="hm-head"><span class="hm-t">최근 5주</span>
+        <span class="hm-legend">적음<i class="hm-l1"></i><i class="hm-l2"></i><i class="hm-l3"></i><i class="hm-l4"></i>많음</span></div>
+      <div class="hm-days">${days}</div>
+      <div class="hm-grid">${grid}</div>
+      <div class="hm-read" id="hmRead-${cat}">${this._heatSummary(cells)}</div>
+    </div>`;
+  },
+
+  _heatLabel(c) {
+    const md = c.ds.slice(5).replace('-','/');
+    if(c.lv===-2) return md;
+    if(c.lv===-1) return `${md} · 쉬는 날`;
+    return `${md} · ${c.done}/${c.total}`;
+  },
+  _heatSummary(cells) {
+    const real = cells.filter(c=>c.lv>=0);
+    if(!real.length) return '';
+    const perfect = real.filter(c=>c.lv===4).length;
+    return `${real.length}일 중 <strong>${perfect}일</strong> 전부 완료`;
+  },
+  _heatHover(cat, i) {
+    const el = document.getElementById('hmRead-'+cat);
+    const cells = this._heatData && this._heatData[cat];
+    if(!el||!cells) return;
+    el.innerHTML = i<0 ? this._heatSummary(cells) : this._heatLabel(cells[i]);
   },
 
   streak(id) {
@@ -107,10 +183,13 @@ const Habits = {
     + (list.length ? '' : `<p class="empty">${Icons.big(C.ic)}${cat==='dev'?'독서·강의·외국어 같은 자기개발 습관을 추가해보세요':'습관이 없습니다'}</p>`)
     + `<div class="habit-add-btn" onclick="Habits.showInlineAdd(App?.S?.selDate,'${cat}')">${C.addLbl}</div>`;
 
+    // 히트맵은 카드 맨 아래다. 오늘 몇 개 했는지를 먼저 읽고, 그다음에 지난 다섯 주를 본다.
+    // 순서가 뒤집히면 오늘 얘기가 지난 달 얘기 밑에 깔린다.
     const foot=document.getElementById(C.foot);
-    if(foot) foot.innerHTML = list.length
+    if(foot) foot.innerHTML = (list.length
       ? `${isToday?'오늘':'해당 날짜'} <strong>${done}/${list.length}</strong> 완료 ${done===list.length?'🏆 퍼펙트!':''}`
-      : '';
+      : '')
+      + (reorder ? '' : this._heatHtml(cat, date));
   },
 
   // ── 탭/클릭 ──────────────────────────
