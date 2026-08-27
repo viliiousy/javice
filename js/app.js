@@ -76,7 +76,6 @@ const App = {
     try { CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,[],this.S.selDate); } catch(e){ console.warn('Cal render',e); }
     this._updateStatsBanner();
     await this.sync();
-    try { Weather.init(); } catch(e){ console.warn('Weather',e); }
   },
 
   startOffline() {
@@ -96,7 +95,6 @@ const App = {
     document.getElementById('eventsWrap').innerHTML='<p class="empty">오프라인 모드</p>';
     document.getElementById('tasksContainer').innerHTML='<p class="empty">로그인 시 동기화됩니다</p>';
     this._updateStatsBanner();
-    try{ Weather.init(); }catch{}
   },
 
   // ── 동기화 ────────────────────────────
@@ -226,8 +224,10 @@ const App = {
       <div class="stat-chip ${hLeft===0&&hList.length>0?'stat-green':''}" data-s="habits">${ic('check')}${habitTxt}</div>
       <div class="stat-chip ${calGoal&&calLeft<0?'stat-red':calPct>=80?'stat-green':''}" data-s="diet">${ic('diet')}${calTxt}</div>
       ${pending>0?`<div class="stat-chip" data-s="tasks">${ic('tasks')}할일 ${pending}개</div>`:''}
-      ${clItems.length>0?`<div class="stat-chip" data-s="checklist">${ic('pen')}체크리스트 ${clItems.length}개</div>`:''}
-      ${typeof TopStrip!=='undefined'?TopStrip.chips():''}`;
+      ${clItems.length>0?`<div class="stat-chip" data-s="checklist">${ic('pen')}체크리스트 ${clItems.length}개</div>`:''}`;
+    // 인바디·자산은 이 줄에서 빠졌다. 헤더 오른쪽 두 줄(TopStrip)로 옮겼다 —
+    // 같은 줄에 여섯 칸이 붙으면 모바일에서 두 줄로 접히면서 정작 오늘 할 일이 밀렸다.
+    try { TopStrip.render(); } catch(e){}
 
     // 이번주 일정/할일 - 날짜 포함, 3개씩 줄바꿈
     const upcomingHTML=upcoming.length?`
