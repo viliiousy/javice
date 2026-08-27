@@ -540,7 +540,12 @@ textarea.inp{ resize:vertical; min-height:64px; }
   position:sticky; top:0; background:var(--card); z-index:1;
   border-radius:18px 18px 0 0;
 }
-.modal-head h3{ font-size:16px; font-weight:700; color:var(--text); }
+.modal-head h3{
+  display:flex; align-items:center; gap:8px; min-width:0;
+  font-size:16px; font-weight:700; color:var(--text);
+}
+/* 제목 아이콘은 글자보다 흐리다 — "일정 추가" 를 먼저 읽어야 한다. */
+.modal-head h3 .ic{ color:var(--text3); width:19px; height:19px; }
 .modal-close{
   background:var(--card2); border:1px solid var(--border);
   color:var(--text2); cursor:pointer; font-size:13px;
