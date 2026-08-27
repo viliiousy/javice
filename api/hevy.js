@@ -98,14 +98,25 @@ module.exports = async function handler(req, res) {
   if (!process.env.HEVY_API_KEY) { res.status(500).json({ error: 'HEVY_API_KEY 미설정' }); return; }
   if (!uid) { res.status(500).json({ error: 'HEVY_UID / INBODY_UID 미설정' }); return; }
 
-  const ok = [process.env.CRON_SECRET, process.env.HEVY_WEBHOOK_SECRET]
-    .filter(Boolean).map(s => 'Bearer ' + s);
-  if (!ok.length) { res.status(500).json({ error: '인증 비밀이 하나도 설정되어 있지 않습니다' }); return; }
-  if (!ok.includes(req.headers.authorization || '')) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  const secrets = [process.env.CRON_SECRET, process.env.HEVY_WEBHOOK_SECRET].filter(Boolean);
+  if (!secrets.length) { res.status(500).json({ error: '인증 비밀이 하나도 설정되어 있지 않습니다' }); return; }
+  // Hevy 웹후크 설정칸에 'Bearer xxx' 로 넣을 수도, 값만 넣을 수도 있다. 둘 다 받는다 —
+  // 여기서 틀리면 증상이 '조용히 아무 일도 안 일어남' 이라 원인을 찾기 어렵다.
+  const given = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  if (!secrets.includes(given)) { res.status(401).json({ error: 'Unauthorized' }); return; }
+
+  // Hevy 는 5초 안에 200 을 받아야 성공으로 친다(웹후크 설정 화면에 명시돼 있다).
+  // 그런데 아래 일은 파이어베이스 토큰 발급까지 포함해서 콜드 스타트면 그보다 오래 걸릴 수 있다.
+  // 그래서 웹후크(POST)에는 먼저 200 을 돌려준 뒤 일을 한다.
+  // Vercel 함수는 핸들러 프로미스가 끝날 때까지 살아 있으므로 뒷일도 그대로 끝난다.
+  const webhook = req.method === 'POST';
+  let replied = false;
+  const reply = (code, body) => { if (!replied) { replied = true; res.status(code).json(body); } };
+  if (webhook) reply(200, { ok: true, queued: true });
 
   try {
     const prefix = await findPrefix(uid);
-    if (!prefix) { res.status(409).json({ error: '앱 데이터를 찾지 못했습니다. 앱에서 한 번 로그인해 주세요.' }); return; }
+    if (!prefix) { reply(409, { error: '앱 데이터를 찾지 못했습니다. 앱에서 한 번 로그인해 주세요.' }); return; }
     const path = '/users/' + uid + '/' + prefix + RAW_KEY + '.json';
 
     const cur  = await readList(path);
@@ -117,7 +128,7 @@ module.exports = async function handler(req, res) {
     let pages = 1;
     for (let p = 1; p <= (full ? Math.min(pages, MAX_PAGE) : 1); p++) {
       const r = await hevy('/workouts?page=' + p + '&pageSize=10');
-      if (r.status !== 200) { res.status(502).json({ error: 'Hevy 응답 ' + r.status, head: r.head, page: p }); return; }
+      if (r.status !== 200) { reply(502, { error: 'Hevy 응답 ' + r.status, head: r.head, page: p }); return; }
       pages = (r.body && r.body.page_count) || 1;
       for (const w of ((r.body && r.body.workouts) || [])) {
         const n = normalize(w);
@@ -140,7 +151,7 @@ module.exports = async function handler(req, res) {
 
     // 바뀐 게 없으면 쓰지 않는다. 매시간 같은 값을 덮어쓰면 다른 기기가 매번 '변경됨' 으로 깨어난다.
     if (!added && !updated) {
-      res.status(200).json({ ok: true, changed: false, total: out.length, full: full });
+      reply(200, { ok: true, changed: false, total: out.length, full: full });
       return;
     }
 
@@ -159,9 +170,9 @@ module.exports = async function handler(req, res) {
       body: JSON.stringify(String(Date.now())),
     });
 
-    res.status(200).json({ ok: true, changed: true, added: added, updated: updated, total: out.length, full: full });
+    reply(200, { ok: true, changed: true, added: added, updated: updated, total: out.length, full: full });
   } catch (e) {
     console.error('[hevy]', e);
-    res.status(500).json({ error: e.message });
+    reply(500, { error: e.message });
   }
 };
