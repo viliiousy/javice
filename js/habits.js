@@ -439,7 +439,7 @@ const Habits = {
 
   showEditHabit(id) {
     const h=this.getList().find(x=>x.id===id); if(!h) return;
-    App.openModal('✅ 습관 편집',`
+    App.openModal('@check 습관 편집',`
       <div class="modal-row"><label class="modal-lbl">이름</label>
         <input id="hEditName" type="text" value="${esc(h.name)}" class="inp"></div>
       <div class="modal-row"><label class="modal-lbl">이모지</label>
