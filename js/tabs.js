@@ -96,7 +96,7 @@ const Tabs = {
   },
 
   openSettings() {
-    App.openModal('🧩 메인 카드', `<div id="cardSetBody"></div>
+    App.openModal('@grid 메인 카드', `<div id="cardSetBody"></div>
       <p class="ec-hint">끈 카드는 화면에서만 빠집니다. 기록은 그대로 남고, 다시 켜면 돌아옵니다.</p>
       <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div>`);
     this._paintSettings();
