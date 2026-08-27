@@ -487,7 +487,7 @@ const JARVIS = {
   _getKey(){ return localStorage.getItem('gl_ai_key')||''; },
 
   showKeySetup() {
-    App.openModal('🔑 JARVIS API 키',`
+    App.openModal('@key JARVIS API 키',`
       <p style="color:var(--text2);font-size:13px;margin-bottom:14px">
         완전 무료 Groq API 키 필요<br>
         <a href="https://console.groq.com" target="_blank" style="color:var(--accent-l)">console.groq.com</a> → API Keys → Create API Key
