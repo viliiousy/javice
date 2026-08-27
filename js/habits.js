@@ -59,9 +59,11 @@ const Habits = {
   //
   // 그날 할 습관이 아예 없던 날(평일 습관인데 주말)은 실패가 아니다. 빈칸으로 둔다.
   // 0% 와 '해당 없음' 을 같은 색으로 칠하면 쉰 날이 무너진 날처럼 보인다.
-  _heat(cat, date) {
+  // 격자는 언제나 '오늘' 을 끝으로 잡는다. 고른 날짜를 끝으로 잡으면
+  // 과거 칸을 누르는 순간 그 뒤 날들이 미래가 되어 사라진다 — 돌아올 길이 없어진다.
+  _heat(cat) {
     const all = this.getList();
-    const end = new Date(date); end.setHours(0,0,0,0);
+    const end = new Date(); end.setHours(0,0,0,0);
     const start = new Date(end);
     start.setDate(start.getDate() - start.getDay() - 28);   // 4주 전 일요일부터
     const out = [];
@@ -80,19 +82,25 @@ const Habits = {
     return out;
   },
 
-  _heatHtml(cat, date) {
-    const cells = this._heat(cat, date);
+  _heatHtml(cat, selDate) {
+    const cells = this._heat(cat);
     // 기록이 아예 없으면 빈 격자만 뜬다. 그건 정보가 아니라 회색 벽이다.
     if(!cells.some(c=>c.lv>0)) return '';
     this._heatData = this._heatData||{}; this._heatData[cat]=cells;
 
     const todayStr = this._dateStr(new Date());
+    const selStr   = this._dateStr(selDate || new Date());
     const grid = cells.map((c,i)=>{
       const cls = c.lv===-2 ? 'hm-fut' : c.lv===-1 ? 'hm-off' : 'hm-l'+c.lv;
-      return `<button class="hm-c ${cls}${c.ds===todayStr?' hm-today':''}"
+      const day = Number(c.ds.slice(8));
+      // 칸에 날짜를 적어야 달력으로 읽힌다. 색만 있으면 '어느 날인지' 를 세어야 한다.
+      // 지나지 않은 날은 누를 것도 없으니 눌리지 않게 둔다.
+      const dead = c.lv===-2;
+      return `<button class="hm-c ${cls}${c.ds===todayStr?' hm-today':''}${c.ds===selStr&&c.ds!==todayStr?' hm-sel':''}"${dead?' disabled':''}
         onpointerenter="Habits._heatHover('${cat}',${i})" onfocus="Habits._heatHover('${cat}',${i})"
         onpointerleave="Habits._heatHover('${cat}',-1)" onblur="Habits._heatHover('${cat}',-1)"
-        aria-label="${this._heatLabel(c)}"></button>`;
+        ${dead?'':`onclick="Habits._heatPick('${c.ds}')"`}
+        aria-label="${this._heatLabel(c)}"><span>${day}</span></button>`;
     }).join('');
 
     const days = this.DAYS_KO.map(d=>`<span>${d}</span>`).join('');
@@ -106,10 +114,10 @@ const Habits = {
   },
 
   _heatLabel(c) {
-    const md = c.ds.slice(5).replace('-','/');
+    const md = c.ds.slice(5).replace(/-/,'/').replace(/^0/,'');
     if(c.lv===-2) return md;
     if(c.lv===-1) return `${md} · 쉬는 날`;
-    return `${md} · ${c.done}/${c.total}`;
+    return `${md} · ${Math.round(c.done/c.total*100)}% (${c.done}/${c.total})`;
   },
   _heatSummary(cells) {
     const real = cells.filter(c=>c.lv>=0);
@@ -117,6 +125,14 @@ const Habits = {
     const perfect = real.filter(c=>c.lv===4).length;
     return `${real.length}일 중 <strong>${perfect}일</strong> 전부 완료`;
   },
+  // 칸을 누르면 카드 전체가 그 날짜로 간다. 달력처럼 생겼으면 달력처럼 눌려야 한다.
+  _heatPick(ds) {
+    const d = new Date(ds + 'T00:00:00');
+    if(isNaN(d.getTime())) return;
+    if(typeof App !== 'undefined' && App.selectCalDate) App.selectCalDate(d);
+    else this.render(d);
+  },
+
   _heatHover(cat, i) {
     const el = document.getElementById('hmRead-'+cat);
     const cells = this._heatData && this._heatData[cat];
