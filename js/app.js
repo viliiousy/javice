@@ -201,11 +201,32 @@ const App = {
     this._statsPrev=curStr;
 
     // HTML 조립
+    const ic=n=>typeof Icons!=='undefined'?Icons.svg(n,'chip-ic'):'';
+
+    // 아침에는 모든 칸이 0 이다. `0/2800kcal`, `습관 0/4` — 이건 정보가 아니라 벽이다.
+    // 하루를 여는 화면이 "아직 아무것도 안 했다"만 네 번 반복해서 알려준다.
+    // 그래서 '한 것' 이 아니라 '남은 것' 을 적는다. 아침에도 할 말이 생기고,
+    // 어차피 행동을 정하는 숫자는 먹은 양이 아니라 더 먹어도 되는 양이다.
+    const hLeft = hList.length - hDone;
+    const habitTxt = !hList.length ? '습관 없음'
+                   : hLeft === 0   ? '습관 완료'
+                                   : `습관 ${hLeft}개 남음`;
+
+    const calGoal = Number(ds.calorieGoal) || 0;
+    const calLeft = calGoal - dt.cal;
+    const won = v => Math.round(v).toLocaleString('ko-KR');
+    // 색은 세 단계면 충분하다. 초과(빨강) / 거의 다 채움(초록) / 그 외(무색).
+    // 예전엔 50~80% 구간에 노랑을 줬는데, '1,150kcal 남음' 이 경고색으로 뜨면
+    // 뭐가 잘못된 줄 안다. 아직 더 먹어도 된다는 뜻인데.
+    const calTxt = !calGoal      ? `${won(dt.cal)}kcal`
+                 : calLeft >= 0  ? `${won(calLeft)}kcal 남음`
+                                 : `${won(-calLeft)}kcal 초과`;
+
     const chipsHTML=`
-      <div class="stat-chip ${hDone===hList.length&&hList.length>0?'stat-green':''}" data-s="habits">✅ 습관 ${hDone}/${hList.length}</div>
-      <div class="stat-chip ${calPct>=80?'stat-green':calPct>=50?'stat-yellow':''}" data-s="diet">🥗 ${dt.cal}/${ds.calorieGoal}kcal</div>
-      ${pending>0?`<div class="stat-chip" data-s="tasks">📋 할일 ${pending}개</div>`:''}
-      ${clItems.length>0?`<div class="stat-chip" data-s="checklist">✍️ ${clItems.length}개</div>`:''}
+      <div class="stat-chip ${hLeft===0&&hList.length>0?'stat-green':''}" data-s="habits">${ic('check')}${habitTxt}</div>
+      <div class="stat-chip ${calGoal&&calLeft<0?'stat-red':calPct>=80?'stat-green':''}" data-s="diet">${ic('diet')}${calTxt}</div>
+      ${pending>0?`<div class="stat-chip" data-s="tasks">${ic('tasks')}할일 ${pending}개</div>`:''}
+      ${clItems.length>0?`<div class="stat-chip" data-s="checklist">${ic('pen')}체크리스트 ${clItems.length}개</div>`:''}
       ${typeof TopStrip!=='undefined'?TopStrip.chips():''}`;
 
     // 이번주 일정/할일 - 날짜 포함, 3개씩 줄바꿈
@@ -213,7 +234,7 @@ const App = {
       <div class="stats-upcoming">
         ${upcoming.map(i=>{
           const md=`${i.date.getMonth()+1}/${i.date.getDate()}`;
-          return `<span class="stats-upcoming-chip ${i.isTask?'uc-task':'uc-event'}">${i.isTask?'📋':'📅'} <span class="uc-date">${md}</span> ${esc(i.label)}</span>`;
+          return `<span class="stats-upcoming-chip ${i.isTask?'uc-task':'uc-event'}">${i.isTask?ic('tasks'):ic('calendar')}<span class="uc-date">${md}</span> ${esc(i.label)}</span>`;
         }).join('')}
       </div>`:'';
 
