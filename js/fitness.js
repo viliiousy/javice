@@ -252,7 +252,7 @@ const Fitness = {
     this._cart=[]; this._hits=null; this._part=null; this._q='';
     const parts=this._parts();
     const n=parts.reduce((a,p)=>a+EX_DB[p].length,0);
-    App.openModal('💪 운동 추가', `
+    App.openModal('@dumbbell 운동 추가', `
       <div class="ex-parts">
         ${parts.map(p=>`<button class="ex-part" data-part="${p}" onclick="Fitness.setPart('${p}')">${p}</button>`).join('')}
       </div>
