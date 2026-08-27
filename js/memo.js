@@ -33,7 +33,7 @@ const Memo = {
   },
 
   showAdd(){
-    App.openModal('📝 메모 추가',`
+    App.openModal('@memo 메모 추가',`
       <div class="modal-row"><label class="modal-lbl">제목 *</label>
         <input id="mTitle" type="text" placeholder="제목" class="inp"></div>
       <div class="modal-row"><label class="modal-lbl">내용 (선택)</label>
@@ -57,7 +57,7 @@ const Memo = {
 
   showEdit(id){
     const m=this.getItems().find(x=>x.id===id); if(!m) return;
-    App.openModal('📝 메모 편집',`
+    App.openModal('@memo 메모 편집',`
       <div class="modal-row"><label class="modal-lbl">제목</label>
         <input id="mEditTitle" type="text" value="${esc(m.title)}" class="inp"></div>
       <div class="modal-row"><label class="modal-lbl">내용</label>
