@@ -196,7 +196,7 @@ const Econ = {
   // ── 터미널 (모달) ───────────────────────────────────
   open(view) {
     this.view = view || 'main';
-    App.openModal('📈 경제', `
+    App.openModal('@trend 경제', `
       <div class="ec-nav">
         ${[['main','메인'],['hold','보유'],['watch','관심종목'],['charts','차트']].map(([v,l]) =>
           `<button class="${this.view===v?'on':''}" onclick="Econ.tab('${v}')">${l}</button>`).join('')}
@@ -512,7 +512,7 @@ const Econ = {
        <button class="btn-sm ec-rm" onclick="Econ._times.splice(${i},1);Econ._renderSettings()">삭제</button></div>`).join('');
     const mk = (k,l) => `<label class="ec-toggle-row"><span>${l}</span>
       <span class="ec-sw"><input type="checkbox" ${ma[k]?'checked':''} onchange="Econ.cfg().market_alerts['${k}']=this.checked"><span></span></span></label>`;
-    App.openModal('📈 시세 알림 설정', `
+    App.openModal('@bell 시세 알림 설정', `
       <label class="modal-lbl">매일 리포트 받을 시간 (여러 개 가능)</label>
       <div>${rows || '<p class="ec-hint">시간을 추가하세요</p>'}</div>
       <button class="btn-sm" onclick="Econ._times.push('08:00');Econ._renderSettings()">＋ 시간 추가</button>
@@ -655,7 +655,7 @@ const Econ = {
   },
 
   async openChart(it) {
-    App.openModal('📈 ' + it.name, '<div id="ecOne" class="ec-one"><p class="empty">차트 불러오는 중…</p></div>');
+    App.openModal('@trend ' + it.name, '<div id="ecOne" class="ec-one"><p class="empty">차트 불러오는 중…</p></div>');
     document.querySelector('#modal .modal-box')?.classList.add('wide');
     const [lw, hist] = await Promise.all([this._lw(), this._history()]);
     const box = document.getElementById('ecOne');
