@@ -546,7 +546,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     const ds=dateStr||this._localDateStr();
     const key=localStorage.getItem('gl_ai_key');
     if(!key){ App.showToast('JARVIS API 키를 먼저 설정해주세요 (⚡→🔑)','error'); return; }
-    App.openModal('📷 음식 사진 AI 분석',`
+    App.openModal('@camera 음식 사진 AI 분석',`
       <p style="color:var(--text2);font-size:13px;margin-bottom:10px">사진을 업로드하면 AI가 자동 분석합니다.</p>
       <div style="margin-bottom:10px"><label class="modal-lbl">식사 구분</label>
         <select id="photoMeal" class="inp inp-sm">
@@ -634,7 +634,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     const s=this.getSettings();
     const rest=s.restDays||[0,6]; // 기본: 일,토
     const days=['일','월','화','수','목','금','토'];
-    App.openModal('⚙️ 식단 목표 설정',`
+    App.openModal('@gear 식단 목표 설정',`
       <div style="margin-bottom:12px">
         <div style="font-weight:700;font-size:13px;margin-bottom:8px">📅 평일 기본 목표</div>
         <div class="modal-row"><label class="modal-lbl">칼로리 (kcal)</label>
