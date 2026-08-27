@@ -73,12 +73,15 @@ function normalize(w) {
   };
 }
 
+// 한 번 찾으면 바뀌지 않는다. 웜 인스턴스에서 왕복 하나를 던다 — 5초 예산이 빠듯해서다.
+let _prefix = null;
 async function findPrefix(uid) {
+  if (_prefix) return _prefix;
   const keys = await fbGet('/users/' + uid + '.json?shallow=true');
   if (!keys || typeof keys !== 'object') return null;
   for (const k of Object.keys(keys)) {
     const m = k.match(/^(u_.+?_)gl_/);
-    if (m) return m[1];
+    if (m) { _prefix = m[1]; return _prefix; }
   }
   return null;
 }
@@ -106,13 +109,15 @@ module.exports = async function handler(req, res) {
   if (!secrets.includes(given)) { res.status(401).json({ error: 'Unauthorized' }); return; }
 
   // Hevy 는 5초 안에 200 을 받아야 성공으로 친다(웹후크 설정 화면에 명시돼 있다).
-  // 그런데 아래 일은 파이어베이스 토큰 발급까지 포함해서 콜드 스타트면 그보다 오래 걸릴 수 있다.
-  // 그래서 웹후크(POST)에는 먼저 200 을 돌려준 뒤 일을 한다.
-  // Vercel 함수는 핸들러 프로미스가 끝날 때까지 살아 있으므로 뒷일도 그대로 끝난다.
-  const webhook = req.method === 'POST';
+  // 한때 그것 때문에 '먼저 200 을 돌려주고 나중에 일한다' 로 바꿨는데, 그건 틀렸다.
+  // Vercel 함수는 응답을 보내는 순간 얼어붙는다 — 뒷일이 그냥 죽는다.
+  // 2026-08-27 웹후크 첫 발사에서 200 은 돌아왔는데 기록은 하나도 안 들어갔고,
+  // 뒤이어 돈 크론이 added:1 로 집어넣어서야 드러났다. 응답 코드는 아무것도 증명하지 않는다.
+  //
+  // 그래서 다시 '일을 끝내고 응답한다'. 실측하면 2초 안에 끝나서 5초 안에 들어온다.
+  // 그래도 늦어지면 웹후크 한 번을 놓칠 뿐이고, 매시 크론이 같은 걸 메운다.
   let replied = false;
   const reply = (code, body) => { if (!replied) { replied = true; res.status(code).json(body); } };
-  if (webhook) reply(200, { ok: true, queued: true });
 
   try {
     const prefix = await findPrefix(uid);
