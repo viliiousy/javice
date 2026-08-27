@@ -115,6 +115,7 @@ const Fitness = {
         </div>`).join('')}
       ${isToday?'<div class="habit-add-btn" onclick="Fitness.showInlineAdd()">+ 운동 추가</div>':''}
       ${typeof Hevy!=='undefined'?Hevy.html(ds):''}
+      ${typeof Hevy!=='undefined'?Hevy.weeklyHtml(8):''}
       <div class="fit-progress">
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
         <span class="progress-txt">${done}/${allEx.length} (${pct}%)</span>
