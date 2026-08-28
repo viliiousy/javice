@@ -198,16 +198,11 @@ const JARVIS = {
     const key=this._getKey(); if(!key) return;
     this._setStatus('사진 분석 중...');
     try{
-      const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
-        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
-        body:JSON.stringify({ model:'meta-llama/llama-4-scout-17b-16e-instruct', max_tokens:1000,
-          messages:[{role:'user',content:[
-            {type:'image_url',image_url:{url:`data:${mimeType};base64,${base64}`}},
-            {type:'text',text:`음식 사진 분석 JSON만 출력:\n{"foods":[{"name":"","amount":"","cal":0,"protein":0,"carb":0,"fat":0}],"total_cal":0,"meal":"아침|점심|저녁|간식","comment":""}\n한국 음식 기준으로 정확하게 추정해줘.`}
-          ]}]
-        }),
-      });
-      const data=await res.json();
+      const data=await this.chat({ max_tokens:1000,
+        messages:[{role:'user',content:[
+          {type:'image_url',image_url:{url:`data:${mimeType};base64,${base64}`}},
+          {type:'text',text:`음식 사진 분석 JSON만 출력:\n{"foods":[{"name":"","amount":"","cal":0,"protein":0,"carb":0,"fat":0}],"total_cal":0,"meal":"아침|점심|저녁|간식","comment":""}\n한국 음식 기준으로 정확하게 추정해줘.`}
+        ]}] }, 'vision');
       const text=data.choices?.[0]?.message?.content||'';
       let parsed; try{ const m=text.match(/\{[\s\S]*\}/); parsed=m?JSON.parse(m[0]):null; }catch{}
       if(!parsed?.foods){ this._addMsg('ai','음식을 인식하지 못했습니다.'); return; }
@@ -242,13 +237,7 @@ const JARVIS = {
     this.history.push({role:'user',content:userMsg});
     const msgs=this.history.slice(-12);
     const ctx=this._buildCtx(), sys=this._buildSys(ctx);
-    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
-      body:JSON.stringify({model:'llama-3.3-70b-versatile',max_tokens:1200,messages:[{role:'system',content:sys},...msgs]}),
-    });
-    if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error(e.error?.message||`HTTP ${res.status}`); }
-    const data=await res.json();
+    const data=await this.chat({ max_tokens:1200, messages:[{role:'system',content:sys},...msgs] });
     const text=data.choices?.[0]?.message?.content||'';
     this.history.push({role:'assistant',content:text});
     return text;
@@ -485,6 +474,72 @@ const JARVIS = {
   _setStatus(s){ const el=document.getElementById('jStatus'); if(el) el.textContent=s; },
   _setVoice(on){ document.getElementById('jVoiceBar')?.classList.toggle('hidden',!on); const btn=document.getElementById('jMicBtn'); if(btn) btn.style.color=on?'var(--red)':''; },
   _getKey(){ return localStorage.getItem('gl_ai_key')||''; },
+
+  // ── 어떤 모델로 부를 것인가 ─────────────────────────
+  // 모델 이름을 코드에 박아 두면 Groq 이 그걸 내리는 날 앱이 조용히 죽는다.
+  // 실제로 두 번 그랬다 — llama-3.3-70b 는 2026-08-16, llama-4-scout 는 2026-07-17 에
+  // 무료·개발자 등급에서 내려갔고, 화면에는 "does not exist or you do not have access" 만 떴다.
+  //
+  // 그래서 이름을 고정하지 않는다. 이 키로 지금 쓸 수 있는 목록을 물어보고 그 안에서 고른다.
+  // 다음에 또 하나가 내려가도 다음 후보로 저절로 넘어간다.
+  MODELS: {
+    text:   ['openai/gpt-oss-120b','qwen/qwen3.8-27b','qwen/qwen3.6-27b','openai/gpt-oss-20b'],
+    vision: ['qwen/qwen3.8-27b','qwen/qwen3.6-27b'],
+  },
+  _MC: 'gl_ai_models',
+
+  async _modelIds(fresh) {
+    if(!fresh){
+      try {
+        const c = JSON.parse(localStorage.getItem(this._MC)||'null');
+        // 하루면 충분하다. 모델이 내려가는 건 몇 달에 한 번이다.
+        if(c && Date.now()-c.at < 864e5 && Array.isArray(c.ids) && c.ids.length) return c.ids;
+      } catch {}
+    }
+    const key=this._getKey(); if(!key) return [];
+    try {
+      const res=await fetch('https://api.groq.com/openai/v1/models',{ headers:{ Authorization:`Bearer ${key}` } });
+      if(!res.ok) return [];
+      const data=await res.json();
+      const ids=(data.data||[]).map(m=>m&&m.id).filter(Boolean);
+      if(ids.length) localStorage.setItem(this._MC, JSON.stringify({ at:Date.now(), ids }));
+      return ids;
+    } catch { return []; }
+  },
+
+  async model(kind='text') {
+    const want=this.MODELS[kind]||this.MODELS.text;
+    const ids=await this._modelIds();
+    // 목록을 못 받았으면(네트워크·권한) 첫 후보로 그냥 해 본다. 틀리면 아래 chat() 이 한 번 더 챙긴다.
+    return want.find(m=>ids.includes(m)) || want[0];
+  },
+
+  // 모든 Groq 호출은 여기를 지난다. 모델이 없다고 하면 목록을 새로 받아 한 번만 다시 시도한다.
+  async chat(body, kind='text') {
+    const key=this._getKey();
+    if(!key) throw new Error('API 키가 없습니다');
+    const send = async (model) => {
+      const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
+        body:JSON.stringify({ ...body, model }),
+      });
+      const data=await res.json().catch(()=>({}));
+      return { ok:res.ok, status:res.status, data };
+    };
+    let model=await this.model(kind);
+    let r=await send(model);
+    const gone = !r.ok && /does not exist|do not have access|decommission|model_not_found/i.test(
+      r.data?.error?.message || r.data?.error?.code || '');
+    if(gone){
+      // 캐시가 낡았다. 새로 받아서 다른 후보로 한 번만 더.
+      const ids=await this._modelIds(true);
+      const next=(this.MODELS[kind]||this.MODELS.text).find(m=>ids.includes(m) && m!==model);
+      if(next) r=await send(next);
+    }
+    if(!r.ok) throw new Error(r.data?.error?.message || `HTTP ${r.status}`);
+    return r.data;
+  },
 
   showKeySetup() {
     App.openModal('@key JARVIS API 키',`
