@@ -34,7 +34,7 @@ const Checklist = {
       const dueStr=dueValid?due.toLocaleDateString('ko-KR',{month:'short',day:'numeric',weekday:'short'}):'';
 
       return `<div class="cl-item${item.done?' done':''}${Checklist._reorderMode?' reorder-mode':''}"
-          data-reorderable="${item.id}">
+          data-reorderable="${item.id}"${Checklist._reorderMode?'':` data-row data-i="${item.id}" data-label="${esc(item.title)}"`}>
         ${Checklist._reorderMode?`<div class="reorder-handle" onclick="event.stopPropagation()" title="꾹 눌러서 순서 변경">⠿</div>`:''}
         <div class="cl-check" onclick="event.stopPropagation();Checklist.toggle('${item.id}')"></div>
         <div class="cl-body" onclick="Checklist._bodyTap('${item.id}')">
@@ -44,6 +44,11 @@ const Checklist = {
       </div>`;
     }).join('')
     +`<div class="habit-add-btn" onclick="Checklist.showAdd()">+ 항목 추가</div>`;
+
+    try { RowUI.paint(wrap, {
+      edit: id => this._bodyTap(id),
+      del:  id => this.remove(id),
+    }); } catch(e) { console.warn('RowUI', e); }
   },
 
   // ── 터치 제스처 ───────────────────────
