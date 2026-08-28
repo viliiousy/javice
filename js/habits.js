@@ -206,18 +206,25 @@ const Habits = {
       else if(_d.length===5&&[1,2,3,4,5].every(x=>_d.includes(x))) daysLabel='<span class="habit-days">평일</span>';
       else if(_d.length===2&&[0,6].every(x=>_d.includes(x))) daysLabel='<span class="habit-days">주말</span>';
       else daysLabel=`<span class="habit-days">${_d.map(d=>this.DAYS_KO[d]).join('')}</span>`;
+      const ds2=Habits._dateStr(date);
+      // 순서 바꾸는 중에는 밀기·길게누르기를 붙이지 않는다 — 끌어야 하는데 삭제가 열린다.
       return `<div class="habit-item${isDone?' done':''}${reorder?' reorder-mode':''}"
-        data-reorderable="${h.id}"
-        onclick="Habits._handleTap('${h.id}','${Habits._dateStr(date)}')">
+        data-reorderable="${h.id}"${reorder?'':` data-row data-i="${h.id}" data-label="${esc(h.name)}"`}>
         ${reorder?`<div class="reorder-handle" onclick="event.stopPropagation()" title="꾹 눌러서 순서 변경">⠿</div>`:''}
-        <div class="habit-chk">${isDone?'✓':''}</div>
-        <span class="habit-name">${h.emoji?esc(h.emoji)+' ':''}${esc(h.name)}${daysLabel}</span>
+        <div class="habit-chk" onclick="event.stopPropagation();Habits._handleTap('${h.id}','${ds2}')">${isDone?'✓':''}</div>
+        <span class="habit-name" onclick="event.stopPropagation();Habits.showEditHabit('${h.id}')">${h.emoji?esc(h.emoji)+' ':''}${esc(h.name)}${daysLabel}</span>
         ${st>0&&!reorder?`<span class="habit-streak">🔥${st}</span>`:''}
-        ${reorder?`<button class="cl-del-btn edit-del-btn" onclick="event.stopPropagation();Habits._delFrom('${h.id}','${Habits._dateStr(date)}')" title="삭제">✕</button>`:''}
+        ${reorder?`<button class="cl-del-btn edit-del-btn" onclick="event.stopPropagation();Habits._delFrom('${h.id}','${ds2}')" title="삭제">✕</button>`:''}
       </div>`;
     }).join('')
     + (list.length ? '' : `<p class="empty">${Icons.big(C.ic)}${cat==='dev'?'독서·강의·외국어 같은 자기개발 습관을 추가해보세요':'습관이 없습니다'}</p>`)
     + `<div class="habit-add-btn" onclick="Habits.showInlineAdd(App?.S?.selDate,'${cat}')">${C.addLbl}</div>`;
+
+    // 밀기·길게누르기·✕ 를 붙인다 (js/rowui.js)
+    try { RowUI.paint(wrap, {
+      edit: id => this.showEditHabit(id),
+      del:  id => this._delFrom(id, this._dateStr(date)),
+    }); } catch(e) { console.warn('RowUI', e); }
 
     // 히트맵은 카드 맨 아래다. 오늘 몇 개 했는지를 먼저 읽고, 그다음에 지난 다섯 주를 본다.
     // 순서가 뒤집히면 오늘 얘기가 지난 달 얘기 밑에 깔린다.
