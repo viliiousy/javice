@@ -2,8 +2,14 @@ name: Send Notifications
 
 on:
   schedule:
-    # 매시간 정각 실행 (UTC 기준 - 한국은 +9시간)
-    - cron: '0 * * * *'
+    # 10분마다. 매시 정각만 돌던 시절엔 :00~:04 로 맞춘 알림만 나갔고
+    # 21:30 같은 설정은 영영 오지 않았다.
+    #
+    # 다만 지금 정확성은 이 주기에 걸려 있지 않다. api/cron-notify.js 는
+    # '지금이 그 시각인가' 가 아니라 '지났는가 + 오늘 보냈는가' 로 판정한다.
+    # 그래서 이 주기가 정하는 건 '얼마나 늦게 올 수 있나' 뿐이다 — 최대 10분.
+    # GitHub 의 예약 실행이 밀려도, 한 번 걸러도, 다음 실행이 대신 보낸다.
+    - cron: '*/10 * * * *'
   workflow_dispatch:  # 수동 실행 가능
     inputs:
       force:
@@ -29,23 +35,3 @@ jobs:
           cat /tmp/cron.json; echo
           # 실패를 초록불로 넘기지 않는다
           [ "$code" = "200" ] || exit 1
-
-      - name: Sync Hevy workouts
-        if: always()
-        run: |
-          # Hevy 연동의 안전망이다. 평소엔 웹후크가 운동 저장 순간에 바로 넣어 주고,
-          # 이 단계는 그게 한 번 실패했을 때 한 시간 안에 메우는 역할만 한다.
-          # 그래서 크론을 새로 만들지 않고 이미 도는 이 워크플로에 얹었다 —
-          # 2026-08-26 에 1분 크론 하나 때문에 실패 메일이 쏟아진 걸 겪었다.
-          for i in 1 2 3; do
-            code=$(curl -sS -o /tmp/hevy.json -w '%{http_code}' \
-              "https://bashy.app/api/hevy" \
-              -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
-            echo "시도 $i → HTTP $code"
-            cat /tmp/hevy.json; echo
-            [ "$code" = "200" ] && exit 0
-            sleep 5
-          done
-          # 세 번 다 실패하면 드러낸다. 조용히 넘기면 기록이 며칠씩 안 들어와도 초록불이다.
-          echo "Hevy 동기화 3회 모두 실패"
-          exit 1
