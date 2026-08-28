@@ -797,6 +797,12 @@ const App = {
         ${v.map(t=>this._taskHTML(t)).join('')}
       </div>`;
     }).join('');
+
+    // 밀기·길게누르기 (js/rowui.js). PC 의 ✕ 는 .task-del 이 이미 한다.
+    try { RowUI.paint(document.getElementById('tasksContainer'), {
+      edit: v => { const [id,lid]=v.split('|'); this._showTaskDetail(id,lid); },
+      del:  v => { const [id,lid]=v.split('|'); this._delTask(id,lid); },
+    }); } catch(e) { console.warn('RowUI', e); }
   },
 
   _taskHTML(t) {
@@ -806,7 +812,8 @@ const App = {
     const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
     const catCol=catColors[t._lid]||'';
     const colorBar=catCol?`<div class="task-cat-bar" style="background:${catCol}"></div>`:'';
-    return `<div class="task-item${done?' done':''}${hidden?' task-hidden':''}">
+    return `<div class="task-item${done?' done':''}${hidden?' task-hidden':''}"
+      data-row data-nox data-i="${t.id}|${t._lid}" data-label="${esc(t.title)}">
       ${colorBar}
       <div class="task-check" onclick="event.stopPropagation();App._toggle('${t.id}','${t._lid}',${done})"></div>
       <div class="task-body" onclick="App._showTaskDetail('${t.id}','${t._lid}')">
