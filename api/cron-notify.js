@@ -136,14 +136,32 @@ function googleSubFromPrefix(prefix) {
 //   신규: { settings, devices: { <기기id>: { token, ua, updatedAt } } }
 //   구버전: { token, settings }            ← 기기 하나만 담을 수 있어 PC·폰이 서로 덮어썼다
 function deviceList(data) {
-  const out = [];
+  const out = [], skipped = [];
+  const take = (id, token, ua, invalid) => {
+    if (typeof token !== 'string' || !token) return;
+    // 한 번 죽었다고 표시된 기기는 다시 두드리지 않는다.
+    // 매번 재시도하면 매번 실패하고, 이 크론은 실패가 있으면 500 을 준다 —
+    // 10분마다 도는 지금은 그게 곧 실패 메일 폭주다. 2026-08-26 에 겪었다.
+    // 기기를 다시 등록하면 이 노드가 통째로 교체되면서 표식도 같이 사라진다.
+    if (invalid) { skipped.push(id); return; }
+    out.push({ id, token, ua: ua || '' });
+  };
   if (data.devices && typeof data.devices === 'object') {
     for (const [id, d] of Object.entries(data.devices)) {
-      if (d && typeof d.token === 'string' && d.token) out.push({ id, token: d.token, ua: d.ua || '' });
+      if (d) take(id, d.token, d.ua, d.invalid);
     }
   }
-  if (typeof data.token === 'string' && data.token) out.push({ id: 'legacy', token: data.token, ua: '' });
-  return out;
+  take('legacy', data.token, '', data.invalid);
+  return { devices: out, skipped };
+}
+
+// 못 쓰는 기기에 표식을 남긴다. 지우지 않는 이유는 재등록 시 통째로 교체되기 때문.
+async function markInvalid(uid, devId, info) {
+  const path = devId === 'legacy'
+    ? `/fcm_tokens/${uid}/invalid.json`
+    : `/fcm_tokens/${uid}/devices/${devId}/invalid.json`;
+  await fbFetch(path, { method:'PUT', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ at: Date.now(), ...info }) }).catch(()=>{});
 }
 
 // 문자열 FCM 토큰, 또는 구버전 PushSubscription JSON 에서 토큰을 뽑는다
@@ -181,12 +199,12 @@ async function processUser(uid, tokenData) {
   const tag = uid.slice(0,8) + '…';
   if(!settings?.enabled) return { sent:0, failed:0, detail:[`${tag} 알림 꺼짐`] };
 
-  const devices = deviceList(tokenData);
-  if(!devices.length) return { sent:0, failed:0, detail:[`${tag} 등록된 기기 없음`] };
+  const { devices, skipped } = deviceList(tokenData);
+  const skipNote = skipped.length ? [`${tag} 못 쓰는 기기 ${skipped.length}대 건너뜀 (${skipped.join(', ')})`] : [];
+  if(!devices.length) return { sent:0, failed:0, detail:[...skipNote, `${tag} 쓸 수 있는 기기 없음`] };
 
   const now    = new Date(Date.now() + 9*3600000);
-  const hour   = now.getUTCHours();
-  const min    = now.getUTCMinutes();
+  const nowMin = now.getUTCHours()*60 + now.getUTCMinutes();
   const today  = dateStr();
   const userData = await fbGet(`/users/${uid}.json`);
   if(!userData) return { sent:0, failed:0, detail:[`${tag} 사용자 데이터 없음`] };
@@ -199,112 +217,144 @@ async function processUser(uid, tokenData) {
 
   const force = tokenData.force === true;
 
-  // 시:분 파싱 후 현재 시각이 설정 시간 ±5분 이내인지 확인
-  function timeMatches(timeStr, hour, min) {
-    const parts = (timeStr || '09:00').split(':').map(Number);
-    const hh = parts[0], mm = parts[1] || 0;
-    return hour === hh && min >= mm && min < mm + 5;
+  // ── 언제 보낼지 ────────────────────────────────────────────────
+  // 예전에는 '지금이 설정 시각 ±5분인가' 로 물었다. 크론이 매시 정각에만 도니
+  // 분이 00~04 인 설정만 걸렸고, 21:30 으로 맞춰 둔 알림은 영영 오지 않았다.
+  // 설정 화면은 <input type="time"> 이라 아무 분이나 고를 수 있는데 말이다.
+  //
+  // 게다가 GitHub Actions 의 예약 실행은 몇 분에서 몇십 분씩 밀린다.
+  // 정각 설정마저 '크론이 제때 왔는가' 라는 운에 걸려 있었다.
+  //
+  // 그래서 질문을 바꿨다 — '지금이 그 시각인가' 가 아니라
+  // '그 시각이 지났는가, 그리고 오늘 아직 안 보냈는가'.
+  // 크론이 늦어도, 한 번 걸러도, 다음 실행이 대신 보낸다.
+  // 표식(sent)이 있으니 두 번 가지 않는다.
+  //
+  // 다만 너무 늦은 것은 보내지 않는다. 21:30 리마인더가 새벽 2시에 오면
+  // 안 오느니만 못하고, 크론이 반나절 멈췄다 살아나면 묵은 알림이 한꺼번에 쏟아진다.
+  const LATE_LIMIT = 120;                 // 분 — 이보다 늦었으면 그냥 넘긴다
+  const sentMap = tokenData.sent || {};
+  const done    = new Set();              // 오늘 처리 끝난 칸 (보냈거나, 보낼 게 없었거나)
+
+  function due(slot, timeStr) {
+    if (force) return true;
+    const p = String(timeStr || '09:00').split(':').map(Number);
+    const target = (p[0]||0)*60 + (p[1]||0);
+    if (nowMin < target) return false;                  // 아직 시간 전
+    if (nowMin - target > LATE_LIMIT) return false;     // 너무 늦었다
+    return sentMap[slot] !== today;                     // 오늘 이미 처리했으면 끝
   }
+  // 보낼 게 없다고 판정난 칸도 표식을 남긴다. 안 그러면 10분마다 같은 걸 다시 계산하고,
+  // 캘린더는 구글 API를 헛되이 다시 부른다.
+  const settle = (slot) => { if(!force) done.add(slot); };
 
   // 보낼 메시지를 먼저 다 만든 뒤, 등록된 모든 기기에 같은 내용을 보낸다
   const msgs  = [];
   const notes = [];        // 발송과 별개로 로그에 남길 설명 (조용히 사라지지 않게)
   let   quiet = 0;         // 알림은 못 만들었지만 "고장"인 경우의 수
-  if(settings.habits?.enabled) {
-    if(force || timeMatches(settings.habits.time, hour, min)) {
-      const list = JSON.parse(userData[`${prefix}gl_habits_list`]||'[]');
-      const done = JSON.parse(userData[`${prefix}gl_habits_${today}`]||'[]');
-      const miss = list.filter(h=>!done.includes(h.id));
-      if(miss.length>0) msgs.push({title:'✅ 습관 리마인더', body:`${miss.length}개 남았어요: ${miss.slice(0,2).map(h=>h.name).join(', ')}`});
-    }
+  if(settings.habits?.enabled && due('habits', settings.habits.time)) {
+    const list = JSON.parse(userData[`${prefix}gl_habits_list`]||'[]');
+    const checked = JSON.parse(userData[`${prefix}gl_habits_${today}`]||'[]');
+    const miss = list.filter(h=>!checked.includes(h.id));
+    if(miss.length>0) msgs.push({slot:'habits', title:'✅ 습관 리마인더', body:`${miss.length}개 남았어요: ${miss.slice(0,2).map(h=>h.name).join(', ')}`});
+    else settle('habits');                       // 다 했으면 조를 일이 없다
   }
   if(settings.diet?.enabled) {
     for(const [meal,t] of Object.entries({아침:settings.diet.아침||'09:00',점심:settings.diet.점심||'13:00',저녁:settings.diet.저녁||'19:00'})) {
-      if(force || timeMatches(t, hour, min)) {
-        const diet=JSON.parse(userData[`${prefix}gl_diet_${today}`]||'{}');
-        if(!(diet[meal]?.length)) msgs.push({title:`🥗 ${meal} 식단 기록`, body:`${meal}을 아직 기록하지 않으셨어요!`});
-      }
+      const slot = `diet_${meal}`;
+      if(!due(slot, t)) continue;
+      const diet=JSON.parse(userData[`${prefix}gl_diet_${today}`]||'{}');
+      if(!(diet[meal]?.length)) msgs.push({slot, title:`🥗 ${meal} 식단 기록`, body:`${meal}을 아직 기록하지 않으셨어요!`});
+      else settle(slot);                         // 이미 먹은 걸 적었으면 끝
     }
   }
-  if(settings.tasks?.enabled) {
-    if(force || timeMatches(settings.tasks.time, hour, min)) {
-      const due=[];
-      Object.entries(userData).forEach(([k,v])=>{
-        if(!k.startsWith(prefix)) return;
-        try { const arr=JSON.parse(v); if(Array.isArray(arr)) arr.filter(t=>t.status==='needsAction'&&t.due?.startsWith(today)).forEach(t=>due.push(t.title)); } catch {}
-      });
-      if(due.length>0) msgs.push({title:'📋 오늘 마감 할일', body:`${due.length}개: ${due.slice(0,2).join(', ')}`});
-    }
+  if(settings.tasks?.enabled && due('tasks', settings.tasks.time)) {
+    const dueTasks=[];
+    Object.entries(userData).forEach(([k,v])=>{
+      if(!k.startsWith(prefix)) return;
+      try { const arr=JSON.parse(v); if(Array.isArray(arr)) arr.filter(t=>t.status==='needsAction'&&t.due?.startsWith(today)).forEach(t=>dueTasks.push(t.title)); } catch {}
+    });
+    if(dueTasks.length>0) msgs.push({slot:'tasks', title:'📋 오늘 마감 할일', body:`${dueTasks.length}개: ${dueTasks.slice(0,2).join(', ')}`});
+    else settle('tasks');
   }
   // 📅 오늘 일정 — 구글 캘린더를 서버에서 직접 읽는다.
-  // 예전 설정에 있던 minutesBefore(몇 분 전)는 구현된 적이 없다. 크론이 매시 정각에만 도니
-  // 분 단위 예고를 지킬 수 없어서, 지정한 시각에 오늘 일정을 묶어 보내는 방식으로 바꿨다.
-  if(settings.calendar?.enabled) {
-    const calTime = settings.calendar.time || '08:00';
-    if(force || timeMatches(calTime, hour, min)) {
-      const sub = googleSubFromPrefix(prefix);
-      if(!sub) {
-        notes.push(`${tag} 캘린더: 접두사에서 구글 ID를 못 읽음 (${prefix})`);
-        quiet++;
-      } else {
-        try {
-          const r = await todayEvents(sub);
-          if(r.needConsent) {
-            // 버그가 아니라 사용자 조치 사항이다 → 실패로 세지 않되 로그에는 반드시 남긴다
-            notes.push(`${tag} 캘린더: 서버 동의 없음 (${r.reason}) — 앱에서 캘린더 접근을 다시 허용해야 합니다`);
-          } else if(r.error) {
-            notes.push(`${tag} 캘린더: ${r.error} ${r.detail||''}`);
-            quiet++;
-          } else if(!r.events.length) {
-            notes.push(`${tag} 캘린더: 오늘(${r.date}) 일정 없음`);
-          } else {
-            const head = r.events.slice(0,3).map(e=>`${e.time} ${e.title}`).join(' · ');
-            msgs.push({
-              title: `📅 오늘 일정 ${r.events.length}개`,
-              body:  r.events.length>3 ? `${head} 외 ${r.events.length-3}건` : head,
-            });
-          }
-        } catch(e) {
-          notes.push(`${tag} 캘린더: 예외 ${e.message}`);
-          quiet++;
+  // 예전 설정에 있던 minutesBefore(몇 분 전)는 구현된 적이 없다. 지정한 시각에
+  // 오늘 일정을 묶어 보내는 방식이다.
+  if(settings.calendar?.enabled && due('calendar', settings.calendar.time || '08:00')) {
+    const sub = googleSubFromPrefix(prefix);
+    if(!sub) {
+      notes.push(`${tag} 캘린더: 접두사에서 구글 ID를 못 읽음 (${prefix})`);
+      quiet++;
+    } else {
+      try {
+        const r = await todayEvents(sub);
+        if(r.needConsent) {
+          // 버그가 아니라 사용자 조치 사항이다 → 실패로 세지 않되 로그에는 반드시 남긴다.
+          // 하루 한 번만 남긴다 — 10분마다 같은 줄을 쌓아 봐야 읽히지 않는다.
+          notes.push(`${tag} 캘린더: 서버 동의 없음 (${r.reason}) — 앱에서 캘린더 접근을 다시 허용해야 합니다`);
+          settle('calendar');
+        } else if(r.error) {
+          notes.push(`${tag} 캘린더: ${r.error} ${r.detail||''}`);
+          quiet++;                                 // 표식을 남기지 않는다 — 다음 실행에서 다시 해본다
+        } else if(!r.events.length) {
+          notes.push(`${tag} 캘린더: 오늘(${r.date}) 일정 없음`);
+          settle('calendar');
+        } else {
+          const head = r.events.slice(0,3).map(e=>`${e.time} ${e.title}`).join(' · ');
+          msgs.push({
+            slot:  'calendar',
+            title: `📅 오늘 일정 ${r.events.length}개`,
+            body:  r.events.length>3 ? `${head} 외 ${r.events.length-3}건` : head,
+          });
         }
+      } catch(e) {
+        notes.push(`${tag} 캘린더: 예외 ${e.message}`);
+        quiet++;
       }
+    }
+  }
+
+  // 처리 끝난 칸에 오늘 날짜를 남긴다. 이게 있어야 다음 실행이 같은 걸 또 보내지 않는다.
+  // force(수동 테스트)일 때는 남기지 않는다 — 테스트 한 번이 그날 진짜 알림을 삼키면 안 된다.
+  async function stamp() {
+    for (const slot of done) {
+      await fbFetch(`/fcm_tokens/${uid}/sent/${encodeURIComponent(slot)}.json`,
+        { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(today) }).catch(()=>{});
     }
   }
 
   if(!msgs.length) {
-    return { sent:0, failed:quiet, detail:[...notes, `${tag} 지금 보낼 알림 없음 (기기 ${devices.length}대)`] };
+    await stamp();
+    return { sent:0, failed:quiet, detail:[...skipNote, ...notes, `${tag} 지금 보낼 알림 없음 (기기 ${devices.length}대)`] };
   }
 
-  let sent=0, failed=quiet; const detail=[...notes];
+  let sent=0, failed=quiet; const detail=[...skipNote, ...notes];
   for (const dev of devices) {
     const shape = tokenShape(dev.token);
     const fcm   = toFcmToken(dev.token);
     if(!fcm) {
       failed++;
       detail.push(`${tag}/${dev.id} ${shape} → FCM으로 보낼 수 없는 형식`);
+      // 형식이 틀린 토큰은 다음에도 틀리다. 한 번 알리고 표식을 남겨 조용히 시킨다.
+      await markInvalid(uid, dev.id, { status:0, reason:'UNSUPPORTED_TOKEN_FORMAT', shape });
       continue;
     }
-    const results = await Promise.all(msgs.map(m => sendFCM(fcm, m.title, m.body).then(r => ({...r, title:m.title}))));
+    const results = await Promise.all(msgs.map(m => sendFCM(fcm, m.title, m.body).then(r => ({...r, title:m.title, slot:m.slot}))));
     const ok   = results.filter(r=>r.ok);
     const fail = results.filter(r=>!r.ok);
     sent += ok.length; failed += fail.length;
+    // 한 대라도 받았으면 그 칸은 오늘 몫을 다한 것으로 본다.
+    for (const r of ok) if(!force && r.slot) done.add(r.slot);
     detail.push(`${tag}/${dev.id} ${shape} → 성공 ${ok.length} / 실패 ${fail.length}`);
     for (const f of fail) {
       console.error('[cron] 발송 실패:', dev.id, f.title, f.status, f.reason);
       detail.push(`    ${f.title}: ${f.status} ${f.reason||''}`);
     }
-    // 죽은 기기는 그 기기 칸에만 표시한다. 지우지 않는 이유는 재등록 시 통째로 교체되기 때문.
     const dead = fail.find(f => f.status === 404 || f.reason === 'UNREGISTERED' || f.reason === 'INVALID_ARGUMENT');
-    if (dead) {
-      const path = dev.id === 'legacy'
-        ? `/fcm_tokens/${uid}/invalid.json`
-        : `/fcm_tokens/${uid}/devices/${dev.id}/invalid.json`;
-      await fbFetch(path, { method:'PUT', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ at: Date.now(), status: dead.status, reason: dead.reason || null }) }).catch(()=>{});
-    }
+    if (dead) await markInvalid(uid, dev.id, { status: dead.status, reason: dead.reason || null });
   }
 
+  await stamp();
   return { sent, failed, detail };
 }
 
