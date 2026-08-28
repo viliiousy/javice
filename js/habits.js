@@ -15,8 +15,8 @@ const Habits = {
   CATS: {
     life: { label:'일상',     icon:'✅', ic:'check', wrap:'habitsWrap', foot:'habitsFooter',
             titleSel:'.card-habits .card-title', btn:'btnHabitReorder', addLbl:'+ 습관 추가' },
-    dev:  { label:'자기개발', icon:'📚', ic:'book',  wrap:'devWrap',    foot:'devFooter',
-            titleSel:'.card-dev .card-title',    btn:'btnDevReorder',   addLbl:'+ 자기개발 추가' },
+    dev:  { label:'자기개발', icon:'📚', ic:'book',  wrap:'habitsWrap', foot:'habitsFooter',
+            titleSel:'.card-habits .card-title', btn:'btnHabitReorder', addLbl:'+ 자기개발 추가' },
   },
   _catOf(h) { return (h && h.cat === 'dev') ? 'dev' : 'life'; },
 
@@ -155,8 +155,28 @@ const Habits = {
 
   init(date=new Date()) { this.render(date); },
 
-  render(date=new Date()) {
-    Object.keys(this.CATS).forEach(cat => this._renderCard(cat, date));
+  // 카드 두 장이던 걸 한 장으로 합쳤다. 같은 모듈을 카테고리만 갈라 두 번 그리느라
+  // 화면을 두 배로 쓰고 있었다. 지금은 한 장 안에서 분류를 바꿔 본다.
+  _view: 'life',
+
+  setView(cat) {
+    if (!this.CATS[cat] || this._view === cat) return;
+    this._view = cat;
+    this._reorderMode = null;          // 분류를 옮기면 편집 모드는 푼다
+    this.render(App?.S?.selDate || new Date());
+  },
+
+  render(date=new Date()) { this._renderCard(this._view, date); },
+
+  // 안 보고 있는 쪽에 남은 개수를 숫자로 띄운다.
+  // 카드를 합치면서 잃을 뻔한 게 이거다 — 자기개발이 눈에서 사라지면 그냥 안 하게 된다.
+  _segHtml(date) {
+    const all = this.getList(), chk = this.getChecked(date);
+    return '<div class="hb-seg">' + Object.entries(this.CATS).map(([c, C]) => {
+      const left = this._forDate(all, date, c).filter(h => !chk.includes(h.id)).length;
+      return `<button class="hb-seg-btn${c === this._view ? ' on' : ''}" onclick="Habits.setView('${c}')">
+        ${Icons.svg(C.ic, 'hb-seg-ic')}${C.label}${left ? `<i>${left}</i>` : ''}</button>`;
+    }).join('') + '</div>';
   },
 
   _renderCard(cat, date=new Date()) {
@@ -177,7 +197,7 @@ const Habits = {
         : (isToday?'자기개발'  :`${dLbl} 자기개발`));
     }
 
-    wrap.innerHTML=list.map(h=>{
+    wrap.innerHTML=this._segHtml(date)+list.map(h=>{
       const isDone=chk.includes(h.id);
       const st=this.streak(h.id);
       const _d = h.days||[];
@@ -270,18 +290,19 @@ const Habits = {
   // 편집 모드는 한 번에 한 카테고리만 (null | 'life' | 'dev')
   _reorderMode: null,
 
-  toggleReorderMode(cat='life') {
-    if (!this.CATS[cat]) return;
+  toggleReorderMode(cat) {
+    cat = this.CATS[cat] ? cat : this._view;
+    // 편집은 지금 보고 있는 분류에 대해서만 한다
+    if (cat !== this._view) { this._view = cat; }
     this._reorderMode = (this._reorderMode === cat) ? null : cat;
 
-    // 모든 카테고리 버튼 상태 갱신
-    Object.entries(this.CATS).forEach(([c, C]) => {
-      const btn = document.getElementById(C.btn);
-      if (!btn) return;
-      const on = this._reorderMode === c;
+    // 버튼은 이제 하나다. 예전처럼 카테고리마다 돌면 뒤엣것이 앞엣것을 덮어쓴다.
+    const btn = document.getElementById('btnHabitReorder');
+    if (btn) {
+      const on = this._reorderMode !== null;
       btn.style.background = on ? 'var(--accent)' : '';
       btn.style.color      = on ? 'white' : '';
-    });
+    }
 
     // 현재 선택된 날짜 컨텍스트 유지 (App.S.selDate가 없으면 오늘)
     this.render(App?.S?.selDate || new Date());
