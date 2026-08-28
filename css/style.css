@@ -11,10 +11,14 @@
   --border:    #e2e8f0;
   --border2:   #cbd5e1;
 
-  --accent:    #4f46e5;
-  --accent-h:  #4338ca;
-  --accent-l:  #818cf8;
-  --accent-bg: #eef2ff;
+  /* 강조색은 먹색이다. 이 화면에서 초록은 '완료', 빨강은 '위험' 으로 이미 뜻이 있어서,
+     강조색까지 색을 가지면 셋이 서로 경쟁한다. 강조를 무채색으로 빼면
+     색을 가진 건 데이터뿐이 되고, 히트맵 초록과 수익률 빨강이 그제서야 제 몫을 한다. */
+  --accent:    #1f2937;
+  --accent-h:  #111827;
+  --accent-l:  #6b7280;
+  --accent-bg: #f1f3f6;
+  --accent-fg: #ffffff;   /* 강조색 위에 얹는 글자 */
 
   --blue:      #3b82f6;
   --cyan:      #0891b2;
@@ -32,9 +36,11 @@
   --r:         12px;
   --r-sm:      8px;
   --r-xs:      6px;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow:    0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
-  --shadow-lg: 0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
+  /* 그림자에 배경 색조를 섞는다. 순수한 검정 그림자는 카드를 종이가 아니라
+     스티커처럼 보이게 한다 — 회색 위에 회색을 얹은 꼴이라 깊이가 안 생긴다. */
+  --shadow-sm: 0 1px 3px rgba(15,23,42,0.07), 0 1px 2px rgba(15,23,42,0.04);
+  --shadow:    0 4px 16px rgba(15,23,42,0.08), 0 2px 6px rgba(15,23,42,0.04);
+  --shadow-lg: 0 12px 40px rgba(15,23,42,0.13), 0 4px 12px rgba(15,23,42,0.07);
 }
 
 /* ── 기본 ────────────────────────────── */
@@ -79,7 +85,7 @@ html,body{
 .login-sub{ color:var(--text2); margin-bottom:22px; font-size:14px; }
 .login-features{ display:flex; flex-wrap:wrap; gap:7px; justify-content:center; margin-bottom:28px; }
 .login-features span{
-  background:var(--accent-bg); border:1px solid #c7d2fe;
+  background:var(--accent-bg); border:1px solid var(--border2);
   border-radius:20px; padding:4px 12px; font-size:12px; color:var(--accent);
 }
 .btn-google-login{
@@ -200,10 +206,10 @@ html,body{
   font-family:inherit; font-weight:500; transition:all 0.15s;
 }
 .btn-sm:hover{ border-color:var(--accent); color:var(--accent); background:var(--accent-bg); }
-.btn-sm.accent{ background:var(--accent); border-color:var(--accent); color:white; }
+.btn-sm.accent{ background:var(--accent); border-color:var(--accent); color:var(--accent-fg); }
 .btn-sm.accent:hover{ background:var(--accent-h); }
 .badge{ font-size:12px; padding:2px 8px; border-radius:12px; background:var(--bg); color:var(--text2); border:1px solid var(--border); font-weight:500; }
-.badge-accent{ background:var(--accent-bg); color:var(--accent); border-color:#c7d2fe; }
+.badge-accent{ background:var(--accent-bg); color:var(--accent); border-color:var(--border2); }
 .badge-green{ background:#ecfdf5; color:var(--green); border-color:#a7f3d0; }
 .empty{ padding:24px 16px; text-align:center; color:var(--text3); font-size:13px; }
 
@@ -285,7 +291,7 @@ textarea.inp{ resize:vertical; min-height:64px; }
   transition:all 0.15s; flex-shrink:0;
 }
 .fit-tab:hover{ border-color:var(--accent); color:var(--accent); }
-.fit-tab.active{ background:var(--accent); border-color:var(--accent); color:white; }
+.fit-tab.active{ background:var(--accent); border-color:var(--accent); color:var(--accent-fg); }
 
 /* ── 캘린더 ──────────────────────────── */
 .mini-cal{ padding:10px 14px; flex-shrink:0; }
@@ -305,7 +311,7 @@ textarea.inp{ resize:vertical; min-height:64px; }
   position:relative; user-select:none; color:var(--text);
 }
 .cal-day:hover{ background:var(--accent-bg); color:var(--accent); }
-.cal-day.today{ background:var(--accent); color:white; font-weight:700; }
+.cal-day.today{ background:var(--accent); color:var(--accent-fg); font-weight:700; }
 .cal-day.selected:not(.today){ background:var(--accent-bg); color:var(--accent); outline:2px solid var(--accent); outline-offset:-1px; }
 .cal-day.other-month{ color:var(--text4); }
 .cal-day.has-event::after{
@@ -329,7 +335,7 @@ textarea.inp{ resize:vertical; min-height:64px; }
   background:var(--card); color:var(--text2); font-size:12px; font-weight:600;
   cursor:pointer; font-family:inherit; transition:all 0.15s;
 }
-.cal-panel-tab.active{ background:var(--accent); border-color:var(--accent); color:white; }
+.cal-panel-tab.active{ background:var(--accent); border-color:var(--accent); color:var(--accent-fg); }
 .cal-panel-tab:hover:not(.active){ border-color:var(--accent); color:var(--accent); }
 .events-wrap{ padding:6px; overflow-y:auto; flex:1; max-height:280px; }
 .ev-group-hd{ padding:4px 10px 2px; font-size:12px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:0.05em; }
@@ -496,7 +502,7 @@ textarea.inp{ resize:vertical; min-height:64px; }
   display:flex; align-items:center; justify-content:center;
   font-size:12px; transition:all 0.2s; background:var(--card);
 }
-.ex-item.done .ex-chk{ background:var(--accent); border-color:var(--accent); color:white; }
+.ex-item.done .ex-chk{ background:var(--accent); border-color:var(--accent); color:var(--accent-fg); }
 .ex-name{ flex:1; font-size:13px; color:var(--text); }
 .ex-sets{ font-size:12px; color:var(--text3); white-space:nowrap; }
 .fit-progress{ margin-top:10px; display:flex; align-items:center; gap:8px; }
@@ -632,7 +638,7 @@ textarea.inp{ resize:vertical; min-height:64px; }
 .j-user{ flex-direction:row-reverse; }
 .j-avatar{
   width:28px; height:28px; border-radius:50%;
-  background:var(--accent-bg); border:1.5px solid #c7d2fe;
+  background:var(--accent-bg); border:1.5px solid var(--border2);
   display:flex; align-items:center; justify-content:center;
   font-size:13px; flex-shrink:0;
 }
@@ -643,7 +649,7 @@ textarea.inp{ resize:vertical; min-height:64px; }
   box-shadow:var(--shadow-sm);
 }
 .j-bubble-user{
-  background:var(--accent); color:white; border-color:var(--accent);
+  background:var(--accent); color:var(--accent-fg); border-color:var(--accent);
   border-radius:12px 12px 2px 12px;
 }
 .j-ai .j-bubble{ border-radius:2px 12px 12px 12px; }
@@ -763,7 +769,13 @@ html.dark {
   --text2:    #94a3b8;
   --text3:    #64748b;
   --text4:    #3d4f6e;
-  --accent-bg:#1e1b4b;
+  /* 어두운 바탕에선 먹이 안 보인다. 잉크를 뒤집어 분필로 쓴다 —
+     밝은 회백색 바탕에 어두운 글자. 강조가 배경에 묻히지 않는 유일한 방향이다. */
+  --accent:   #e2e8f0;
+  --accent-h: #f1f5f9;
+  --accent-l: #64748b;
+  --accent-bg:#232c46;
+  --accent-fg:#0f1117;
 }
 html.dark .header,
 html.dark .stats-banner,
@@ -1538,7 +1550,7 @@ html.dark .reorder-dragging { background: var(--card) !important; }
   border:1px solid var(--border); border-radius:var(--r-xs); font-family:inherit;
 }
 .ib-period:hover{ color:var(--text2); }
-.ib-period.active{ color:#fff; background:var(--accent); border-color:var(--accent); }
+.ib-period.active{ color:var(--accent-fg); background:var(--accent); border-color:var(--accent); }
 .ib-period:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
 
 .ib-more-btn{
@@ -1682,7 +1694,7 @@ html.dark .login-scope{ background:rgba(255,255,255,0.04); }
   color:var(--text2); border-radius:20px; padding:6px 13px;
   font-size:12.5px; font-weight:600; cursor:pointer; white-space:nowrap; font-family:inherit;
 }
-.ec-chip.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
+.ec-chip.on{ background:var(--accent); color:var(--accent-fg); border-color:var(--accent); }
 .ec-chip.ec-add{ color:var(--yellow); border-style:dashed; }
 .ec-lhead{ display:flex; align-items:center; gap:8px; margin:2px 0 10px; }
 .ec-lt{ font-size:15px; font-weight:700; flex:1; color:var(--text); }
@@ -1704,7 +1716,7 @@ html.dark .login-scope{ background:rgba(255,255,255,0.04); }
 .ec-seg{ display:inline-flex; background:var(--card2); border:1px solid var(--border); border-radius:var(--r-sm); padding:3px; margin-bottom:10px; }
 .ec-seg button{ border:none; background:transparent; color:var(--text2); font-family:inherit;
   font-size:12.5px; font-weight:600; padding:6px 14px; border-radius:var(--r-xs); cursor:pointer; }
-.ec-seg button.on{ background:var(--accent); color:#fff; }
+.ec-seg button.on{ background:var(--accent); color:var(--accent-fg); }
 .ec-seg.ec-tf{ display:flex; width:100%; }
 .ec-seg.ec-tf button{ flex:1; padding:6px 4px; font-size:12px; }
 .ec-cgrid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
@@ -1862,7 +1874,7 @@ html.dark .login-scope{ background:rgba(255,255,255,0.04); }
   background:var(--card); color:var(--text2); font-size:12px; font-family:inherit; cursor:pointer;
 }
 .ex-part:hover{ border-color:var(--accent); color:var(--accent); }
-.ex-part.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.ex-part.on{ background:var(--accent); border-color:var(--accent); color:var(--accent-fg); }
 
 .ex-results{ max-height:300px; overflow-y:auto; margin-top:10px; }
 .ex-results:not(:empty){ border:1px solid var(--border); border-radius:var(--r-sm); }
@@ -2344,7 +2356,7 @@ html.dark .hm-l1 span, html.dark .hm-l2 span{ color:#cbd5e1; }
   font-style:normal; font-size:11px; font-weight:700; line-height:1;
   padding:2px 5px; border-radius:8px; background:var(--border); color:var(--text2);
 }
-.hb-seg-btn.on i{ background:var(--accent); color:#fff; }
+.hb-seg-btn.on i{ background:var(--accent); color:var(--accent-fg); }
 
 /* ── 목록 한 줄 조작 (js/rowui.js) ────────────────────
    손가락은 밀어서, 마우스는 올려서. 같은 줄에 두 길을 같이 둔다. */
@@ -2397,3 +2409,34 @@ html.dark .rw-x:hover{ background:rgba(220,38,38,.18); }
   color:inherit; font-size:12px; line-height:1; padding:0 1px;
 }
 .task-datechip button:hover{ opacity:.65; }
+
+
+/* ── 활자 규칙 (supanova redesign 체크리스트에서 골라 적용) ─────────
+   랜딩 페이지용 스킬이라 여백·모션·히어로 얘기는 안 가져왔다. 대시보드에도
+   그대로 통하는 다섯 개만 옮겼다. */
+
+/* 1. 숫자는 폭이 고정돼야 한다.
+   kcal·체중·수익률·3/17 이 값이 바뀔 때마다 좌우로 흔들리면
+   같은 자리에 있는 숫자를 눈이 매번 다시 찾는다. */
+body{ font-variant-numeric: tabular-nums; }
+/* 이름·문장에는 걸지 않는다. 비례 폭이 읽기엔 낫다. */
+.habit-name, .task-text, .task-title-txt, .cl-title, .memo-item,
+.event-title, .diet-food-nm, .j-bubble{ font-variant-numeric: normal; }
+
+/* 2. 한글은 단어 가운데서 끊지 않는다. */
+body, .empty, .card-title, .modal-lbl, .habit-name, .task-text,
+.cl-title, .event-title, .wm-hint, .diet-empty-hint, .notif-time-lbl{
+  word-break: keep-all;
+  overflow-wrap: anywhere;   /* 그래도 안 들어가는 긴 URL 은 끊는다 */
+}
+
+/* 3. 제목은 줄을 고르게 나눈다 — 마지막 한 글자만 떨어지는 걸 막는다. */
+.card-title, .modal-head h3, .hb-seg-btn, .empty{ text-wrap: balance; }
+
+/* 4. 굵기 단계. 400 과 700 만 쓰면 '중간' 이 없어서 위계가 두 칸뿐이다. */
+.card-title{ font-weight:600; }
+.habit-name, .cl-title, .task-title-txt{ font-weight:500; }
+.stat-chip{ font-weight:600; }
+
+/* 5. 숫자를 읽는 자리는 자간을 조금 좁힌다. 큰 수가 늘어질 때 덩어리로 안 읽힌다. */
+.ib-tile-val, .wm-cnt, .hw-val, .ec-price, .stat-chip{ letter-spacing:-0.01em; }
