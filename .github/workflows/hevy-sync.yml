@@ -1,0 +1,32 @@
+name: Sync Hevy
+
+# 평소엔 웹후크가 운동 저장 순간에 바로 넣어 준다. 이건 그게 한 번 실패했을 때
+# 한 시간 안에 메우는 안전망이다.
+#
+# 예전에는 알림 워크플로에 얹어 뒀다. 크론을 새로 만들기 싫어서였다 —
+# 2026-08-26 에 1분 크론 하나 때문에 실패 메일이 쏟아진 걸 겪었으니까.
+# 그런데 알림이 10분마다 돌게 되면서 얹어 둘 수가 없어졌다.
+# 하루 144번 Hevy API 를 두드릴 이유는 없다. 시간당 한 번이면 충분하다.
+on:
+  schedule:
+    - cron: '17 * * * *'   # 정각은 붐빈다. 17분에 두면 덜 밀린다.
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync Hevy workouts
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -sS -o /tmp/hevy.json -w '%{http_code}' \
+              "https://bashy.app/api/hevy" \
+              -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+            echo "시도 $i → HTTP $code"
+            cat /tmp/hevy.json; echo
+            [ "$code" = "200" ] && exit 0
+            sleep 5
+          done
+          # 세 번 다 실패하면 드러낸다. 조용히 넘기면 기록이 며칠씩 안 들어와도 초록불이다.
+          echo "Hevy 동기화 3회 모두 실패"
+          exit 1
