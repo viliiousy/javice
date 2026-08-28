@@ -265,13 +265,15 @@ textarea.inp{ resize:vertical; min-height:64px; }
 .task-star::before{ font-size:14px; content:'☆'; }
 .task-star.starred{ opacity:1; color:var(--yellow); }
 .task-star.starred::before{ content:'★'; }
-.task-item:hover .task-star{ opacity:1; }
+.task-item:hover .task-star,
+.task-item:focus-within .task-star{ opacity:1; }
 .task-del{
   opacity:0; background:transparent; border:none; color:var(--text3);
   cursor:pointer; font-size:12px; padding:2px 4px;
   transition:all 0.15s; flex-shrink:0; border-radius:4px;
 }
-.task-item:hover .task-del{ opacity:1; }
+.task-item:hover .task-del,
+.task-item:focus-within .task-del{ opacity:1; }
 .task-del:hover{ color:var(--red); background:#fee2e2; }
 
 /* 탭 (공용) */
@@ -2344,3 +2346,39 @@ html.dark .hm-l1 span, html.dark .hm-l2 span{ color:#cbd5e1; }
   padding:2px 5px; border-radius:8px; background:var(--border); color:var(--text2);
 }
 .hb-seg-btn.on i{ background:var(--accent); color:#fff; }
+
+/* ── 목록 한 줄 조작 (js/rowui.js) ────────────────────
+   손가락은 밀어서, 마우스는 올려서. 같은 줄에 두 길을 같이 둔다. */
+.rw{ position:relative; overflow:hidden; }
+.rw-slide{ position:relative; z-index:1; transition:transform .18s cubic-bezier(.2,.8,.2,1); }
+.rw-slide.rw-on{ transform:translateX(-56px); }
+/* 버튼은 미는 동안에만 보인다. 늘 깔아 두면 줄의 둥근 모서리 틈으로 빨간 게 비친다 —
+   아무것도 안 했는데 삭제가 어른거리는 건 불안하다. */
+.rw-del{
+  position:absolute; top:0; right:0; bottom:0; width:56px; z-index:0;
+  display:none; align-items:center; justify-content:center;
+  background:var(--red); color:#fff; border:0; cursor:pointer;
+  font-size:12px; font-weight:700; font-family:inherit;
+  opacity:0; transition:opacity .12s;
+}
+.rw-slide.rw-on ~ .rw-del, .rw-slide.rw-drag ~ .rw-del{ opacity:1; }
+.rw-x{
+  flex:none; background:transparent; border:0; cursor:pointer; font-family:inherit;
+  color:var(--text3); font-size:12px; padding:2px 5px; border-radius:4px;
+  opacity:0; transition:opacity .15s, color .15s, background .15s;
+}
+.rw-x:hover{ color:var(--red); background:#fee2e2; }
+html.dark .rw-x:hover{ background:rgba(220,38,38,.18); }
+
+/* 마우스가 있는 화면 — 줄에 올리거나 키보드로 들어오면 ✕ 가 보인다.
+   호버해야만 나타나는 버튼은 키보드 쓰는 사람에겐 없는 버튼이라 focus-within 을 같이 건다. */
+@media (hover:hover){
+  .rw:hover .rw-x, .rw:focus-within .rw-x{ opacity:1; }
+  .rw-x:focus-visible{ opacity:1; outline:2px solid var(--accent); outline-offset:1px; }
+}
+/* 손가락만 있는 화면 — ✕ 대신 밀어서 나오는 삭제 버튼 */
+@media (hover:none){
+  .rw-x{ display:none; }
+  .rw-del{ display:flex; }
+  .rw-slide{ touch-action:pan-y; }
+}
