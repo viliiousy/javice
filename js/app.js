@@ -362,7 +362,7 @@ const App = {
       if(taskCount > 0) {
         const badge = document.createElement('span');
         badge.textContent = '할일 ' + taskCount;
-        badge.style.cssText = 'font-size:9px;background:#4f46e5;color:white;padding:1px 5px;border-radius:8px;font-weight:700;margin-left:4px;vertical-align:middle';
+        badge.style.cssText = 'font-size:9px;background:var(--accent);color:var(--accent-fg);padding:1px 5px;border-radius:8px;font-weight:700;margin-left:4px;vertical-align:middle';
         elDay.appendChild(badge);
       }
     }
