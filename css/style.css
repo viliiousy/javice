@@ -59,23 +59,29 @@ html,body{
 .hidden{ display:none !important; }
 
 /* ── 로그인 ──────────────────────────── */
+/* 로그인 화면은 예전에 보라 그라데이션(#667eea→#764ba2)에 보라·청록 구슬을 띄웠다.
+   테마와 무관하게 박힌 색이라 라이트든 다크든 카드만 따로 놀았다 —
+   문을 열면 다른 집이 나오는 셈이었다.
+   지금은 대시보드와 같은 바탕색을 쓰고, 깊이는 아주 옅은 빛 한 겹으로만 만든다. */
 .login-screen{
   min-height:100vh; display:flex; align-items:center; justify-content:center;
-  padding:20px; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding:20px; background:var(--bg);
   position:relative; overflow:hidden;
 }
-.login-orbs{ position:absolute; inset:0; pointer-events:none; }
-.orb{ position:absolute; border-radius:50%; filter:blur(60px); opacity:0.25; animation:drift 8s ease-in-out infinite alternate; }
-.orb1{ width:400px;height:400px;background:#fff;top:-10%;left:-8%;animation-delay:0s }
-.orb2{ width:300px;height:300px;background:#c4b5fd;bottom:5%;right:-5%;animation-delay:3s }
-.orb3{ width:200px;height:200px;background:#a5f3fc;top:50%;left:45%;animation-delay:5s }
-@keyframes drift{ from{transform:translate(0,0)scale(1)} to{transform:translate(25px,30px)scale(1.08)} }
+.login-orbs{
+  position:absolute; inset:0; pointer-events:none;
+  background:
+    radial-gradient(70% 50% at 50% -10%,  var(--card) 0%, transparent 65%),
+    radial-gradient(50% 40% at 88% 108%,  var(--card2) 0%, transparent 70%);
+}
+.orb{ display:none; }   /* 구슬은 뺐다 — 색이 문제였지 움직임이 문제가 아니었다 */
 @keyframes float{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
 
 .login-card{
-  position:relative; background:rgba(255,255,255,0.95);
-  border-radius:24px; padding:44px 40px; width:100%; max-width:420px;
-  text-align:center; box-shadow:var(--shadow-lg); backdrop-filter:blur(20px);
+  position:relative; background:var(--card);
+  border:1px solid var(--border);
+  border-radius:20px; padding:44px 40px; width:100%; max-width:420px;
+  text-align:center; box-shadow:var(--shadow-lg);
 }
 .login-emoji{ font-size:56px; display:block; margin-bottom:14px; animation:float 3s ease-in-out infinite; }
 .login-title{
