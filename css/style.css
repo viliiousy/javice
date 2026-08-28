@@ -174,9 +174,7 @@ html,body{
 .card-memo      { grid-column:3; grid-row:3; }
 .card-inbody    { grid-column:1/3; grid-row:4; }
 .card-fitness   { grid-column:3;   grid-row:4; }
-.card-dev       { grid-column:1;   grid-row:5; }
-.card-wmission  { grid-column:2/4; grid-row:5; }
-.card-econ      { grid-column:1/4; grid-row:6; }
+.card-econ      { grid-column:1/4; grid-row:5; }
 
 /* ── 카드 ────────────────────────────── */
 .card{
@@ -670,8 +668,6 @@ textarea.inp{ resize:vertical; min-height:64px; }
   .card-diet    { grid-column:2; grid-row:auto; }
   .card-memo    { grid-column:1/3; grid-row:auto; }
   .card-inbody  { grid-column:1/3; grid-row:auto; }
-  .card-dev     { grid-column:1/3; grid-row:auto; }
-  .card-wmission{ grid-column:1/3; grid-row:auto; }
   .card-fitness { grid-column:1/3; grid-row:auto; }
   .card-econ    { grid-column:1/3; grid-row:auto; }
 }
@@ -685,8 +681,8 @@ textarea.inp{ resize:vertical; min-height:64px; }
     grid-template-columns:1fr; gap:10px; padding:10px;
   }
   .card-tasks,.card-calendar,.card-checklist,
-  .card-habits,.card-diet,.card-memo,.card-inbody,.card-dev,.card-fitness,
-  .card-wmission,.card-econ{ grid-column:1; grid-row:auto; }
+  .card-habits,.card-diet,.card-memo,.card-inbody,.card-fitness,
+  .card-econ{ grid-column:1; grid-row:auto; }
 
   /* 인바디 타일 2열로 */
   /* 모바일에서도 한 줄을 유지한다. 두 줄이 되면 카드가 길어져 스크롤이 늘어난다. */
@@ -2329,58 +2325,22 @@ html.dark .hm-l1 span, html.dark .hm-l2 span{ color:#cbd5e1; }
 .diet-ai-grid .inp{ width:100%; }
 .diet-ai-add{ width:100%; margin-top:9px; padding:9px; }
 
-/* ── 주간 미션 ────────────────────────────────────────
-   습관은 '이 요일에', 주간 미션은 '이번 주에 N번'. 그래서 요일 격자가 아니라
-   왼쪽부터 차는 점 줄이다. */
-.wm-wrap{ padding:10px 14px 12px; }
-.wm-nav{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
-.wm-nav button{
-  width:28px; height:28px; flex:none; cursor:pointer;
-  background:var(--card2); border:1px solid var(--border); border-radius:var(--r-xs);
-  color:var(--text2); font-size:15px; line-height:1;
-}
-.wm-nav button:hover:not(:disabled){ color:var(--accent); border-color:var(--accent); }
-.wm-nav button:disabled{ opacity:.35; cursor:default; }
-.wm-week{ font-size:13px; font-weight:700; color:var(--text); display:flex; align-items:baseline; gap:6px; }
-.wm-week i{ font-style:normal; font-size:11px; font-weight:500; color:var(--text3); }
-
-/* 구분선은 줄 사이에만 둔다. :last-of-type 은 클래스가 아니라 태그로 세기 때문에
-   미터도 div 라 마지막 줄의 밑줄이 안 지워졌었다. */
-.wm-row{ padding:8px 0; }
-.wm-row + .wm-row{ border-top:1px solid var(--border); }
-.wm-top{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:6px; }
-.wm-name{
-  background:none; border:0; padding:0; cursor:pointer; text-align:left;
-  font-size:13.5px; font-weight:600; color:var(--text); font-family:inherit;
-}
-.wm-name:hover{ color:var(--accent); }
-.wm-cnt{ font-size:12px; font-weight:700; color:var(--text2); flex:none; }
-.wm-cnt i{ font-style:normal; font-weight:500; color:var(--text3); }
-.wm-cnt.is-full{ color:var(--green); }
-
-.wm-dots{ display:flex; flex-wrap:wrap; gap:5px; }
-.wm-dot{
-  min-width:30px; height:30px; padding:0 6px; cursor:pointer;
+/* ── 습관 분류 전환 ──────────────────────────────────
+   '오늘의 습관'과 '자기개발'이 카드 두 장이던 걸 한 장으로 합쳤다.
+   안 보고 있는 쪽에 남은 개수를 숫자로 띄운다 — 그게 없으면 자기개발이
+   눈에서 사라지고, 눈에서 사라지면 그냥 안 하게 된다. */
+.hb-seg{ display:flex; gap:5px; margin-bottom:9px; }
+.hb-seg-btn{
+  flex:1; display:inline-flex; align-items:center; justify-content:center; gap:5px;
+  padding:7px 8px; cursor:pointer; font-family:inherit;
   background:var(--card2); border:1.5px solid var(--border); border-radius:var(--r-xs);
-  color:var(--text3); font-size:12px; font-weight:600; font-family:inherit;
+  color:var(--text3); font-size:12.5px; font-weight:600;
 }
-.wm-dot:hover:not(:disabled){ border-color:var(--accent); color:var(--accent); }
-.wm-dot.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
-.wm-dot:disabled{ opacity:.5; cursor:default; }
-
-/* 미터 — 한 값이 한 한계에 대해 어디쯤인가. 같은 색조의 옅은 트랙 + 진한 채움 하나.
-   퍼센트 구간마다 색을 갈아 끼우면 색이 뜻을 잃는다. */
-.wm-meter{ margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
-.wm-track{ height:8px; border-radius:4px; background:var(--accent-bg); overflow:hidden; }
-.wm-fill{ height:100%; border-radius:4px; background:var(--accent); transition:width .18s ease; }
-.wm-fill.is-full{ background:var(--green); }
-.wm-mlb{ display:flex; justify-content:space-between; margin-top:5px; font-size:11px; color:var(--text3); }
-.wm-pct{ font-weight:700; color:var(--text2); display:inline-flex; align-items:center; gap:3px; }
-.wm-ic{ width:13px; height:13px; color:var(--green); }
-.wm-hint{ font-size:11px; color:var(--text3); line-height:1.6; }
-
-.wm-footer{
-  padding:8px 14px; border-top:1px solid var(--border); background:var(--card2);
-  display:flex; align-items:center; justify-content:space-between; gap:8px;
-  font-size:12px; color:var(--text2);
+.hb-seg-btn:hover:not(.on){ color:var(--text2); border-color:var(--border2); }
+.hb-seg-btn.on{ background:var(--accent-bg); border-color:var(--accent); color:var(--accent); }
+.hb-seg-ic{ width:15px; height:15px; }
+.hb-seg-btn i{
+  font-style:normal; font-size:11px; font-weight:700; line-height:1;
+  padding:2px 5px; border-radius:8px; background:var(--border); color:var(--text2);
 }
+.hb-seg-btn.on i{ background:var(--accent); color:#fff; }
