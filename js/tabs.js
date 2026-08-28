@@ -23,8 +23,6 @@ const Tabs = {
     { cls:'card-tasks',     name:'할일',      tab:'today' },
     { cls:'card-checklist', name:'체크리스트', tab:'today' },
     { cls:'card-habits',    name:'오늘의 습관', tab:'today' },
-    { cls:'card-wmission',  name:'주간 미션',   tab:'today' },
-    { cls:'card-dev',       name:'자기개발',   tab:'today' },
     { cls:'card-calendar',  name:'캘린더',    tab:'plan'  },
     { cls:'card-memo',      name:'메모',      tab:'plan'  },
     { cls:'card-diet',      name:'식단 기록',  tab:'body'  },
