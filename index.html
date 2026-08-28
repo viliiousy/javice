@@ -111,17 +111,28 @@
 
   <div class="dashboard">
 
-    <!-- 할일 -->
-    <section class="card card-tasks">
+
+    <!-- 캘린더 -->
+    <section class="card card-calendar">
       <div class="card-head">
-        <span class="card-title" data-ic="tasks">할일</span>
+        <span class="card-title" data-ic="calendar">일정과 할일</span>
         <div class="card-acts">
+          <button class="btn-sm" id="btnCalSettings" title="캘린더 설정">⚙️</button>
           <button class="btn-sm" id="btnSync" title="동기화">🔄</button>
           <button class="btn-sm" id="btnShowCompleted" title="완료됨 보기">✓</button>
           <button class="btn-sm" id="btnShowHidden" title="숨김 보기">🙈</button>
-          <button class="btn-sm accent" id="btnAddTask">+ 추가</button>
+          <button class="btn-sm accent" id="btnAddEvent">+ 일정</button>
+          <button class="btn-sm accent" id="btnAddTask">+ 할일</button>
         </div>
       </div>
+      <div id="miniCal" class="mini-cal"></div>
+      <div class="cal-panel-tabs">
+        <button class="cal-panel-tab active" onclick="App.setCalPanel('today',this)">오늘</button>
+        <button class="cal-panel-tab" onclick="App.setCalPanel('week',this)">이번 주</button>
+        <button class="cal-panel-tab" onclick="App.setCalPanel('month',this)">이번 달</button>
+      </div>
+      <div id="eventsWrap" class="events-wrap"></div>
+      <div class="cal-sep"></div>
       <div id="taskFilters" class="task-filter-wrap"></div>
       <div class="task-form hidden" id="taskForm">
         <input type="text" id="taskInput" placeholder="할일 입력..." class="inp">
@@ -135,24 +146,6 @@
         </div>
       </div>
       <div id="tasksContainer" class="tasks-wrap"><p class="empty">불러오는 중…</p></div>
-    </section>
-
-    <!-- 캘린더 -->
-    <section class="card card-calendar">
-      <div class="card-head">
-        <span class="card-title" data-ic="calendar">캘린더</span>
-        <div class="card-acts">
-          <button class="btn-sm" id="btnCalSettings" title="캘린더 설정">⚙️</button>
-          <button class="btn-sm accent" id="btnAddEvent">+ 일정</button>
-        </div>
-      </div>
-      <div id="miniCal" class="mini-cal"></div>
-      <div class="cal-panel-tabs">
-        <button class="cal-panel-tab active" onclick="App.setCalPanel('today',this)">오늘</button>
-        <button class="cal-panel-tab" onclick="App.setCalPanel('week',this)">이번 주</button>
-        <button class="cal-panel-tab" onclick="App.setCalPanel('month',this)">이번 달</button>
-      </div>
-      <div id="eventsWrap" class="events-wrap"></div>
     </section>
 
     <!-- 체크리스트 -->
