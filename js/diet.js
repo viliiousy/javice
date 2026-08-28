@@ -228,7 +228,7 @@ const Diet = {
     if(btn){ btn.disabled=true; btn.textContent='찾는 중…'; }
     if(box) box.innerHTML='';
     try{
-      const f=await this._aiFood(key, q);
+      const f=await this._aiFood(q);
       this._aiPending=f;
       if(box) box.innerHTML=this._aiConfirmHtml(f, meal, ds);
     }catch(err){
@@ -236,18 +236,15 @@ const Diet = {
     }
     if(btn){ btn.disabled=false; btn.textContent='AI 로 다시 찾기'; }
   },
-  async _aiFood(key, q){
+  async _aiFood(q){
     const prompt = `한국에서 흔히 먹는 기준으로 「${q}」의 1회 제공량 영양정보를 알려줘.
 JSON 만 출력해. 다른 말은 붙이지 마.
 {"ok":true,"name":"음식 이름","unit":"기준량 (예: 100g, 1개, 1인분)","cal":숫자,"protein":숫자,"carb":숫자,"fat":숫자}
 음식이 아니거나 모르면 {"ok":false} 만 출력해.`;
-    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
-      method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
-      body:JSON.stringify({ model:'llama-3.3-70b-versatile', max_tokens:300, temperature:0.2,
-        messages:[{role:'user',content:prompt}] }),
-    });
-    if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error(e.error?.message||`HTTP ${res.status}`); }
-    const data=await res.json();
+    // 모델 이름은 JARVIS 가 고른다 — 한 군데서 고르지 않으면 Groq 이 모델을 내릴 때마다
+    // 여기저기서 따로 죽는다. 실제로 그렇게 죽었다.
+    const data=await JARVIS.chat({ max_tokens:300, temperature:0.2,
+      messages:[{role:'user',content:prompt}] });
     const text=data.choices?.[0]?.message?.content||'';
     let j=null; try{ const m=text.match(/\{[\s\S]*\}/); j=m?JSON.parse(m[0]):null; }catch{}
     if(!j || j.ok===false) throw new Error('음식으로 못 찾았습니다');
@@ -590,18 +587,13 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     const key=localStorage.getItem('gl_ai_key');
     const meal=document.getElementById('photoMeal')?.value||'저녁';
     try{
-      const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
-        method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
-        body:JSON.stringify({ model:'meta-llama/llama-4-scout-17b-16e-instruct', max_tokens:1000,
-          messages:[{role:'user',content:[
-            {type:'image_url',image_url:{url:`data:image/jpeg;base64,${this._photoBase64}`}},
-            {type:'text',text:`이 사진에 있는 음식을 분석해서 아래 JSON 형식으로만 출력해줘. 다른 텍스트 없이 JSON만.
+      const data=await JARVIS.chat({ max_tokens:1000,
+        messages:[{role:'user',content:[
+          {type:'image_url',image_url:{url:`data:image/jpeg;base64,${this._photoBase64}`}},
+          {type:'text',text:`이 사진에 있는 음식을 분석해서 아래 JSON 형식으로만 출력해줘. 다른 텍스트 없이 JSON만.
 {"foods":[{"name":"음식명","amount":"양(예:100g,1개)","cal":칼로리숫자,"protein":단백질g,"carb":탄수화물g,"fat":지방g}],"total_cal":총칼로리,"meal":"아침|점심|저녁|간식","comment":"한줄코멘트"}
 한국 음식 기준으로 칼로리를 최대한 정확하게 추정해줘. 음식이 없으면 foods를 빈 배열로 반환해줘.`}
-          ]}]
-        }),
-      });
-      const data=await res.json();
+        ]}] }, 'vision');
       const text=data.choices?.[0]?.message?.content||'';
       let parsed; try{ const m=text.match(/\{[\s\S]*\}/); parsed=m?JSON.parse(m[0]):null; }catch{}
       if(!parsed?.foods){ App.showToast('분석 실패','error'); if(btn){btn.disabled=false;btn.textContent='AI 분석';} return; }
