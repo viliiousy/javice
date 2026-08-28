@@ -758,24 +758,36 @@ textarea.inp{ resize:vertical; min-height:64px; }
 /* ═══════════════════════════════════════
    다크 모드
    ═══════════════════════════════════════ */
+/* 다크는 밝은 화면을 뒤집은 게 아니라 따로 짠 것이다.
+   예전 값은 남색이 섞인 네이비(#1a2035)였다. 파란 기가 돌면 카드가 '어두운 화면' 이 아니라
+   '파란 화면' 으로 읽히고, 그 위에 올린 초록·빨강이 전부 한 겹 탁해진다.
+   그래서 색을 거의 뺀 무채색으로 다시 잡았다.
+
+   깊이는 그림자가 아니라 밝기 단계로 만든다 — 어두운 바탕에서 그림자는 거의 안 보인다.
+   바탕 → 카드 → 줄 순서로 3~4% 씩 밝아진다. */
 html.dark {
-  --bg:       #0f1117;
-  --bg2:      #161b27;
-  --card:     #1a2035;
-  --card2:    #1e2640;
-  --border:   #2a3550;
-  --border2:  #374560;
-  --text:     #e2e8f0;
-  --text2:    #94a3b8;
-  --text3:    #64748b;
-  --text4:    #3d4f6e;
+  --bg:       #0a0a0c;
+  --bg2:      #0f0f12;
+  --card:     #141417;
+  --card2:    #1b1b1f;
+  --border:   #26262b;
+  --border2:  #33333a;
+  /* 본문은 순백이 아니다. 순백은 어두운 바탕에서 번져 보이고 눈이 빨리 지친다. */
+  --text:     #ededf0;
+  --text2:    #a0a0a8;
+  --text3:    #6e6e78;
+  --text4:    #48484f;
   /* 어두운 바탕에선 먹이 안 보인다. 잉크를 뒤집어 분필로 쓴다 —
      밝은 회백색 바탕에 어두운 글자. 강조가 배경에 묻히지 않는 유일한 방향이다. */
-  --accent:   #e2e8f0;
-  --accent-h: #f1f5f9;
-  --accent-l: #64748b;
-  --accent-bg:#232c46;
-  --accent-fg:#0f1117;
+  --accent:   #f4f4f5;
+  --accent-h: #ffffff;
+  --accent-l: #71717a;
+  --accent-bg:#232329;
+  --accent-fg:#0a0a0c;
+  /* 어두운 바탕에서 그림자는 일을 거의 못 한다. 남겨 두면 카드 둘레만 지저분해진다. */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow:    0 4px 14px rgba(0,0,0,0.45);
+  --shadow-lg: 0 16px 44px rgba(0,0,0,0.55);
 }
 html.dark .header,
 html.dark .stats-banner,
@@ -801,7 +813,7 @@ html.dark .macro,
 html.dark .meal-food { background:var(--card2); }
 html.dark .diet-quick-item { background:var(--card2); }
 html.dark .lp-btn { background:var(--card2); }
-html.dark .login-card { background:rgba(26,32,53,0.95); }
+html.dark .login-card { background:rgba(20,20,23,0.96); }
 html.dark .modal-box { background:var(--card); }
 html.dark .task-item:hover,
 html.dark .ex-item:hover { background:var(--card2); }
@@ -1615,7 +1627,7 @@ html.dark .cat-pick-btn.on{ background:var(--accent-bg); }
 }
 .login-links a{ color:var(--text3); text-decoration:none; }
 .login-links a:hover{ color:var(--accent); text-decoration:underline; }
-html.dark .login-card{ background:rgba(26,32,53,0.95); }
+html.dark .login-card{ background:rgba(20,20,23,0.96); }
 html.dark .login-scope{ background:rgba(255,255,255,0.04); }
 @media (max-width:640px){
   .login-card{ padding:32px 22px; }
@@ -2304,8 +2316,8 @@ html.dark .hm-l4  { background:#6ee7b7; }
 .hm-l3 span, .hm-l4 span{ color:#fff; }
 .hm-fut span{ opacity:.35; }
 .hm-c[disabled]{ cursor:default; }
-html.dark .hm-l3 span, html.dark .hm-l4 span{ color:#0b1220; }
-html.dark .hm-l1 span, html.dark .hm-l2 span{ color:#cbd5e1; }
+html.dark .hm-l3 span, html.dark .hm-l4 span{ color:#0a0a0c; }
+html.dark .hm-l1 span, html.dark .hm-l2 span{ color:#d4d4d8; }
 /* 오늘과 '지금 보고 있는 날' 은 다르다. 과거 칸을 눌러 둘러보는 중에도 오늘이 어디였는지 남아야 한다. */
 .hm-sel{ box-shadow:0 0 0 1.5px var(--text3); }
 
