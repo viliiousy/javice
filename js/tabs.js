@@ -12,19 +12,19 @@
 const Tabs = {
   // icon 은 js/icons.js 의 이름표다. 이모지를 직접 넣지 않는다 —
   // 기기마다 그림이 달라지고, 색이 제각각이라 지금 눌러둔 탭이 어느 건지 흐려졌다.
+  // 계획 탭은 없앴다. 캘린더가 할일과 한 카드가 되면서 '오늘' 로 옮겨졌고,
+  // 남은 게 메모 하나뿐인 탭은 탭이라고 할 게 못 된다.
   DEF: [
     { id:'today', label:'오늘', icon:'sun'      },
-    { id:'plan',  label:'계획', icon:'calendar' },
     { id:'body',  label:'몸',   icon:'dumbbell' },
     { id:'money', label:'자산', icon:'trend'    },
   ],
   // 카드 → 탭 · 이름 (설정 화면에서도 이 목록을 쓴다)
   CARDS: [
-    { cls:'card-tasks',     name:'할일',      tab:'today' },
+    { cls:'card-calendar',  name:'일정과 할일', tab:'today' },
     { cls:'card-checklist', name:'체크리스트', tab:'today' },
     { cls:'card-habits',    name:'오늘의 습관', tab:'today' },
-    { cls:'card-calendar',  name:'캘린더',    tab:'plan'  },
-    { cls:'card-memo',      name:'메모',      tab:'plan'  },
+    { cls:'card-memo',      name:'메모',      tab:'today' },
     { cls:'card-diet',      name:'식단 기록',  tab:'body'  },
     { cls:'card-fitness',   name:'오늘의 운동', tab:'body'  },
     { cls:'card-inbody',    name:'인바디',    tab:'body'  },
