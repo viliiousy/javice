@@ -68,7 +68,6 @@ const App = {
     try { Notifications.init(); } catch(e){ console.warn('Notifications init',e); }
     try { Diet.render(new Date()); } catch(e){ console.warn('Diet render',e); }
     try { Fitness.render(new Date()); } catch(e){ console.warn('Fitness render',e); }
-    try { WMission.render(); } catch(e){ console.warn('WMission render',e); }
     try { Checklist.render(); }     catch(e){ console.warn('Checklist render',e); }
     try { Memo.render(); }          catch(e){ console.warn('Memo render',e); }
     try { InBody.init(); }          catch(e){ console.warn('InBody init',e); }
@@ -87,7 +86,6 @@ const App = {
     try{ Habits.init(new Date()); }catch{}
     try{ Diet.render(new Date()); }catch{}
     try{ Fitness.render(new Date()); }catch{}
-    try{ WMission.render(); }catch{}
     try{ Checklist.render(); }catch{}
     try{ Memo.render(); }catch{}
     try{ InBody.init(); }catch{}
