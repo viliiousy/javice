@@ -534,14 +534,27 @@ textarea.inp{ resize:vertical; min-height:64px; }
 /* ── 식단 ────────────────────────────── */
 .diet-wrap{ padding:10px; overflow-y:auto; flex:1; }
 .diet-summary{
-  display:flex; align-items:center; gap:12px; margin-bottom:10px;
-  padding:12px 14px; background:var(--card2); border-radius:10px; border:1px solid var(--border);
+  display:flex; align-items:center; gap:10px; margin-bottom:8px;
+  padding:8px 11px; background:var(--card2); border-radius:10px; border:1px solid var(--border);
 }
-.diet-ring{ width:52px; height:52px; flex-shrink:0; }
-.diet-info{ flex:1; }
-.diet-cal-num{ font-size:22px; font-weight:700; color:var(--text); line-height:1.1; }
+/* 링이 52px 이라 이 칸의 높이를 혼자 정하고 있었다. 안에 든 글자가 두 줄도 안 되는데
+   칸만 76px 이었다. 링은 숫자 옆의 표시지 주인공이 아니다 — 글자 높이에 맞춘다. */
+.diet-ring{ width:38px; height:38px; flex-shrink:0; }
+.diet-info{ flex:1; min-width:0; }
+.diet-cal-num{ font-size:19px; font-weight:700; color:var(--text); line-height:1.15; }
 .diet-cal-unit{ font-size:12px; font-weight:500; color:var(--text3); margin-left:3px; }
 .diet-cal-sub{ font-size:12px; color:var(--text3); }
+/* 오른쪽 단추 둘도 같이 줄인다. 링만 줄이면 이번엔 얘들이 칸 높이를 정한다. */
+.diet-sum-btns{ display:flex; gap:4px; flex:none; }
+.diet-photo-btn{
+  background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.25);
+  border-radius:7px; color:var(--cyan); cursor:pointer;
+  font-size:14px; line-height:1; padding:5px 6px;
+}
+.diet-set-btn{
+  background:none; border:none; color:var(--text3); cursor:pointer;
+  font-size:13px; line-height:1; padding:5px 3px;
+}
 /* 이름·값·목표를 세 줄로 쌓았더니 칸 하나가 세 줄을 먹었다. 한 줄이면 충분하다 —
    숫자를 읽는 데 필요한 건 '무엇이 얼마인지' 이고, 목표는 그 옆에 작게 붙으면 된다. */
 .diet-macros{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:8px; }
@@ -709,14 +722,18 @@ textarea.inp{ resize:vertical; min-height:64px; }
 
 /* 복사칩 — 문구를 몸에 지니고 다니는 단추.
    글줄 안에 앉으므로 글자보다 작고, 눌러야 색이 든다. */
+/* 크기를 px 로 박아 두니(19px) 13px 글자 옆에서 저 혼자 컸다.
+   글줄 상자보다 큰 물건이 한 줄에 끼면 그 줄만 키가 커져서 문단이 층계처럼 어긋난다.
+   em 으로 바꿔 글자를 따라가게 하고, 높이를 줄 상자(1.6em) 안에 들어오게 잡는다. */
 .mm-cp{
   display:inline-flex; align-items:center; justify-content:center;
-  width:19px; height:19px; margin:0 2px; vertical-align:-4px;
-  border:1px solid var(--border2); border-radius:5px;
+  width:1.15em; height:1.15em; margin:0 .15em; vertical-align:-0.2em;
+  line-height:1; flex:none;
+  border:1px solid var(--border2); border-radius:4px;
   background:var(--card2); color:var(--text3);
   cursor:pointer; user-select:none; transition:all .12s;
 }
-.mm-cp .ic{ width:11px; height:11px; }
+.mm-cp .ic{ width:.7em; height:.7em; }
 .mm-cp:hover{ color:var(--accent); border-color:var(--accent); }
 .mm-cp.cp-ok{ color:var(--green); border-color:var(--green); }
 /* 편집창 안에서는 옮길 수 있는 물건이다 — 커서로 그렇게 말한다. */
@@ -1793,31 +1810,34 @@ html.dark .reorder-dragging { background: var(--card) !important; }
 .ib-period.active{ color:var(--accent-fg); background:var(--accent); border-color:var(--accent); }
 .ib-period:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
 
-/* 최근 몇 회를 볼지 — 숫자를 눌러 위아래로 올리고 내린다.
-   휠과 위·아래 방향키도 같이 받는다. 화살표만 노리게 하면 손가락으로는 너무 작다. */
+/* 최근 몇 회를 볼지 — − 숫자 + 를 좌우로 편 스테퍼.
+   예전엔 ▲▼ 를 세로로 쌓았는데 화살표 하나가 8px 이라 손가락으로 못 맞혔고,
+   위가 늘리기인지 줄이기인지도 매번 다시 봐야 했다. −/+ 는 그 설명이 필요 없다.
+   끝에 닿으면 그쪽 단추를 흐리게 죽인다 — 눌러도 안 되는 걸 눌러 보게 두지 않는다. */
 .ib-recent{
-  display:flex; align-items:center; justify-content:center; gap:5px;
+  display:flex; align-items:center; justify-content:center; gap:6px;
   margin:-2px 0 9px; font-size:12px; color:var(--text3);
 }
-.ib-spin{
-  display:inline-flex; align-items:stretch; gap:1px;
-  border:1px solid var(--border2); border-radius:var(--r-xs);
-  background:var(--card2); cursor:ns-resize; user-select:none;
+.ib-step{
+  display:inline-flex; align-items:center;
+  border:1px solid var(--border2); border-radius:999px;
+  background:var(--card2); user-select:none; overflow:hidden;
 }
-.ib-spin:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
-.ib-spin-v{
-  display:flex; align-items:center; padding:2px 7px;
+.ib-step-v{
+  min-width:26px; text-align:center;
   font-size:13px; font-weight:700; color:var(--text);
-  font-variant-numeric:tabular-nums; min-width:24px; justify-content:center;
+  font-variant-numeric:tabular-nums;
 }
-.ib-spin-ar{ display:flex; flex-direction:column; border-left:1px solid var(--border2); }
-.ib-spin-b{
-  flex:1; width:18px; padding:0; line-height:1;
+.ib-step-b{
+  width:26px; height:24px; padding:0; line-height:1;
+  display:flex; align-items:center; justify-content:center;
   background:none; border:0; cursor:pointer; font-family:inherit;
-  font-size:8px; color:var(--text3);
+  font-size:15px; font-weight:600; color:var(--text2);
+  transition:background .12s, color .12s;
 }
-.ib-spin-b:first-child{ border-bottom:1px solid var(--border2); }
-.ib-spin-b:hover{ color:var(--accent); background:var(--card); }
+.ib-step-b:hover:not(:disabled){ color:var(--accent); background:var(--card); }
+.ib-step-b:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px; }
+.ib-step-b:disabled{ color:var(--text4); cursor:default; opacity:.5; }
 
 .ib-more-btn{
   display:block; width:100%; cursor:pointer; font-weight:600;
@@ -2275,9 +2295,12 @@ html.dark .ec-fav.on, html.dark .diet-food-fav.on { color:#fbbf24; }
     /* 아이폰 홈 인디케이터. Safari 가 툴바를 숨기면 0 을 돌려주므로 하한을 둔다. */
     padding-bottom:max(env(safe-area-inset-bottom), 6px);
   }
+  /* 높이를 min-height 로 두면 글자 크기 설정에 따라 바 높이가 달라진다.
+     그러면 그 위에 뜨는 자비스 창이 바를 얼마나 피해야 하는지 CSS 가 알 수 없다.
+     한 값으로 못 박고, 창도 아래에서 같은 --tabbar-h 를 본다. */
   .tab-btn{
     flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
-    min-height:52px; padding:8px 0 6px;
+    height:var(--tabbar-h, 54px); padding:7px 0 5px;
     background:transparent; border:none; cursor:pointer;
     color:var(--text3); font-family:inherit;
   }
@@ -2285,6 +2308,25 @@ html.dark .ec-fav.on, html.dark .diet-food-fav.on { color:#fbbf24; }
   .tab-lb{ font-size:12px; font-weight:600; letter-spacing:-0.02em; }
   .tab-btn.on{ color:var(--accent); }
   .tab-btn.on .tab-ic{ filter:none; opacity:1; }
+
+  /* 자비스는 화면을 바꾸지 않고 창을 연다. 그래서 'on' 이 붙지 않는다 —
+     대신 아이콘에 색을 줘서 나머지 셋과 성격이 다르다는 걸 보여 준다. */
+  .tab-jarvis{ position:relative; }
+  .tab-jarvis .tab-ic{ filter:none; opacity:1; color:var(--accent-l); }
+  .tab-badge{
+    position:absolute; top:4px; left:calc(50% + 5px);
+    min-width:16px; height:16px; padding:0 4px; border-radius:8px;
+    background:var(--red); color:#fff; border:2px solid var(--card);
+    font-size:10px; font-weight:700; line-height:12px; text-align:center;
+  }
+  .tab-badge.hidden{ display:none; }
+
+  /* 떠 있던 동그란 자비스 단추는 폰에서 뺀다. 오른쪽 아래는 늘 카드 위였고,
+     같은 일을 하는 자리가 탭바에 생겼다. 넓은 화면에서는 그대로 둔다. */
+  .jarvis-btn{ display:none !important; }
+  /* 탭바 높이와 홈 인디케이터 여백을 그대로 더한다. 숫자를 눈대중으로 넣었더니
+     6px 이 모자라 탭바를 덮었다 — 이제 바와 같은 변수를 본다. */
+  .jarvis-panel{ bottom:calc(var(--tabbar-h, 54px) + max(env(safe-area-inset-bottom), 6px)); }
 
   /* 지금 탭의 카드만 보인다. 나머지는 DOM 에 그대로 있고 화면에서만 빠진다. */
   /* 카드가 열 껍데기 안에 들어가면서 '>' 가 안 먹는다. 자손 선택자로 바꾼다. */
@@ -2298,7 +2340,7 @@ html.dark .ec-fav.on, html.dark .diet-food-fav.on { color:#fbbf24; }
   body[data-tab]:not([data-tab="today"]) .top-strip{ display:none !important; }
 
   /* 탭바에 마지막 카드가 가리지 않도록 */
-  .dashboard{ padding-bottom:calc(58px + max(env(safe-area-inset-bottom), 6px) + 14px); }
+  .dashboard{ padding-bottom:calc(var(--tabbar-h, 54px) + max(env(safe-area-inset-bottom), 6px) + 14px); }
 }
 
 /* 태블릿 세로(641~900px)에서는 2열 유지 + 탭. 한 탭에 카드 두세 개면 딱 맞는다. */
@@ -2519,10 +2561,18 @@ html.dark .stat-chip.stat-green{ background:rgba(5,150,105,0.14); border-color:r
   text-decoration:none; display:inline-block;
   width:1px; height:9px; margin:0 6px; background:var(--border2); opacity:.8;
 }
+/* 폰에서 이 줄이 길어지면 헤더의 왼쪽(날짜)을 밀어냈다. 두 가지를 건다 —
+   값 사이 간격을 좁히고, 그래도 넘치면 줄이 스스로 잘리게 한다.
+   왼쪽을 침범하느니 오른쪽 끝이 흐려지는 편이 낫다. */
 @media (max-width:640px){
-  .ts-row{ font-size:11px; gap:4px; }
+  .h-sum{ min-width:0; max-width:60vw; }
+  .ts-row{ font-size:11px; gap:4px; max-width:100%; }
+  /* flex 컨테이너에는 말줄임이 안 걸린다. 폰에서만 인라인으로 흘려 ... 이 생기게 한다.
+     안쪽 b·i·s 는 원래 인라인이라 모양은 그대로다. */
+  .ts-row .ts-body{ display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+  .ts-body s{ margin:0 3px; }
+  .ts-body i{ margin-left:0; }
   .ts-ic{ width:12px; height:12px; }
-  .ts-body s{ margin:0 4px; }
 }
 
 
