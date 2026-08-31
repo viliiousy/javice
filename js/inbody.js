@@ -25,7 +25,7 @@ const InBody = {
   // 인바디는 매일 재는 게 아니라서 '일주일'을 고르면 그 안에 기록이 1건뿐이라
   // 추이가 안 그려지는 일이 잦았다. 최근 N회는 언제 재든 항상 선이 그려진다.
   PERIODS: {
-    'r5':  { label:'최근',   count: 5  },
+    'r5':  { label:'최근',   count: 3  },   // 실제 값은 recentN() 이 정한다 (아래)
     '7d':  { label:'일주일', days: 7   },
     '30d': { label:'한달',   days: 30  },
     'all': { label:'전체',   days: null },
@@ -153,6 +153,30 @@ const InBody = {
     return `<span class="ib-est" title="과거 실측 기록으로 계산한 추정값입니다">추정</span>`;
   },
 
+  // ── 최근 몇 회를 볼지 ───────────────────
+  // 인바디는 사람마다 재는 간격이 다르다. 매일 재는 사람에게 5회는 닷새고,
+  // 분기에 한 번 재는 사람에게는 1년이 넘는다. 그래서 숫자를 열어 뒀다.
+  RECENT_KEY: 'gl_ib_recent_n',
+  RECENT_MIN: 2,
+  RECENT_MAX: 30,
+  recentN() {
+    const n = parseInt(UserStore.get(this.RECENT_KEY), 10);
+    return (n >= this.RECENT_MIN && n <= this.RECENT_MAX) ? n : 3;
+  },
+  bumpRecent(d) {
+    const n = Math.max(this.RECENT_MIN, Math.min(this.RECENT_MAX, this.recentN() + d));
+    if (n === this.recentN()) return;
+    UserStore.set(this.RECENT_KEY, String(n));
+    this._shown = this.PAGE;
+    this.render();
+    Sounds?.click();
+  },
+  // 회수형 기간은 저장된 숫자를 입혀서 돌려준다. PERIODS 의 count 는 기본값일 뿐이다.
+  _p(k) {
+    const p = this.PERIODS[k || this._period()];
+    return p.count ? { ...p, count: this.recentN() } : p;
+  },
+
   // ── 기간 ───────────────────────────────
   _period() {
     this._migratePeriod();                    // 읽는 시점에 확인한다 (위 주석 참고)
@@ -167,7 +191,7 @@ const InBody = {
   },
   // 기간(또는 회수) 안의 기록만. 'all' 이면 그대로.
   _inPeriod(recs) {
-    const p = this.PERIODS[this._period()];
+    const p = this._p();
     if (p.count) return recs.slice(-p.count);   // recs 는 날짜 오름차순
     if (!p.days) return recs;
     const from = new Date(Date.now() + 9*3600000 - (p.days-1)*86400000)
@@ -176,16 +200,35 @@ const InBody = {
   },
   // "일주일 안에" / "최근 5회 중" / "전체 기록 중" — 문장이 어색해지지 않게 한 곳에서 만든다
   _periodPhrase() {
-    const k = this._period(), p = this.PERIODS[k];
+    const p = this._p();
     if (p.count) return `최근 ${p.count}회 중`;
     if (!p.days) return '전체 기록 중';
     return `${p.label} 안에`;
   },
   _periodHtml() {
     const cur = this._period();
-    return `<div class="ib-periods">` + Object.entries(this.PERIODS).map(([k,p]) =>
+    const bar = `<div class="ib-periods">` + Object.entries(this.PERIODS).map(([k,p]) =>
       `<button class="ib-period${k===cur?' active':''}" onclick="InBody.setPeriod('${k}')">${p.label}</button>`
     ).join('') + `</div>`;
+    if (!this.PERIODS[cur].count) return bar;
+    // '최근' 을 골랐을 때만 몇 회인지 정하는 칸이 나온다.
+    const n = this.recentN();
+    return bar + `<div class="ib-recent">
+      최근
+      <span class="ib-spin" tabindex="0" role="spinbutton"
+            aria-valuenow="${n}" aria-valuemin="${this.RECENT_MIN}" aria-valuemax="${this.RECENT_MAX}"
+            aria-label="최근 몇 회를 볼지"
+            onwheel="event.preventDefault();InBody.bumpRecent(event.deltaY<0?1:-1)"
+            onkeydown="if(event.key==='ArrowUp'){event.preventDefault();InBody.bumpRecent(1)}
+                       else if(event.key==='ArrowDown'){event.preventDefault();InBody.bumpRecent(-1)}">
+        <b class="ib-spin-v">${n}</b>
+        <span class="ib-spin-ar">
+          <button type="button" class="ib-spin-b" onclick="InBody.bumpRecent(1)" aria-label="늘리기" tabindex="-1">▲</button>
+          <button type="button" class="ib-spin-b" onclick="InBody.bumpRecent(-1)" aria-label="줄이기" tabindex="-1">▼</button>
+        </span>
+      </span>
+      회 보기
+    </div>`;
   },
 
   _summaryHtml(la) {
@@ -398,7 +441,7 @@ const InBody = {
         <span class="ib-row-v">${r.bf ? r.bf+'<i>%</i>' : '<i>—</i>'}</span>
       </div>`).join('');
 
-    const pl   = this.PERIODS[this._period()].label;
+    const pl   = this._p().label;
     const rest = all.length - Math.min(limit, all.length);
     if (!all.length) {
       return `<div class="ib-list"><div class="ib-chart-empty">${this._periodPhrase()} 기록이 없습니다${
