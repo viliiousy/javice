@@ -236,13 +236,18 @@ async function processUser(uid, tokenData) {
   const sentMap = tokenData.sent || {};
   const done    = new Set();              // 오늘 처리 끝난 칸 (보냈거나, 보낼 게 없었거나)
 
-  function due(slot, timeStr) {
+  // 분 단위로 직접 묻는 쪽. 약 알림은 '설정 시각' 이 아니라 '5분 전' '한 시간 뒤' 처럼
+  // 계산된 시각이라 문자열이 아니라 분을 받는다.
+  function dueAt(slot, targetMin) {
     if (force) return true;
-    const p = String(timeStr || '09:00').split(':').map(Number);
-    const target = (p[0]||0)*60 + (p[1]||0);
-    if (nowMin < target) return false;                  // 아직 시간 전
-    if (nowMin - target > LATE_LIMIT) return false;     // 너무 늦었다
+    if (targetMin < 0) return false;
+    if (nowMin < targetMin) return false;               // 아직 시간 전
+    if (nowMin - targetMin > LATE_LIMIT) return false;  // 너무 늦었다
     return sentMap[slot] !== today;                     // 오늘 이미 처리했으면 끝
+  }
+  function due(slot, timeStr) {
+    const p = String(timeStr || '09:00').split(':').map(Number);
+    return dueAt(slot, (p[0]||0)*60 + (p[1]||0));
   }
   // 보낼 게 없다고 판정난 칸도 표식을 남긴다. 안 그러면 10분마다 같은 걸 다시 계산하고,
   // 캘린더는 구글 API를 헛되이 다시 부른다.
@@ -252,9 +257,45 @@ async function processUser(uid, tokenData) {
   const msgs  = [];
   const notes = [];        // 발송과 별개로 로그에 남길 설명 (조용히 사라지지 않게)
   let   quiet = 0;         // 알림은 못 만들었지만 "고장"인 경우의 수
+  const habitList    = JSON.parse(userData[`${prefix}gl_habits_list`]||'[]');
+  const habitChecked = JSON.parse(userData[`${prefix}gl_habits_${today}`]||'[]');
+
+  // ── 약 ──────────────────────────────────────────────────────
+  // 다른 습관과 달리 하나씩 따로 본다. '2개 남았어요' 는 어느 약인지 모르는 알림이라
+  // 받고도 다시 앱을 열어 봐야 한다. 약은 이름과 시각이 알림 안에 있어야 한다.
+  //
+  // 초기화는 따로 안 한다 — 표식이 날짜라서 자정이 지나면 모든 칸이 저절로 다시 열린다.
+  const dow = now.getUTCDay();                   // now 는 이미 KST 로 밀어 둔 시각
+  const meds = habitList.filter(h => h && h.cat==='med' && h.notify !== false && h.time);
+  for (const h of meds) {
+    if (Array.isArray(h.days) && h.days.length && !h.days.includes(dow)) continue;
+    if (h.createdAt   && today <  h.createdAt)   continue;
+    if (h.deletedFrom && today >= h.deletedFrom) continue;
+    if (habitChecked.includes(h.id)) continue;   // 먹었으면 더 조를 일이 없다
+
+    const p = String(h.time).split(':').map(Number);
+    const target = (p[0]||0)*60 + (p[1]||0);
+    const nm = String(h.name||'약').slice(0,40);
+
+    if (dueAt(`med_${h.id}_pre`, target - 5))
+      msgs.push({ slot:`med_${h.id}_pre`, title:'💊 약 먹을 시간', body:`${nm} · ${h.time}` });
+
+    // 시각이 지났는데도 체크가 없으면 한 시간마다. 한 번에 하나만 보낸다 —
+    // 크론이 반나절 멈췄다 살아나면 밀린 것을 몰아 보내게 되는데 그건 알림이 아니라 소음이다.
+    for (let k = 1; k <= 12; k++) {
+      const at = target + 60*k;
+      if (at >= 24*60) break;
+      if (dueAt(`med_${h.id}_h${k}`, at)) {
+        msgs.push({ slot:`med_${h.id}_h${k}`, title:'💊 아직 약을 안 드셨어요', body:`${nm} · ${h.time} 이었어요` });
+        break;
+      }
+    }
+  }
+
   if(settings.habits?.enabled && due('habits', settings.habits.time)) {
-    const list = JSON.parse(userData[`${prefix}gl_habits_list`]||'[]');
-    const checked = JSON.parse(userData[`${prefix}gl_habits_${today}`]||'[]');
+    // 약은 저 위에서 제 이름으로 따로 알리므로 여기서 또 세지 않는다.
+    const list = habitList.filter(h => !(h && h.cat==='med' && h.notify !== false));
+    const checked = habitChecked;
     const miss = list.filter(h=>!checked.includes(h.id));
     if(miss.length>0) msgs.push({slot:'habits', title:'✅ 습관 리마인더', body:`${miss.length}개 남았어요: ${miss.slice(0,2).map(h=>h.name).join(', ')}`});
     else settle('habits');                       // 다 했으면 조를 일이 없다
