@@ -2537,21 +2537,18 @@ html.dark .stat-chip.stat-green{ background:rgba(5,150,105,0.14); border-color:r
    '오늘의 습관'과 '자기개발'이 카드 두 장이던 걸 한 장으로 합쳤다.
    안 보고 있는 쪽에 남은 개수를 숫자로 띄운다 — 그게 없으면 자기개발이
    눈에서 사라지고, 눈에서 사라지면 그냥 안 하게 된다. */
-.hb-seg{ display:flex; gap:5px; margin-bottom:9px; }
-.hb-seg-btn{
-  flex:1; display:inline-flex; align-items:center; justify-content:center; gap:5px;
-  padding:7px 8px; cursor:pointer; font-family:inherit;
-  background:var(--card2); border:1.5px solid var(--border); border-radius:var(--r-xs);
-  color:var(--text3); font-size:12.5px; font-weight:600;
+/* 분류 이름표 — 예전엔 카드 위 탭이었다. 탭 하나에 습관 두어 개씩이라 매번 건너다녀야 했고,
+   안 보고 있는 쪽은 그냥 안 하게 됐다. 지금은 한 목록이고 분류는 줄에 붙는 표시일 뿐이다. */
+.hb-cat-ic{ width:14px; height:14px; color:var(--text3); flex:none; margin-right:5px; vertical-align:-2px; }
+.habit-time{
+  display:inline-block; margin-left:6px; padding:1px 7px; border-radius:20px;
+  background:var(--accent-bg); border:1px solid var(--border2);
+  font-size:11px; font-weight:700; color:var(--accent); font-variant-numeric:tabular-nums;
 }
-.hb-seg-btn:hover:not(.on){ color:var(--text2); border-color:var(--border2); }
-.hb-seg-btn.on{ background:var(--accent-bg); border-color:var(--accent); color:var(--accent); }
-.hb-seg-ic{ width:15px; height:15px; }
-.hb-seg-btn i{
-  font-style:normal; font-size:11px; font-weight:700; line-height:1;
-  padding:2px 5px; border-radius:8px; background:var(--border); color:var(--text2);
-}
-.hb-seg-btn.on i{ background:var(--accent); color:var(--accent-fg); }
+/* 약 전용 칸 */
+.med-line{ display:flex; align-items:center; gap:10px; }
+.med-chk{ display:inline-flex; align-items:center; gap:5px; font-size:12.5px; color:var(--text2); cursor:pointer; }
+.med-note{ margin-top:5px; font-size:11px; line-height:1.5; color:var(--text3); word-break:keep-all; }
 
 /* ── 목록 한 줄 조작 (js/rowui.js) ────────────────────
    손가락은 밀어서, 마우스는 올려서. 같은 줄에 두 길을 같이 둔다. */
@@ -2626,7 +2623,7 @@ body, .empty, .card-title, .modal-lbl, .habit-name, .task-text,
 }
 
 /* 3. 제목은 줄을 고르게 나눈다 — 마지막 한 글자만 떨어지는 걸 막는다. */
-.card-title, .modal-head h3, .hb-seg-btn, .empty{ text-wrap: balance; }
+.card-title, .modal-head h3, .empty{ text-wrap: balance; }
 
 /* 4. 굵기 단계. 400 과 700 만 쓰면 '중간' 이 없어서 위계가 두 칸뿐이다. */
 .card-title{ font-weight:600; }
