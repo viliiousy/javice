@@ -174,7 +174,9 @@ module.exports = async function handler(req, res) {
   // 그래서 다시 '일을 끝내고 응답한다'. 실측하면 2초 안에 끝나서 5초 안에 들어온다.
   // 그래도 늦어지면 웹후크 한 번을 놓칠 뿐이고, 매시 크론이 같은 걸 메운다.
   let replied = false;
-  const reply = (code, body) => { if (!replied) { replied = true; res.status(code).json(body); } };
+  // endpoint 를 박아 둔다. 바깥 스케줄러에서 URL 을 서로 바꿔 넣어도 둘 다 200 이 떠서
+  // 눈치채지 못한다 — 자세한 사연은 api/cron-notify.js 참고.
+  const reply = (code, body) => { if (!replied) { replied = true; res.status(code).json({ endpoint:'hevy', ...body }); } };
 
   try {
     const prefix = await findPrefix(uid);
