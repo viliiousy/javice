@@ -258,23 +258,33 @@ const Diet = {
     if(btn){ btn.disabled=false; btn.textContent='AI 로 다시 찾기'; }
   },
   async _aiFood(q){
-    // 순서가 중요하다. '모르면 추정해라' 만 시키면 '돌멩이' 에도 420kcal 을 지어냈다.
-    // 음식이냐 아니냐를 먼저 묻고, 그 다음에야 추정을 허락한다.
+    // 세트를 통째로 물으면 값이 낮게, 그리고 매번 다르게 나왔다.
+    // 실제로 '버거킹 몬스터 jr 버거 라지세트' 를 다섯 번 물어 910·1000·910·1000·1010 kcal 을 받았다.
+    // 실제 값은 1,300 kcal 쯤이다(버거 690 + 감자 라지 410 + 콜라 210).
+    //
+    // 나눠서 물으면 두 가지가 같이 해결된다. 구성품 하나하나는 모델이 잘 아는 물건이고,
+    // 더하기는 우리가 한다 — 1,290 kcal 이 나왔고 세 번을 물어도 같은 값이었다.
+    // 사람도 '버거 560 + 감자 470 + 콜라 260' 을 보면 어디가 틀렸는지 짚을 수 있다.
+    // 합계 하나만 보여 주면 틀렸는지조차 알 수 없다.
     const prompt = `「${q}」가 사람이 먹는 음식인지 먼저 판단해라.
-음식이 아니면(사물·장소·사람·상표만 있는 말 등) 다른 필드 없이 {"ok":false} 만 낸다. 이때는 절대 숫자를 지어내지 않는다.
-음식이면 한국에서 파는 기준으로 1회 제공량 영양정보를 낸다.
-브랜드 메뉴·세트 메뉴도 음식이다. 세트면 구성품(버거·감자·음료)을 모두 합친 값으로 낸다.
-공식 수치를 몰라도 비슷한 메뉴를 근거로 추정한다 — 사람이 보고 고칠 수 있다.
+음식이 아니면(사물·장소·사람 등) 다른 필드 없이 {"ok":false} 만 낸다. 이때는 절대 숫자를 지어내지 않는다.
+음식이면 한국에서 파는 1회 제공량 기준으로 답한다.
+세트·콤보처럼 여러 음식이 묶인 이름이면 구성품을 하나씩 나눠 적고 각각의 값을 낸다.
+세트는 보통 메인 + 사이드(감자튀김 등) + 음료다. 라지 세트면 사이드와 음료도 라지다.
+단일 음식이면 parts 에 그 하나만 넣는다.
 JSON 만 출력해. 다른 말은 붙이지 마.
-{"ok":true,"name":"음식 이름","unit":"기준량 (예: 100g, 1개, 1세트)","cal":숫자,"protein":숫자,"carb":숫자,"fat":숫자}`;
+{"ok":true,"name":"음식 이름","unit":"기준량 (예: 100g, 1개, 1세트)","parts":[{"n":"구성품","amt":"양","cal":숫자,"protein":숫자,"carb":숫자,"fat":숫자}]}`;
     // 모델 이름은 JARVIS 가 고른다 — 한 군데서 고르지 않으면 Groq 이 모델을 내릴 때마다
     // 여기저기서 따로 죽는다. 실제로 그렇게 죽었다.
     //
     // max_tokens 가 300 이었다. 지금 모델은 답하기 전에 속으로 생각하고 그 생각도 이 예산을 먹는다.
-    // '사과' 는 통과했지만 '버거킹 몬스터 jr 버거 라지세트' 처럼 조금만 복잡해지면
-    // 생각만 하다 예산이 끝나 본문이 빈 채로 돌아왔다(finish_reason:'length', content:'').
-    // 화면에는 'AI 검색 실패 · 음식으로 못 찾았습니다' 로 나왔지만 모델은 모른다고 한 적이 없다.
-    const data=await JARVIS.chat({ max_tokens:1200, temperature:0.2,
+    // '사과' 는 통과했지만 세트 메뉴처럼 조금만 복잡해지면 생각만 하다 예산이 끝나
+    // 본문이 빈 채로 돌아왔다(finish_reason:'length', content:'').
+    // 그렇다고 크게 잡을 수도 없다 — 무료 등급은 분당 8,000 토큰이라 금방 막힌다.
+    //
+    // temperature 는 0 이다. 0.2 는 같은 음식을 두 번 물으면 다른 숫자를 줬고,
+    // 그중 하나가 사전에 영영 저장됐다. 추정이어도 흔들리지는 말아야 한다.
+    const data=await JARVIS.chat({ max_tokens:900, temperature:0,
       messages:[{role:'user',content:prompt}] });
     const ch=data.choices?.[0];
     const text=ch?.message?.content||'';
@@ -286,10 +296,30 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     let j=null; try{ const m=text.match(/\{[\s\S]*\}/); j=m?JSON.parse(m[0]):null; }catch{}
     if(!j) throw new Error('AI 답을 읽지 못했어요. 다시 눌러 주세요');
     if(j.ok===false) throw new Error('먹는 것으로 보지 않았어요');
+
     const num=v=>{ const n=Number(v); return isFinite(n)&&n>=0 ? n : 0; };
+    // parts 가 없으면 예전 모양(cal/protein/…)으로 온 것이다. 한 덩어리로 받아 준다.
+    const parts=(Array.isArray(j.parts)&&j.parts.length ? j.parts : [j])
+      .map(x=>({ n:String(x.n||x.name||'').trim().slice(0,30),
+                 amt:String(x.amt||'').trim().slice(0,20),
+                 c:Math.round(num(x.cal)), p:num(x.protein), cb:num(x.carb), ft:num(x.fat) }))
+      .filter(x=>x.c>0||x.p>0||x.cb>0||x.ft>0);
+    if(!parts.length) throw new Error('AI 가 숫자를 못 냈어요. 다시 눌러 주세요');
+
+    const sum=k=>parts.reduce((a,x)=>a+x[k],0);
+    const r1=v=>Math.round(v*10)/10;
+    let c=sum('c'); const p=r1(sum('p')), cb=r1(sum('cb')), ft=r1(sum('ft'));
+
+    // 칼로리와 단탄지는 서로 묶여 있다 — 단백질·탄수 4, 지방 9 kcal.
+    // 둘이 크게 어긋나면 둘 중 하나가 헛소리다. 이때는 계산으로 나오는 쪽을 믿는다.
+    // (더하기는 틀릴 수가 없고, 기억해 낸 총량은 틀릴 수 있다.)
+    const derived=Math.round(4*p+4*cb+9*ft);
+    let fixed=false;
+    if(derived>0 && Math.abs(c-derived)/derived > 0.3){ c=derived; fixed=true; }
+
     const name=String(j.name||q).trim().slice(0,40) || q;
     return { n:name, u:String(j.unit||'').trim().slice(0,20),
-             c:Math.round(num(j.cal)), p:num(j.protein), cb:num(j.carb), ft:num(j.fat) };
+             c, p, cb, ft, parts, fixed };
   },
   // AI 가 낸 숫자는 그대로 들어가지 않는다. 추정값이라고 말하고, 고칠 수 있게 두고,
   // 누를 때 들어간다. 한번 들어간 칼로리는 나중에 틀린 걸 알아채기가 어렵다.
@@ -300,6 +330,12 @@ JSON 만 출력해. 다른 말은 붙이지 마.
         <span class="diet-ai-nm">🤖 ${esc(f.n)}</span>
         <span class="diet-ai-warn">AI 추정값 · 맞는지 보고 담으세요</span>
       </div>
+      ${(f.parts&&f.parts.length>1)?`<div class="diet-ai-parts">
+        ${f.parts.map(x=>`<div class="dap-row"><span class="dap-n">${esc(x.n)}${
+          x.amt?` <i>${esc(x.amt)}</i>`:''}</span><span class="dap-c">${x.c}<i>kcal</i></span></div>`).join('')}
+        <div class="dap-row dap-sum"><span class="dap-n">합계</span><span class="dap-c">${f.c}<i>kcal</i></span></div>
+      </div>`:''}
+      ${f.fixed?`<div class="diet-ai-note">단백질·탄수·지방으로 계산한 값과 크게 달라서 칼로리를 다시 계산했어요.</div>`:''}
       <div class="diet-ai-grid">
         <label>기준량<input id="aiU"  class="inp inp-sm" value="${A(f.u)}"></label>
         <label>kcal<input id="aiC"  type="number" class="inp inp-sm" value="${f.c}"></label>
