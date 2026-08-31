@@ -549,6 +549,9 @@ const JARVIS = {
       const next=(this.MODELS[kind]||this.MODELS.text).find(m=>ids.includes(m) && m!==model);
       if(next) r=await send(next, withDefaults);
     }
+    // 무료 등급은 분당 토큰이 8,000 이다. 영어 원문을 그대로 띄우면
+    // '내가 뭘 잘못했나' 로 읽힌다 — 잘못한 게 아니라 잠깐 기다리면 되는 일이다.
+    if(r.status===429) throw new Error('AI 사용량이 잠깐 찼어요. 30초쯤 뒤에 다시 눌러 주세요');
     if(!r.ok) throw new Error(r.data?.error?.message || `HTTP ${r.status}`);
     return r.data;
   },
