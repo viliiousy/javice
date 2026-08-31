@@ -280,11 +280,10 @@ const App = {
   },
 
   // ── 날짜 선택 ────────────────────────
+  // 달력을 할일의 날짜 필터로도 쓰게 해 뒀었는데, 날짜를 누를 때마다 할일 목록이
+  // 통째로 줄어들어 '할일이 사라졌다' 로 읽혔다. 달력은 위쪽 일정·습관·식단이
+  // 보는 날을 정할 뿐, 할일 목록은 건드리지 않는다.
   selectCalDate(date) {
-    // 달력은 이제 할일의 날짜 필터를 겸한다. 같은 날을 다시 누르면 필터가 풀린다 —
-    // 켜는 방법만 있고 끄는 방법이 없으면 그건 함정이다.
-    const ds = this._dsOf(date);
-    this.S.dateFilter = (this.S.dateFilter === ds) ? null : ds;
     this.S.selDate=date;
     this.S.calPanel='today';
     document.querySelectorAll('.cal-panel-tab').forEach((t,i)=>t.classList.toggle('active',i===0));
@@ -300,7 +299,6 @@ const App = {
   _dsOf(d){ const x=new Date(d);
     return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; },
 
-  clearDateFilter(){ this.S.dateFilter=null; this._renderTasks(); },
 
   _updateHeaderDate(date) {
     const d   = new Date(date);
@@ -776,9 +774,6 @@ const App = {
     }
     if(filter==='starred') all=all.filter(t=>t.starred);
     else if(filter!=='all') all=all.filter(t=>t._lid===filter);
-    // 달력에서 고른 날짜로 좁힌다. 마감일이 그날인 할일만 남는다.
-    const df=this.S.dateFilter;
-    if(df) all=all.filter(t=>t.due && t.due.startsWith(df));
     // 숨김 처리
     if(!this.S.showHidden) all=all.filter(t=>!t._hidden);
     // 기본: 날짜순 + 별표 우선
@@ -789,15 +784,10 @@ const App = {
       const db=b.due?new Date(b.due):new Date('9999');
       return da-db;
     });
-    // 지금 좁혀 보고 있다는 걸 목록 위에 적는다. 안 적으면 '할일이 사라졌다' 로 읽힌다.
-    const chip = df
-      ? `<div class="task-datechip">${new Date(df+'T00:00:00').toLocaleDateString('ko-KR',{month:'long',day:'numeric'})} 마감만
-           <button onclick="App.clearDateFilter()" aria-label="날짜 필터 해제">✕</button></div>`
-      : '';
     if(!all.length){
-      document.getElementById('tasksContainer').innerHTML = chip +
+      document.getElementById('tasksContainer').innerHTML =
         `<p class="empty">${Icons.big('tasks')}${
-          df ? '이 날 마감인 할일이 없습니다' : filter==='starred' ? '별표한 할일이 없습니다' : '할일이 없습니다'}</p>`;
+          filter==='starred' ? '별표한 할일이 없습니다' : '할일이 없습니다'}</p>`;
       return;
     }
     const groups={};
@@ -809,7 +799,7 @@ const App = {
       all.forEach(t=>{ if(!groups[t._lname])groups[t._lname]=[]; groups[t._lname].push(t); });
     }
     const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
-    document.getElementById('tasksContainer').innerHTML=chip+Object.entries(groups).map(([k,v])=>{
+    document.getElementById('tasksContainer').innerHTML=Object.entries(groups).map(([k,v])=>{
       if(k==='_all_') return `<div class="task-group">${v.map(t=>this._taskHTML(t)).join('')}</div>`;
       // 카테고리 그룹 border-left 색상
       const listId=v[0]?._lid||'';
