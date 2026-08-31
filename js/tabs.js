@@ -14,11 +14,17 @@ const Tabs = {
   // 기기마다 그림이 달라지고, 색이 제각각이라 지금 눌러둔 탭이 어느 건지 흐려졌다.
   // 계획 탭은 없앴다. 캘린더가 할일과 한 카드가 되면서 '오늘' 로 옮겨졌고,
   // 남은 게 메모 하나뿐인 탭은 탭이라고 할 게 못 된다.
+  // 이름은 카드가 하는 일을 그대로 부른다. '오늘·몸·자산' 은 짧지만
+  // 그 탭에 뭐가 들어 있는지는 눌러 봐야 알았다. id 는 그대로 둔다 —
+  // 끈 카드 목록과 body[data-tab] 이 이 값을 쓰고 있어서, 바꾸면 저장된 설정이 끊긴다.
   DEF: [
-    { id:'today', label:'오늘', icon:'sun'      },
-    { id:'body',  label:'몸',   icon:'dumbbell' },
-    { id:'money', label:'자산', icon:'trend'    },
+    { id:'today', label:'일정', icon:'calendar' },
+    { id:'body',  label:'건강', icon:'dumbbell' },
+    { id:'money', label:'경제', icon:'trend'    },
   ],
+  // 탭바에만 있고 카드는 없는 자리. 자비스는 화면을 바꾸는 게 아니라 창을 연다.
+  // 떠 있던 동그란 단추는 늘 뭔가를 가리고 있었다 — 손이 닿는 자리는 어차피 여기다.
+  JARVIS_TAB: { id:'jarvis', label:'자비스', icon:'zap' },
   // 카드 → 탭 · 이름 (설정 화면에서도 이 목록을 쓴다)
   CARDS: [
     { cls:'card-calendar',  name:'일정과 할일', tab:'today' },
@@ -54,10 +60,15 @@ const Tabs = {
   _paintBar() {
     const bar = document.getElementById('tabbar');
     if (!bar) return;
+    const j = this.JARVIS_TAB;
     bar.innerHTML = this.DEF.map(t =>
       `<button class="tab-btn" data-t="${t.id}" onclick="Tabs.set('${t.id}')" aria-label="${t.label}">
         ${Icons.svg(t.icon, 'tab-ic')}<span class="tab-lb">${t.label}</span>
-      </button>`).join('');
+      </button>`).join('')
+      + `<button class="tab-btn tab-jarvis" data-t="${j.id}" onclick="JARVIS.toggle()" aria-label="${j.label}">
+          ${Icons.svg(j.icon, 'tab-ic')}<span id="tabJarvisBadge" class="tab-badge hidden">0</span>
+          <span class="tab-lb">${j.label}</span>
+        </button>`;
   },
 
   set(id, silent) {
