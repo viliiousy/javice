@@ -114,15 +114,30 @@ const Diet = {
     const isToday=new Date(date).toDateString()===new Date().toDateString();
     const ds=this._localDateStr(date);
 
-    document.getElementById('dietBadge').textContent=`${t.cal} / ${s.calorieGoal} kcal`;
+    // 배지 하나에 '얼마나 먹었고 목표 대비 몇 퍼센트인지' 를 다 적는다.
+    // 아래 요약에 같은 말을 또 쓰면 카드가 한 줄을 공짜로 잃는다.
+    document.getElementById('dietBadge').textContent=`${t.cal.toLocaleString()} / ${s.calorieGoal.toLocaleString()} kcal · ${pct}%`;
 
     const mealsHTML=this.MEALS.map(meal=>{
       const items=data[meal]||[];
       const mealCal=items.reduce((s,i)=>s+(i.cal||0),0);
-      return `<div class="meal-sec">
-        <div class="meal-hd" onclick="Diet.showAdd('${meal}','${ds}')">
-          <span>${this.EMOJIS[meal]} ${meal}${mealCal?` <span style="color:var(--text3);font-weight:400">${mealCal}kcal</span>`:''}</span>
-          <span style="color:var(--accent-l);font-size:14px">+</span>
+      const mp=items.reduce((s,i)=>s+(i.protein||0),0);
+      const mc=items.reduce((s,i)=>s+(i.carb||0),0);
+      const mf=items.reduce((s,i)=>s+(i.fat||0),0);
+      const open=!!this._open[meal];
+      // 접힌 줄 하나로 그 끼니를 다 말한다 — 뭘 먹었고, 몇 kcal 이고, 단탄지가 얼마인지.
+      const names=items.map(i=>i.name);
+      const sum=items.length
+        ? `<b>${esc(names.slice(0,2).join(', '))}${names.length>2?` 외 ${names.length-2}`:''}</b>`
+          + ` · ${mealCal}kcal · 단 ${Math.round(mp)} · 탄 ${Math.round(mc)} · 지 ${Math.round(mf)}`
+        : '기록 없음';
+      return `<div class="meal-sec${open?' open':''}">
+        <div class="meal-hd" onclick="Diet.toggleMeal('${meal}','${ds}')">
+          <span class="meal-cv">▶</span>
+          <span class="meal-nm">${this.EMOJIS[meal]} ${meal}</span>
+          <span class="meal-sum">${sum}</span>
+          <button type="button" class="meal-add" title="${meal} 추가"
+            onclick="event.stopPropagation();Diet.showAdd('${meal}','${ds}')">+</button>
         </div>
         <div class="meal-items">
           ${items.map((item,idx)=>`
@@ -147,8 +162,8 @@ const Diet = {
             transform="rotate(-90 24 24)" style="transition:stroke-dasharray 0.5s"/>
         </svg>
         <div class="diet-info">
-          <div class="diet-cal-num">${t.cal.toLocaleString()}</div>
-          <div class="diet-cal-sub">${isToday?'오늘':ds} · 목표 ${s.calorieGoal.toLocaleString()}kcal · ${pct}%</div>
+          <div class="diet-cal-num">${t.cal.toLocaleString()}<span class="diet-cal-unit">kcal</span></div>
+          ${isToday?'':`<div class="diet-cal-sub">${ds}</div>`}
         </div>
         <div style="display:flex;gap:4px">
           <button onclick="Diet.showPhotoAnalysis('${ds}')" title="📷 사진 분석"
@@ -158,13 +173,21 @@ const Diet = {
         </div>
       </div>
       <div class="diet-macros">
-        <div class="macro"><div class="macro-lbl">단백질</div><div class="macro-val" style="color:var(--cyan)">${t.protein}g</div><div class="macro-goal">목표 ${s.proteinGoal}g</div></div>
-        <div class="macro"><div class="macro-lbl">탄수화물</div><div class="macro-val" style="color:var(--yellow)">${t.carb}g</div><div class="macro-goal">목표 ${s.carbGoal}g</div></div>
-        <div class="macro"><div class="macro-lbl">지방</div><div class="macro-val" style="color:var(--accent-l)">${t.fat}g</div><div class="macro-goal">목표 ${s.fatGoal}g</div></div>
+        <div class="macro"><span class="macro-lbl">단백질</span><span class="macro-val" style="color:var(--cyan)">${Math.round(t.protein)}<i>g</i></span><span class="macro-goal">/${s.proteinGoal}</span></div>
+        <div class="macro"><span class="macro-lbl">탄수</span><span class="macro-val" style="color:var(--yellow)">${Math.round(t.carb)}<i>g</i></span><span class="macro-goal">/${s.carbGoal}</span></div>
+        <div class="macro"><span class="macro-lbl">지방</span><span class="macro-val" style="color:var(--accent-l)">${Math.round(t.fat)}<i>g</i></span><span class="macro-goal">/${s.fatGoal}</span></div>
       </div>
       ${mealsHTML}`;
 
     if(typeof App!=='undefined') App._updateStatsBanner();
+  },
+
+  // 어느 끼니를 펼쳐 뒀는지. 화면을 새로 열면 다시 다 접힌다 —
+  // 접힌 줄만으로도 그 끼니가 다 읽히기 때문에 굳이 저장할 값이 아니다.
+  _open: {},
+  toggleMeal(meal, dateStr){
+    this._open[meal] = !this._open[meal];
+    this.render(new Date(dateStr+'T00:00:00'));
   },
 
   _clickFav(name,meal,dateStr){
