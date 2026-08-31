@@ -57,6 +57,14 @@ const CalendarUI = {
       });
     }
 
+    // 습관 농도. 예전엔 습관 카드 안에 '최근 5주' 격자를 따로 뒀는데, 한 화면에
+    // 달력이 둘이면 어느 쪽이 무엇인지 매번 다시 읽어야 한다. 여기 바탕으로 들어왔다.
+    // 습관을 안 쓰거나 기록이 없으면 아무 칸도 안 칠해진다 — 조용히 없는 기능이 된다.
+    let hb = {};
+    if (typeof Habits !== 'undefined' && Habits.monthLevels) {
+      try { hb = Habits.monthLevels(yr, mo); } catch(e) { console.warn('habit levels', e); }
+    }
+
     const moLabel=currentDate.toLocaleDateString('ko-KR',{year:'numeric',month:'long'});
     // 월~일 순서
     const dows=['월','화','수','목','금','토','일'];
@@ -72,15 +80,23 @@ const CalendarUI = {
       const isSat=dow===6, isSun=dow===0;
 
       let cls='cal-day';
+      // 오늘과 '보고 있는 날' 은 표시 모양이 달라서 겹쳐도 된다.
+      // 예전엔 else if 라 오늘을 보고 있으면 선택 표시가 아예 안 붙었다.
       if(isToday) cls+=' today';
-      else if(isSel) cls+=' selected';
+      if(isSel)   cls+=' selected';
       if(evDays.has(d)) cls+=' has-event';
       if(taskDays.has(d)) cls+=' has-task';
       if(clDays.has(d)) cls+=' has-cl';
       if((isSun||isHoliday)&&!isToday) cls+=' day-red';
       if(isSat&&!isToday) cls+=' day-blue';
 
-      cells+=`<div class="${cls}"
+      // 0단계(할 습관이 있었는데 하나도 못 함)는 안 칠한다. 빈 칸이 곧 0 이다 —
+      // 여기에까지 색을 주면 달력이 온통 칠해져서 정작 지킨 날이 안 보인다.
+      const h = hb[d];
+      let tip = '';
+      if (h && h.lv > 0) { cls += ` cal-hb hb-l${h.lv}`; tip = ` title="습관 ${h.done}/${h.total}"`; }
+
+      cells+=`<div class="${cls}"${tip}
         onclick="App.selectCalDate(new Date(${yr},${mo},${d}))"
         ontouchend="(function(e){e.preventDefault();App.selectCalDate(new Date(${yr},${mo},${d}));CalendarUI._endLP();})(event)"
         ontouchstart="CalendarUI._startLP(${yr},${mo},${d},event)"
