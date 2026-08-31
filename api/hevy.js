@@ -155,13 +155,15 @@ module.exports = async function handler(req, res) {
   if (!uid) { res.status(500).json({ error: 'HEVY_UID / INBODY_UID 미설정' }); return; }
 
   // PING_SECRET 은 바깥 스케줄러(cron-job.org) 몫이다. 자세한 사연은 api/cron-notify.js 참고.
-  const secrets = [process.env.CRON_SECRET, process.env.HEVY_WEBHOOK_SECRET,
-                   process.env.PING_SECRET].filter(Boolean);
+  const NAMES = ['CRON_SECRET', 'HEVY_WEBHOOK_SECRET', 'PING_SECRET'];
+  const have  = NAMES.filter(n => process.env[n]);
+  const secrets = have.map(n => process.env[n]);
   if (!secrets.length) { res.status(500).json({ error: '인증 비밀이 하나도 설정되어 있지 않습니다' }); return; }
   // Hevy 웹후크 설정칸에 'Bearer xxx' 로 넣을 수도, 값만 넣을 수도 있다. 둘 다 받는다 —
   // 여기서 틀리면 증상이 '조용히 아무 일도 안 일어남' 이라 원인을 찾기 어렵다.
   const given = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  if (!secrets.includes(given)) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  // 이름만 돌려준다(값은 아니다). 401 의 원인이 '값이 틀림' 인지 '아직 배포 안 됨' 인지 갈라 준다.
+  if (!secrets.includes(given)) { res.status(401).json({ error: 'Unauthorized', accepts: have }); return; }
 
   // Hevy 는 5초 안에 200 을 받아야 성공으로 친다(웹후크 설정 화면에 명시돼 있다).
   // 한때 그것 때문에 '먼저 200 을 돌려주고 나중에 일한다' 로 바꿨는데, 그건 틀렸다.
