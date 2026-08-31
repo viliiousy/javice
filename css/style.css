@@ -2543,7 +2543,7 @@ html.dark .rw-x:hover{ background:rgba(220,38,38,.18); }
 /* ── 일정과 할일 (한 카드) ─────────────────────────────
    달력이 할일의 날짜 필터를 겸한다. 두 덩어리 사이에 선을 하나 둬서
    '위는 일정, 아래는 할일' 이 눈으로 갈리게 한다. */
-.cal-sep{ height:1px; background:var(--border); margin:4px 14px 10px; }
+.cal-sep{ height:1px; background:var(--border); margin:2px 14px 4px; }
 .task-datechip{
   display:flex; align-items:center; gap:6px; margin:0 0 8px;
   padding:5px 10px; border-radius:20px; width:fit-content;
