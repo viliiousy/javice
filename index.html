@@ -148,15 +148,6 @@
       <div id="tasksContainer" class="tasks-wrap"><p class="empty">불러오는 중…</p></div>
     </section>
 
-    <!-- 체크리스트 -->
-    <section class="card card-checklist">
-      <div class="card-head">
-        <span class="card-title" data-ic="pen">체크리스트</span>
-        <button class="btn-sm" id="btnClReorder" onclick="Checklist.toggleReorderMode()" title="편집 모드">⚙️</button>
-      </div>
-      <div id="checklistWrap" class="checklist-wrap"></div>
-    </section>
-
     <!-- 습관 -->
     <section class="card card-habits">
       <div class="card-head">
@@ -209,11 +200,19 @@
       <div id="econWrap"></div>
     </section>
 
+    <!-- 체크리스트 -->
+    <section class="card card-checklist">
+      <div class="card-head">
+        <span class="card-title" data-ic="pen">체크리스트</span>
+        <button class="btn-sm" id="btnClReorder" onclick="Checklist.toggleReorderMode()" title="편집 모드">⚙️</button>
+      </div>
+      <div id="checklistWrap" class="checklist-wrap"></div>
+    </section>
+
     <!-- 메모 -->
     <section class="card card-memo">
       <div class="card-head">
         <span class="card-title" data-ic="memo">메모</span>
-        <button class="btn-sm" id="btnMemoReorder" onclick="Memo.toggleReorderMode()" title="편집 모드">⚙️</button>
       </div>
       <div id="memoWrap" class="memo-wrap"></div>
     </section>
