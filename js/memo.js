@@ -73,9 +73,11 @@ const Memo = {
   },
 
   // 저장된 HTML 을 화면에 올릴 수 있게 만든다. 칩에 아이콘과 손잡이를 달아 준다.
+  // 붙여넣기·되돌리기로 새로 들어온 칩도 이 길로 다시 꾸며진다.
   paintChips(root){
     root.querySelectorAll('.mm-cp').forEach(c => {
       c.setAttribute('contenteditable', 'false');
+      c.setAttribute('draggable', 'true');
       c.setAttribute('title', `복사: ${c.dataset.cp || ''}`);
       if (!c.querySelector('svg')) c.innerHTML = (typeof Icons !== 'undefined') ? Icons.svg('copy') : '⧉';
     });
@@ -230,8 +232,6 @@ const Memo = {
 
     // 체크리스트 네모를 누르면 켜고 끈다. 글자 자리를 누르면 그냥 커서다.
     ed.addEventListener('click', (e) => {
-      const chip = e.target.closest('.mm-cp');
-      if (chip) { e.preventDefault(); this.copyChip(chip); return; }
       const li = e.target.closest('li');
       if (li && li.parentElement?.classList.contains('mm-check')) {
         const x = e.clientX - li.getBoundingClientRect().left;
@@ -239,11 +239,80 @@ const Memo = {
       }
     });
 
+    // 칩 옮기기.
+    // 처음엔 눌렀을 때 바로 복사만 하게 해 뒀는데, 그 preventDefault 때문에 칩을
+    // 고를 수가 없어서 잘라내기도 끌기도 막혀 있었다 — 만들고 나면 못 움직이는 물건이었다.
+    // HTML5 드래그는 contenteditable 안에서 브라우저마다 제각각이라 포인터로 직접 옮긴다.
+    // 누른 채 움직이면 커서를 따라 칩이 실제로 이동하고, 안 움직이고 떼면 복사다.
+    ed.addEventListener('pointerdown', (e) => {
+      const chip = e.target.closest('.mm-cp');
+      if (!chip) return;
+      e.preventDefault();
+      let moved = false;
+      const sx = e.clientX, sy = e.clientY;
+      const move = (ev) => {
+        if (!moved && Math.abs(ev.clientX-sx) < 5 && Math.abs(ev.clientY-sy) < 5) return;
+        if (!moved) { moved = true; chip.classList.add('cp-drag'); }
+        const r = Memo._caretAt(ev.clientX, ev.clientY);
+        if (!r || !ed.contains(r.startContainer) || chip.contains(r.startContainer)) return;
+        r.insertNode(chip);                    // 이미 문서에 있는 노드라 '옮기기' 가 된다
+      };
+      const up = () => {
+        ed.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        chip.classList.remove('cp-drag');
+        if (moved) {
+          // 옮긴 뒤 칩 바로 뒤에 커서를 둔다. 그래야 이어서 글을 칠 수 있다.
+          const after = document.createRange();
+          after.setStartAfter(chip); after.collapse(true);
+          const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(after);
+          this._sel = after.cloneRange();
+          App?.showToast('칩 옮김 ✓','success');
+        } else {
+          this.copyChip(chip);
+          // 복사한 김에 칩을 골라 둔다 — 바로 Ctrl+X 로 잘라내 옮길 수 있게.
+          const r = document.createRange(); r.selectNode(chip);
+          const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        }
+      };
+      ed.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    });
+
+    // 붙여넣기는 늘 거른다. 다른 앱에서 온 서식이 통째로 딸려 오면 저장할 때
+    // 어차피 정화기에 걸려 사라지므로, 화면과 저장이 어긋나지 않게 들어올 때 거른다.
+    ed.addEventListener('paste', (e) => {
+      const dt = e.clipboardData; if (!dt) return;
+      const html = dt.getData('text/html');
+      const text = dt.getData('text/plain');
+      e.preventDefault();
+      const frag = this.clean(html || esc(text).replace(/\n/g,'<br>'));
+      document.execCommand('insertHTML', false, frag);
+      this.paintChips(ed);
+    });
+
+    // 되돌리기·끌어놓기 등 우리가 모르는 길로 들어온 칩도 꾸며 준다.
+    new MutationObserver(() => this.paintChips(ed))
+      .observe(ed, { childList:true, subtree:true });
+
     document.querySelectorAll('.mm-bar .mm-b').forEach(b => {
       // mousedown 에서 막지 않으면 단추를 누르는 순간 고른 자리가 풀린다.
       b.addEventListener('mousedown', e => e.preventDefault());
       b.addEventListener('click', () => this._cmd(b.dataset.cmd, ed));
     });
+  },
+
+  // 포인터가 가리키는 글자 사이 자리. 크롬·사파리와 파이어폭스가 이름이 다르다.
+  _caretAt(x, y){
+    if (document.caretRangeFromPoint) return document.caretRangeFromPoint(x, y);
+    if (document.caretPositionFromPoint) {
+      const p = document.caretPositionFromPoint(x, y);
+      if (!p) return null;
+      const r = document.createRange();
+      r.setStart(p.offsetNode, p.offset); r.collapse(true);
+      return r;
+    }
+    return null;
   },
 
   _restore(ed){
