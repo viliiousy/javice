@@ -212,20 +212,19 @@ const InBody = {
     ).join('') + `</div>`;
     if (!this.PERIODS[cur].count) return bar;
     // '최근' 을 골랐을 때만 몇 회인지 정하는 칸이 나온다.
+    // 위아래 화살표 두 개를 세로로 쌓은 옛날 스피너였다. 화살표 하나가 8px 이라
+    // 손가락으로는 못 맞히고, 눈으로도 어느 쪽이 '늘리기' 인지 매번 확인해야 했다.
+    // 좌우로 편 스테퍼로 바꾼다 — − 와 + 는 방향을 설명할 필요가 없고, 칸도 넓다.
     const n = this.recentN();
+    const lo = n <= this.RECENT_MIN, hi = n >= this.RECENT_MAX;
     return bar + `<div class="ib-recent">
       최근
-      <span class="ib-spin" tabindex="0" role="spinbutton"
-            aria-valuenow="${n}" aria-valuemin="${this.RECENT_MIN}" aria-valuemax="${this.RECENT_MAX}"
-            aria-label="최근 몇 회를 볼지"
-            onwheel="event.preventDefault();InBody.bumpRecent(event.deltaY<0?1:-1)"
-            onkeydown="if(event.key==='ArrowUp'){event.preventDefault();InBody.bumpRecent(1)}
-                       else if(event.key==='ArrowDown'){event.preventDefault();InBody.bumpRecent(-1)}">
-        <b class="ib-spin-v">${n}</b>
-        <span class="ib-spin-ar">
-          <button type="button" class="ib-spin-b" onclick="InBody.bumpRecent(1)" aria-label="늘리기" tabindex="-1">▲</button>
-          <button type="button" class="ib-spin-b" onclick="InBody.bumpRecent(-1)" aria-label="줄이기" tabindex="-1">▼</button>
-        </span>
+      <span class="ib-step" role="group" aria-label="최근 몇 회를 볼지">
+        <button type="button" class="ib-step-b" onclick="InBody.bumpRecent(-1)"
+          ${lo?'disabled':''} aria-label="줄이기">−</button>
+        <b class="ib-step-v" aria-live="polite">${n}</b>
+        <button type="button" class="ib-step-b" onclick="InBody.bumpRecent(1)"
+          ${hi?'disabled':''} aria-label="늘리기">+</button>
       </span>
       회 보기
     </div>`;
