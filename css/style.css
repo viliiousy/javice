@@ -244,6 +244,19 @@ html.dark .btn-google-login:hover{ background:#1c1c1e; border-color:#8e918f; }
 .btn-sm:hover{ border-color:var(--accent); color:var(--accent); background:var(--accent-bg); }
 .btn-sm.accent{ background:var(--accent); border-color:var(--accent); color:var(--accent-fg); }
 .btn-sm.accent:hover{ background:var(--accent-h); }
+/* 이모지가 들어 있던 자리. 아이콘은 글자보다 넓이가 일정해서 좌우를 좁혀도 된다. */
+.btn-sm.btn-ic{
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:5px 7px; line-height:0;
+}
+.btn-sm.btn-ic .ic{ width:15px; height:15px; }
+/* 할일 목록 머리의 + 추가. 필터 칩과 같은 줄이라 같은 모양을 쓰되,
+   하는 일이 달라서(고르기 vs 만들기) 왼쪽에 선 하나로 갈라 둔다. */
+.fit-tab.tf-add{
+  margin-left:auto; font-weight:700; color:var(--accent);
+  border-color:var(--border2); border-style:dashed;
+}
+.fit-tab.tf-add:hover{ border-color:var(--accent); border-style:solid; background:var(--accent-bg); }
 .badge{ font-size:12px; padding:2px 8px; border-radius:12px; background:var(--bg); color:var(--text2); border:1px solid var(--border); font-weight:500; }
 .badge-accent{ background:var(--accent-bg); color:var(--accent); border-color:var(--border2); }
 .badge-green{ background:#ecfdf5; color:var(--green); border-color:#a7f3d0; }
@@ -737,7 +750,12 @@ textarea.inp{ resize:vertical; min-height:64px; }
 .mm-cp:hover{ color:var(--accent); border-color:var(--accent); }
 .mm-cp.cp-ok{ color:var(--green); border-color:var(--green); }
 /* 편집창 안에서는 옮길 수 있는 물건이다 — 커서로 그렇게 말한다. */
+/* 손가락으로 잡으려면 브라우저에게서 그 터치를 먼저 뺏어와야 한다.
+   touch-action 을 안 막으면 끌기가 전부 화면 스크롤로 먹혔다.
+   iOS 는 꾹 누르면 돋보기와 '복사' 풍선을 띄우는데, 그것도 여기서는 방해다. */
+.mm-cp{ touch-action:none; -webkit-touch-callout:none; }
 .mm-ed .mm-cp{ cursor:grab; }
+.mm-ed .mm-cp.cp-drag{ transform:scale(1.25); box-shadow:var(--shadow); }
 .mm-ed .mm-cp.cp-drag{ cursor:grabbing; opacity:.55; border-color:var(--accent); }
 
 /* ── 메모 편집창 ──────────────────────── */
@@ -987,7 +1005,11 @@ html.dark .btn-danger:hover{ background:rgba(220,38,38,0.24); }
   .habit-name{ font-size:14px; }
 
   /* 스크롤 영역 최대 높이 모바일 */
-  .tasks-wrap{ max-height:320px; }
+  /* 폰에서는 열을 맞출 이웃이 없다 — 한 탭에 한 카드씩만 보인다.
+     그런데 flex:1 1 0 이라 남는 높이만 받아서 두 줄 만에 스크롤이 걸렸다.
+     여기서는 내용만큼 자라게 두되, 다섯 줄이 넘어가면 그때부터 스크롤한다.
+     (한 줄 ≈ 44px: 글자 두 줄 + 위아래 8px + 테두리) */
+  .tasks-wrap{ flex:0 0 auto; max-height:calc(44px * 5); min-height:0; }
   .checklist-wrap{ max-height:300px; }
   .events-wrap{ max-height:220px; }
   .memo-wrap{ max-height:280px; }
@@ -1079,9 +1101,12 @@ html.dark .profile-menu { background:var(--card); border-color:var(--border); }
   z-index:200; min-width:160px; overflow:hidden;
 }
 .profile-menu-item {
+  display:flex; align-items:center; gap:9px;
   padding:11px 16px; font-size:13px; color:var(--text);
   cursor:pointer; transition:background 0.12s; font-weight:500;
 }
+.profile-menu-item > span{ display:flex; align-items:center; gap:9px; }
+.profile-menu-item .ic{ width:16px; height:16px; color:var(--text3); }
 .profile-menu-item:hover { background:var(--bg); }
 .header { position:relative; }
 
@@ -2430,6 +2455,107 @@ html.dark .cardset-row{ background:var(--card2); border-color:var(--border); }
 .cardset-hd{ display:flex; align-items:center; gap:6px; }
 .cardset-hd .ic{ width:15px; height:15px; }
 
+/* ── 아이콘 모드: 심플 / 컬러 ─────────────
+   테마(시스템·밝게·어둡게)와는 다른 축이다. 테마는 '바탕이 밝나 어둡나' 고,
+   이건 '아이콘이 조용한가 말이 많은가' 다. 둘은 자유롭게 섞인다.
+
+   컬러는 아이콘을 두 벌 그려서 만들지 않았다. 두 벌이 되면 하나를 고칠 때
+   다른 하나를 잊는다 — 이 앱에서 이모지와 선 아이콘이 실제로 그렇게 어긋나 있었다.
+   모양은 한 벌로 두고 색과 판만 갈아입힌다. data-i 가 어떤 아이콘인지 알려 준다.
+
+   '귀엽다' 를 만드는 건 색이 아니라 세 가지다 —
+   둥근 판, 살짝 굵고 끝이 둥근 선, 그리고 누를 때 통통 튀는 반응. */
+html[data-icons="color"]{
+  --i-tasks:#4f46e5; --i-calendar:#e11d48; --i-pen:#0891b2;  --i-check:#059669;
+  --i-diet:#ea580c;  --i-book:#7c3aed;    --i-dumbbell:#0284c7; --i-chart:#0d9488;
+  --i-trend:#16a34a; --i-memo:#d97706;    --i-moon:#6366f1;  --i-sun:#f59e0b;
+  --i-plus:#4f46e5;  --i-list:#64748b;    --i-palette:#db2777; --i-camera:#0891b2;
+  --i-gear:#64748b;  --i-bell:#f59e0b;    --i-download:#0284c7; --i-key:#a16207;
+  --i-checkbox:#059669; --i-copy:#7c3aed; --i-pill:#e11d48;  --i-code:#0f766e;
+  --i-clock:#dc2626; --i-cloud:#0284c7;   --i-user:#64748b;  --i-grid:#7c3aed;
+  --i-zap:#f59e0b;   --i-refresh:#0891b2; --i-eyeoff:#64748b; --i-monitor:#4f46e5;
+  --i-volume:#0284c7; --i-mute:#94a3b8;   --i-logout:#dc2626; --i-sparkle:#db2777;
+}
+html[data-icons="color"] .ic{
+  color:var(--i, currentColor);
+  stroke-width:1.9;                     /* 살짝 굵게 — 통통한 인상은 여기서 나온다 */
+}
+/* 이름마다 제 색. --i 하나만 갈아 끼우면 위 규칙이 알아서 쓴다. */
+html[data-icons="color"] .ic[data-i="tasks"]{--i:var(--i-tasks)}
+html[data-icons="color"] .ic[data-i="calendar"]{--i:var(--i-calendar)}
+html[data-icons="color"] .ic[data-i="pen"]{--i:var(--i-pen)}
+html[data-icons="color"] .ic[data-i="check"]{--i:var(--i-check)}
+html[data-icons="color"] .ic[data-i="diet"]{--i:var(--i-diet)}
+html[data-icons="color"] .ic[data-i="book"]{--i:var(--i-book)}
+html[data-icons="color"] .ic[data-i="dumbbell"]{--i:var(--i-dumbbell)}
+html[data-icons="color"] .ic[data-i="chart"]{--i:var(--i-chart)}
+html[data-icons="color"] .ic[data-i="trend"]{--i:var(--i-trend)}
+html[data-icons="color"] .ic[data-i="memo"]{--i:var(--i-memo)}
+html[data-icons="color"] .ic[data-i="moon"]{--i:var(--i-moon)}
+html[data-icons="color"] .ic[data-i="sun"]{--i:var(--i-sun)}
+html[data-icons="color"] .ic[data-i="plus"]{--i:var(--i-plus)}
+html[data-icons="color"] .ic[data-i="list"]{--i:var(--i-list)}
+html[data-icons="color"] .ic[data-i="palette"]{--i:var(--i-palette)}
+html[data-icons="color"] .ic[data-i="camera"]{--i:var(--i-camera)}
+html[data-icons="color"] .ic[data-i="gear"]{--i:var(--i-gear)}
+html[data-icons="color"] .ic[data-i="bell"]{--i:var(--i-bell)}
+html[data-icons="color"] .ic[data-i="download"]{--i:var(--i-download)}
+html[data-icons="color"] .ic[data-i="key"]{--i:var(--i-key)}
+html[data-icons="color"] .ic[data-i="checkbox"]{--i:var(--i-checkbox)}
+html[data-icons="color"] .ic[data-i="copy"]{--i:var(--i-copy)}
+html[data-icons="color"] .ic[data-i="pill"]{--i:var(--i-pill)}
+html[data-icons="color"] .ic[data-i="code"]{--i:var(--i-code)}
+html[data-icons="color"] .ic[data-i="clock"]{--i:var(--i-clock)}
+html[data-icons="color"] .ic[data-i="cloud"]{--i:var(--i-cloud)}
+html[data-icons="color"] .ic[data-i="user"]{--i:var(--i-user)}
+html[data-icons="color"] .ic[data-i="grid"]{--i:var(--i-grid)}
+html[data-icons="color"] .ic[data-i="zap"]{--i:var(--i-zap)}
+html[data-icons="color"] .ic[data-i="refresh"]{--i:var(--i-refresh)}
+html[data-icons="color"] .ic[data-i="eyeoff"]{--i:var(--i-eyeoff)}
+html[data-icons="color"] .ic[data-i="monitor"]{--i:var(--i-monitor)}
+html[data-icons="color"] .ic[data-i="volume"]{--i:var(--i-volume)}
+html[data-icons="color"] .ic[data-i="mute"]{--i:var(--i-mute)}
+html[data-icons="color"] .ic[data-i="logout"]{--i:var(--i-logout)}
+html[data-icons="color"] .ic[data-i="sparkle"]{--i:var(--i-sparkle)}
+
+/* 카드 머리글과 프로필 메뉴에서는 아이콘이 혼자 서 있다. 거기에만 둥근 판을 깐다.
+   판 색은 글자색을 8% 만 깔아 만든다 — 색을 서른 개 또 정하지 않으려고
+   color-mix 를 쓴다. 못 알아듣는 브라우저는 판 없이 색 아이콘만 나온다(그래도 멀쩡하다). */
+html[data-icons="color"] .card-title .ic,
+html[data-icons="color"] .profile-menu-item .ic,
+html[data-icons="color"] .cardset-hd .ic{
+  box-sizing:content-box; padding:4px; border-radius:8px;
+  background:color-mix(in srgb, var(--i, var(--text3)) 12%, transparent);
+}
+html[data-icons="color"] .card-title .ic{ color:var(--i, var(--text3)); }
+
+/* 하단 탭도 제 색을 입는다. 다만 지금 눌러둔 탭은 강조색이 이긴다 —
+   어디에 있는지가 무슨 탭인지보다 먼저다. */
+@media (max-width:900px){
+  html[data-icons="color"] .tab-ic{ color:var(--i, var(--text3)); opacity:1; }
+  html[data-icons="color"] .tab-btn.on .tab-ic{ color:var(--accent); }
+}
+
+/* 누르면 통통. 색만으로는 '귀엽다' 가 안 되고, 이 한 번의 반응이 나머지를 만든다. */
+html[data-icons="color"] .btn-sm.btn-ic:active .ic,
+html[data-icons="color"] .profile-menu-item:active .ic{ transform:scale(.86); }
+html[data-icons="color"] .ic{ transition:transform .12s cubic-bezier(.34,1.8,.64,1); }
+html[data-icons="color"] .btn-sm.btn-ic:hover .ic{ transform:scale(1.12) rotate(-4deg); }
+
+/* 어두운 바탕에서는 같은 색이 탁해진다. 채도를 올리고 판을 조금 더 깐다. */
+html.dark[data-icons="color"] .ic{ filter:saturate(1.25) brightness(1.18); }
+html.dark[data-icons="color"] .card-title .ic,
+html.dark[data-icons="color"] .profile-menu-item .ic,
+html.dark[data-icons="color"] .cardset-hd .ic{
+  background:color-mix(in srgb, var(--i, var(--text3)) 18%, transparent);
+}
+
+/* 움직임을 원치 않는다고 기기에 적어 둔 사람에게는 튀지 않는다. */
+@media (prefers-reduced-motion: reduce){
+  html[data-icons="color"] .ic{ transition:none; }
+  html[data-icons="color"] .btn-sm.btn-ic:hover .ic{ transform:none; }
+}
+
 /* ── 빈 화면 아이콘 ────────────────────── */
 .ic-empty{
   display:block; width:34px; height:34px; margin:2px auto 10px;
@@ -2594,6 +2720,26 @@ html.dark .stat-chip.stat-green{ background:rgba(5,150,105,0.14); border-color:r
 .diet-ai-hd{ display:flex; flex-wrap:wrap; align-items:baseline; gap:6px; margin-bottom:8px; }
 .diet-ai-nm{ font-size:13.5px; font-weight:700; color:var(--text); }
 .diet-ai-warn{ font-size:11px; color:var(--text3); }
+
+/* 세트를 구성품으로 쪼개 보여 준다. 합계 하나만 있으면 틀렸는지조차 알 수 없다 —
+   '감자 470' 을 봐야 '내 건 미디엄인데' 라고 고칠 수 있다. */
+.diet-ai-parts{
+  margin:8px 0 4px; padding:7px 9px;
+  background:var(--card2); border:1px solid var(--border); border-radius:var(--r-xs);
+}
+.dap-row{
+  display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+  font-size:11.5px; color:var(--text2); padding:2px 0;
+}
+.dap-n{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dap-n i{ font-style:normal; color:var(--text3); font-size:10.5px; margin-left:3px; }
+.dap-c{ flex:none; font-variant-numeric:tabular-nums; font-weight:600; color:var(--text); }
+.dap-c i{ font-style:normal; font-weight:400; font-size:10px; color:var(--text3); margin-left:1px; }
+.dap-sum{ margin-top:3px; padding-top:5px; border-top:1px solid var(--border); font-weight:700; }
+.dap-sum .dap-n{ color:var(--text); font-weight:700; }
+.diet-ai-note{
+  margin:6px 0 2px; font-size:11px; line-height:1.45; color:var(--yellow);
+}
 .diet-ai-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
 /* 기준량은 "1인분 (350g)" 처럼 길다. 한 칸에 우겨넣으면 잘려서 뭘 기준으로 낸
    숫자인지 못 읽는다 — 그게 이 카드에서 제일 중요한 정보다. */
