@@ -11,14 +11,26 @@ const Habits = {
   ],
   DAYS_KO: ['일','월','화','수','목','금','토'],
 
-  // 카테고리 — 기존 습관은 cat 필드가 없으므로 전부 'life'로 취급된다
+  // 분류.
+  // 예전엔 '일상' 과 '자기개발' 두 칸이었고 카드 위에 탭이 있었다. 탭 하나에 습관 두어 개씩이라
+  // 매번 건너다니며 확인해야 했고, 안 보고 있는 쪽은 그냥 안 하게 됐다.
+  // 지금은 한 목록에 다 있고, 분류는 줄에 붙는 이름표일 뿐이다.
   CATS: {
-    life: { label:'일상',     icon:'✅', ic:'check', wrap:'habitsWrap', foot:'habitsFooter',
-            titleSel:'.card-habits .card-title', btn:'btnHabitReorder', addLbl:'+ 습관 추가' },
-    dev:  { label:'자기개발', icon:'📚', ic:'book',  wrap:'habitsWrap', foot:'habitsFooter',
-            titleSel:'.card-habits .card-title', btn:'btnHabitReorder', addLbl:'+ 자기개발 추가' },
+    ex:    { label:'운동', ic:'dumbbell' },
+    study: { label:'공부', ic:'book'     },
+    med:   { label:'약',   ic:'pill'     },
+    code:  { label:'개발', ic:'code'     },
+    etc:   { label:'기타', ic:'list'     },
   },
-  _catOf(h) { return (h && h.cat === 'dev') ? 'dev' : 'life'; },
+  // 새 '개발' 을 'dev' 로 부르지 않는 이유: 예전 값 'dev' 가 '자기개발' 이었다.
+  // 같은 글자가 두 가지 뜻이면 어느 쪽인지 영영 알 수 없는 데이터가 된다.
+  // 예전 값은 읽는 시점에만 옮긴다 — 저장을 통째로 다시 쓰면 동기화가 한 번 크게 출렁인다.
+  //   'dev'(자기개발) → 공부,  'life'·없음 → 기타
+  _catOf(h) {
+    const c = h && h.cat;
+    if (this.CATS[c]) return c;
+    return c === 'dev' ? 'study' : 'etc';
+  },
 
   _lk(k) { return UserStore.key(k); },
 
@@ -99,49 +111,24 @@ const Habits = {
 
   init(date=new Date()) { this.render(date); },
 
-  // 카드 두 장이던 걸 한 장으로 합쳤다. 같은 모듈을 카테고리만 갈라 두 번 그리느라
-  // 화면을 두 배로 쓰고 있었다. 지금은 한 장 안에서 분류를 바꿔 본다.
-  _view: 'life',
+  render(date=new Date()) { this._renderCard(date); },
 
-  setView(cat) {
-    if (!this.CATS[cat] || this._view === cat) return;
-    this._view = cat;
-    this._reorderMode = null;          // 분류를 옮기면 편집 모드는 푼다
-    this.render(App?.S?.selDate || new Date());
-  },
-
-  render(date=new Date()) { this._renderCard(this._view, date); },
-
-  // 안 보고 있는 쪽에 남은 개수를 숫자로 띄운다.
-  // 카드를 합치면서 잃을 뻔한 게 이거다 — 자기개발이 눈에서 사라지면 그냥 안 하게 된다.
-  _segHtml(date) {
-    const all = this.getList(), chk = this.getChecked(date);
-    return '<div class="hb-seg">' + Object.entries(this.CATS).map(([c, C]) => {
-      const left = this._forDate(all, date, c).filter(h => !chk.includes(h.id)).length;
-      return `<button class="hb-seg-btn${c === this._view ? ' on' : ''}" onclick="Habits.setView('${c}')">
-        ${Icons.svg(C.ic, 'hb-seg-ic')}${C.label}${left ? `<i>${left}</i>` : ''}</button>`;
-    }).join('') + '</div>';
-  },
-
-  _renderCard(cat, date=new Date()) {
-    const C=this.CATS[cat]; if(!C) return;
-    const wrap=document.getElementById(C.wrap); if(!wrap) return;
-    const list=this.getHabitsForDate(date, cat);
+  _renderCard(date=new Date()) {
+    const wrap=document.getElementById('habitsWrap'); if(!wrap) return;
+    const list=this.getHabitsForDate(date);
     const chk=this.getChecked(date);
     const isToday=this._dateStr(date)===this._dateStr(new Date());
     const done=list.filter(h=>chk.includes(h.id)).length;
-    const reorder=this._reorderMode===cat;
+    const reorder=!!this._reorderMode;
 
-    const titleEl=document.querySelector(C.titleSel);
+    const titleEl=document.querySelector('.card-habits .card-title');
     if(titleEl){
       const dLbl=new Date(date).toLocaleDateString('ko-KR',{month:'short',day:'numeric'});
       // textContent 로 쓰면 머리글 아이콘까지 지워진다. Icons.title 로 통일한다.
-      Icons.title(titleEl, C.ic, cat==='life'
-        ? (isToday?'오늘의 습관':`${dLbl} 습관`)
-        : (isToday?'자기개발'  :`${dLbl} 자기개발`));
+      Icons.title(titleEl, 'check', isToday?'오늘의 습관':`${dLbl} 습관`);
     }
 
-    wrap.innerHTML=this._segHtml(date)+list.map(h=>{
+    wrap.innerHTML=list.map(h=>{
       const isDone=chk.includes(h.id);
       const st=this.streak(h.id);
       const _d = h.days||[];
@@ -151,18 +138,23 @@ const Habits = {
       else if(_d.length===2&&[0,6].every(x=>_d.includes(x))) daysLabel='<span class="habit-days">주말</span>';
       else daysLabel=`<span class="habit-days">${_d.map(d=>this.DAYS_KO[d]).join('')}</span>`;
       const ds2=Habits._dateStr(date);
+      const cat=this._catOf(h), C=this.CATS[cat];
+      // 약은 '몇 시에' 가 이름만큼 중요하다. 그것만 줄에 붙인다.
+      const timeLabel = (cat==='med' && h.time)
+        ? `<span class="habit-time">${esc(h.time)}${h.notify===false?'':' 🔔'}</span>` : '';
       // 순서 바꾸는 중에는 밀기·길게누르기를 붙이지 않는다 — 끌어야 하는데 삭제가 열린다.
       return `<div class="habit-item${isDone?' done':''}${reorder?' reorder-mode':''}"
         data-reorderable="${h.id}"${reorder?'':` data-row data-i="${h.id}" data-label="${esc(h.name)}"`}>
         ${reorder?`<div class="reorder-handle" onclick="event.stopPropagation()" title="꾹 눌러서 순서 변경">⠿</div>`:''}
         <div class="habit-chk" onclick="event.stopPropagation();Habits._handleTap('${h.id}','${ds2}')">${isDone?'✓':''}</div>
-        <span class="habit-name" onclick="event.stopPropagation();Habits.showEditHabit('${h.id}')">${h.emoji?esc(h.emoji)+' ':''}${esc(h.name)}${daysLabel}</span>
+        <span class="habit-name" onclick="event.stopPropagation();Habits.showEditHabit('${h.id}')"
+          >${Icons.svg(C.ic,'hb-cat-ic')}${h.emoji?esc(h.emoji)+' ':''}${esc(h.name)}${timeLabel}${daysLabel}</span>
         ${st>0&&!reorder?`<span class="habit-streak">🔥${st}</span>`:''}
         ${reorder?`<button class="cl-del-btn edit-del-btn" onclick="event.stopPropagation();Habits._delFrom('${h.id}','${ds2}')" title="삭제">✕</button>`:''}
       </div>`;
     }).join('')
-    + (list.length ? '' : `<p class="empty">${Icons.big(C.ic)}${cat==='dev'?'독서·강의·외국어 같은 자기개발 습관을 추가해보세요':'습관이 없습니다'}</p>`)
-    + `<div class="habit-add-btn" onclick="Habits.showInlineAdd(App?.S?.selDate,'${cat}')">${C.addLbl}</div>`;
+    + (list.length ? '' : `<p class="empty">${Icons.big('check')}습관이 없습니다</p>`)
+    + `<div class="habit-add-btn" onclick="Habits.showInlineAdd(App?.S?.selDate)">+ 습관 추가</div>`;
 
     // 밀기·길게누르기·✕ 를 붙인다 (js/rowui.js)
     try { RowUI.paint(wrap, {
@@ -172,7 +164,7 @@ const Habits = {
 
     // 지난 다섯 주 격자는 여기 있었는데 달력 칸 바탕으로 옮겼다(monthLevels).
     // 한 화면에 달력이 둘이면 어느 쪽이 무엇인지 매번 다시 읽어야 한다.
-    const foot=document.getElementById(C.foot);
+    const foot=document.getElementById('habitsFooter');
     if(foot) foot.innerHTML = list.length
       ? `${isToday?'오늘':'해당 날짜'} <strong>${done}/${list.length}</strong> 완료 ${done===list.length?'🏆 퍼펙트!':''}`
       : '';
@@ -237,43 +229,28 @@ const Habits = {
     } else { Sounds?.uncheck(); }
   },
 
-  // 편집 모드는 한 번에 한 카테고리만 (null | 'life' | 'dev')
-  _reorderMode: null,
+  // 목록이 하나가 되면서 편집 모드도 하나다.
+  _reorderMode: false,
 
-  toggleReorderMode(cat) {
-    cat = this.CATS[cat] ? cat : this._view;
-    // 편집은 지금 보고 있는 분류에 대해서만 한다
-    if (cat !== this._view) { this._view = cat; }
-    this._reorderMode = (this._reorderMode === cat) ? null : cat;
-
-    // 버튼은 이제 하나다. 예전처럼 카테고리마다 돌면 뒤엣것이 앞엣것을 덮어쓴다.
+  toggleReorderMode() {
+    this._reorderMode = !this._reorderMode;
     const btn = document.getElementById('btnHabitReorder');
     if (btn) {
-      const on = this._reorderMode !== null;
-      btn.style.background = on ? 'var(--accent)' : '';
-      btn.style.color      = on ? 'white' : '';
+      btn.style.background = this._reorderMode ? 'var(--accent)' : '';
+      btn.style.color      = this._reorderMode ? 'white' : '';
     }
-
-    // 현재 선택된 날짜 컨텍스트 유지 (App.S.selDate가 없으면 오늘)
     this.render(App?.S?.selDate || new Date());
+    if (!this._reorderMode) return;
 
-    const active = this._reorderMode;
-    if (!active) return;
-
-    // render 후 Reorder 모듈 활성화
     setTimeout(() => {
-      const wrap = document.getElementById(this.CATS[active].wrap);
+      const wrap = document.getElementById('habitsWrap');
       if (!wrap || typeof Reorder === 'undefined') return;
       Reorder.enable(wrap, (newOrder) => {
-        const list  = this.getList();
-        const inCat = list.filter(h => this._catOf(h) === active);
-        // 새 순서대로 정렬하되, 순서에 없는 항목은 뒤에 붙인다
-        const ordered = newOrder.map(id => inCat.find(h => h.id === id)).filter(Boolean);
-        inCat.forEach(h => { if (!ordered.includes(h)) ordered.push(h); });
-        // 다른 카테고리 항목의 자리는 그대로 두고 해당 카테고리 자리만 교체
-        let qi = 0;
-        const sorted = list.map(h => this._catOf(h) === active ? ordered[qi++] : h);
-        this.saveList(sorted);
+        const list = this.getList();
+        // 새 순서대로 세우고, 그 안에 없던 것(그날 안 보이는 습관)은 뒤에 붙인다
+        const ordered = newOrder.map(id => list.find(h => h.id === id)).filter(Boolean);
+        list.forEach(h => { if (!ordered.includes(h)) ordered.push(h); });
+        this.saveList(ordered);
         Sounds?.click();
       });
     }, 50);
@@ -329,25 +306,41 @@ const Habits = {
   },
 
   _pendingAddDate: null, // showInlineAdd 호출 시 기준 날짜 저장
-  _pendingAddCat: 'life',
+  _pendingAddCat: 'etc',
 
   // 카테고리 선택 UI (추가/편집 모달 공용)
   _catPickerHtml(selected, name) {
     return `<div class="cat-picker">` + Object.entries(this.CATS).map(([c,C]) =>
       `<label class="cat-pick-btn${c===selected?' on':''}">
          <input type="radio" name="${name}" value="${c}" ${c===selected?'checked':''}
-                onchange="Habits._syncCatPicker(this)"> ${C.icon} ${C.label}
+                onchange="Habits._syncCatPicker(this)"> ${Icons.svg(C.ic,'hb-cat-ic')}${C.label}
        </label>`).join('') + `</div>`;
   },
   _syncCatPicker(input) {
-    input.closest('.cat-picker')?.querySelectorAll('.cat-pick-btn')
+    const box = input.closest('.cat-picker');
+    box?.querySelectorAll('.cat-pick-btn')
       .forEach(l => l.classList.toggle('on', l.querySelector('input')?.checked));
+    // '약' 을 고를 때만 시각 칸이 나온다. 늘 띄워 두면 나머지 넷에서 뜻 없는 칸이 된다.
+    const med = box?.parentElement?.parentElement?.querySelector('.med-row');
+    if (med) med.hidden = input.value !== 'med';
   },
 
-  showInlineAdd(baseDate, cat='life') {
+  // 약 전용 칸 — 몇 시에 먹을지, 알림을 받을지
+  _medRowHtml(cat, time, notify) {
+    return `<div class="modal-row med-row"${cat==='med'?'':' hidden'}>
+      <label class="modal-lbl">복용 시각</label>
+      <div class="med-line">
+        <input id="hMedTime" type="time" class="inp inp-sm" value="${esc(time||'09:00')}">
+        <label class="med-chk"><input id="hMedNotify" type="checkbox" ${notify===false?'':'checked'}> 알림 받기</label>
+      </div>
+      <div class="med-note">5분 전에 한 번 알리고, 체크가 없으면 한 시간마다 다시 알립니다. 자정이 지나면 처음으로 돌아갑니다.</div>
+    </div>`;
+  },
+
+  showInlineAdd(baseDate, cat='etc') {
     // baseDate 미전달 시 현재 선택된 날짜 사용, 없으면 오늘
     this._pendingAddDate = baseDate || App?.S?.selDate || new Date();
-    this._pendingAddCat  = this.CATS[cat] ? cat : 'life';
+    this._pendingAddCat  = this.CATS[cat] ? cat : 'etc';
     const baseDateStr = this._dateStr(this._pendingAddDate);
     const today = this._dateStr(new Date());
     const dateLabel = baseDateStr !== today
@@ -358,12 +351,12 @@ const Habits = {
       '<input type="checkbox" value="' + i + '" checked class="hday-chk"> ' + d +
       '</label>'
     ).join('');
-    App.openModal(`${this.CATS[this._pendingAddCat].icon} ${this.CATS[this._pendingAddCat].label} 습관 추가`,
+    App.openModal('@check 습관 추가',
       '<div class="modal-row"><label class="modal-lbl">습관 이름 *</label>' +
-      '<input id="habitName" type="text" placeholder="' +
-        (this._pendingAddCat==='dev' ? '예: 독서 30분' : '예: 물 2L 마시기') + '" class="inp"></div>' +
+      '<input id="habitName" type="text" placeholder="예: 물 2L 마시기" class="inp"></div>' +
       '<div class="modal-row"><label class="modal-lbl">분류</label>' +
       this._catPickerHtml(this._pendingAddCat, 'hAddCat') + '</div>' +
+      this._medRowHtml(this._pendingAddCat, '09:00', true) +
       '<div class="modal-row"><label class="modal-lbl">반복 요일</label>' +
       '<div class="day-picker">' + dayBtns + '</div></div>' +
       `<div style="font-size:11px;color:var(--text3);margin-bottom:8px">시작일: ${baseDateStr}${dateLabel}</div>` +
@@ -389,16 +382,22 @@ const Habits = {
       ? this._dateStr(this._pendingAddDate)
       : this._dateStr(new Date());
     this._pendingAddDate = null;
-    const cat = document.querySelector('input[name="hAddCat"]:checked')?.value
-             || this._pendingAddCat || 'life';
-    list.push({
+    const raw = document.querySelector('input[name="hAddCat"]:checked')?.value
+             || this._pendingAddCat || 'etc';
+    const cat = this.CATS[raw] ? raw : 'etc';
+    const h = {
       id: 'h'+Date.now(),
       name,
       emoji: '',
-      cat: this.CATS[cat] ? cat : 'life',
+      cat,
       days: days.length ? days : [0,1,2,3,4,5,6],
       createdAt,  // 선택한 날짜부터 습관 시작
-    });
+    };
+    if (cat === 'med') {
+      h.time   = document.getElementById('hMedTime')?.value || '09:00';
+      h.notify = !!document.getElementById('hMedNotify')?.checked;
+    }
+    list.push(h);
     this.saveList(list);
     // selDate 기준으로 렌더링
     const renderDate = App?.S?.selDate || new Date();
@@ -417,6 +416,7 @@ const Habits = {
         <input id="hEditEmoji" type="text" value="${h.emoji||''}" class="inp" style="width:80px" maxlength="2"></div>
       <div class="modal-row"><label class="modal-lbl">분류</label>
         ${this._catPickerHtml(this._catOf(h),'hEditCat')}</div>
+      ${this._medRowHtml(this._catOf(h), h.time, h.notify)}
       <div class="modal-row"><label class="modal-lbl">반복 요일</label>
         <div class="day-picker">
           ${this.DAYS_KO.map((d,i)=>`<label class="day-pick-btn"><input type="checkbox" value="${i}" ${(h.days||[]).includes(i)?'checked':''} class="day-edit-chk"> ${d}</label>`).join('')}
@@ -435,6 +435,10 @@ const Habits = {
     h.emoji=document.getElementById('hEditEmoji')?.value.trim()||h.emoji;
     const cat=document.querySelector('input[name="hEditCat"]:checked')?.value;
     if(this.CATS[cat]) h.cat=cat;
+    if(h.cat==='med'){
+      h.time   = document.getElementById('hMedTime')?.value || h.time || '09:00';
+      h.notify = !!document.getElementById('hMedNotify')?.checked;
+    } else { delete h.time; delete h.notify; }   // 약이 아니게 되면 시각도 알림도 뜻이 없다
     const days=[...document.querySelectorAll('.day-edit-chk:checked')].map(c=>parseInt(c.value));
     h.days=days.length?days:[0,1,2,3,4,5,6];
     this.saveList(list);
