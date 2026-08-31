@@ -511,9 +511,11 @@ const App = {
     const tasks=this._getTasksForDate(date);
     const cls=typeof Checklist!=='undefined'?Checklist.getItemsForDate(date):[];
     const label=date.toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'short'});
+    const sum=this._daySummary(date);
 
     if(!evs.length&&!tasks.length&&!cls.length){
-      wrap.innerHTML=`<p class="empty" style="font-size:12px">${label} — 일정 없음<br><span style="color:var(--text3);font-size:11px">꾹 누르면 추가</span></p>`;
+      wrap.innerHTML=`<div class="day-sum-hd">${label}</div>${sum}`
+        +`<p class="empty" style="font-size:12px">일정 없음<br><span style="color:var(--text3);font-size:11px">꾹 누르면 추가</span></p>`;
       return;
     }
 
@@ -521,12 +523,6 @@ const App = {
     const clH=cls.map(c=>`<div class="event-item" style="border-color:var(--accent)">
       <div class="event-time" style="color:var(--accent)">체크</div>
       <div class="event-title${c.done?' done-text':''}">${esc(c.title)}</div>
-    </div>`).join('');
-
-    // Task 항목 (마감일 기준)
-    const taskH=tasks.map(t=>`<div class="event-item" style="border-color:var(--yellow)">
-      <div class="event-time" style="color:var(--yellow)">할일</div>
-      <div class="event-title">${esc(t.title)}</div>
     </div>`).join('');
 
     // 캘린더 이벤트
@@ -543,7 +539,64 @@ const App = {
       </div>`;
     }).join('');
 
-    wrap.innerHTML=`<div style="padding:5px 12px 3px;font-size:11px;color:var(--text3)">${label}</div>${clH}${taskH}${evH}`;
+    wrap.innerHTML=`<div class="day-sum-hd">${label}</div>${sum}${clH}${evH}`;
+  },
+
+  // ── 그 날 하루 요약 ────────────────────
+  // 달력 칸은 습관 농도까지가 한계다. 네 가지 신호를 30px 칸에 다 넣으면 아무것도 안 읽힌다.
+  // 그래서 고른 날의 습관·운동·식단은 달력 바로 아래 세 줄로 편다 —
+  // 훑는 건 달력이 하고, 자세한 건 날짜를 눌러서 본다.
+  _daySummary(date) {
+    const row=(k,v,dim,go)=>`<button type="button" class="day-sum-row${go?'':' nogo'}"${
+      go?` onclick="App._gotoCard('${go}')"`:''}><span class="dsr-k">${k}</span><span class="dsr-v${
+      dim?' dim':''}">${v}</span></button>`;
+    const out=[];
+
+    try {
+      const list=Habits.getHabitsForDate(date), chk=Habits.getChecked(date);
+      if(list.length){
+        const done=list.filter(h=>chk.includes(h.id)).length;
+        const left=list.filter(h=>!chk.includes(h.id)).map(h=>h.name);
+        out.push(row('습관',`<b>${done}/${list.length}</b>${
+          left.length?` · 남음 ${esc(left.slice(0,2).join(', '))}${left.length>2?` 외 ${left.length-2}`:''}`:' · 전부 완료'}`,
+          false,'habits'));
+      }
+    } catch(e){ console.warn('요약 습관', e); }
+
+    // 이 날 마감인 할일. 아래 할일 목록에도 같은 항목이 있지만 그건 '전체를 날짜순으로'
+    // 보는 목록이고 여기는 '고른 날' 얘기다. 대신 같은 모양의 줄로 넣어 따로 놀지 않게 한다.
+    try {
+      const td=this._getTasksForDate(date);
+      if(td.length) out.push(row('할일',
+        `${esc(td.slice(0,2).map(t=>t.title).join(', '))}${td.length>2?` 외 ${td.length-2}`:''}`, false, null));
+    } catch(e){ console.warn('요약 할일', e); }
+
+    try {
+      const dow=new Date(date).getDay(), plan=Fitness.PLAN[dow];
+      const n=(plan.exercises||[]).length + Fitness.getCustomExercises(date).length;
+      const done=Fitness._checked(date).length;
+      if(plan.name==='휴식') out.push(row('운동','휴식일',true,'fitness'));
+      else if(n) out.push(row('운동',`${esc(plan.name)} · <b>${done}/${n}</b> 종목`,!done,'fitness'));
+    } catch(e){ console.warn('요약 운동', e); }
+
+    try {
+      const t=Diet.totals(Diet.getData(date)), goal=Diet.getSettings().calorieGoal;
+      out.push(t.cal
+        ? row('식단',`<b>${t.cal.toLocaleString()}</b> / ${goal.toLocaleString()} kcal · 단백질 ${t.protein}g`,false,'diet')
+        : row('식단','기록 없음',true,'diet'));
+    } catch(e){ console.warn('요약 식단', e); }
+
+    return out.length?`<div class="day-sum">${out.join('')}</div>`:'';
+  },
+
+  // 요약 줄을 누르면 그 카드로 데려간다. 모바일에서는 탭까지 옮겨 준다.
+  _gotoCard(name) {
+    const card=document.querySelector('.card-'+name); if(!card) return;
+    const tab=card.getAttribute('data-tab');
+    if(tab && typeof Tabs!=='undefined' && Tabs.set) { try{ Tabs.set(tab); }catch{} }
+    card.scrollIntoView({behavior:'smooth',block:'center'});
+    card.classList.add('card-ping');
+    setTimeout(()=>card.classList.remove('card-ping'),1200);
   },
 
   _renderWeekEvents(wrap) {
