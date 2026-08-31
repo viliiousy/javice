@@ -165,11 +165,9 @@ const Diet = {
           <div class="diet-cal-num">${t.cal.toLocaleString()}<span class="diet-cal-unit">kcal</span></div>
           ${isToday?'':`<div class="diet-cal-sub">${ds}</div>`}
         </div>
-        <div style="display:flex;gap:4px">
-          <button onclick="Diet.showPhotoAnalysis('${ds}')" title="📷 사진 분석"
-            style="background:rgba(6,182,212,0.1);border:1px solid rgba(6,182,212,0.25);border-radius:8px;color:var(--cyan);cursor:pointer;font-size:18px;padding:6px 8px">📷</button>
-          <button onclick="Diet.showSettings()" title="목표 설정"
-            style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:4px">⚙️</button>
+        <div class="diet-sum-btns">
+          <button class="diet-photo-btn" onclick="Diet.showPhotoAnalysis('${ds}')" title="사진으로 식단 분석">📷</button>
+          <button class="diet-set-btn" onclick="Diet.showSettings()" title="목표 설정">⚙️</button>
         </div>
       </div>
       <div class="diet-macros">
@@ -260,17 +258,31 @@ const Diet = {
     if(btn){ btn.disabled=false; btn.textContent='AI 로 다시 찾기'; }
   },
   async _aiFood(q){
-    const prompt = `한국에서 흔히 먹는 기준으로 「${q}」의 1회 제공량 영양정보를 알려줘.
+    const prompt = `한국에서 파는 기준으로 「${q}」의 1회 제공량 영양정보를 알려줘.
+브랜드 메뉴·세트 메뉴도 답한다. 세트면 구성품(버거·감자·음료)을 모두 합친 값으로 낸다.
+정확한 공식 수치를 몰라도 비슷한 메뉴를 근거로 추정해서 답해라 — 사람이 보고 고칠 수 있다.
 JSON 만 출력해. 다른 말은 붙이지 마.
-{"ok":true,"name":"음식 이름","unit":"기준량 (예: 100g, 1개, 1인분)","cal":숫자,"protein":숫자,"carb":숫자,"fat":숫자}
-음식이 아니거나 모르면 {"ok":false} 만 출력해.`;
+{"ok":true,"name":"음식 이름","unit":"기준량 (예: 100g, 1개, 1세트)","cal":숫자,"protein":숫자,"carb":숫자,"fat":숫자}
+먹는 것이 아예 아닐 때만 {"ok":false} 를 낸다.`;
     // 모델 이름은 JARVIS 가 고른다 — 한 군데서 고르지 않으면 Groq 이 모델을 내릴 때마다
     // 여기저기서 따로 죽는다. 실제로 그렇게 죽었다.
-    const data=await JARVIS.chat({ max_tokens:300, temperature:0.2,
+    //
+    // max_tokens 가 300 이었다. 지금 모델은 답하기 전에 속으로 생각하고 그 생각도 이 예산을 먹는다.
+    // '사과' 는 통과했지만 '버거킹 몬스터 jr 버거 라지세트' 처럼 조금만 복잡해지면
+    // 생각만 하다 예산이 끝나 본문이 빈 채로 돌아왔다(finish_reason:'length', content:'').
+    // 화면에는 'AI 검색 실패 · 음식으로 못 찾았습니다' 로 나왔지만 모델은 모른다고 한 적이 없다.
+    const data=await JARVIS.chat({ max_tokens:1200, temperature:0.2,
       messages:[{role:'user',content:prompt}] });
-    const text=data.choices?.[0]?.message?.content||'';
+    const ch=data.choices?.[0];
+    const text=ch?.message?.content||'';
+    // 왜 실패했는지를 구분해서 말한다. '못 찾았습니다' 한 마디로 뭉뚱그리면
+    // 질문을 바꿔야 하는지, 다시 눌러야 하는지 알 수가 없다.
+    if(!text.trim()) throw new Error(ch?.finish_reason==='length'
+      ? '답이 길어 잘렸어요. 이름을 조금 짧게 해서 다시 눌러 주세요'
+      : 'AI 가 빈 답을 보냈어요. 다시 눌러 주세요');
     let j=null; try{ const m=text.match(/\{[\s\S]*\}/); j=m?JSON.parse(m[0]):null; }catch{}
-    if(!j || j.ok===false) throw new Error('음식으로 못 찾았습니다');
+    if(!j) throw new Error('AI 답을 읽지 못했어요. 다시 눌러 주세요');
+    if(j.ok===false) throw new Error('먹는 것으로 보지 않았어요');
     const num=v=>{ const n=Number(v); return isFinite(n)&&n>=0 ? n : 0; };
     const name=String(j.name||q).trim().slice(0,40) || q;
     return { n:name, u:String(j.unit||'').trim().slice(0,20),
