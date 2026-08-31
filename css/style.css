@@ -32,6 +32,17 @@
   --text3:     #94a3b8;
   --text4:     #cbd5e1;
 
+  /* 습관 농도 — 달력 칸 바탕.
+     예전 히트맵은 깃허브식 에메랄드(#10b981)였는데, 강조를 무채색으로 뺀 이 화면에서는
+     그 초록 하나가 제일 큰 소리를 냈다. 뜻(지켰다)은 초록이 맞으니 색상은 두고
+     채도만 크게 낮춘다 — 훑을 때 농도 차이는 남고, 안 볼 때는 조용하다. */
+  --hb1:       #e2ebe5;
+  --hb2:       #c6dacd;
+  --hb3:       #97bda8;
+  --hb4:       #4f7d68;
+  /* 글자를 뒤집는 건 제일 짙은 칸 하나뿐이다. 1~3 단계는 기본 글자색으로 충분히 읽힌다. */
+  --hb-fg-hi:  #ffffff;
+
   /* ─ 레이아웃 ─ */
   --r:         12px;
   --r-sm:      8px;
@@ -185,13 +196,17 @@ html.dark .btn-google-login:hover{ background:#1c1c1e; border-color:#8e918f; }
   grid-template-columns:1fr 1fr 1fr;
   gap:14px; padding:16px;
   max-width:1440px; margin:0 auto;
+  /* 카드는 내용만큼만 높다. 늘려서 줄을 맞추면 짧은 카드 안에 죽은 여백이 생기고,
+     그 여백은 아무 뜻도 없이 화면만 먹는다. 아래가 들쭉날쭉한 편이 낫다.
+     달력만 예외로 늘린다 — 남는 높이를 할일 목록이 실제로 쓴다. */
+  align-items:start;
 }
 /* 캘린더가 할일을 품어서 제일 길다. 한 열을 통으로 쓴다. */
-.card-calendar  { grid-column:1; grid-row:1/4; }
+.card-calendar  { grid-column:1; grid-row:1/4; align-self:stretch; }
 /* 매일 손대는 것(습관·식단)이 위, 가끔 보는 것(체크리스트·메모)이 아래. */
-.card-habits    { grid-column:2; grid-row:1/3; }
+.card-habits    { grid-column:2; grid-row:1; }
 .card-diet      { grid-column:3; grid-row:1/3; }
-.card-checklist { grid-column:2; grid-row:3; }
+.card-checklist { grid-column:2; grid-row:2; }
 .card-memo      { grid-column:3; grid-row:3; }
 .card-inbody    { grid-column:1/3; grid-row:4; }
 .card-fitness   { grid-column:3;   grid-row:4; }
@@ -329,21 +344,38 @@ textarea.inp{ resize:vertical; min-height:64px; }
   font-size:12px; cursor:pointer; transition:background 0.12s;
   position:relative; user-select:none; color:var(--text);
 }
-.cal-day:hover{ background:var(--accent-bg); color:var(--accent); }
-.cal-day.today{ background:var(--accent); color:var(--accent-fg); font-weight:700; }
-.cal-day.selected:not(.today){ background:var(--accent-bg); color:var(--accent); outline:2px solid var(--accent); outline-offset:-1px; }
+/* 칸이 습관 농도를 입으면서 오늘·선택을 배경색으로 칠할 수 없게 됐다 —
+   칠하는 순간 그 날 습관이 안 보인다. 배경 대신 모양으로 말한다.
+   오늘은 숫자 아래 밑줄, 보고 있는 날은 테두리. 모양이 다르니 겹쳐도 안 헷갈린다. */
+.cal-day:hover{ box-shadow:inset 0 0 0 1.5px var(--border2); }
+.cal-day.today{
+  font-weight:800;
+  text-decoration:underline; text-decoration-thickness:2px;
+  text-underline-offset:3px; text-decoration-color:var(--accent);
+}
+.cal-day.selected{ outline:2px solid var(--accent); outline-offset:-1px; }
 .cal-day.other-month{ color:var(--text4); }
 .cal-day.has-event::after{
   content:''; position:absolute; bottom:1px; left:50%; transform:translateX(-50%);
   width:4px; height:4px; border-radius:50%; background:var(--cyan);
 }
-.cal-day.today.has-event::after{ background:rgba(255,255,255,0.8); }
 .cal-day.has-task::after{
   content:''; position:absolute; bottom:1px; left:calc(50% - 6px);
   width:4px; height:4px; border-radius:50%; background:var(--yellow);
 }
 .cal-day.has-event.has-task::after{ left:calc(50% - 2px); }
 .cal-day.has-event::after{ left:calc(50% - 6px); }
+/* 습관 농도 — 단계색은 :root 의 --hb1~4 한 곳에서 정한다.
+   today/selected 규칙보다 뒤에 둬야 짙은 칸 위 글자가 흰색으로 뒤집힌다. */
+.cal-day.hb-l1{ background:var(--hb1); }
+.cal-day.hb-l2{ background:var(--hb2); }
+.cal-day.hb-l3{ background:var(--hb3); }
+/* 제일 짙은 칸에서만 글자를 뒤집는다. 주말 빨강·파랑은 여기서 안 읽히므로 같이 뒤집는다 —
+   저쪽이 !important 라 이기려면 이쪽도 같은 무기를 들어야 한다. */
+.cal-day.hb-l4{ background:var(--hb4); color:var(--hb-fg-hi); }
+.cal-day.hb-l4.day-red,
+.cal-day.hb-l4.day-blue{ color:var(--hb-fg-hi) !important; }
+.cal-day.hb-l4.today{ text-decoration-color:var(--hb-fg-hi); }
 .cal-day.has-cl::before{
   content:''; position:absolute; bottom:1px; right:3px;
   width:4px; height:4px; border-radius:50%; background:var(--accent-l);
@@ -360,6 +392,33 @@ textarea.inp{ resize:vertical; min-height:64px; }
    280px 를 붙잡고 있어서 그 아래 할일과의 사이가 통째로 빈다. 늘어나야 하는 건
    실제로 길어지는 할일 목록 쪽이다. */
 .events-wrap{ padding:6px; overflow-y:auto; flex:0 1 auto; max-height:280px; }
+
+/* ── 하루 요약 ─────────────────────────
+   달력 칸은 습관 농도까지가 한계다. 30px 칸에 네 신호를 다 넣으면 아무것도 안 읽힌다.
+   훑는 건 달력이 하고, 고른 날의 습관·운동·식단은 여기 세 줄로 편다. */
+.day-sum-hd{ padding:5px 12px 3px; font-size:11px; color:var(--text3); }
+.day-sum{ display:flex; flex-direction:column; margin:2px 6px 8px; }
+.day-sum-row{
+  display:grid; grid-template-columns:34px 1fr; gap:9px; align-items:baseline;
+  width:100%; text-align:left; padding:6px 8px; border:0; border-radius:var(--r-xs);
+  background:none; cursor:pointer; font-family:inherit;
+  border-top:1px solid var(--border);
+}
+.day-sum-row:first-child{ border-top:0; }
+.day-sum-row.nogo{ cursor:default; }
+.day-sum-row:not(.nogo):hover{ background:var(--card2); }
+.dsr-k{ font-size:11px; font-weight:700; color:var(--text3); }
+.dsr-v{ font-size:12.5px; color:var(--text); word-break:keep-all; line-height:1.45; }
+.dsr-v.dim{ color:var(--text3); }
+.dsr-v b{ font-weight:700; }
+
+/* 요약 줄을 눌러 카드로 넘어갔을 때, 어느 카드로 왔는지 한 번 알려 준다.
+   말없이 스크롤만 하면 화면이 왜 움직였는지 모른다. */
+.card-ping{ animation:cardPing 1.2s ease-out; }
+@keyframes cardPing{
+  0%,100%{ box-shadow:var(--shadow-sm); }
+  15%,60%{ box-shadow:0 0 0 2px var(--accent), var(--shadow); }
+}
 .events-wrap:empty{ display:none; }
 .ev-group-hd{ padding:4px 10px 2px; font-size:12px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:0.05em; }
 .event-item{
@@ -895,6 +954,13 @@ html.dark {
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
   --shadow:    0 4px 14px rgba(0,0,0,0.45);
   --shadow-lg: 0 16px 44px rgba(0,0,0,0.55);
+
+  /* 어두운 바탕에서는 단계가 뒤집힌다 — 적을수록 어둡고 많을수록 밝다. */
+  --hb1:       #202e27;
+  --hb2:       #2f4d40;
+  --hb3:       #4a7561;
+  --hb4:       #7fae94;
+  --hb-fg-hi:  #0a0a0c;
 }
 html.dark .header,
 html.dark .stats-banner,
@@ -1016,18 +1082,15 @@ html.dark .stats-urgent-chip.urgent-over { background:rgba(220,38,38,0.15); }
 /* ═══════════════════════════════════════
    달력 공휴일/일요일 배경
    ═══════════════════════════════════════ */
+/* 습관색이 칠해진 칸에는 일요일·공휴일 바탕을 덧칠하지 않는다.
+   배경 두 겹이 겹치면 둘 다 무슨 뜻인지 알 수 없는 색이 된다.
+   글자가 이미 빨강이라 '쉬는 날' 은 그것만으로 읽힌다. */
 .cal-day.day-red {
   color: var(--red) !important;
-  background: rgba(220,38,38,0.07);
   border-radius: 6px;
 }
-.cal-day.day-red:hover {
-  background: rgba(220,38,38,0.15) !important;
-}
-.cal-day.today.day-red {
-  background: var(--accent) !important;
-  color: white !important;
-}
+.cal-day.day-red:not(.cal-hb){ background: rgba(220,38,38,0.07); }
+.cal-day.day-red:not(.cal-hb):hover{ background: rgba(220,38,38,0.15); }
 
 /* 5. 모바일 stat chip 클릭 커서 */
 .stat-chip { cursor: pointer; }
@@ -2375,51 +2438,6 @@ html.dark .stat-chip.stat-green{ background:rgba(5,150,105,0.14); border-color:r
 }
 .hw-wip{ color:var(--text3); font-size:10.5px; }
 
-/* ── 습관 히트맵 ─────────────────────────
-   한 색을 옅게→짙게. 무지개도, 초록↔빨강도 아니다 — 이건 '얼마나' 이지 '좋다/나쁘다' 가 아니다. */
-.hm{ margin-top:12px; padding-top:10px; border-top:1px solid var(--border); }
-.hm-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
-.hm-t{ font-size:12px; font-weight:700; color:var(--text2); }
-.hm-legend{ display:flex; align-items:center; gap:3px; font-size:10px; color:var(--text3); }
-.hm-legend i{ width:9px; height:9px; border-radius:2px; display:inline-block; }
-.hm-days{
-  display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:3px;
-  font-size:9.5px; color:var(--text3); text-align:center;
-}
-.hm-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
-.hm-c{
-  position:relative;
-  aspect-ratio:1; border-radius:3px; border:1px solid transparent;
-  padding:0; cursor:pointer; background:var(--bg);
-}
-.hm-c:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
-/* 0% 와 '할 습관이 없던 날' 은 다른 것이다. 같은 색이면 쉰 날이 무너진 날처럼 보인다. */
-.hm-l0 { background:var(--bg);   border-color:var(--border); }
-.hm-off{ background:transparent; border-color:transparent; }
-.hm-fut{ background:transparent; border-color:transparent; }
-.hm-l1 { background:#d1fae5; }
-.hm-l2 { background:#6ee7b7; }
-.hm-l3 { background:#10b981; }
-.hm-l4 { background:#047857; }
-/* 오늘 표시는 아래 -- '오늘' 과 '보고 있는 날' 참고 */
-.hm-read{
-  margin-top:7px; font-size:11.5px; color:var(--text2); text-align:center;
-  font-variant-numeric:tabular-nums;
-}
-.hm-read strong{ color:var(--text); font-weight:700; }
-
-/* 다크는 뒤집는 게 아니라 따로 고른다 — 밝은 초록 네 단계를 그냥 얹으면 화면을 찢는다. */
-html.dark .hm-c   { background:var(--card2); }
-html.dark .hm-l0  { background:var(--card2); border-color:var(--border); }
-html.dark .hm-off,
-html.dark .hm-fut { background:transparent; border-color:transparent; }
-/* 어두운 바탕에서는 '많을수록 밝게' 가 맞다. 밝은 초록 네 단계를 그대로 얹으면
-   낮은 단계끼리 붙어버려서 다섯 주가 다 비슷해 보인다. 단계를 다시 골랐다. */
-html.dark .hm-l1  { background:#0d3b2e; }
-html.dark .hm-l2  { background:#14785c; }
-html.dark .hm-l3  { background:#10b981; }
-html.dark .hm-l4  { background:#6ee7b7; }
-
 /* ── 헤더 오른쪽 두 줄 (인바디 · 자산) ────
    날씨가 있던 자리다. 날씨는 잠금화면에도 위젯에도 창밖에도 있다.
    여기에는 여기서만 볼 수 있는 걸 둔다. */
@@ -2449,32 +2467,6 @@ html.dark .hm-l4  { background:#6ee7b7; }
   .ts-body s{ margin:0 4px; }
 }
 
-/* ── 히트맵: 칸에 날짜 ────────────────── */
-.hm-c span{
-  font-size:9.5px; font-weight:600; line-height:1;
-  color:var(--text3); pointer-events:none;
-}
-/* 짙은 칸 위에서는 흐린 회색이 안 읽힌다. 글자를 뒤집는다. */
-.hm-l3 span, .hm-l4 span{ color:#fff; }
-.hm-fut span{ opacity:.35; }
-.hm-c[disabled]{ cursor:default; }
-html.dark .hm-l3 span, html.dark .hm-l4 span{ color:#0a0a0c; }
-html.dark .hm-l1 span, html.dark .hm-l2 span{ color:#d4d4d8; }
-/* ── '오늘' 과 '보고 있는 날' ──────────────
-   둘 다 얇은 테두리였고 색만 달랐다(먹 vs 회색). 나란히 놓으면 어느 쪽이 오늘인지
-   구분이 안 된다 — 같은 모양은 색을 아무리 달리해도 같은 것으로 읽힌다.
-   그래서 모양을 갈랐다. 보고 있는 날은 테두리, 오늘은 칸 아래 짧은 막대. */
-.hm-sel{ box-shadow:0 0 0 2px var(--accent); }
-.hm-today::after{
-  content:''; position:absolute; left:50%; bottom:2px; transform:translateX(-50%);
-  width:10px; height:2px; border-radius:1px; background:var(--accent);
-}
-/* 짙게 칠해진 칸 위에서는 먹색 막대가 안 보인다 — 글자와 같이 뒤집는다. */
-.hm-l3.hm-today::after, .hm-l4.hm-today::after{ background:#fff; }
-html.dark .hm-l3.hm-today::after,
-html.dark .hm-l4.hm-today::after{ background:#0a0a0c; }
-/* 막대가 들어갈 자리를 비운다 */
-.hm-c span{ transform:translateY(-1px); }
 
 /* ── AI 음식 사전 ─────────────────────────────────────
    프리셋에 없는 음식을 AI 로 찾는 길. 결과는 '담기 전에 고칠 수 있는 카드'로
