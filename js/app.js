@@ -7,7 +7,6 @@ const App = {
     lists:         [],
     tasks:         {},
     events:        [],
-    offline:       false,
     taskFilter:    'all',
     taskSort:      false,
     calPanel:      'today',
@@ -27,7 +26,6 @@ const App = {
     const $=id=>document.getElementById(id);
     const on=(id,fn)=>{ const el=$(id); if(el) el.onclick=fn; };
     on('btnGoogleLogin', ()=>Auth.login());
-    on('btnOfflineMode', ()=>this.startOffline());
     on('btnLogout',      ()=>Auth.logout());
     on('btnSync',        ()=>this.sync());
     on('btnShowCompleted',()=>{ this.S.showCompleted=!this.S.showCompleted; const b=document.getElementById('btnShowCompleted'); if(b)b.style.background=this.S.showCompleted?'var(--accent)':''; this._renderTasks(); });
@@ -76,28 +74,15 @@ const App = {
     await this.sync();
   },
 
-  startOffline() {
-    this.S.offline=true;
-    document.getElementById('loginScreen').style.display='none';
-    document.getElementById('app').style.display='block';
-    this._updateHeaderDate(new Date());
-    try{ Habits.init(new Date()); }catch{}
-    try{ Diet.render(new Date()); }catch{}
-    try{ Fitness.render(new Date()); }catch{}
-    try{ Checklist.render(); }catch{}
-    try{ Memo.render(); }catch{}
-    try{ InBody.init(); }catch{}
-    try{ Econ.init(); }catch{}
-    try{ TopStrip.render(); }catch{}
-    try{ CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,[],this.S.selDate); }catch{}
-    document.getElementById('eventsWrap').innerHTML='<p class="empty">오프라인 모드</p>';
-    document.getElementById('tasksContainer').innerHTML='<p class="empty">로그인 시 동기화됩니다</p>';
-    this._updateStatsBanner();
-  },
+  // 오프라인 모드는 없앴다.
+  // 로그인 없이 쓰면 기록이 u_offline_* 로 저장돼서 클라우드에 한 번도 안 올라갔다.
+  // 화면에는 멀쩡히 보이니까 저장된 줄 알지만, 다른 기기에는 없고 브라우저를 지우면 같이 사라진다.
+  // '보이는데 없는' 상태를 만드는 문이라 문 자체를 닫았다.
+  // (승계는 UserStore.adoptOffline() 이 로그인할 때 한 번 해 준다.)
 
   // ── 동기화 ────────────────────────────
   async sync() {
-    if(this.S.offline||!Auth.isLoggedIn()) return;
+    if(!Auth.isLoggedIn()) return;
     this.showToast('동기화 중...','');
     try {
       this.S.lists=await GoogleTasks.fetchTaskLists();
@@ -812,7 +797,7 @@ const App = {
       <p style="color:var(--text2);font-size:13px;margin-bottom:8px">${e.start?.date||_fmtFull(s)}<br>${allDay?'종일':_fmtTime(s)+(en?' — '+_fmtTime(en):'')}</p>
       ${e.location?`<p style="color:var(--text2);font-size:13px;margin-bottom:8px">📍 ${esc(e.location)}</p>`:''}
       ${e.description?`<div style="color:var(--text2);font-size:13px;padding:10px;background:var(--card2);border-radius:8px;white-space:pre-wrap;margin-bottom:12px">${esc(e.description)}</div>`:''}
-      ${!this.S.offline?`<button onclick="App._delEvent('${e.id}','${e._calId||''}')" style="width:100%;padding:9px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:8px;color:var(--red);cursor:pointer;font-family:inherit;font-size:13px">🗑 일정 삭제</button>`:''}
+      <button onclick="App._delEvent('${e.id}','${e._calId||''}')" style="width:100%;padding:9px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:8px;color:var(--red);cursor:pointer;font-family:inherit;font-size:13px">🗑 일정 삭제</button>
     `);
   },
 
@@ -1068,7 +1053,7 @@ const App = {
     // 로컬 스토리지 업데이트
     t.starred?localStorage.setItem('gl_star_'+taskId,'1'):localStorage.removeItem('gl_star_'+taskId);
     // Google Tasks API notes 필드에 별표 상태 동기화 (fire-and-forget)
-    if(!this.S.offline && Auth.isLoggedIn()){
+    if(Auth.isLoggedIn()){
       GoogleTasks.setTaskStar(listId, taskId, t.starred, t.notes||'');
       // API 마커 상태도 로컬에 반영
       t._apiStarred = t.starred;
