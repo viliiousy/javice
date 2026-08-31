@@ -1983,6 +1983,41 @@ html.dark .login-scope{ background:rgba(255,255,255,0.04); }
 .ec-nav .ec-gear{ flex:0 0 38px; }
 .ec-search{ width:100%; margin-bottom:10px; }
 
+/* ── 캡처로 보유 채우기 ─────────────────
+   검색칸과 한 줄에 둔다. 둘 다 '보유에 종목을 넣는' 같은 일이고,
+   손으로 넣을지 캡처로 넣을지만 다르다. */
+.ec-hold-top{ display:flex; gap:8px; align-items:flex-start; }
+.ec-hold-top .ec-search{ flex:1; min-width:0; }
+.ec-scan{
+  flex:none; display:inline-flex; align-items:center; gap:5px;
+  white-space:nowrap; font-weight:600;
+}
+.ec-scan .ic{ width:14px; height:14px; }
+
+/* 읽어 온 줄. 종목명·수량·평단이 세로로 딱 맞아야 훑으면서 틀린 걸 잡아낸다. */
+.hs-list{
+  display:flex; flex-direction:column; gap:2px;
+  max-height:260px; overflow-y:auto;
+  border:1px solid var(--border); border-radius:var(--r-xs); padding:6px;
+  background:var(--card2);
+}
+.hs-row{
+  display:grid; grid-template-columns:18px 1fr auto auto; gap:9px; align-items:center;
+  padding:6px 7px; border-radius:var(--r-xs); font-size:12.5px; cursor:pointer;
+}
+.hs-row:hover{ background:var(--card); }
+.hs-nm{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+.hs-nm i{ font-style:normal; font-size:11px; font-weight:500; color:var(--red); }
+.hs-q, .hs-a{ font-variant-numeric:tabular-nums; color:var(--text2); font-size:12px; }
+/* 못 맞힌 줄은 지우지 않고 흐리게 남긴다 — 조용히 빠지면 몇 개가 빠졌는지도 모른다. */
+.hs-miss{ opacity:.55; cursor:default; }
+.hs-miss .hs-nm{ font-weight:500; }
+
+@media (max-width:640px){
+  .ec-hold-top{ flex-direction:column; }
+  .ec-scan{ width:100%; justify-content:center; }
+}
+
 .ec-res{
   display:flex; align-items:center; justify-content:space-between; gap:8px;
   padding:9px 12px; background:var(--card2); border:1px solid var(--border);
