@@ -42,13 +42,22 @@ const Icons = {
     cloud:    '<path d="M17.5 19a4.5 4.5 0 0 0 .5-8.97A6 6 0 0 0 6.2 11.3 3.5 3.5 0 0 0 6.5 19Z"/>',
     user:     '<circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>',
     zap:      '<path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10.5H13l0-8.5Z"/>',
+    refresh:  '<path d="M20 11a8 8 0 0 0-13.7-5.7L3 8"/><path d="M4 13a8 8 0 0 0 13.7 5.7L21 16"/><path d="M3 4v4h4M21 20v-4h-4"/>',
+    eyeoff:   '<path d="M10.6 6.3A9.6 9.6 0 0 1 12 6c5 0 9 4.5 9 6 0 .7-.9 2.1-2.4 3.4"/><path d="M6.3 8.1C4.2 9.5 3 11.3 3 12c0 1.5 4 6 9 6 1.4 0 2.7-.35 3.8-.9"/><path d="m10.3 10.3a2.4 2.4 0 0 0 3.4 3.4"/><path d="m3.5 3.5 17 17"/>',
+    monitor:  '<rect x="2.5" y="4" width="19" height="12.5" rx="2"/><path d="M9 20.5h6M12 16.5v4"/>',
+    volume:   '<path d="M11 5 6.5 8.8H3.5v6.4h3L11 19V5Z"/><path d="M15 9.2a4 4 0 0 1 0 5.6"/><path d="M17.8 6.4a8 8 0 0 1 0 11.2"/>',
+    mute:     '<path d="M11 5 6.5 8.8H3.5v6.4h3L11 19V5Z"/><path d="m15.5 9.5 5 5M20.5 9.5l-5 5"/>',
+    logout:   '<path d="M9.5 3.5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h3.5"/><path d="M15.5 16.5 20 12l-4.5-4.5"/><path d="M20 12H9"/>',
+    sparkle:  '<path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9 12 3.5Z"/><path d="M18.5 3v3M20 4.5h-3M6 17v2.5M7.25 18.25h-2.5"/>',
     grid:     '<rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/>',
   },
 
   svg(name, cls) {
     const d = this.P[name];
     if (!d) return '';                       // 이름을 잘못 쓰면 조용히 빈칸. 깨진 네모보다 낫다.
-    return `<svg class="ic${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+    // data-i 로 이름을 남긴다. 컬러 모드에서 아이콘마다 다른 색을 주려면
+    // CSS 가 '이게 무슨 아이콘인지' 를 알아야 하는데, 클래스를 스무 개 만드는 것보다 낫다.
+    return `<svg class="ic${cls ? ' ' + cls : ''}" data-i="${name}" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
   },
 
   // 빈 화면 한가운데 놓는 큰 아이콘.
@@ -75,6 +84,49 @@ const Icons = {
       el.dataset.icOn = '1';
     });
   },
+  // ── 아이콘 모드 ─────────────────────────
+  // 심플: 지금 그대로. 굵기·크기·색이 하나로 묶인 회색 선 아이콘.
+  // 컬러: 같은 선을 그대로 쓰되 아이콘마다 제 색을 주고, 뒤에 옅은 색 판을 깐다.
+  //
+  // 아이콘을 두 벌 그리지 않은 이유가 있다. 두 벌이 되면 하나를 고칠 때마다
+  // 다른 하나를 잊는다 — 실제로 이 앱에서 이모지와 아이콘이 그렇게 어긋나 있었다.
+  // 모양은 한 벌로 두고, 옷만 CSS 가 갈아입힌다.
+  //
+  // (이 블록은 반드시 객체 리터럴 안에 있어야 한다. Object.assign 으로 밖에서 얹으면
+  //  getter/setter 가 아니라 '그때 읽은 값' 이 복사돼서, 바꿔도 저장이 안 된다. 겪었다.)
+  MODES: ['simple', 'color'],
+  MODE_KEY: 'gl_icon_mode',
+  MODE_LBL: { simple:'아이콘: 심플', color:'아이콘: 컬러' },
+
+  get mode() {
+    const v = localStorage.getItem(this.MODE_KEY);
+    return this.MODES.includes(v) ? v : 'simple';
+  },
+  set mode(v) { localStorage.setItem(this.MODE_KEY, v); },
+
+  applyMode() { document.documentElement.dataset.icons = this.mode; },
+
+  toggleMode() {
+    const i = this.MODES.indexOf(this.mode);
+    this.mode = this.MODES[(i + 1) % this.MODES.length];
+    this.applyMode();
+    this.updateModeLabel();
+    document.getElementById('profileMenu')?.classList.add('hidden');
+    if (typeof App !== 'undefined') App.showToast(this.MODE_LBL[this.mode], 'success');
+    if (typeof Sounds !== 'undefined') Sounds.click?.();
+  },
+
+  updateModeLabel() {
+    const el = document.getElementById('iconModeLabel');
+    if (!el) return;
+    // textContent 로 쓰면 아이콘이 지워진다. 여기도 title() 과 같은 규칙을 따른다.
+    el.innerHTML = this.svg(this.mode === 'color' ? 'palette' : 'sparkle')
+                 + this.MODE_LBL[this.mode];
+    el.dataset.icOn = '1';
+  },
 };
 
-document.addEventListener('DOMContentLoaded', () => Icons.paint());
+// 첫 페인트 전에 걸어야 아이콘이 회색으로 한 번 번쩍이지 않는다.
+Icons.applyMode();
+
+document.addEventListener('DOMContentLoaded', () => { Icons.paint(); Icons.updateModeLabel(); });
