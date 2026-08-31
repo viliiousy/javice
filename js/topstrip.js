@@ -63,6 +63,8 @@ const TopStrip = {
     }
 
     // 보유가 없으면 관심종목 등락으로 대신한다. 두 개까지만 — 훑어보는 자리다.
+    // '+2' 는 뺐다. 그 자리에서 할 수 있는 게 없는 숫자였다(눌러 봐야 경제 카드가 열릴 뿐이고,
+    // 그건 줄 전체가 이미 하는 일이다). 폰에서는 그 두 글자가 왼쪽 날짜를 밀어냈다.
     const favs = (c && c.favorites) || [];
     if (!favs.length) return '';
     const SHOW = 2;
@@ -73,8 +75,8 @@ const TopStrip = {
       return `${esc(String(it.name || '').slice(0, 5))} <b class="${cls}">${
         pct == null ? '—' : ar + Math.abs(pct).toFixed(1) + '%'}</b>`;
     }).join('<s></s>');
-    const more = favs.length > SHOW ? `<s></s><i>+${favs.length - SHOW}</i>` : '';
-    return this._row('tsEcon', 'trend', parts + more, "Econ.open('main')", '관심종목');
+    const title = favs.length > SHOW ? `관심종목 ${favs.length}개` : '관심종목';
+    return this._row('tsEcon', 'trend', parts, "Econ.open('main')", title);
   },
 
   // 카드로 데려간다. 스크롤만 하면 어디로 갔는지 모르니 잠깐 테두리를 밝힌다.
