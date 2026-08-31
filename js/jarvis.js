@@ -87,15 +87,17 @@ const JARVIS = {
   },
 
   // ── 읽지 않은 알림 배지 ───────────────
+  // 배지가 붙을 자리가 둘이다 — 넓은 화면의 떠 있는 단추, 좁은 화면의 하단 탭.
+  // 한쪽만 갱신하면 폰에서는 읽지 않은 알림이 있어도 아무 표시가 없다.
   _updateBadge() {
-    const badge=document.getElementById('jarvisBadge');
-    if(!badge) return;
-    if(this._unread>0 && !this.isOpen){
-      badge.textContent=this._unread>9?'9+':String(this._unread);
-      badge.classList.remove('hidden');
-    } else {
-      badge.classList.add('hidden');
-    }
+    const on = this._unread > 0 && !this.isOpen;
+    const txt = this._unread > 9 ? '9+' : String(this._unread);
+    ['jarvisBadge','tabJarvisBadge'].forEach(id => {
+      const b = document.getElementById(id);
+      if (!b) return;
+      if (on) { b.textContent = txt; b.classList.remove('hidden'); }
+      else b.classList.add('hidden');
+    });
   },
 
   // ── 스마트 리마인더 ───────────────────
@@ -518,24 +520,34 @@ const JARVIS = {
   async chat(body, kind='text') {
     const key=this._getKey();
     if(!key) throw new Error('API 키가 없습니다');
-    const send = async (model) => {
+    // 지금 쓰는 모델(gpt-oss)은 답하기 전에 속으로 생각하고, 그 생각도 max_tokens 를 먹는다.
+    // 조금 어려운 질문이면 생각만 하다 예산이 끝나 본문이 빈 채로 돌아온다
+    // (finish_reason:'length', content:'') — 부르는 쪽에서는 '모델이 모른다' 로 보인다.
+    // 그래서 생각의 깊이를 기본값으로 낮춰 둔다. 부르는 쪽이 정했으면 그 값을 쓴다.
+    const withDefaults = { reasoning_effort:'low', ...body };
+    const send = async (model, b) => {
       const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
-        body:JSON.stringify({ ...body, model }),
+        body:JSON.stringify({ ...b, model }),
       });
       const data=await res.json().catch(()=>({}));
       return { ok:res.ok, status:res.status, data };
     };
     let model=await this.model(kind);
-    let r=await send(model);
+    let r=await send(model, withDefaults);
+    // 생각 깊이를 안 받는 모델도 있다. 그것 때문에 통째로 실패하면 안 되니 한 번은 빼고 다시.
+    if(!r.ok && /reasoning_effort/i.test(r.data?.error?.message||'')){
+      const { reasoning_effort, ...bare } = withDefaults;
+      r=await send(model, bare);
+    }
     const gone = !r.ok && /does not exist|do not have access|decommission|model_not_found/i.test(
       r.data?.error?.message || r.data?.error?.code || '');
     if(gone){
       // 캐시가 낡았다. 새로 받아서 다른 후보로 한 번만 더.
       const ids=await this._modelIds(true);
       const next=(this.MODELS[kind]||this.MODELS.text).find(m=>ids.includes(m) && m!==model);
-      if(next) r=await send(next);
+      if(next) r=await send(next, withDefaults);
     }
     if(!r.ok) throw new Error(r.data?.error?.message || `HTTP ${r.status}`);
     return r.data;
