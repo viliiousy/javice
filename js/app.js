@@ -788,12 +788,43 @@ const App = {
   },
 
   // ── 할일 ─────────────────────────────
+  // 기한이 지난 할일을 보일지. 켜고 끈 값은 계정에 저장돼서 다음에 열어도 그대로다 —
+  // 매번 기본값으로 돌아가는 토글은 토글이 아니라 버튼이다.
+  // 기본은 '보인다'. 지금 할일 중 기한 지난 게 대부분인데 기본을 숨김으로 두면
+  // 앱을 처음 열었을 때 목록이 텅 비어 보인다 — 없는 것과 가려 둔 것은 다르다.
+  showOverdue(){ return UserStore.get('gl_task_show_overdue') !== '0'; },
+  toggleOverdue(){
+    UserStore.set('gl_task_show_overdue', this.showOverdue()?'0':'1');
+    FirebaseSync?.scheduleSave();
+    this._buildTaskFilters(); this._renderTasks();
+  },
+  // 지금 몇 개가 숨어 있는지. 숫자를 안 적으면 '지난 할일이 없다' 와 '가려 뒀다' 가 같아 보인다.
+  _overdueCount(){
+    const t0=new Date(); t0.setHours(0,0,0,0);
+    let n=0;
+    for(const list of this.S.lists){
+      (this.S.tasks[list.id]||[]).forEach(t=>{
+        if(t.status!=='needsAction'||!t.due) return;
+        if(!this.S.showHidden && t._hidden) return;
+        const [y,m,d]=t.due.split('T')[0].split('-').map(Number);
+        if(new Date(y,m-1,d) < t0) n++;
+      });
+    }
+    return n;
+  },
+
   _buildTaskFilters() {
     const wrap=document.getElementById('taskFilters'); if(!wrap) return;
-    const tabs=[{id:'all',label:'전체'},{id:'starred',label:'⭐ 별표'},...this.S.lists.map(l=>({id:l.id,label:l.title}))];
+    // 별표는 손대도 아무 일이 안 일어나던 필터라 뺐다. 안 되는 버튼은 없는 버튼보다 나쁘다.
+    const tabs=[{id:'all',label:'전체'},...this.S.lists.map(l=>({id:l.id,label:l.title}))];
     const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
-    wrap.innerHTML=tabs.map(t=>{
-      const isListTab=t.id!=='all'&&t.id!=='starred';
+    const on=this.showOverdue(), n=this._overdueCount();
+    const ic=(typeof Icons!=='undefined')?Icons.svg('clock','tf-ic'):'';
+    wrap.innerHTML=`<button class="fit-tab tf-over${on?' active':''}"
+        onclick="App.toggleOverdue()" aria-pressed="${on}"
+        title="${on?'기한 지난 할일 감추기':'기한 지난 할일 보기'}">${ic}지난${n?` ${n}`:''}</button>`
+      + tabs.map(t=>{
+      const isListTab=t.id!=='all';
       const col=isListTab&&catColors[t.id]?catColors[t.id]:'';
       const borderStyle=col?`border-color:${col};color:${col};border-width:2px`:'' ;
       return `<button class="fit-tab${this.S.taskFilter===t.id?' active':''}"
@@ -825,14 +856,20 @@ const App = {
         return false;
       }).forEach(t=>all.push({...t,_lid:list.id,_lname:list.title}));
     }
-    if(filter==='starred') all=all.filter(t=>t.starred);
-    else if(filter!=='all') all=all.filter(t=>t._lid===filter);
+    if(filter!=='all') all=all.filter(t=>t._lid===filter);
     // 숨김 처리
     if(!this.S.showHidden) all=all.filter(t=>!t._hidden);
-    // 기본: 날짜순 + 별표 우선
+    // 기한이 지난 것은 기본으로 접어 둔다. 위 '지난' 을 켜면 다시 나온다.
+    if(!this.showOverdue()){
+      const t0=new Date(); t0.setHours(0,0,0,0);
+      all=all.filter(t=>{
+        if(t.status!=='needsAction'||!t.due) return true;
+        const [y,m,d]=t.due.split('T')[0].split('-').map(Number);
+        return new Date(y,m-1,d) >= t0;
+      });
+    }
+    // 날짜순
     all.sort((a,b)=>{
-      if(a.starred&&!b.starred) return -1;
-      if(!a.starred&&b.starred) return 1;
       const da=a.due?new Date(a.due):new Date('9999');
       const db=b.due?new Date(b.due):new Date('9999');
       return da-db;
@@ -840,13 +877,13 @@ const App = {
     if(!all.length){
       document.getElementById('tasksContainer').innerHTML =
         `<p class="empty">${Icons.big('tasks')}${
-          filter==='starred' ? '별표한 할일이 없습니다' : '할일이 없습니다'}</p>`;
+          this.showOverdue() ? '할일이 없습니다' : '다가올 할일이 없습니다 (지난 할일은 위에서 켜서 보세요)'}</p>`;
       return;
     }
     const groups={};
     // 전체/날짜순 탭: 단일 목록으로 날짜순 표시
     // 특정 목록 탭: 해당 카테고리만 그룹핑
-    if(filter==='all'||filter==='starred'){
+    if(filter==='all'){
       groups['_all_']=[...all];
     } else {
       all.forEach(t=>{ if(!groups[t._lname])groups[t._lname]=[]; groups[t._lname].push(t); });
@@ -873,7 +910,7 @@ const App = {
 
   _taskHTML(t) {
     const done=t.status==='completed', due=t.due?new Date(t.due):null;
-    const overdue=due&&due<new Date()&&!done, star=t.starred, hidden=t._hidden;
+    const overdue=due&&due<new Date()&&!done, hidden=t._hidden;
     const dueStr=due?`<span class="task-due-inline${overdue?' overdue':''}">${_fmtDate(due)}</span>`:'';
     const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
     const catCol=catColors[t._lid]||'';
@@ -889,7 +926,6 @@ const App = {
         </div>
         ${t.notes?`<div class="task-notes">${esc(t.notes.slice(0,60))}${t.notes.length>60?'…':''}</div>`:''}
       </div>
-      <button class="task-star${star?' starred':''}" onclick="event.stopPropagation();App._toggleStar('${t.id}','${t._lid}')"></button>
       <button class="task-hide-btn" onclick="event.stopPropagation();App._toggleHideTask('${t.id}','${t._lid}')" title="${hidden?'숨김 해제':'숨김'}">${hidden?'👁':'🙈'}</button>
       <button class="task-del" onclick="event.stopPropagation();App._delTask('${t.id}','${t._lid}')">✕</button>
     </div>`;
