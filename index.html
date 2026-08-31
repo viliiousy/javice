@@ -111,111 +111,117 @@
 
   <div class="dashboard">
 
-
-    <!-- 캘린더 -->
-    <section class="card card-calendar">
-      <div class="card-head">
-        <span class="card-title" data-ic="calendar">일정과 할일</span>
-        <div class="card-acts">
-          <button class="btn-sm" id="btnCalSettings" title="캘린더 설정">⚙️</button>
-          <button class="btn-sm" id="btnSync" title="동기화">🔄</button>
-          <button class="btn-sm" id="btnShowCompleted" title="완료됨 보기">✓</button>
-          <button class="btn-sm" id="btnShowHidden" title="숨김 보기">🙈</button>
-          <button class="btn-sm accent" id="btnAddEvent">+ 일정</button>
-          <button class="btn-sm accent" id="btnAddTask">+ 할일</button>
+    <!-- 위 세 열. 그리드가 아니라 열마다 따로 흐르는 flex 다 —
+         그리드는 한 줄의 높이를 그 줄에서 제일 큰 카드가 정해서, 짧은 카드 아래가
+         통째로 빈다. 열끼리 높이를 맞출 이유는 없다. 카드가 끝나면 그냥 다음 카드다. -->
+    <div class="dash-top">
+      <div class="dash-col">
+      <!-- 캘린더 -->
+      <section class="card card-calendar">
+        <div class="card-head">
+          <span class="card-title" data-ic="calendar">일정과 할일</span>
+          <div class="card-acts">
+            <button class="btn-sm" id="btnCalSettings" title="캘린더 설정">⚙️</button>
+            <button class="btn-sm" id="btnSync" title="동기화">🔄</button>
+            <button class="btn-sm" id="btnShowCompleted" title="완료됨 보기">✓</button>
+            <button class="btn-sm" id="btnShowHidden" title="숨김 보기">🙈</button>
+            <button class="btn-sm accent" id="btnAddEvent">+ 일정</button>
+            <button class="btn-sm accent" id="btnAddTask">+ 할일</button>
+          </div>
         </div>
-      </div>
-      <div id="miniCal" class="mini-cal"></div>
-      <div class="cal-panel-tabs">
-        <button class="cal-panel-tab active" onclick="App.setCalPanel('today',this)">오늘</button>
-        <button class="cal-panel-tab" onclick="App.setCalPanel('week',this)">이번 주</button>
-        <button class="cal-panel-tab" onclick="App.setCalPanel('month',this)">이번 달</button>
-      </div>
-      <div id="eventsWrap" class="events-wrap"></div>
-      <div class="cal-sep"></div>
-      <div id="taskFilters" class="task-filter-wrap"></div>
-      <div class="task-form hidden" id="taskForm">
-        <input type="text" id="taskInput" placeholder="할일 입력..." class="inp">
-        <div class="task-form-row">
-          <select id="taskListSel" class="inp inp-sm"></select>
-          <input type="date" id="taskDue" class="inp inp-sm">
+        <div id="miniCal" class="mini-cal"></div>
+        <div class="cal-panel-tabs">
+          <button class="cal-panel-tab active" onclick="App.setCalPanel('today',this)">오늘</button>
+          <button class="cal-panel-tab" onclick="App.setCalPanel('week',this)">이번 주</button>
+          <button class="cal-panel-tab" onclick="App.setCalPanel('month',this)">이번 달</button>
         </div>
-        <div class="task-form-btns">
-          <button id="btnSaveTask" class="btn-sm accent">저장</button>
-          <button id="btnCancelTask" class="btn-sm">취소</button>
+        <div id="eventsWrap" class="events-wrap"></div>
+        <div class="cal-sep"></div>
+        <div id="taskFilters" class="task-filter-wrap"></div>
+        <div class="task-form hidden" id="taskForm">
+          <input type="text" id="taskInput" placeholder="할일 입력..." class="inp">
+          <div class="task-form-row">
+            <select id="taskListSel" class="inp inp-sm"></select>
+            <input type="date" id="taskDue" class="inp inp-sm">
+          </div>
+          <div class="task-form-btns">
+            <button id="btnSaveTask" class="btn-sm accent">저장</button>
+            <button id="btnCancelTask" class="btn-sm">취소</button>
+          </div>
         </div>
+        <div id="tasksContainer" class="tasks-wrap"><p class="empty">불러오는 중…</p></div>
+      </section>
       </div>
-      <div id="tasksContainer" class="tasks-wrap"><p class="empty">불러오는 중…</p></div>
-    </section>
-
-    <!-- 습관 -->
-    <section class="card card-habits">
-      <div class="card-head">
-        <span class="card-title" data-ic="check">오늘의 습관</span>
-        <button class="btn-sm" id="btnHabitReorder" onclick="Habits.toggleReorderMode('life')" title="편집 모드">⚙️</button>
-      </div>
-      <div id="habitsWrap" class="habits-wrap"></div>
-      <div id="habitsFooter" class="habits-footer"></div>
-    </section>
-
-    <!-- 식단 -->
-    <section class="card card-diet">
-      <div class="card-head">
-        <span class="card-title" data-ic="diet">식단 기록</span>
-        <span id="dietBadge" class="badge"></span>
-      </div>
-      <div id="dietWrap" class="diet-wrap"></div>
-    </section>
-
-
-    <!-- 운동 -->
-    <section class="card card-fitness">
-      <div class="card-head">
-        <span class="card-title" data-ic="dumbbell">운동</span>
-        <span id="fitBadge" class="badge"></span>
-      </div>
-      <div id="fitnessWrap" class="fitness-wrap"></div>
-    </section>
-
-    <!-- 인바디 -->
-    <section class="card card-inbody">
-      <div class="card-head">
-        <span class="card-title" data-ic="chart">인바디</span>
-        <span id="inbodyBadge" class="badge"></span>
-      </div>
-      <div id="inbodyWrap" class="inbody-wrap"></div>
-    </section>
-
-    <!-- 경제 (경제알림 흡수) -->
-    <section class="card card-econ">
-      <div class="card-head">
-        <span class="card-title" data-ic="trend">경제</span>
-        <div class="card-acts">
-          <span class="ec-upd" id="econUpd"></span>
-          <button class="btn-sm" onclick="Econ.refresh()" title="새로고침">⟳</button>
-          <button class="btn-sm accent" onclick="Econ.open('main')">전체 보기</button>
+      <div class="dash-col">
+      <!-- 습관 -->
+      <section class="card card-habits">
+        <div class="card-head">
+          <span class="card-title" data-ic="check">오늘의 습관</span>
+          <button class="btn-sm" id="btnHabitReorder" onclick="Habits.toggleReorderMode('life')" title="편집 모드">⚙️</button>
         </div>
+        <div id="habitsWrap" class="habits-wrap"></div>
+        <div id="habitsFooter" class="habits-footer"></div>
+      </section>
+      <!-- 식단 -->
+      <section class="card card-diet">
+        <div class="card-head">
+          <span class="card-title" data-ic="diet">식단 기록</span>
+          <span id="dietBadge" class="badge"></span>
+        </div>
+        <div id="dietWrap" class="diet-wrap"></div>
+      </section>
       </div>
-      <div id="econHold"></div>
-      <div id="econWrap"></div>
-    </section>
+      <div class="dash-col">
+      <!-- 체크리스트 -->
+      <section class="card card-checklist">
+        <div class="card-head">
+          <span class="card-title" data-ic="pen">체크리스트</span>
+          <button class="btn-sm" id="btnClReorder" onclick="Checklist.toggleReorderMode()" title="편집 모드">⚙️</button>
+        </div>
+        <div id="checklistWrap" class="checklist-wrap"></div>
+      </section>
+      <!-- 메모 -->
+      <section class="card card-memo">
+        <div class="card-head">
+          <span class="card-title" data-ic="memo">메모</span>
+        </div>
+        <div id="memoWrap" class="memo-wrap"></div>
+      </section>
+      </div>
+    </div>
 
-    <!-- 체크리스트 -->
-    <section class="card card-checklist">
-      <div class="card-head">
-        <span class="card-title" data-ic="pen">체크리스트</span>
-        <button class="btn-sm" id="btnClReorder" onclick="Checklist.toggleReorderMode()" title="편집 모드">⚙️</button>
-      </div>
-      <div id="checklistWrap" class="checklist-wrap"></div>
-    </section>
-
-    <!-- 메모 -->
-    <section class="card card-memo">
-      <div class="card-head">
-        <span class="card-title" data-ic="memo">메모</span>
-      </div>
-      <div id="memoWrap" class="memo-wrap"></div>
-    </section>
+    <!-- 넓게 쓰는 카드들 -->
+    <div class="dash-rest">
+      <!-- 인바디 -->
+      <section class="card card-inbody">
+        <div class="card-head">
+          <span class="card-title" data-ic="chart">인바디</span>
+          <span id="inbodyBadge" class="badge"></span>
+        </div>
+        <div id="inbodyWrap" class="inbody-wrap"></div>
+      </section>
+      <!-- 운동 -->
+      <section class="card card-fitness">
+        <div class="card-head">
+          <span class="card-title" data-ic="dumbbell">운동</span>
+          <span id="fitBadge" class="badge"></span>
+        </div>
+        <div id="fitnessWrap" class="fitness-wrap"></div>
+      </section>
+      <!-- 경제 (경제알림 흡수) -->
+      <section class="card card-econ">
+        <div class="card-head">
+          <span class="card-title" data-ic="trend">경제</span>
+          <div class="card-acts">
+            <span class="ec-upd" id="econUpd"></span>
+            <button class="btn-sm" onclick="Econ.refresh()" title="새로고침">⟳</button>
+            <button class="btn-sm accent" onclick="Econ.open('main')">전체 보기</button>
+          </div>
+        </div>
+        <div id="econHold"></div>
+        <div id="econWrap"></div>
+      </section>
+    </div>
 
   </div>
 
