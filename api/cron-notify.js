@@ -444,7 +444,7 @@ module.exports = async (req, res) => {
 
   try {
     const tokens = await fbGet('/fcm_tokens.json');
-    if(!tokens) { res.status(200).json({success:true,sent:0,failed:0,detail:['등록된 기기 없음']}); return; }
+    if(!tokens) { res.status(200).json({endpoint:'cron-notify',success:true,sent:0,failed:0,detail:['등록된 기기 없음']}); return; }
     let sent=0, failed=0; const detail=[];
     for(const [uid,data] of Object.entries(tokens)) {
       try {
@@ -455,8 +455,11 @@ module.exports = async (req, res) => {
     }
     // 실패를 조용히 넘기지 않는다 — 예전에는 시도 횟수를 성공으로 보고했고,
     // 워크플로는 HTTP 200만 보므로 계속 초록불이었다. 실패가 있으면 200을 주지 않는다.
+    // endpoint 를 박아 둔다. 바깥 스케줄러에 작업이 둘이라 URL 을 서로 바꿔 넣기 쉬운데,
+    // 그러면 둘 다 200 이 떠서 눈치채지 못한다 — 실제로 'hevy' 라 이름 붙인 작업이
+    // 이쪽을 두드리고 있었고, 응답 모양을 뜯어보고서야 알았다.
     res.status(failed ? 500 : 200)
-       .json({success:failed===0, sent, failed, detail, time:new Date().toISOString()});
+       .json({endpoint:'cron-notify', success:failed===0, sent, failed, detail, time:new Date().toISOString()});
   } catch(e) {
     console.error('[cron]',e);
     res.status(500).json({error:e.message});
