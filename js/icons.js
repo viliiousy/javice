@@ -41,6 +41,7 @@ const Icons = {
     clock:    '<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>',
     cloud:    '<path d="M17.5 19a4.5 4.5 0 0 0 .5-8.97A6 6 0 0 0 6.2 11.3 3.5 3.5 0 0 0 6.5 19Z"/>',
     user:     '<circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>',
+    zap:      '<path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10.5H13l0-8.5Z"/>',
     grid:     '<rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/>',
   },
 
