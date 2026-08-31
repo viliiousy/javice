@@ -96,7 +96,7 @@ const Habits = {
       // 칸에 날짜를 적어야 달력으로 읽힌다. 색만 있으면 '어느 날인지' 를 세어야 한다.
       // 지나지 않은 날은 누를 것도 없으니 눌리지 않게 둔다.
       const dead = c.lv===-2;
-      return `<button class="hm-c ${cls}${c.ds===todayStr?' hm-today':''}${c.ds===selStr&&c.ds!==todayStr?' hm-sel':''}"${dead?' disabled':''}
+      return `<button class="hm-c ${cls}${c.ds===todayStr?' hm-today':''}${c.ds===selStr?' hm-sel':''}"${dead?' disabled':''}
         onpointerenter="Habits._heatHover('${cat}',${i})" onfocus="Habits._heatHover('${cat}',${i})"
         onpointerleave="Habits._heatHover('${cat}',-1)" onblur="Habits._heatHover('${cat}',-1)"
         ${dead?'':`onclick="Habits._heatPick('${c.ds}')"`}
