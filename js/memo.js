@@ -244,24 +244,51 @@ const Memo = {
     // 고를 수가 없어서 잘라내기도 끌기도 막혀 있었다 — 만들고 나면 못 움직이는 물건이었다.
     // HTML5 드래그는 contenteditable 안에서 브라우저마다 제각각이라 포인터로 직접 옮긴다.
     // 누른 채 움직이면 커서를 따라 칩이 실제로 이동하고, 안 움직이고 떼면 복사다.
+    //
+    // 손가락은 마우스와 사정이 다르다. 폰에서 이게 안 됐던 이유가 셋이었다.
+    //   1. pointermove 를 ed 에 걸어 뒀다. 손가락이 칩 밖으로 나가는 순간 이벤트가 끊긴다.
+    //      → setPointerCapture 로 칩이 끝까지 받게 한다.
+    //   2. 브라우저가 그 터치를 스크롤로 먼저 가져갔다. → CSS 의 touch-action:none.
+    //   3. 조금만 움직여도 끌기로 쳐서, 누르려던 것이 자꾸 끌려갔다.
+    //      → 아이폰처럼 '꾹 눌러야 들린다'. 250ms 지나면 칩이 들리고, 그 전에 떼면 복사다.
     ed.addEventListener('pointerdown', (e) => {
       const chip = e.target.closest('.mm-cp');
       if (!chip) return;
       e.preventDefault();
-      let moved = false;
+      const touch = e.pointerType !== 'mouse';
       const sx = e.clientX, sy = e.clientY;
+      let moved = false, armed = !touch;      // 마우스는 곧바로, 손가락은 꾹 눌러야
+      try { chip.setPointerCapture(e.pointerId); } catch {}
+
+      // 손가락: 꾹 누르고 있으면 칩이 '들린다'. 들렸다는 걸 몸으로 알려 준다.
+      const arm = touch ? setTimeout(() => {
+        armed = true; chip.classList.add('cp-drag');
+        navigator.vibrate?.(12);
+      }, 250) : null;
+
       const move = (ev) => {
-        if (!moved && Math.abs(ev.clientX-sx) < 5 && Math.abs(ev.clientY-sy) < 5) return;
+        const far = Math.abs(ev.clientX-sx) >= 6 || Math.abs(ev.clientY-sy) >= 6;
+        // 들리기 전에 손가락이 크게 움직였으면 끌기가 아니라 스크롤이다. 없던 일로 한다.
+        if (!armed) { if (far) { clearTimeout(arm); cancel(); } return; }
+        if (!moved && !far) return;
         if (!moved) { moved = true; chip.classList.add('cp-drag'); }
         const r = Memo._caretAt(ev.clientX, ev.clientY);
         if (!r || !ed.contains(r.startContainer) || chip.contains(r.startContainer)) return;
         r.insertNode(chip);                    // 이미 문서에 있는 노드라 '옮기기' 가 된다
       };
-      const up = () => {
-        ed.removeEventListener('pointermove', move);
-        window.removeEventListener('pointerup', up);
+      const cleanup = () => {
+        clearTimeout(arm);
+        chip.removeEventListener('pointermove', move);
+        chip.removeEventListener('pointerup', up);
+        chip.removeEventListener('pointercancel', cancel);
+        try { chip.releasePointerCapture(e.pointerId); } catch {}
         chip.classList.remove('cp-drag');
-        if (moved) {
+      };
+      const cancel = () => cleanup();
+      const up = () => {
+        const didMove = moved;
+        cleanup();
+        if (didMove) {
           // 옮긴 뒤 칩 바로 뒤에 커서를 둔다. 그래야 이어서 글을 칠 수 있다.
           const after = document.createRange();
           after.setStartAfter(chip); after.collapse(true);
@@ -275,8 +302,33 @@ const Memo = {
           const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
         }
       };
-      ed.addEventListener('pointermove', move);
-      window.addEventListener('pointerup', up);
+      chip.addEventListener('pointermove', move);
+      chip.addEventListener('pointerup', up);
+      chip.addEventListener('pointercancel', cancel);
+    });
+
+    // ── 목록에서의 엔터·백스페이스 ──────────────
+    // 워드에서 몸에 익은 동작을 그대로 가져온다.
+    //   Shift+Enter : 번호를 늘리지 않고 같은 항목 안에서 줄만 내린다.
+    //   빈 항목 Enter : 번호를 떼고 그 자리에 들여쓴 문단으로 남는다.
+    //   그 문단 맨 앞 Backspace : 들여쓰기만 푼다(글자를 지우지 않는다).
+    ed.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.shiftKey) {
+        e.preventDefault();
+        try { document.execCommand('insertLineBreak', false, null); } catch {}
+        return;
+      }
+      if (e.key === 'Enter' && !e.shiftKey) {
+        const li = Memo._closest(ed, 'LI');
+        if (li && !li.textContent.trim() && !li.querySelector('.mm-cp')) {
+          e.preventDefault(); Memo._leaveList(ed, li); return;
+        }
+      }
+      if (e.key === 'Backspace') {
+        const b = Memo._block(ed);
+        const cur = b && [...b.classList].find(c => /^mm-i[1-4]$/.test(c));
+        if (cur && Memo._atBlockStart(ed)) { e.preventDefault(); Memo._indent(ed, -1); }
+      }
     });
 
     // 붙여넣기는 늘 거른다. 다른 앱에서 온 서식이 통째로 딸려 오면 저장할 때
@@ -334,6 +386,49 @@ const Memo = {
       const ul = this._blockUL(ed);
       if (ul) ul.classList.remove('mm-check');
     }
+    ed.focus();
+  },
+
+  _closest(ed, tag){
+    const s = window.getSelection();
+    let n = s && s.anchorNode;
+    while (n && n !== ed) { if (n.nodeType === 1 && n.tagName === tag) return n; n = n.parentNode; }
+    return null;
+  },
+
+  // 커서가 이 블록의 맨 앞에 있는가. 앞에 글자가 하나라도 있으면 백스페이스는
+  // 원래 하던 일(글자 지우기)을 해야 한다.
+  _atBlockStart(ed){
+    const s = window.getSelection();
+    if (!s || !s.isCollapsed || !s.rangeCount) return false;
+    const b = this._block(ed); if (!b) return false;
+    const r = s.getRangeAt(0).cloneRange();
+    try { r.setStart(b, 0); } catch { return false; }
+    return r.toString().length === 0;
+  },
+
+  // 빈 항목에서 엔터. 번호(또는 점)를 떼고 들여쓴 문단으로 내려놓는다.
+  // 안쪽 목록이면 한 단계만 밖으로 — 그게 '들여쓰기가 하나 풀린다' 는 뜻이다.
+  _leaveList(ed, li){
+    const list = li.parentElement;
+    const nested = list && list.parentElement && list.parentElement.tagName === 'LI';
+    if (nested) {
+      try { document.execCommand('outdent', false, null); } catch {}
+      ed.querySelectorAll('ul.mm-check ul').forEach(u => u.classList.add('mm-check'));
+      ed.focus(); return;
+    }
+    const p = document.createElement('div');
+    p.className = 'mm-i1';                    // 번호는 사라지고 들여쓰기는 남는다
+    p.appendChild(document.createElement('br'));
+    // 마지막 항목이면 목록 뒤에, 중간이면 목록을 쪼개지 않고 그 앞에 놓는다.
+    if (li.nextElementSibling) list.parentNode.insertBefore(p, list);
+    else list.parentNode.insertBefore(p, list.nextSibling);
+    li.remove();
+    if (!list.children.length) list.remove();
+    const r = document.createRange();
+    r.setStart(p, 0); r.collapse(true);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    this._sel = r.cloneRange();
     ed.focus();
   },
 
