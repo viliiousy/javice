@@ -53,91 +53,35 @@ const Habits = {
     });
   },
 
-  // ── 최근 5주 히트맵 ───────────────────
-  // 하루치 체크는 '오늘 했나' 만 말한다. 다섯 주를 한 판에 깔면 '요즘 무너지고 있나' 가 보인다 —
+  // ── 습관 농도 ─────────────────────────
+  // 하루치 체크는 '오늘 했나' 만 말한다. 여러 날을 겹쳐 깔면 '요즘 무너지고 있나' 가 보인다 —
   // 연속 기록(🔥)이 못 보여주는 것이다. 끊긴 날은 0 이 되고 끝이지만, 여기선 자국이 남는다.
   //
-  // 그날 할 습관이 아예 없던 날(평일 습관인데 주말)은 실패가 아니다. 빈칸으로 둔다.
-  // 0% 와 '해당 없음' 을 같은 색으로 칠하면 쉰 날이 무너진 날처럼 보인다.
-  // 격자는 언제나 '오늘' 을 끝으로 잡는다. 고른 날짜를 끝으로 잡으면
-  // 과거 칸을 누르는 순간 그 뒤 날들이 미래가 되어 사라진다 — 돌아올 길이 없어진다.
-  _heat(cat) {
+  // 예전엔 습관 카드 안에 '최근 5주' 격자를 따로 뒀는데, 바로 위에 달력이 또 있었다.
+  // 달력 두 개가 나란히 있으면 어느 쪽이 무엇인지 매번 다시 읽어야 한다.
+  // 그래서 농도를 달력 칸 바탕으로 옮겼다 — 5주가 아니라 한 달을 통으로 본다.
+  _level(done, total) {
+    if (!total) return -1;                 // 그날 할 습관이 아예 없었다 (쉰 날 ≠ 무너진 날)
+    const r = done / total;
+    return r===0 ? 0 : r<0.34 ? 1 : r<0.67 ? 2 : r<1 ? 3 : 4;
+  },
+
+  // 달력이 한 달치를 한 번에 받아 간다. 날마다 getList() 를 부르면 JSON 을 31번 파싱한다.
+  monthLevels(year, month) {               // month 는 0부터
     const all = this.getList();
     const end = new Date(); end.setHours(0,0,0,0);
-    const start = new Date(end);
-    start.setDate(start.getDate() - start.getDay() - 28);   // 4주 전 일요일부터
-    const out = [];
-    for(let i=0;i<35;i++){
-      const d = new Date(start); d.setDate(start.getDate()+i);
-      const ds = this._dateStr(d);
-      if(d > end){ out.push({ds, lv:-2}); continue; }        // 아직 오지 않은 날
-      const hs = this._forDate(all, d, cat);
-      if(!hs.length){ out.push({ds, lv:-1}); continue; }     // 할 습관이 없던 날
-      const chk  = this.getChecked(d);
-      const done = hs.filter(h=>chk.includes(h.id)).length;
-      const r    = done/hs.length;
-      out.push({ ds, done, total:hs.length,
-                 lv: r===0?0 : r<0.34?1 : r<0.67?2 : r<1?3 : 4 });
+    const n = new Date(year, month+1, 0).getDate();
+    const out = {};
+    for (let d=1; d<=n; d++) {
+      const dt = new Date(year, month, d);
+      if (dt > end) continue;              // 아직 오지 않은 날은 칠할 것이 없다
+      const hs = this._forDate(all, dt, null);
+      if (!hs.length) continue;
+      const chk  = this.getChecked(dt);
+      const done = hs.filter(h => chk.includes(h.id)).length;
+      out[d] = { lv: this._level(done, hs.length), done, total: hs.length };
     }
     return out;
-  },
-
-  _heatHtml(cat, selDate) {
-    const cells = this._heat(cat);
-    // 기록이 아예 없으면 빈 격자만 뜬다. 그건 정보가 아니라 회색 벽이다.
-    if(!cells.some(c=>c.lv>0)) return '';
-    this._heatData = this._heatData||{}; this._heatData[cat]=cells;
-
-    const todayStr = this._dateStr(new Date());
-    const selStr   = this._dateStr(selDate || new Date());
-    const grid = cells.map((c,i)=>{
-      const cls = c.lv===-2 ? 'hm-fut' : c.lv===-1 ? 'hm-off' : 'hm-l'+c.lv;
-      const day = Number(c.ds.slice(8));
-      // 칸에 날짜를 적어야 달력으로 읽힌다. 색만 있으면 '어느 날인지' 를 세어야 한다.
-      // 지나지 않은 날은 누를 것도 없으니 눌리지 않게 둔다.
-      const dead = c.lv===-2;
-      return `<button class="hm-c ${cls}${c.ds===todayStr?' hm-today':''}${c.ds===selStr?' hm-sel':''}"${dead?' disabled':''}
-        onpointerenter="Habits._heatHover('${cat}',${i})" onfocus="Habits._heatHover('${cat}',${i})"
-        onpointerleave="Habits._heatHover('${cat}',-1)" onblur="Habits._heatHover('${cat}',-1)"
-        ${dead?'':`onclick="Habits._heatPick('${c.ds}')"`}
-        aria-label="${this._heatLabel(c)}"><span>${day}</span></button>`;
-    }).join('');
-
-    const days = this.DAYS_KO.map(d=>`<span>${d}</span>`).join('');
-    return `<div class="hm">
-      <div class="hm-head"><span class="hm-t">최근 5주</span>
-        <span class="hm-legend">적음<i class="hm-l1"></i><i class="hm-l2"></i><i class="hm-l3"></i><i class="hm-l4"></i>많음</span></div>
-      <div class="hm-days">${days}</div>
-      <div class="hm-grid">${grid}</div>
-      <div class="hm-read" id="hmRead-${cat}">${this._heatSummary(cells)}</div>
-    </div>`;
-  },
-
-  _heatLabel(c) {
-    const md = c.ds.slice(5).replace(/-/,'/').replace(/^0/,'');
-    if(c.lv===-2) return md;
-    if(c.lv===-1) return `${md} · 쉬는 날`;
-    return `${md} · ${Math.round(c.done/c.total*100)}% (${c.done}/${c.total})`;
-  },
-  _heatSummary(cells) {
-    const real = cells.filter(c=>c.lv>=0);
-    if(!real.length) return '';
-    const perfect = real.filter(c=>c.lv===4).length;
-    return `${real.length}일 중 <strong>${perfect}일</strong> 전부 완료`;
-  },
-  // 칸을 누르면 카드 전체가 그 날짜로 간다. 달력처럼 생겼으면 달력처럼 눌려야 한다.
-  _heatPick(ds) {
-    const d = new Date(ds + 'T00:00:00');
-    if(isNaN(d.getTime())) return;
-    if(typeof App !== 'undefined' && App.selectCalDate) App.selectCalDate(d);
-    else this.render(d);
-  },
-
-  _heatHover(cat, i) {
-    const el = document.getElementById('hmRead-'+cat);
-    const cells = this._heatData && this._heatData[cat];
-    if(!el||!cells) return;
-    el.innerHTML = i<0 ? this._heatSummary(cells) : this._heatLabel(cells[i]);
   },
 
   streak(id) {
@@ -226,13 +170,12 @@ const Habits = {
       del:  id => this._delFrom(id, this._dateStr(date)),
     }); } catch(e) { console.warn('RowUI', e); }
 
-    // 히트맵은 카드 맨 아래다. 오늘 몇 개 했는지를 먼저 읽고, 그다음에 지난 다섯 주를 본다.
-    // 순서가 뒤집히면 오늘 얘기가 지난 달 얘기 밑에 깔린다.
+    // 지난 다섯 주 격자는 여기 있었는데 달력 칸 바탕으로 옮겼다(monthLevels).
+    // 한 화면에 달력이 둘이면 어느 쪽이 무엇인지 매번 다시 읽어야 한다.
     const foot=document.getElementById(C.foot);
-    if(foot) foot.innerHTML = (list.length
+    if(foot) foot.innerHTML = list.length
       ? `${isToday?'오늘':'해당 날짜'} <strong>${done}/${list.length}</strong> 완료 ${done===list.length?'🏆 퍼펙트!':''}`
-      : '')
-      + (reorder ? '' : this._heatHtml(cat, date));
+      : '';
   },
 
   // ── 탭/클릭 ──────────────────────────
