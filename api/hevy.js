@@ -154,7 +154,9 @@ module.exports = async function handler(req, res) {
   if (!process.env.HEVY_API_KEY) { res.status(500).json({ error: 'HEVY_API_KEY 미설정' }); return; }
   if (!uid) { res.status(500).json({ error: 'HEVY_UID / INBODY_UID 미설정' }); return; }
 
-  const secrets = [process.env.CRON_SECRET, process.env.HEVY_WEBHOOK_SECRET].filter(Boolean);
+  // PING_SECRET 은 바깥 스케줄러(cron-job.org) 몫이다. 자세한 사연은 api/cron-notify.js 참고.
+  const secrets = [process.env.CRON_SECRET, process.env.HEVY_WEBHOOK_SECRET,
+                   process.env.PING_SECRET].filter(Boolean);
   if (!secrets.length) { res.status(500).json({ error: '인증 비밀이 하나도 설정되어 있지 않습니다' }); return; }
   // Hevy 웹후크 설정칸에 'Bearer xxx' 로 넣을 수도, 값만 넣을 수도 있다. 둘 다 받는다 —
   // 여기서 틀리면 증상이 '조용히 아무 일도 안 일어남' 이라 원인을 찾기 어렵다.
