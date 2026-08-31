@@ -46,12 +46,44 @@ const Fitness = {
   _checked(date=new Date()){ return JSON.parse(UserStore.get(this._checkKey(date))||'[]'); },
   _save(v,date=new Date()){ UserStore.set(this._checkKey(date),JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
 
+  // ── Hevy 루틴 ─────────────────────────
+  // PLAN 은 코드에 박아 둔 기본 계획이다. 정작 사람은 Hevy 에서 루틴을 짜는데
+  // 두 곳을 손으로 맞춰 두면 언젠가 반드시 어긋난다. 루틴이 있으면 그쪽이 이긴다.
+  ROUTINE_KEY: 'gl_hevy_routines_v1',
+  DAYPLAN_KEY: 'gl_fitness_dayplan',     // { 0:'루틴id', 1:'rest', 2:'' … }  0=일
+
+  routines() {
+    try {
+      const v = JSON.parse(UserStore.get(this.ROUTINE_KEY) || '[]');
+      return Array.isArray(v) ? v : [];
+    } catch (e) { return []; }
+  },
+  dayPlan() {
+    try {
+      const v = JSON.parse(UserStore.get(this.DAYPLAN_KEY) || '{}');
+      return (v && typeof v === 'object') ? v : {};
+    } catch (e) { return {}; }
+  },
+  saveDayPlan(v) { UserStore.set(this.DAYPLAN_KEY, JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
+
+  // 그 요일에 무엇을 할지. 정해 둔 게 없으면 코드의 기본 계획으로 떨어진다 —
+  // 루틴을 안 쓰거나 아직 안 받아왔을 때도 카드는 그대로 돌아야 한다.
+  planFor(dow) {
+    const pick = this.dayPlan()[dow];
+    if (pick === 'rest') return { name:'휴식', exercises:[], src:'day' };
+    if (pick) {
+      const r = this.routines().find(x => x.id === pick);
+      if (r) return { name:r.title, exercises:r.items, src:'hevy' };
+    }
+    return { ...this.PLAN[dow], src:'default' };
+  },
+
   render(date=new Date(), planIdx=null) {
     // 피트니스 카드가 없는 레이아웃에서는 조용히 종료
     if (!document.getElementById('fitnessWrap')) return;
     const d    = new Date(date);
     const dow  = planIdx!==null ? planIdx : d.getDay();
-    const plan = this.PLAN[dow];
+    const plan = this.planFor(dow);
     const chk  = this._checked(d);
     const custom = this.getCustomExercises(d);
     const isToday = this._dateStr(d)===this._dateStr(new Date());
@@ -71,7 +103,9 @@ const Fitness = {
     const badge = document.getElementById('fitBadge');
     if (badge) {
       // 배지에 있던 이모지는 뺐다. 바로 옆 머리글이 이미 선 아이콘이라 둘이 부딪혔다.
-      badge.textContent=plan.name;
+      // 어디서 온 계획인지 한 글자로 남긴다. 같은 이름이라도 Hevy 루틴인지
+      // 코드의 기본 계획인지 모르면 '왜 안 바뀌지' 를 한참 헤매게 된다.
+      badge.textContent=plan.name + (plan.src==='hevy' ? ' · Hevy' : '');
       badge.className=allEx.length?'badge badge-accent':'badge';
     }
 
@@ -79,7 +113,9 @@ const Fitness = {
     // 예전엔 휴식일이면 탭 없이 return 해서, 일요일(휴무)을 누르는 순간
     // 다른 요일로 돌아갈 방법이 사라졌다. 카드가 막다른 길이 됐다.
     const DOW=['일','월','화','수','목','금','토'];
-    const tabs=DOW.map((d,i)=>`<button class="fit-tab${i===dow?' active':''}" onclick="Fitness.render(new Date('${Fitness._dateStr(date)}T00:00:00'),${i})">${d}</button>`).join('');
+    const tabs=DOW.map((d,i)=>`<button class="fit-tab${i===dow?' active':''}" onclick="Fitness.render(new Date('${Fitness._dateStr(date)}T00:00:00'),${i})">${d}</button>`).join('')
+      + `<button class="fit-tab fit-plan-btn" onclick="Fitness.showDayPlan()" title="요일별 루틴 배정">${
+          typeof Icons!=='undefined'?Icons.svg('gear','tf-ic'):'⚙'}</button>`;
 
     const container = document.getElementById('fitnessWrap');
     if (!allEx.length) {
@@ -120,6 +156,46 @@ const Fitness = {
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
         <span class="progress-txt">${done}/${allEx.length} (${pct}%)</span>
       </div>`;
+  },
+
+  // ── 요일별 루틴 배정 ───────────────────
+  showDayPlan() {
+    const rs = this.routines(), dp = this.dayPlan();
+    const DOW = ['일','월','화','수','목','금','토'];
+    const rows = DOW.map((d,i) => {
+      const cur = dp[i] || '';
+      const opts = [`<option value=""${cur===''?' selected':''}>기본 계획 (${esc(this.PLAN[i].name)})</option>`,
+                    `<option value="rest"${cur==='rest'?' selected':''}>휴식</option>`]
+        .concat(rs.map(r => `<option value="${esc(r.id)}"${cur===r.id?' selected':''}>${esc(r.title)} (${r.items.length}종목)</option>`));
+      return `<div class="dp-row">
+        <span class="dp-d${i===0?' dp-sun':''}${i===6?' dp-sat':''}">${d}</span>
+        <select class="inp inp-sm dp-sel" data-dow="${i}">${opts.join('')}</select>
+      </div>`;
+    }).join('');
+
+    const note = rs.length
+      ? `Hevy 에서 짠 루틴 ${rs.length}개를 불러왔습니다. 루틴을 고치면 한 시간 안에 여기에도 반영됩니다.`
+      : `아직 받아온 루틴이 없습니다. Hevy 에 루틴을 만들어 두면 한 시간 안에 여기 목록에 나타납니다.`;
+
+    App.openModal('@dumbbell 요일별 운동', `
+      <div class="dp-note">${note}</div>
+      <div class="dp-list">${rows}</div>
+      <div class="modal-btns">
+        <button onclick="Fitness._saveDayPlan()" class="btn-sm accent">저장</button>
+        <button onclick="App.closeModal()" class="btn-sm">취소</button>
+      </div>`);
+  },
+
+  _saveDayPlan() {
+    const dp = {};
+    document.querySelectorAll('.dp-sel').forEach(sel => {
+      const v = sel.value;
+      if (v) dp[sel.dataset.dow] = v;      // 빈 값(기본 계획)은 저장하지 않는다
+    });
+    this.saveDayPlan(dp);
+    App.closeModal();
+    App.showToast('요일별 운동 저장됨 ✓','success');
+    this.render(App?.S?.selDate || new Date());
   },
 
   toggle(idx, dateStr=null) {
