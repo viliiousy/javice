@@ -121,12 +121,12 @@ html,body{
    구글은 흰 버튼 말고 어두운 버튼(#131314)도 공식으로 허용한다 — 로고는 그대로 두고 판만 바꾼다. */
 html.dark .btn-google-login{ background:#131314; color:#e3e3e3; border-color:#5f6368; box-shadow:none; }
 html.dark .btn-google-login:hover{ background:#1c1c1e; border-color:#8e918f; }
-.btn-offline{
-  width:100%; padding:11px; background:transparent;
-  border:1.5px solid var(--border2); color:var(--text2);
-  border-radius:var(--r); cursor:pointer; font-family:inherit; font-size:13px; transition:all 0.2s;
+/* 로그인 화면 안내 한 줄. '오프라인 모드로 시작' 단추가 있던 자리다.
+   (.login-note 는 아래 권한 안내가 이미 쓰고 있어서 이름을 따로 뒀다.) */
+.login-sync{
+  margin:10px 0 0; font-size:12px; line-height:1.5;
+  color:var(--text3); text-align:center;
 }
-.btn-offline:hover{ border-color:var(--accent); color:var(--accent); }
 .login-note{ font-size:12px; color:var(--text3); margin-top:14px; }
 
 /* ── 헤더 ────────────────────────────── */
