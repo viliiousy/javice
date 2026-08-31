@@ -370,6 +370,9 @@ const Auth = {
       const rawUid        = this.userInfo.id || this.userInfo.email || 'user';
       UserStore.setUser(rawUid);
       const normalizedUid = UserStore.getUser();
+      // 오프라인 모드 시절 기록을 계정으로 데려온다. 반드시 load() 앞이다 —
+      // 클라우드에 같은 키가 있으면 그쪽이 최신이므로 뒤에 오는 load() 가 덮어써야 맞다.
+      const adopted = UserStore.adoptOffline();
 
       if (typeof FirebaseSync !== 'undefined' &&
           CONFIG.FIREBASE_DB_URL &&
@@ -380,7 +383,9 @@ const Auth = {
         await FirebaseSync.signIn(this.accessToken);
         const loaded = await FirebaseSync.load();
         FirebaseSync.startPolling();
-        if (loaded) App.showToast('동기화 완료 ✓', 'success');
+        // 데려온 기록은 아직 이 브라우저에만 있다. 올려 두지 않으면 다음 기기에서 또 없다.
+        if (adopted) { FirebaseSync.scheduleSave(); App.showToast(`이전 기록 ${adopted}건을 계정으로 옮겼습니다`, 'success'); }
+        else if (loaded) App.showToast('동기화 완료 ✓', 'success');
         // 서버에 리프레시 토큰이 없으면 최초 1회 동의를 제안한다 (모달, 스누즈 가능)
         setTimeout(() => this._maybeOfferOffline(), 2500);
       }
