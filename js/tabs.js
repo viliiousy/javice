@@ -40,7 +40,8 @@ const Tabs = {
   },
 
   init() {
-    document.querySelectorAll('.dashboard > .card').forEach(el => {
+    // 카드가 열 껍데기(.dash-col) 안으로 들어가서 '>' 로는 안 잡힌다.
+    document.querySelectorAll('.dashboard .card').forEach(el => {
       const c = this.CARDS.find(x => el.classList.contains(x.cls));
       if (c) el.dataset.tab = c.tab;
     });
