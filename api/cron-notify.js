@@ -409,10 +409,19 @@ module.exports = async (req, res) => {
   // 그러려면 열쇠를 남의 서비스 설정칸에 적어 둬야 한다. 그 하나가 새더라도
   // 깃허브 쪽까지 같이 뚫리면 안 된다. 이 열쇠로 할 수 있는 일은
   // '밀린 알림을 지금 보내라' 뿐이고, 그건 어차피 곧 일어날 일이다.
-  const auth    = req.headers.authorization;
-  const secrets = [process.env.CRON_SECRET, process.env.PING_SECRET].filter(Boolean);
+  const auth  = req.headers.authorization;
+  const NAMES = ['CRON_SECRET', 'PING_SECRET'];
+  const have  = NAMES.filter(n => process.env[n]);
+  const secrets = have.map(n => process.env[n]);
   if(!secrets.length) { res.status(500).json({error:'CRON_SECRET 미설정'}); return; }
-  if(!secrets.some(x => auth === `Bearer ${x}`)) { res.status(401).json({error:'Unauthorized'}); return; }
+  if(!secrets.some(x => auth === `Bearer ${x}`)) {
+    // 이름만 돌려준다(값은 절대 아니다). 401 이 났을 때 '내 값이 틀렸나' 와
+    // '아직 배포에 안 올라왔나' 는 고치는 방법이 완전히 다른데, 그냥 Unauthorized 만
+    // 보면 구분이 안 된다. Vercel 은 환경변수를 새 배포부터 적용하므로
+    // 'Redeploy 를 깜빡했다' 가 실제로 가장 흔한 원인이다.
+    res.status(401).json({ error:'Unauthorized', accepts: have });
+    return;
+  }
 
   // ?check=1 — 알림을 보내지 않고 DB 인증만 점검한다 (배포 검증용)
   if (req.query?.check === '1') {
