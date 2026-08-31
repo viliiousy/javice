@@ -17,6 +17,7 @@ const { koName } = require('../lib/hevy-map');
 
 const API     = 'https://api.hevyapp.com/v1';
 const RAW_KEY = 'gl_hevy_v1';
+const RT_KEY  = 'gl_hevy_routines_v1';   // 루틴(계획). 기록과 달리 자주 안 바뀐다.
 const KEEP    = 200;      // 오래된 것부터 잘라낸다. 대시보드는 최근을 본다.
 const MAX_PAGE = 30;
 
@@ -73,6 +74,24 @@ function normalize(w) {
   };
 }
 
+// ── 루틴 ────────────────────────────────────────────────────
+// 기록(workouts)이 '한 것' 이라면 루틴은 '할 것' 이다. 앱의 요일별 계획이 여태
+// 코드에 박혀 있었는데, 정작 사람은 Hevy 에서 루틴을 짠다. 두 곳을 손으로 맞춰 놓는 건
+// 언젠가 반드시 어긋난다. 짜는 곳을 하나로 두고 앱은 받아만 쓴다.
+function normRoutine(r) {
+  const items = (r.exercises || []).map(e => {
+    const sets = e.sets || [];
+    const reps = sets.map(s => Number(s.reps)).filter(v => v > 0);
+    // 세트가 전부 같은 횟수면 '4×10', 아니면 세트 수만. 없는 값을 지어내지 않는다.
+    let label = '';
+    if (reps.length === sets.length && reps.length && reps.every(v => v === reps[0]))
+      label = sets.length + '×' + reps[0];
+    else if (sets.length) label = sets.length + '세트';
+    return { name: koName(e.exercise_template_id, e.title), sets: label };
+  }).filter(it => it.name);
+  return { id: r.id, title: r.title || '이름 없음', updated: r.updated_at || '', items: items };
+}
+
 // 한 번 찾으면 바뀌지 않는다. 웜 인스턴스에서 왕복 하나를 던다 — 5초 예산이 빠듯해서다.
 let _prefix = null;
 async function findPrefix(uid) {
@@ -92,6 +111,40 @@ async function readList(path) {
   if (typeof raw === 'string') { try { list = JSON.parse(raw); } catch (e) {} }
   else if (Array.isArray(raw)) list = raw;
   return Array.isArray(list) ? list : [];
+}
+
+// 앱이 다음 폴링에서 변경을 알아채도록 타임스탬프를 올린다.
+async function touch(uid) {
+  await fbFetch('/users/' + uid + '/_savedAt.json', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(String(Date.now())),
+  }).catch(() => {});
+}
+
+async function syncRoutines(path) {
+  const out = [];
+  let pages = 1;
+  // pageSize 는 10 이 최대다(Hevy 문서). 루틴 쉰 개까지는 다섯 번이면 다 받는다.
+  for (let p = 1; p <= Math.min(pages, 5); p++) {
+    const r = await hevy('/routines?page=' + p + '&pageSize=10');
+    if (r.status !== 200) return { ok: false, status: r.status, head: r.head };
+    pages = (r.body && r.body.page_count) || 1;
+    for (const x of ((r.body && r.body.routines) || [])) {
+      const n = normRoutine(x);
+      if (n.items.length) out.push(n);
+    }
+  }
+  const cur = await readList(path);
+  // 바뀐 게 없으면 안 쓴다. 매시간 같은 값을 덮어쓰면 다른 기기가 매번 깨어난다.
+  if (JSON.stringify(cur) === JSON.stringify(out)) return { ok: true, changed: false, n: out.length };
+  const put = await fbFetch(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(JSON.stringify(out)),
+  });
+  if (!put.ok) return { ok: false, status: put.status };
+  return { ok: true, changed: true, n: out.length };
 }
 
 module.exports = async function handler(req, res) {
@@ -154,9 +207,17 @@ module.exports = async function handler(req, res) {
       .sort((a, b) => String(a.dt).localeCompare(String(b.dt)))
       .slice(-KEEP);
 
+    // 루틴은 크론(GET)에서만 받아 온다. 웹후크(POST)는 5초 안에 끝나야 해서
+    // 왕복을 하나라도 더 얹으면 안 된다. 루틴은 급할 일이 없다 — 한 시간이면 충분하다.
+    const rt = req.method === 'GET'
+      ? await syncRoutines('/users/' + uid + '/' + prefix + RT_KEY + '.json')
+      : { skipped: true };
+
     // 바뀐 게 없으면 쓰지 않는다. 매시간 같은 값을 덮어쓰면 다른 기기가 매번 '변경됨' 으로 깨어난다.
     if (!added && !updated) {
-      reply(200, { ok: true, changed: false, total: out.length, full: full });
+      // 루틴만 바뀌었을 수도 있다. 그때는 타임스탬프를 올려 다른 기기가 알아채게 한다.
+      if (rt && rt.changed) await touch(uid);
+      reply(200, { ok: true, changed: false, total: out.length, full: full, routines: rt });
       return;
     }
 
@@ -168,14 +229,10 @@ module.exports = async function handler(req, res) {
     });
     if (!put.ok) throw new Error('RTDB PUT ' + put.status);
 
-    // 앱이 다음 폴링에서 변경을 알아채도록 타임스탬프를 올린다.
-    await fbFetch('/users/' + uid + '/_savedAt.json', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(String(Date.now())),
-    });
+    await touch(uid);
 
-    reply(200, { ok: true, changed: true, added: added, updated: updated, total: out.length, full: full });
+    reply(200, { ok: true, changed: true, added: added, updated: updated, total: out.length,
+                 full: full, routines: rt });
   } catch (e) {
     console.error('[hevy]', e);
     reply(500, { error: e.message });
