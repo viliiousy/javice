@@ -249,7 +249,11 @@ textarea.inp{ resize:vertical; min-height:64px; }
 .task-form{ padding:10px 14px; border-bottom:1px solid var(--border); display:flex; flex-direction:column; gap:8px; background:var(--card2); }
 .task-form-row{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .task-form-btns{ display:flex; gap:6px; justify-content:flex-end; }
-.tasks-wrap{ padding:6px; overflow-y:auto; flex:1; max-height:420px; }
+/* max-height 를 걸어 두면 카드가 오른쪽 열 높이까지 늘어났을 때 목록은 420px 에서
+   멈추고 그 아래가 통째로 빈다. 늘어날 수 있는 칸이 하나도 없어서 남는 자리가
+   아무한테도 안 가는 것이다. 여기서 캡을 풀어 남는 높이를 목록이 그대로 먹게 한다.
+   길어지면 카드 안에서 스크롤된다. (모바일에는 아래쪽 미디어쿼리에 캡이 따로 있다) */
+.tasks-wrap{ padding:6px; overflow-y:auto; flex:1; min-height:0; }
 .task-group{ margin-bottom:8px; }
 .task-group-name{
   font-size:12px; font-weight:700; color:var(--text3);
@@ -595,6 +599,9 @@ textarea.inp{ resize:vertical; min-height:64px; }
 .mm-cp .ic{ width:11px; height:11px; }
 .mm-cp:hover{ color:var(--accent); border-color:var(--accent); }
 .mm-cp.cp-ok{ color:var(--green); border-color:var(--green); }
+/* 편집창 안에서는 옮길 수 있는 물건이다 — 커서로 그렇게 말한다. */
+.mm-ed .mm-cp{ cursor:grab; }
+.mm-ed .mm-cp.cp-drag{ cursor:grabbing; opacity:.55; border-color:var(--accent); }
 
 /* ── 메모 편집창 ──────────────────────── */
 .mm-bar{
@@ -2381,6 +2388,7 @@ html.dark .stat-chip.stat-green{ background:rgba(5,150,105,0.14); border-color:r
 }
 .hm-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
 .hm-c{
+  position:relative;
   aspect-ratio:1; border-radius:3px; border:1px solid transparent;
   padding:0; cursor:pointer; background:var(--bg);
 }
@@ -2393,7 +2401,7 @@ html.dark .stat-chip.stat-green{ background:rgba(5,150,105,0.14); border-color:r
 .hm-l2 { background:#6ee7b7; }
 .hm-l3 { background:#10b981; }
 .hm-l4 { background:#047857; }
-.hm-today{ box-shadow:0 0 0 1.5px var(--accent); }
+/* 오늘 표시는 아래 -- '오늘' 과 '보고 있는 날' 참고 */
 .hm-read{
   margin-top:7px; font-size:11.5px; color:var(--text2); text-align:center;
   font-variant-numeric:tabular-nums;
@@ -2452,8 +2460,21 @@ html.dark .hm-l4  { background:#6ee7b7; }
 .hm-c[disabled]{ cursor:default; }
 html.dark .hm-l3 span, html.dark .hm-l4 span{ color:#0a0a0c; }
 html.dark .hm-l1 span, html.dark .hm-l2 span{ color:#d4d4d8; }
-/* 오늘과 '지금 보고 있는 날' 은 다르다. 과거 칸을 눌러 둘러보는 중에도 오늘이 어디였는지 남아야 한다. */
-.hm-sel{ box-shadow:0 0 0 1.5px var(--text3); }
+/* ── '오늘' 과 '보고 있는 날' ──────────────
+   둘 다 얇은 테두리였고 색만 달랐다(먹 vs 회색). 나란히 놓으면 어느 쪽이 오늘인지
+   구분이 안 된다 — 같은 모양은 색을 아무리 달리해도 같은 것으로 읽힌다.
+   그래서 모양을 갈랐다. 보고 있는 날은 테두리, 오늘은 칸 아래 짧은 막대. */
+.hm-sel{ box-shadow:0 0 0 2px var(--accent); }
+.hm-today::after{
+  content:''; position:absolute; left:50%; bottom:2px; transform:translateX(-50%);
+  width:10px; height:2px; border-radius:1px; background:var(--accent);
+}
+/* 짙게 칠해진 칸 위에서는 먹색 막대가 안 보인다 — 글자와 같이 뒤집는다. */
+.hm-l3.hm-today::after, .hm-l4.hm-today::after{ background:#fff; }
+html.dark .hm-l3.hm-today::after,
+html.dark .hm-l4.hm-today::after{ background:#0a0a0c; }
+/* 막대가 들어갈 자리를 비운다 */
+.hm-c span{ transform:translateY(-1px); }
 
 /* ── AI 음식 사전 ─────────────────────────────────────
    프리셋에 없는 음식을 AI 로 찾는 길. 결과는 '담기 전에 고칠 수 있는 카드'로
