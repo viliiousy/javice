@@ -405,10 +405,14 @@ const Econ = {
   _drawHold() {
     const b = this._body(); if (!b) return;
     const hs = this.cfg().holdings || [], s = this.holdSummary();
-    let h = `<input class="inp ec-search" placeholder="보유 종목 추가 — 검색 (삼성전자, NVDA …)"
-        oninput="Econ.search(this.value,'H')"><div id="ecHRes"></div>`;
+    let h = `<div class="ec-hold-top">
+        <input class="inp ec-search" placeholder="보유 종목 추가 — 검색 (삼성전자, NVDA …)"
+          oninput="Econ.search(this.value,'H')">
+        <button class="btn-sm ec-scan" onclick="Econ.showHoldScan()" title="증권사 앱 캡처에서 읽어 오기">${
+          typeof Icons !== 'undefined' ? Icons.svg('camera') : '📷'}캡처로 채우기</button>
+      </div><div id="ecHRes"></div>`;
     if (!hs.length) {
-      h += `<p class="empty">보유 종목이 없습니다<br><span class="ec-hint">증권사 계좌 조회 API 는 개인에게 열려 있지 않습니다(마이데이터 허가 사항). 수량·평단만 직접 넣으면 현재가·평가액·수익률은 자동으로 계산됩니다.</span></p>`;
+      h += `<p class="empty">보유 종목이 없습니다<br><span class="ec-hint">증권사 계좌 조회 API 는 개인에게 열려 있지 않습니다(마이데이터 허가 사항). 증권사 앱의 보유 화면을 캡처해 <b>캡처로 채우기</b>를 누르면 종목·수량·평단을 읽어 옵니다. 직접 검색해 넣어도 되고, 어느 쪽이든 현재가·평가액·수익률은 자동으로 계산됩니다.</span></p>`;
     } else {
       const cls = s.profit >= 0 ? 'ec-up' : 'ec-dn';
       h += `<div class="ec-hold-sum">
@@ -449,6 +453,170 @@ const Econ = {
         <button class="btn-sm ec-rm" onclick="Econ.holdRemove('${k}')">삭제</button>
       </div></div>`;
   },
+  // ── 캡처로 보유 채우기 ──────────────────────────────
+  // 삼성증권에는 개인이 쓸 수 있는 트레이딩 Open API 가 없다(2026-08 확인).
+  // 오픈뱅킹은 계좌 잔액·이체만이고 주식 보유는 안 준다. 마이데이터는 허가 사업자용이다.
+  // 남은 길은 셋이었다 — 다른 증권사 계좌를 새로 열거나, 로그인 정보를 넣고 긁거나, 눈으로 옮기거나.
+  //
+  // 로그인 정보를 저장하는 길은 처음부터 안 간다. 증권 계좌 비밀번호를 앱에 맡기는 건
+  // 얻는 것(수량 자동 입력)에 비해 잃을 것이 너무 크다.
+  // 대신 사람이 이미 보고 있는 화면을 그대로 읽는다 — 식단 사진 분석과 같은 방식이다.
+  // 캡처는 브라우저 밖으로 나가지 않고, AI 에게는 그림만 보낸다. 로그인 정보는 어디에도 안 남는다.
+  showHoldScan() {
+    if (!localStorage.getItem('gl_ai_key')) {
+      App.showToast('JARVIS API 키를 먼저 설정해주세요 (⚡→🔑)','error'); return;
+    }
+    App.openModal('@camera 캡처로 보유 종목 채우기', `
+      <p class="ec-hint" style="margin-bottom:10px">
+        증권사 앱의 <b>보유 종목 화면</b>을 캡처해서 올리면 종목·수량·평단을 읽어 옵니다.
+        읽은 값은 바로 저장하지 않고 <b>확인 후 담기</b>입니다.
+      </p>
+      <div id="hsZone" class="photo-drop-zone" onclick="document.getElementById('hsFile').click()">
+        <div id="hsPrev"><div style="font-size:44px">📷</div>
+          <p style="color:var(--text2);font-size:13px">클릭하거나 캡처를 끌어다 놓으세요</p></div>
+        <input id="hsFile" type="file" accept="image/*" style="display:none"
+          onchange="Econ._hsPick(this)">
+      </div>
+      <div id="hsRes" style="margin-top:10px"></div>
+      <div class="modal-btns" style="margin-top:10px">
+        <button id="hsGo" onclick="Econ._hsScan()" class="btn-sm accent" disabled>읽기</button>
+        <button onclick="App.closeModal()" class="btn-sm">닫기</button>
+      </div>`);
+    setTimeout(() => {
+      const z = document.getElementById('hsZone'); if (!z) return;
+      z.addEventListener('dragover',  e => { e.preventDefault(); z.style.borderColor='var(--accent)'; });
+      z.addEventListener('dragleave', () => { z.style.borderColor=''; });
+      z.addEventListener('drop', e => { e.preventDefault(); z.style.borderColor='';
+        const f = e.dataTransfer.files[0]; if (f && f.type.startsWith('image/')) Econ._hsLoad(f); });
+      // 캡처는 보통 클립보드에 있다. 파일로 저장하게 만들면 한 단계가 늘어난다.
+      z.addEventListener('paste', e => {
+        const f = [...(e.clipboardData?.items||[])].find(i => i.type.startsWith('image/'));
+        if (f) Econ._hsLoad(f.getAsFile());
+      });
+      document.addEventListener('paste', Econ._hsPaste = e => {
+        if (!document.getElementById('hsZone')) { document.removeEventListener('paste', Econ._hsPaste); return; }
+        const f = [...(e.clipboardData?.items||[])].find(i => i.type.startsWith('image/'));
+        if (f) Econ._hsLoad(f.getAsFile());
+      });
+    }, 100);
+  },
+
+  _hsB64: null,
+  _hsPick(input) { const f = input.files[0]; if (f) this._hsLoad(f); },
+  _hsLoad(file) {
+    const r = new FileReader();
+    r.onload = e => {
+      this._hsB64 = e.target.result.split(',')[1];
+      const prev = document.getElementById('hsPrev');
+      if (prev) prev.innerHTML = `<img src="data:${file.type};base64,${this._hsB64}"
+        style="max-width:100%;max-height:200px;border-radius:8px;object-fit:contain">`;
+      const g = document.getElementById('hsGo'); if (g) g.disabled = false;
+    };
+    r.readAsDataURL(file);
+  },
+
+  async _hsScan() {
+    if (!this._hsB64) return;
+    const go = document.getElementById('hsGo'), box = document.getElementById('hsRes');
+    if (go) { go.disabled = true; go.textContent = '읽는 중…'; }
+    if (box) box.innerHTML = '';
+    try {
+      const data = await JARVIS.chat({ max_tokens:1200, temperature:0, messages:[{ role:'user', content:[
+        { type:'image_url', image_url:{ url:`data:image/jpeg;base64,${this._hsB64}` } },
+        { type:'text', text:`증권사 앱의 보유 종목 화면이다. 보이는 종목만 그대로 읽어라.
+없는 값은 지어내지 말고 null 로 둔다. 평가금액이나 손익이 아니라 매입 평단가를 avg 에 넣는다.
+수량은 주 수다. 미국 주식이면 market 을 "us", 국내면 "kr" 로 한다.
+ticker 에는 종목코드를 넣는다 — 화면에 보이면 그대로, 안 보여도 아는 종목이면 표준 코드를 적어라
+(예: 삼성전자 → "005930", 엔비디아 → "NVDA"). 정말 모르면 null.
+JSON 만 출력. 다른 말 금지.
+{"rows":[{"name":"종목명","ticker":"코드 또는 null","qty":숫자 또는 null,"avg":숫자 또는 null,"market":"kr" 또는 "us"}]}` }
+      ]}] }, 'vision');
+      const ch = data.choices?.[0];
+      const txt = ch?.message?.content || '';
+      if (!txt.trim()) throw new Error(ch?.finish_reason === 'length'
+        ? '답이 길어 잘렸어요. 종목이 많으면 나눠서 캡처해 주세요'
+        : 'AI 가 빈 답을 보냈어요. 다시 눌러 주세요');
+      let j = null; try { const m = txt.match(/\{[\s\S]*\}/); j = m ? JSON.parse(m[0]) : null; } catch {}
+      const rows = (j && Array.isArray(j.rows)) ? j.rows : null;
+      if (!rows) throw new Error('AI 답을 읽지 못했어요. 다시 눌러 주세요');
+      if (!rows.length) throw new Error('보유 종목을 찾지 못했어요. 종목명과 수량이 보이는 화면인지 확인해 주세요');
+      this._hsRows = await this._hsMatch(rows);
+      if (box) box.innerHTML = this._hsPreview();
+    } catch (e) {
+      if (box) box.innerHTML = `<p class="ec-hint" style="color:var(--red)">읽기 실패 · ${esc(e.message)}</p>`;
+    }
+    if (go) { go.disabled = false; go.textContent = '다시 읽기'; }
+  },
+
+  // AI 가 읽은 이름을 실제 종목으로 맞춘다. 못 맞힌 건 버리지 않고 '못 찾음' 으로 남겨서
+  // 사람이 보게 한다 — 조용히 빠지면 몇 종목이 빠졌는지도 모른다.
+  // 이름만으로 맞추면 미국 주식이 통째로 샌다 — 증권사 앱은 '엔비디아' 라고 쓰는데
+  // 우리 목록은 'NVIDIA' 다. 그래서 AI 에게 코드를 같이 물었고, 코드를 먼저 본다.
+  async _hsMatch(rows) {
+    const list = await this._tickers();
+    const num = v => { const n = Number(v); return isFinite(n) && n > 0 ? n : null; };
+    return rows.map(r => {
+      const nm  = String(r.name || '').trim();
+      const tk  = String(r.ticker || '').trim().toLowerCase();
+      const want = (r.market === 'us') ? 'us' : (r.market === 'kr') ? 'kr' : null;
+      const q = nm.toLowerCase();
+      let best = null, bs = 99;
+      for (const e of list) {
+        const cd = e.c.toLowerCase(), n = e.n.toLowerCase();
+        let sc = -1;
+        // 코드가 맞으면 시장 표기가 어긋나도 그게 맞다. 이름은 시장이 맞을 때만 본다.
+        if (tk && cd === tk) sc = 0;
+        else if (want && e.t !== want) continue;
+        else if (n === q) sc = 1; else if (cd === q) sc = 2;
+        else if (n.startsWith(q)) sc = 3; else if (n.includes(q)) sc = 4;
+        if (sc >= 0 && (sc < bs || (sc === bs && e.n.length < best.n.length))) { bs = sc; best = e; }
+      }
+      return { raw:nm, qty:num(r.qty), avg:num(r.avg),
+               hit: best ? { name:best.n, code:best.c, type:best.t, tv:best.tv,
+                             unit:this.unitFor(best.t), floor:null } : null };
+    });
+  },
+
+  _hsRows: null,
+  _hsPreview() {
+    const rs = this._hsRows || [];
+    const ok = rs.filter(r => r.hit).length;
+    const dup = rs.filter(r => r.hit && (this.cfg().holdings||[]).some(h => this.keyOf(h) === this.keyOf(r.hit))).length;
+    return `<div class="hs-list">${rs.map((r,i) => {
+      const cls = !r.hit ? 'hs-miss' : '';
+      return `<label class="hs-row ${cls}">
+        <input type="checkbox" ${r.hit?'checked':'disabled'} data-i="${i}">
+        <span class="hs-nm">${esc(r.hit ? r.hit.name : r.raw)}${
+          r.hit ? '' : ' <i>못 찾음</i>'}</span>
+        <span class="hs-q">${r.qty ?? '—'}주</span>
+        <span class="hs-a">${r.avg == null ? '평단 —'
+          : (r.hit && r.hit.type === 'us') ? '$' + r.avg.toLocaleString('en-US',{maximumFractionDigits:2})
+          : this._won(r.avg)}</span>
+      </label>`; }).join('')}</div>
+      <p class="ec-hint">${ok}종목을 찾았습니다${dup?` · 그중 ${dup}종목은 이미 보유 목록에 있어 값만 덮어씁니다`:''}.
+        <b>AI 가 읽은 값이라 틀릴 수 있습니다</b> — 담은 뒤 수량·평단을 한 번 확인해 주세요.</p>
+      <button class="btn-sm accent" style="width:100%;margin-top:8px" onclick="Econ._hsApply()">고른 종목 담기</button>`;
+  },
+
+  _hsApply() {
+    const rs = this._hsRows || [];
+    const picks = [...document.querySelectorAll('.hs-row input:checked')].map(el => rs[+el.dataset.i]);
+    if (!picks.length) { App.showToast('담을 종목을 골라 주세요','error'); return; }
+    const c = this.cfg();
+    c.holdings = c.holdings || [];
+    let added = 0, updated = 0;
+    for (const r of picks) {
+      if (!r.hit) continue;
+      const k = this.keyOf(r.hit);
+      const cur = c.holdings.find(h => this.keyOf(h) === k);
+      if (cur) { if (r.qty != null) cur.qty = r.qty; if (r.avg != null) cur.avg = r.avg; updated++; }
+      else { c.holdings.push(Object.assign({ qty:r.qty ?? 0, avg:r.avg ?? 0 }, r.hit)); added++; }
+    }
+    this.queueSave(); App.closeModal();
+    this._drawHold(); this._paintHold();
+    App.showToast(`보유 ${added?`${added}종목 추가`:''}${added&&updated?' · ':''}${updated?`${updated}종목 갱신`:''} ✓`,'success');
+  },
+
   holdSet(k, f, v) {
     const it = (this.cfg().holdings || []).find(x => this.keyOf(x) === k);
     if (!it) return;
