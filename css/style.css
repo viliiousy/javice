@@ -614,6 +614,28 @@ textarea.inp{ resize:vertical; min-height:64px; }
 .fitness-wrap{ padding:10px; overflow-y:auto; flex:1; }
 .fit-tabs{ display:flex; gap:4px; margin-bottom:10px; overflow-x:auto; }
 .fit-tabs::-webkit-scrollbar{ display:none; }
+
+/* 요일 탭 줄 끝의 톱니 — 요일과 같은 줄에 두되 붙여 놓지 않는다.
+   요일은 '보기', 이건 '정하기' 라 성격이 다르다. 사이를 벌려 두면 잘못 누르지 않는다. */
+.fit-plan-btn{
+  margin-left:auto; display:inline-flex; align-items:center; justify-content:center;
+  padding:4px 8px; color:var(--text3);
+}
+.fit-plan-btn:hover{ color:var(--accent); }
+
+/* ── 요일별 운동 배정 ─────────────────── */
+.dp-note{
+  font-size:12px; color:var(--text3); line-height:1.5;
+  padding:9px 11px; margin-bottom:10px;
+  background:var(--card2); border-radius:var(--r-xs);
+}
+.dp-list{ display:flex; flex-direction:column; gap:7px; }
+.dp-row{ display:grid; grid-template-columns:26px 1fr; gap:10px; align-items:center; }
+/* 요일 한 글자는 폭이 제각각이라(월 vs 금) 가운데 정렬해야 셀렉트 왼쪽 선이 안 흔들린다. */
+.dp-d{ font-size:12.5px; font-weight:700; color:var(--text2); text-align:center; }
+.dp-sun{ color:var(--red); }
+.dp-sat{ color:var(--blue); }
+.dp-sel{ width:100%; min-width:0; }
 .ex-item{ display:flex; align-items:center; gap:10px; padding:7px 8px; border-radius:8px; cursor:pointer; transition:background 0.12s; }
 .ex-item:hover{ background:var(--card2); }
 .ex-item.done .ex-name{ color:var(--text3); text-decoration:line-through; }
