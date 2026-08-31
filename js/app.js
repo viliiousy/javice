@@ -32,15 +32,13 @@ const App = {
     on('btnSync',        ()=>this.sync());
     on('btnShowCompleted',()=>{ this.S.showCompleted=!this.S.showCompleted; const b=document.getElementById('btnShowCompleted'); if(b)b.style.background=this.S.showCompleted?'var(--accent)':''; this._renderTasks(); });
     on('btnShowHidden',  ()=>{ this.S.showHidden=!this.S.showHidden; const b=document.getElementById('btnShowHidden'); if(b)b.style.background=this.S.showHidden?'var(--accent)':''; this._renderTasks(); });
-    on('btnAddTask',     ()=>this._showTaskForm(true));
-    on('btnCancelTask',  ()=>this._showTaskForm(false));
-    on('btnSaveTask',    ()=>this._saveTask());
-    on('btnAddEvent',    ()=>this.showLongPressMenu(this.S.selDate));
+
+    // 이 카드의 머리는 달력이다. 할일은 아래 목록이 제 + 를 따로 가지고 있다.
+    on('btnAddEvent',    ()=>this._showAddEventModalForDate(this.S.selDate));
     on('btnDateSort',    ()=>this._toggleDateSort());
     on('btnModalClose',  ()=>this.closeModal());
     $('btnCalSettings')?.addEventListener('click',()=>GoogleCalendar.showSettings());
     const modal=$('modal'); if(modal) modal.onclick=e=>{ if(e.target===modal) this.closeModal(); };
-    const ti=$('taskInput'); if(ti) ti.onkeypress=e=>{ if(e.key==='Enter') this._saveTask(); };
   },
 
   _toggleDateSort() {
@@ -103,8 +101,6 @@ const App = {
     this.showToast('동기화 중...','');
     try {
       this.S.lists=await GoogleTasks.fetchTaskLists();
-      const sel=document.getElementById('taskListSel');
-      if(sel) sel.innerHTML=this.S.lists.map(l=>`<option value="${l.id}">${esc(l.title)}</option>`).join('');
       this.S.tasks={};
       await Promise.all(this.S.lists.map(async l=>{
         this.S.tasks[l.id]=await GoogleTasks.fetchTasks(l.id);
@@ -705,30 +701,73 @@ const App = {
     }catch{ this.showToast('일정 추가 실패','error'); }
   },
 
-  _showAddTaskForDate(date) {
+  // 시간은 30분 단위로만 고른다. type="time" 은 1분 단위라 스물네 번을 눌러야
+  // 30분이 움직였고, 폰에서는 휠이 1분씩 돌았다. 할일 마감을 7분 단위로 잡는 사람은 없다.
+  _halfHours(sel) {
+    const out = [`<option value=""${sel?'':' selected'}>시간 없음</option>`];
+    for (let m = 0; m < 24*60; m += 30) {
+      const h = Math.floor(m/60), mm = m%60;
+      const v = String(h).padStart(2,'0') + ':' + String(mm).padStart(2,'0');
+      const ampm = h < 12 ? '오전' : '오후';
+      const h12 = h % 12 === 0 ? 12 : h % 12;
+      out.push(`<option value="${v}"${v===sel?' selected':''}>${ampm} ${h12}:${String(mm).padStart(2,'0')}</option>`);
+    }
+    return out.join('');
+  },
+
+  // 구글 Tasks 의 추가 창을 그대로 따랐다. 거기서 만든 할일이 여기로 내려오는데
+  // 필드 이름이 서로 다르면(메모 vs 세부사항) 같은 칸을 다른 것으로 착각하게 된다.
+  showAddTask(date) {
     if(!Auth.isLoggedIn()){ this.showToast('로그인이 필요합니다','error'); return; }
-    const ds=new Date(date).toISOString().split('T')[0];
+    const d = date ? new Date(date) : (this.S.selDate || new Date());
+    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    // 지금 보고 있는 목록으로 기본값을 맞춘다. '전체' 를 보고 있으면 첫 목록.
+    const cur = this.S.taskFilter !== 'all' && this.S.lists.some(l=>l.id===this.S.taskFilter)
+      ? this.S.taskFilter : (this.S.lists[0]?.id || '');
     this.openModal('@tasks 할일 추가',`
-      <div class="modal-row"><label class="modal-lbl">제목 *</label><input id="qtTitle" type="text" class="inp"></div>
-      <div class="modal-row"><label class="modal-lbl">메모</label><textarea id="qtNotes" class="inp" rows="2" placeholder="(선택)"></textarea></div>
-      <div class="modal-row"><label class="modal-lbl">목록</label><select id="qtList" class="inp inp-sm">${this.S.lists.map(l=>`<option value="${l.id}">${esc(l.title)}</option>`).join('')}</select></div>
-      <div class="modal-row"><label class="modal-lbl">마감</label><input id="qtDue" type="date" value="${ds}" class="inp inp-sm"></div>
+      <div class="modal-row"><label class="modal-lbl">제목 *</label>
+        <input id="qtTitle" type="text" class="inp" placeholder="할 일"></div>
+      <div class="modal-row"><label class="modal-lbl">세부사항</label>
+        <textarea id="qtNotes" class="inp" rows="2" placeholder="(선택)"></textarea></div>
+      <div class="modal-grid2">
+        <div><label class="modal-lbl">마감 날짜</label>
+          <input id="qtDue" type="date" value="${ds}" class="inp inp-sm"></div>
+        <div><label class="modal-lbl">시간</label>
+          <select id="qtTime" class="inp inp-sm">${this._halfHours('')}</select></div>
+      </div>
+      <div class="modal-row"><label class="modal-lbl">목록</label>
+        <select id="qtList" class="inp inp-sm">${this.S.lists.map(l=>
+          `<option value="${l.id}"${l.id===cur?' selected':''}>${esc(l.title)}</option>`).join('')}</select></div>
       <div class="modal-btns">
         <button onclick="App._saveQuickTask()" class="btn-sm accent">추가</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
       </div>`);
-    setTimeout(()=>document.getElementById('qtTitle')?.focus(),50);
+    setTimeout(()=>{
+      const t=document.getElementById('qtTitle');
+      t?.focus();
+      // 제목만 치고 엔터 — 가장 흔한 경우를 두 번 누르게 하지 않는다.
+      t?.addEventListener('keydown', e => {
+        if(e.key==='Enter'){ e.preventDefault(); App._saveQuickTask(); }
+      });
+    },50);
   },
+  // 예전 이름. 달력 길게 누르기 메뉴가 아직 이 이름으로 부른다.
+  _showAddTaskForDate(date) { this.showAddTask(date); },
 
   async _saveQuickTask() {
     const title=document.getElementById('qtTitle')?.value.trim();
     const notes=document.getElementById('qtNotes')?.value.trim()||'';
     const listId=document.getElementById('qtList')?.value;
     const due=document.getElementById('qtDue')?.value;
+    const time=document.getElementById('qtTime')?.value||'';
     if(!title){ this.showToast('제목을 입력해주세요','error'); return; }
     try{
       const task=await GoogleTasks.createTask(listId,title,due||null,notes);
       task.starred=false;
+      // 구글 Tasks 의 due 는 날짜만 받는다(시각은 버려진다). 시간은 세부정보 창과
+      // 같은 자리에 따로 둔다 — 두 곳이 다른 데 저장하면 한쪽에서 넣은 시간이 안 보인다.
+      if(time) localStorage.setItem('gl_task_extra_'+task.id,
+        JSON.stringify({ ...(JSON.parse(localStorage.getItem('gl_task_extra_'+task.id)||'{}')), time }));
       if(!this.S.tasks[listId]) this.S.tasks[listId]=[];
       this.S.tasks[listId].unshift(task);
       this._renderTasks();
@@ -833,7 +872,11 @@ const App = {
         ontouchstart="App._tabLongPress('${t.id}','${esc(t.label)}',event)"
         ontouchend="App._tabLongPressEnd()"
         style="${borderStyle}">${esc(t.label)}</button>`;
-    }).join('');
+    }).join('')
+      // 할일을 더하는 자리는 할일 목록의 머리다. 달력 머리에 있던 '+ 할일' 은
+      // 여기로 옮겼다 — 무엇을 더하는지가 어디를 보고 있는지로 정해진다.
+      + `<button class="fit-tab tf-add" onclick="App.showAddTask()"
+           title="할일 추가" aria-label="할일 추가">+ 추가</button>`;
   },
   _toggleCompleted(){ this.S.showCompleted=!this.S.showCompleted; this._buildTaskFilters(); this._renderTasks(); },
   _tabLpTimer: null,
@@ -951,13 +994,13 @@ const App = {
     this.openModal('@list 세부정보',`
       <div class="modal-row"><label class="modal-lbl">제목</label>
         <input id="tdTitle" type="text" value="${esc(t.title)}" class="inp"></div>
-      <div class="modal-row"><label class="modal-lbl">메모</label>
+      <div class="modal-row"><label class="modal-lbl">세부사항</label>
         <textarea id="tdNotes" class="inp" rows="3">${esc(t.notes||'')}</textarea></div>
       <div class="modal-grid2">
         <div><label class="modal-lbl">마감 날짜</label>
           <input id="tdDue" type="date" value="${due}" class="inp inp-sm"></div>
-        <div><label class="modal-lbl">시간 (선택)</label>
-          <input id="tdTime" type="time" value="${extra.time||''}" class="inp inp-sm"></div>
+        <div><label class="modal-lbl">시간</label>
+          <select id="tdTime" class="inp inp-sm">${this._halfHours(extra.time||'')}</select></div>
       </div>
       <div class="modal-grid2">
         <div><label class="modal-lbl">반복</label>
@@ -1047,30 +1090,9 @@ const App = {
     }catch{ this.showToast('삭제 실패','error'); }
   },
 
-  _showTaskForm(show){
-    document.getElementById('taskForm').classList.toggle('hidden',!show);
-    if(show) setTimeout(()=>document.getElementById('taskInput').focus(),50);
-  },
-
-  async _saveTask(){
-    const title=document.getElementById('taskInput').value.trim(); if(!title) return;
-    const listId=document.getElementById('taskListSel').value;
-    const due=document.getElementById('taskDue').value;
-    if(!Auth.isLoggedIn()){ this.showToast('로그인이 필요합니다','error'); return; }
-    try{
-      const task=await GoogleTasks.createTask(listId,title,due||null);
-      task.starred=false;
-      if(!this.S.tasks[listId]) this.S.tasks[listId]=[];
-      this.S.tasks[listId].unshift(task);
-      this._renderTasks();
-      CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,this.S.selDate);
-      document.getElementById('taskInput').value='';
-      document.getElementById('taskDue').value='';
-      this._showTaskForm(false);
-      this.showToast('할일 추가됨 ✓','success');
-      this._updateStatsBanner();
-    }catch{ this.showToast('추가 실패','error'); }
-  },
+  // 인라인 할일 입력 폼은 없앴다. 같은 일을 하는 창이 둘이면 어느 쪽이 최신인지
+  // 아무도 모른다 — 실제로 이쪽에는 세부사항·시간 칸이 끝내 안 들어갔다.
+  // 지금은 showAddTask() 하나뿐이다.
 
   // ── 프로필 메뉴 ──────────────────────
   toggleProfileMenu() {
@@ -1098,7 +1120,7 @@ const App = {
   // 폰 다크모드를 켜둔 사람에게 앱만 하얗게 빛나면 이질감이 크다.
   // (첫 페인트 전 적용은 index.html <head> 의 부트스트랩이 맡는다. 여기서 하면 늦다.)
   THEMES: ['system','light','dark'],
-  THEME_LBL: { system:'🖥️ 테마: 시스템', light:'☀️ 테마: 밝게', dark:'🌙 테마: 어둡게' },
+  THEME_LBL: { system:'테마: 시스템', light:'테마: 밝게', dark:'테마: 어둡게' },
 
   get _theme(){
     const v = localStorage.getItem('gl_theme');
@@ -1153,14 +1175,24 @@ const App = {
     document.getElementById('profileMenu')?.classList.add('hidden');
   },
 
+  // 라벨에 아이콘이 같이 들어간다. textContent 로 쓰면 아이콘이 지워진다 —
+  // Icons.title() 을 만든 것과 같은 이유다.
+  _label(id, icon, text) {
+    const el=document.getElementById(id); if(!el) return;
+    const ic=(typeof Icons!=='undefined') ? Icons.svg(icon) : '';
+    el.innerHTML = ic + String(text).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    el.dataset.icOn='1';
+  },
   _updateSoundLabel() {
-    const el=document.getElementById('soundLabel');
-    if(el&&typeof Sounds!=='undefined') el.textContent=Sounds.enabled?'🔔 사운드 켜짐':'🔕 사운드 꺼짐';
+    if(typeof Sounds==='undefined') return;
+    this._label('soundLabel', Sounds.enabled?'volume':'mute',
+                Sounds.enabled?'사운드 켜짐':'사운드 꺼짐');
   },
 
   _updateDarkLabel() {
-    const el=document.getElementById('darkModeLabel');
-    if(el) el.textContent=this.THEME_LBL[this._theme] || this.THEME_LBL.system;
+    const t=this._theme;
+    this._label('darkModeLabel', t==='dark'?'moon':t==='light'?'sun':'monitor',
+                this.THEME_LBL[t] || this.THEME_LBL.system);
   },
 
   _showCatColorPicker(listId, listName) {
