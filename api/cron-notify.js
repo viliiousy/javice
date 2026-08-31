@@ -401,10 +401,18 @@ async function processUser(uid, tokenData) {
 
 module.exports = async (req, res) => {
   // 비밀키를 반드시 요구한다. 예전에는 `auth &&` 때문에 헤더가 아예 없으면 통과했다.
-  const auth   = req.headers.authorization;
-  const secret = process.env.CRON_SECRET;
-  if(!secret) { res.status(500).json({error:'CRON_SECRET 미설정'}); return; }
-  if(auth !== `Bearer ${secret}`) { res.status(401).json({error:'Unauthorized'}); return; }
+  //
+  // 열쇠가 둘이다.
+  //   CRON_SECRET — 깃허브 액션이 쓴다. 저장소 시크릿에만 있고 바깥으로 안 나간다.
+  //   PING_SECRET — 바깥 스케줄러(cron-job.org)가 쓴다.
+  // 굳이 나눈 이유: 깃허브 예약 실행이 몇 시간씩 밀려서 바깥 스케줄러를 붙였는데,
+  // 그러려면 열쇠를 남의 서비스 설정칸에 적어 둬야 한다. 그 하나가 새더라도
+  // 깃허브 쪽까지 같이 뚫리면 안 된다. 이 열쇠로 할 수 있는 일은
+  // '밀린 알림을 지금 보내라' 뿐이고, 그건 어차피 곧 일어날 일이다.
+  const auth    = req.headers.authorization;
+  const secrets = [process.env.CRON_SECRET, process.env.PING_SECRET].filter(Boolean);
+  if(!secrets.length) { res.status(500).json({error:'CRON_SECRET 미설정'}); return; }
+  if(!secrets.some(x => auth === `Bearer ${x}`)) { res.status(401).json({error:'Unauthorized'}); return; }
 
   // ?check=1 — 알림을 보내지 않고 DB 인증만 점검한다 (배포 검증용)
   if (req.query?.check === '1') {
