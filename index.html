@@ -97,11 +97,12 @@
       </div>
       <div id="profileMenu" class="profile-menu hidden">
         <div class="profile-menu-item" style="font-size:11px;color:var(--text3);cursor:default;padding:6px 16px;border-bottom:1px solid var(--border)">v26.05.25.0116 업데이트</div>
-        <div class="profile-menu-item" onclick="Notifications.showSettings()">🔔 알림 설정</div>
-        <div class="profile-menu-item" onclick="App.showCardSettings()">🧩 메인 카드</div>
-        <div class="profile-menu-item" onclick="App.toggleDarkMode()"><span id="darkModeLabel">🌙 다크 모드</span></div>
-        <div class="profile-menu-item" onclick="App.toggleSound()"><span id="soundLabel">🔔 사운드 켜짐</span></div>
-        <div class="profile-menu-item" onclick="Auth.logout()">🚪 로그아웃</div>
+        <div class="profile-menu-item" data-ic="bell" onclick="Notifications.showSettings()">알림 설정</div>
+        <div class="profile-menu-item" data-ic="grid" onclick="App.showCardSettings()">메인 카드</div>
+        <div class="profile-menu-item" onclick="App.toggleDarkMode()"><span id="darkModeLabel">테마</span></div>
+        <div class="profile-menu-item" onclick="Icons.toggleMode()"><span id="iconModeLabel">아이콘</span></div>
+        <div class="profile-menu-item" onclick="App.toggleSound()"><span id="soundLabel">사운드</span></div>
+        <div class="profile-menu-item" data-ic="logout" onclick="Auth.logout()">로그아웃</div>
       </div>
     </div>
   </header>
@@ -121,12 +122,13 @@
         <div class="card-head">
           <span class="card-title" data-ic="calendar">일정과 할일</span>
           <div class="card-acts">
-            <button class="btn-sm" id="btnCalSettings" title="캘린더 설정">⚙️</button>
-            <button class="btn-sm" id="btnSync" title="동기화">🔄</button>
-            <button class="btn-sm" id="btnShowCompleted" title="완료됨 보기">✓</button>
-            <button class="btn-sm" id="btnShowHidden" title="숨김 보기">🙈</button>
-            <button class="btn-sm accent" id="btnAddEvent">+ 일정</button>
-            <button class="btn-sm accent" id="btnAddTask">+ 할일</button>
+            <button class="btn-sm btn-ic" id="btnCalSettings" data-ic="gear" title="캘린더 설정" aria-label="캘린더 설정"></button>
+            <button class="btn-sm btn-ic" id="btnSync" data-ic="refresh" title="동기화" aria-label="동기화"></button>
+            <button class="btn-sm btn-ic" id="btnShowCompleted" data-ic="check" title="완료됨 보기" aria-label="완료됨 보기"></button>
+            <button class="btn-sm btn-ic" id="btnShowHidden" data-ic="eyeoff" title="숨김 보기" aria-label="숨김 보기"></button>
+            <!-- 예전엔 '+ 일정' 과 '+ 할일' 이 나란히 있었다. 이 카드는 달력이고,
+                 할일은 아래 목록이 제 머리를 따로 가지고 있다. 여기서는 일정만 더한다. -->
+            <button class="btn-sm accent" id="btnAddEvent">+ 추가</button>
           </div>
         </div>
         <div id="miniCal" class="mini-cal"></div>
@@ -138,17 +140,6 @@
         <div id="eventsWrap" class="events-wrap"></div>
         <div class="cal-sep"></div>
         <div id="taskFilters" class="task-filter-wrap"></div>
-        <div class="task-form hidden" id="taskForm">
-          <input type="text" id="taskInput" placeholder="할일 입력..." class="inp">
-          <div class="task-form-row">
-            <select id="taskListSel" class="inp inp-sm"></select>
-            <input type="date" id="taskDue" class="inp inp-sm">
-          </div>
-          <div class="task-form-btns">
-            <button id="btnSaveTask" class="btn-sm accent">저장</button>
-            <button id="btnCancelTask" class="btn-sm">취소</button>
-          </div>
-        </div>
         <div id="tasksContainer" class="tasks-wrap"><p class="empty">불러오는 중…</p></div>
       </section>
       </div>
@@ -157,7 +148,7 @@
       <section class="card card-habits">
         <div class="card-head">
           <span class="card-title" data-ic="check">오늘의 습관</span>
-          <button class="btn-sm" id="btnHabitReorder" onclick="Habits.toggleReorderMode()" title="편집 모드">⚙️</button>
+          <button class="btn-sm btn-ic" id="btnHabitReorder" onclick="Habits.toggleReorderMode()" data-ic="gear" title="편집 모드" aria-label="편집 모드"></button>
         </div>
         <div id="habitsWrap" class="habits-wrap"></div>
         <div id="habitsFooter" class="habits-footer"></div>
@@ -176,7 +167,7 @@
       <section class="card card-checklist">
         <div class="card-head">
           <span class="card-title" data-ic="pen">체크리스트</span>
-          <button class="btn-sm" id="btnClReorder" onclick="Checklist.toggleReorderMode()" title="편집 모드">⚙️</button>
+          <button class="btn-sm btn-ic" id="btnClReorder" onclick="Checklist.toggleReorderMode()" data-ic="gear" title="편집 모드" aria-label="편집 모드"></button>
         </div>
         <div id="checklistWrap" class="checklist-wrap"></div>
       </section>
