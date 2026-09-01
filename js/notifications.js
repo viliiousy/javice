@@ -165,7 +165,7 @@ const Notifications = {
       await Notification.requestPermission();
     }
     if(Notification.permission === 'granted') {
-      new Notification('⚡ 자비스 알림 테스트', {
+      new Notification('⚡ Bashy 알림 테스트', {
         body: '알림이 정상 작동합니다! 🎉',
         icon: '/icons/icon-192.png',
       });
