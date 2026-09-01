@@ -30,7 +30,7 @@ const JARVIS = {
       </button>
       <div id="jarvisPanel" class="jarvis-panel hidden">
         <div class="jarvis-head">
-          <div class="j-head-l"><span class="j-logo">⚡ JARVIS</span><span id="jStatus" class="j-status">대기 중</span></div>
+          <div class="j-head-l"><span class="j-logo">⚡ Bashy</span><span id="jStatus" class="j-status">대기 중</span></div>
           <div class="j-head-r">
             <button class="j-icon-btn" id="jTtsBtn" onclick="JARVIS.toggleTTS()" title="음성 출력 켜기/끄기">${this._ttsEnabled?'🔊':'🔇'}</button>
             <button class="j-icon-btn" onclick="JARVIS.showKeySetup()">🔑</button>
@@ -41,7 +41,7 @@ const JARVIS = {
         </div>
         <div id="jMsgs" class="j-msgs">
           <div class="j-msg j-ai"><div class="j-avatar">⚡</div>
-            <div class="j-bubble">JARVIS입니다.<br>
+            <div class="j-bubble">Bashy입니다.<br>
               <span style="font-size:11px;color:var(--accent-l)">할일·일정·체크리스트·습관·식단·메모 관리 가능<br>📷 사진으로 식단 자동 분석</span>
             </div>
           </div>
@@ -398,7 +398,7 @@ const JARVIS = {
   },
 
   _buildSys(ctx) {
-    return `당신은 JARVIS — 갓생 대시보드의 AI. 간결하고 한국어로 대화. 사용자: 수훈님.
+    return `당신은 Bashy — 자기관리 앱 Bashy 의 AI 비서. 간결하고 한국어로 대화. 사용자: 수훈님.
 
 현재 상태: ${JSON.stringify(ctx)}
 
@@ -557,7 +557,7 @@ const JARVIS = {
   },
 
   showKeySetup() {
-    App.openModal('@key JARVIS API 키',`
+    App.openModal('@key Bashy API 키',`
       <p style="color:var(--text2);font-size:13px;margin-bottom:14px">
         완전 무료 Groq API 키 필요<br>
         <a href="https://console.groq.com" target="_blank" style="color:var(--accent-l)">console.groq.com</a> → API Keys → Create API Key
@@ -574,7 +574,7 @@ const JARVIS = {
     const k=document.getElementById('aiKeyInp')?.value.trim();
     if(!k){ App.showToast('API 키를 입력해주세요','error'); return; }
     localStorage.setItem('gl_ai_key',k);
-    App.closeModal(); App.showToast('✓ JARVIS 활성화됨','success');
+    App.closeModal(); App.showToast('✓ Bashy 활성화됨','success');
     setTimeout(()=>{ this.isOpen=true; document.getElementById('jarvisPanel').classList.remove('hidden'); this.send('안녕!'); },400);
   },
 };
