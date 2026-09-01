@@ -88,10 +88,19 @@ async function getAccessToken() {
   });
 }
 
-async function sendFCM(fcmToken, title, body) {
+// notification 블록을 빼고 data 로만 보낸다.
+// notification 이 들어 있으면 브라우저·SDK 가 그것만으로도 알림을 띄울 수 있고,
+// 우리 서비스워커도 따로 띄운다 — 같은 알림이 두 번 뜨는 흔한 원인이다.
+// data 만 오는 메시지는 아무도 마음대로 띄우지 않는다. 띄우는 곳이 sw.js 한 군데로 정해진다.
+//
+// slot 을 같이 실어 보낸다. sw.js 가 이걸 알림 tag 로 써서,
+// 같은 알림이 두 번 와도 하나로 합쳐지고 다른 알림끼리는 서로 안 덮는다.
+async function sendFCM(fcmToken, title, body, slot) {
   const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
   const accessToken = await getAccessToken();
-  const payload = JSON.stringify({ message:{ token:fcmToken, notification:{title,body}, webpush:{notification:{icon:'/icons/icon-192.png'},fcm_options:{link:'/'}}} });
+  const payload = JSON.stringify({ message:{ token:fcmToken,
+    data:{ title:String(title), body:String(body), slot:String(slot||'') },
+    webpush:{ fcm_options:{ link:'/' } } } });
   return new Promise((resolve)=>{
     const opts={hostname:'fcm.googleapis.com',path:`/v1/projects/${sa.project_id}/messages:send`,method:'POST',
       headers:{'Content-Type':'application/json','Authorization':`Bearer ${accessToken}`,'Content-Length':Buffer.byteLength(payload)}};
@@ -277,18 +286,25 @@ async function processUser(uid, tokenData) {
     const target = (p[0]||0)*60 + (p[1]||0);
     const nm = String(h.name||'약').slice(0,40);
 
-    if (dueAt(`med_${h.id}_pre`, target - 5))
-      msgs.push({ slot:`med_${h.id}_pre`, title:'💊 약 먹을 시간', body:`${nm} · ${h.time}` });
-
-    // 시각이 지났는데도 체크가 없으면 한 시간마다. 한 번에 하나만 보낸다 —
-    // 크론이 반나절 멈췄다 살아나면 밀린 것을 몰아 보내게 되는데 그건 알림이 아니라 소음이다.
+    // 한 약은 한 번에 하나만. 예전에는 '5분 전' 과 '한 시간 뒤 재알림' 이 같은 실행에서
+    // 둘 다 나갔다 — 크론이 밀려 09:00 에 처음 돌면 08:00 약의 pre(07:55, 65분 지각)와
+    // h1(09:00, 정시)이 동시에 due 가 됐다. 약이 세 개면 여섯 개가 한꺼번에 울렸다.
+    //
+    // 재알림이 나갈 상황이면 '5분 전' 은 이미 뜻이 없다. 보내지 말고 조용히 처리만 해 둔다.
+    let nag = null;
     for (let k = 1; k <= 12; k++) {
       const at = target + 60*k;
       if (at >= 24*60) break;
-      if (dueAt(`med_${h.id}_h${k}`, at)) {
-        msgs.push({ slot:`med_${h.id}_h${k}`, title:'💊 아직 약을 안 드셨어요', body:`${nm} · ${h.time} 이었어요` });
-        break;
-      }
+      // 크론이 반나절 멈췄다 살아나면 밀린 것을 몰아 보내게 되는데 그건 알림이 아니라 소음이다.
+      if (dueAt(`med_${h.id}_h${k}`, at)) { nag = `med_${h.id}_h${k}`; break; }
+    }
+    const preDue = dueAt(`med_${h.id}_pre`, target - 5);
+
+    if (nag) {
+      if (preDue) settle(`med_${h.id}_pre`);      // 지나간 예고는 삼킨다
+      msgs.push({ slot:nag, title:'💊 아직 약을 안 드셨어요', body:`${nm} · ${h.time} 이었어요` });
+    } else if (preDue) {
+      msgs.push({ slot:`med_${h.id}_pre`, title:'💊 약 먹을 시간', body:`${nm} · ${h.time}` });
     }
   }
 
@@ -380,7 +396,7 @@ async function processUser(uid, tokenData) {
       await markInvalid(uid, dev.id, { status:0, reason:'UNSUPPORTED_TOKEN_FORMAT', shape });
       continue;
     }
-    const results = await Promise.all(msgs.map(m => sendFCM(fcm, m.title, m.body).then(r => ({...r, title:m.title, slot:m.slot}))));
+    const results = await Promise.all(msgs.map(m => sendFCM(fcm, m.title, m.body, m.slot).then(r => ({...r, title:m.title, slot:m.slot}))));
     const ok   = results.filter(r=>r.ok);
     const fail = results.filter(r=>!r.ok);
     sent += ok.length; failed += fail.length;
