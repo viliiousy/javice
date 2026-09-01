@@ -22,9 +22,9 @@ const Tabs = {
     { id:'body',  label:'건강', icon:'dumbbell' },
     { id:'money', label:'경제', icon:'trend'    },
   ],
-  // 탭바에만 있고 카드는 없는 자리. 자비스는 화면을 바꾸는 게 아니라 창을 연다.
+  // 탭바에만 있고 카드는 없는 자리. Bashy 는 화면을 바꾸는 게 아니라 창을 연다.
   // 떠 있던 동그란 단추는 늘 뭔가를 가리고 있었다 — 손이 닿는 자리는 어차피 여기다.
-  JARVIS_TAB: { id:'jarvis', label:'자비스', icon:'zap' },
+  JARVIS_TAB: { id:'jarvis', label:'Bashy', icon:'zap' },
   // 카드 → 탭 · 이름 (설정 화면에서도 이 목록을 쓴다)
   CARDS: [
     { cls:'card-calendar',  name:'일정과 할일', tab:'today' },
