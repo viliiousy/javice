@@ -35,7 +35,7 @@ function show(title, body, slot, data) {
   }
   shown.set(key, now);
   if (shown.size > 50) for (const [k, t] of shown) if (now - t > 3600000) shown.delete(k);
-  return self.registration.showNotification(title || '자비스', {
+  return self.registration.showNotification(title || 'Bashy', {
     body:    body || '',
     icon:    '/icons/icon-192.png',
     badge:   '/icons/icon-192.png',
@@ -54,7 +54,7 @@ messaging.onBackgroundMessage(function(payload) {
   show(n.title || d.title, n.body || d.body, d.slot, d);
 });
 
-const CACHE = 'javice-v6';
+const CACHE = 'javice-v7';
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -83,7 +83,7 @@ self.addEventListener('fetch', e => {
 self.addEventListener('push', e => {
   if(!e.data) return;
   let data = {};
-  try { data = e.data.json(); } catch { data = { data:{ title:'자비스', body:e.data.text() } }; }
+  try { data = e.data.json(); } catch { data = { data:{ title:'Bashy', body:e.data.text() } }; }
   const d = data.data || {};
   const n = data.notification || {};
   e.waitUntil(show(n.title || d.title || data.title,
