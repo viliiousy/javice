@@ -464,7 +464,7 @@ const Econ = {
   // 캡처는 브라우저 밖으로 나가지 않고, AI 에게는 그림만 보낸다. 로그인 정보는 어디에도 안 남는다.
   showHoldScan() {
     if (!localStorage.getItem('gl_ai_key')) {
-      App.showToast('JARVIS API 키를 먼저 설정해주세요 (⚡→🔑)','error'); return;
+      App.showToast('Bashy API 키를 먼저 설정해주세요 (⚡→🔑)','error'); return;
     }
     App.openModal('@camera 캡처로 보유 종목 채우기', `
       <p class="ec-hint" style="margin-bottom:10px">
