@@ -1,7 +1,7 @@
 {
-  "name": "자비스 대시보드",
-  "short_name": "자비스",
-  "description": "구글 캘린더·할일을 습관·식단·인바디 기록과 한 화면에서 관리하는 개인 대시보드",
+  "name": "Bashy",
+  "short_name": "Bashy",
+  "description": "습관·식단·운동·체중 기록과 구글 캘린더·할일을 한 화면에서 관리하는 자기관리 앱",
   "start_url": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
