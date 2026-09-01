@@ -243,7 +243,7 @@ const Diet = {
     const q=(document.getElementById('dietSearch')?.value||'').trim();
     if(!q) return;
     const key=localStorage.getItem('gl_ai_key');
-    if(!key){ App.showToast('JARVIS API 키를 먼저 설정해주세요 (⚡→🔑)','error'); return; }
+    if(!key){ App.showToast('Bashy API 키를 먼저 설정해주세요 (⚡→🔑)','error'); return; }
     const btn=document.getElementById('dietAiBtn');
     const box=document.getElementById('dietAiRes');
     if(btn){ btn.disabled=true; btn.textContent='찾는 중…'; }
@@ -616,7 +616,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
   showPhotoAnalysis(dateStr=null){
     const ds=dateStr||this._localDateStr();
     const key=localStorage.getItem('gl_ai_key');
-    if(!key){ App.showToast('JARVIS API 키를 먼저 설정해주세요 (⚡→🔑)','error'); return; }
+    if(!key){ App.showToast('Bashy API 키를 먼저 설정해주세요 (⚡→🔑)','error'); return; }
     App.openModal('@camera 음식 사진 AI 분석',`
       <p style="color:var(--text2);font-size:13px;margin-bottom:10px">사진을 업로드하면 AI가 자동 분석합니다.</p>
       <div style="margin-bottom:10px"><label class="modal-lbl">식사 구분</label>
