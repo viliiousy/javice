@@ -50,7 +50,7 @@ module.exports = async (req, res) => {
     const payload  = JSON.stringify({
       message:{
         token,
-        notification:{title:'⚡ 자비스 알림 테스트',body:'알림이 정상 작동합니다! 🎉'},
+        notification:{title:'⚡ Bashy 알림 테스트',body:'알림이 정상 작동합니다! 🎉'},
         webpush:{notification:{icon:'/icons/icon-192.png'},fcm_options:{link:'/'}}
       }
     });
