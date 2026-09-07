@@ -180,10 +180,49 @@ const Fitness = {
     App.openModal('@dumbbell 요일별 운동', `
       <div class="dp-note">${note}</div>
       <div class="dp-list">${rows}</div>
+      <div style="height:1px;background:var(--border);margin:14px 0"></div>
+      <div class="dp-note" id="hevyLinkNote">Hevy 연동 상태 확인 중…</div>
+      <div class="dp-row" style="gap:6px">
+        <input id="hevyKeyInp" class="inp inp-sm" type="password" autocomplete="off"
+               placeholder="Hevy API 키" style="flex:1">
+        <button onclick="Fitness._saveHevyKey()" class="btn-sm">연동</button>
+      </div>
       <div class="modal-btns">
         <button onclick="Fitness._saveDayPlan()" class="btn-sm accent">저장</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
       </div>`);
+    this._loadHevyLink();
+  },
+
+  // ── Hevy 연동 ─────────────────────────
+  // 키는 사람마다 제 것을 쓴다. Firebase 의 /users/<uid>/_link/hevyKey 에 들어가고,
+  // 크론이 그걸 읽어 그 사람 몫만 받아 온다. localStorage 로는 내려오지 않는다 —
+  // Hevy API 에는 기록을 지우는 엔드포인트도 있어서 브라우저에 두면 안 된다.
+  async _loadHevyLink() {
+    const el = document.getElementById('hevyLinkNote');
+    if (!el) return;
+    if (typeof FirebaseSync === 'undefined' || !FirebaseSync.ready()) {
+      el.textContent = '로그인하면 Hevy 를 연동할 수 있습니다.';
+      return;
+    }
+    const link = await FirebaseSync.getLink();
+    el.textContent = (link && link.hevyKey)
+      ? 'Hevy 연동됨 ✓ — 한 시간마다 기록과 루틴을 받아옵니다. 키를 바꾸려면 새로 입력하세요.'
+      : 'Hevy 앱 → Settings → Developer 에서 API 키를 발급받아 붙여넣으면 운동 기록과 루틴이 자동으로 들어옵니다.';
+  },
+
+  async _saveHevyKey() {
+    const inp = document.getElementById('hevyKeyInp');
+    const key = String((inp && inp.value) || '').trim();
+    if (!key) { App.showToast('API 키를 입력해주세요', 'error'); return; }
+    if (typeof FirebaseSync === 'undefined' || !FirebaseSync.ready()) {
+      App.showToast('로그인이 필요합니다', 'error'); return;
+    }
+    const ok = await FirebaseSync.setLink({ hevyKey: key });
+    if (!ok) { App.showToast('저장 실패 — 잠시 뒤 다시 시도해주세요', 'error'); return; }
+    inp.value = '';
+    App.showToast('Hevy 연동 저장됨 ✓ — 다음 정시에 기록을 받아옵니다', 'success');
+    this._loadHevyLink();
   },
 
   _saveDayPlan() {
