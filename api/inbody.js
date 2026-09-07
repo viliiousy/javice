@@ -106,12 +106,20 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST만 허용' }); return; }
 
+  // 대상은 ?u=<uid> 로 받는다. 예전에는 INBODY_UID 환경변수 하나였는데,
+  // 그러면 누가 가입하든 같은 사람의 인바디 기록에 쓰인다 — 앱스토어 심사관이
+  // 데모 계정으로 들어와도 마찬가지다.
+  //
+  // 비밀은 여전히 하나(INBODY_SECRET)다. 이 엔드포인트는 단축어·자동화가 두드리는
+  // 운영자 전용 통로라서, 비밀을 아는 사람이 곧 운영자다. 일반 사용자는 앱에서
+  // 손으로 입력하고, 그 경로는 Firebase 규칙이 제 uid 밖을 막는다.
   const secret = process.env.INBODY_SECRET;
-  const uid    = process.env.INBODY_UID;
-  if (!secret || !uid) { res.status(500).json({ error: 'INBODY_SECRET / INBODY_UID 미설정' }); return; }
+  const uid    = (req.query && req.query.u) || process.env.INBODY_UID;
+  if (!secret) { res.status(500).json({ error: 'INBODY_SECRET 미설정' }); return; }
   if (req.headers.authorization !== `Bearer ${secret}`) {
     res.status(401).json({ error: 'Unauthorized' }); return;
   }
+  if (!uid) { res.status(400).json({ error: '대상 uid 가 없습니다 (?u=<uid> 또는 INBODY_UID)' }); return; }
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
