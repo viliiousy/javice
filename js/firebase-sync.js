@@ -57,6 +57,32 @@ const FirebaseSync = {
     } catch { return ''; }
   },
 
+  // ── 연동 비밀 (_link) ───────────────────
+  // 앱 데이터(u_<uid>_gl_*)와 달리 이건 localStorage 로 내려오지 않는다.
+  // 서버 크론이 여기 있는 Hevy 키를 읽어 '그 사람 몫' 을 받아 온다.
+  // 예전에는 이 키가 환경변수 하나였고, 그래서 누가 가입하든 같은 사람의 기록이 보였다.
+  async getLink() {
+    if (!this.ready()) return null;
+    try {
+      const r = await fetch(`${this._dbUrl}/users/${this._uid}/_link.json${await this._q()}`);
+      if (!r.ok) return null;
+      return await r.json();
+    } catch (e) { return null; }
+  },
+
+  // PATCH 다 — 나중에 다른 연동이 늘어도 서로 지우지 않는다.
+  async setLink(patch) {
+    if (!this.ready()) return false;
+    try {
+      const r = await fetch(`${this._dbUrl}/users/${this._uid}/_link.json${await this._q()}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(patch),
+      });
+      return r.ok;
+    } catch (e) { return false; }
+  },
+
   // 구버전 경로(구글 sub) → 새 경로(Firebase UID) 1회 이전
   async _migrateLegacy() {
     if (!this._legacyUid || this._legacyUid === this._uid) return;
@@ -101,7 +127,10 @@ const FirebaseSync = {
     if (!remoteData || typeof remoteData !== 'object') return 0;
     let n = 0;
     Object.entries(remoteData).forEach(([k,v]) => {
-      if (!k || k==='_savedAt' || v==null) return;
+      // '_' 로 시작하는 칸은 앱 데이터가 아니라 서버가 쓰는 자리다(_savedAt, _link).
+      // 예전엔 _savedAt 만 걸렀는데, 그러면 새로 생긴 _link 가 localStorage 에
+      // '[object Object]' 로 내려앉는다. 규칙으로 막아 둔다.
+      if (!k || k.charAt(0)==='_' || v==null) return;
       localStorage.setItem(k, String(v));
       n++;
     });
