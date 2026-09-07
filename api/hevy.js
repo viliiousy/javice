@@ -11,6 +11,12 @@
 //
 // API 키는 서버에만 둔다. Hevy API 에는 기록을 만들고 지우는 엔드포인트도 있다 —
 // 브라우저에 두면 그건 공개된 것과 같다.
+//
+// 2026-09-01: 사람마다 제 키를 쓴다.
+// 예전에는 HEVY_API_KEY / HEVY_UID 가 환경변수 하나씩이었다. 그러면 누가 가입하든
+// 같은 사람의 운동 기록이 보인다 — 앱스토어 심사관이 데모 계정으로 들어와도 그렇다.
+// 이제 키는 /users/<uid>/_link/hevyKey 에 사람마다 따로 있고, 크론은 키가 있는 사람만 돈다.
+// 키가 없는 사람은 그냥 Hevy 연동이 없는 것이고, 그건 오류가 아니다.
 
 const { fbFetch, fbGet } = require('../lib/fb-admin');
 const { koName } = require('../lib/hevy-map');
@@ -20,10 +26,11 @@ const RAW_KEY = 'gl_hevy_v1';
 const RT_KEY  = 'gl_hevy_routines_v1';   // 루틴(계획). 기록과 달리 자주 안 바뀐다.
 const KEEP    = 200;      // 오래된 것부터 잘라낸다. 대시보드는 최근을 본다.
 const MAX_PAGE = 30;
+const MAX_USERS = 20;   // 한 번 실행에서 볼 사람 수 상한. 크론이 예산 안에 끝나야 한다.
 
-async function hevy(path) {
+async function hevy(path, apiKey) {
   const r = await fetch(API + path, {
-    headers: { 'api-key': process.env.HEVY_API_KEY, 'Accept': 'application/json' },
+    headers: { 'api-key': apiKey, 'Accept': 'application/json' },
   });
   const text = await r.text();
   let body = null;
@@ -93,16 +100,48 @@ function normRoutine(r) {
 }
 
 // 한 번 찾으면 바뀌지 않는다. 웜 인스턴스에서 왕복 하나를 던다 — 5초 예산이 빠듯해서다.
-let _prefix = null;
+//
+// 캐시는 반드시 uid 별이어야 한다. 예전엔 전역 변수 하나였는데, 사람이 둘이 되는 순간
+// 두 번째 사람이 첫 번째 사람의 prefix 로 경로를 만든다 — 남의 칸에 쓰는 것이다.
+const _prefix = new Map();
 async function findPrefix(uid) {
-  if (_prefix) return _prefix;
+  if (_prefix.has(uid)) return _prefix.get(uid);
   const keys = await fbGet('/users/' + uid + '.json?shallow=true');
-  if (!keys || typeof keys !== 'object') return null;
-  for (const k of Object.keys(keys)) {
-    const m = k.match(/^(u_.+?_)gl_/);
-    if (m) { _prefix = m[1]; return _prefix; }
+  let found = null;
+  if (keys && typeof keys === 'object') {
+    for (const k of Object.keys(keys)) {
+      const m = k.match(/^(u_.+?_)gl_/);
+      if (m) { found = m[1]; break; }
+    }
   }
+  _prefix.set(uid, found);
+  return found;
+}
+
+// 이 사람의 Hevy API 키. 없으면 null — 연동을 안 한 사람이다.
+//
+// HEVY_UID/HEVY_API_KEY 환경변수는 옮겨 심는 동안만 남겨 둔다. 그 사람이 앱에서
+// 키를 한 번 넣으면 Firebase 쪽이 이기고, 그때 환경변수를 지우면 된다.
+async function hevyKeyFor(uid) {
+  try {
+    const k = await fbGet('/users/' + uid + '/_link/hevyKey.json');
+    if (typeof k === 'string' && k.trim()) return k.trim();
+  } catch (e) { /* 아직 없는 경로는 오류가 아니다 */ }
+  if (uid === process.env.HEVY_UID && process.env.HEVY_API_KEY) return process.env.HEVY_API_KEY;
   return null;
+}
+
+// 키를 넣어 둔 사람들. shallow 로 uid 목록만 받고 한 명씩 확인한다.
+async function usersWithKey() {
+  const all = await fbGet('/users.json?shallow=true');
+  const uids = (all && typeof all === 'object') ? Object.keys(all) : [];
+  const out = [];
+  for (const uid of uids) {
+    if (out.length >= MAX_USERS) break;          // 크론이 예산 안에 끝나야 한다
+    const key = await hevyKeyFor(uid);
+    if (key) out.push({ uid: uid, key: key });
+  }
+  return out;
 }
 
 async function readList(path) {
@@ -122,12 +161,12 @@ async function touch(uid) {
   }).catch(() => {});
 }
 
-async function syncRoutines(path) {
+async function syncRoutines(path, apiKey) {
   const out = [];
   let pages = 1;
   // pageSize 는 10 이 최대다(Hevy 문서). 루틴 쉰 개까지는 다섯 번이면 다 받는다.
   for (let p = 1; p <= Math.min(pages, 5); p++) {
-    const r = await hevy('/routines?page=' + p + '&pageSize=10');
+    const r = await hevy('/routines?page=' + p + '&pageSize=10', apiKey);
     if (r.status !== 200) return { ok: false, status: r.status, head: r.head };
     pages = (r.body && r.body.page_count) || 1;
     for (const x of ((r.body && r.body.routines) || [])) {
@@ -147,12 +186,76 @@ async function syncRoutines(path) {
   return { ok: true, changed: true, n: out.length };
 }
 
+// 한 사람 몫. 예전에는 이게 전부 handler 안에 펼쳐져 있었는데,
+// 사람이 여럿이 되면서 같은 일을 반복해야 해서 밖으로 뺐다.
+async function syncOne(uid, apiKey, opts) {
+  const wantAll  = !!(opts && opts.all);
+  const withRoutines = !!(opts && opts.routines);
+
+  const prefix = await findPrefix(uid);
+  // 앱에 한 번도 로그인하지 않은 계정이다. 오류로 세우지 않고 이 사람만 건너뛴다 —
+  // 크론은 나머지 사람들 몫을 마저 해야 한다.
+  if (!prefix) return { uid: uid, skipped: '앱 데이터 없음' };
+
+  const path = '/users/' + uid + '/' + prefix + RAW_KEY + '.json';
+  const cur  = await readList(path);
+  // 처음이면 전체를 긁는다. 그 뒤로는 최근 한 페이지면 충분하다 —
+  // 웹후크가 즉시 넣고, 크론은 한 시간 안의 빠진 것만 메우면 된다.
+  const full = cur.length === 0 || wantAll;
+
+  const fetched = [];
+  let pages = 1;
+  for (let p = 1; p <= (full ? Math.min(pages, MAX_PAGE) : 1); p++) {
+    const r = await hevy('/workouts?page=' + p + '&pageSize=10', apiKey);
+    if (r.status !== 200) return { uid: uid, error: 'Hevy 응답 ' + r.status, head: r.head, page: p };
+    pages = (r.body && r.body.page_count) || 1;
+    for (const w of ((r.body && r.body.workouts) || [])) {
+      const n = normalize(w);
+      if (n.dt && n.items.length) fetched.push(n);
+    }
+  }
+
+  const byId = new Map(cur.filter(w => w && w.id).map(w => [w.id, w]));
+  let added = 0, updated = 0;
+  for (const w of fetched) {
+    const old = byId.get(w.id);
+    if (!old) { added++; byId.set(w.id, w); continue; }
+    // 같은 운동을 다시 받아온 것뿐이면 건드리지 않는다. 매시간 같은 값을 덮어쓰면
+    // 다른 기기가 매번 '변경됨' 으로 깨어나 토스트를 띄운다.
+    if (JSON.stringify(old) !== JSON.stringify(w)) { updated++; byId.set(w.id, w); }
+  }
+  const out = Array.from(byId.values())
+    .sort((a, b) => String(a.dt).localeCompare(String(b.dt)))
+    .slice(-KEEP);
+
+  // 루틴은 크론(GET)에서만 받아 온다. 웹후크(POST)는 5초 안에 끝나야 해서
+  // 왕복을 하나라도 더 얹으면 안 된다. 루틴은 급할 일이 없다 — 한 시간이면 충분하다.
+  const rt = withRoutines
+    ? await syncRoutines('/users/' + uid + '/' + prefix + RT_KEY + '.json', apiKey)
+    : { skipped: true };
+
+  // 바뀐 게 없으면 쓰지 않는다. 매시간 같은 값을 덮어쓰면 다른 기기가 매번 '변경됨' 으로 깨어난다.
+  if (!added && !updated) {
+    // 루틴만 바뀌었을 수도 있다. 그때는 타임스탬프를 올려 다른 기기가 알아채게 한다.
+    if (rt && rt.changed) await touch(uid);
+    return { uid: uid, changed: false, total: out.length, full: full, routines: rt };
+  }
+
+  // 앱이 localStorage 문자열로 다루므로 같은 형식(JSON 문자열)으로 저장한다.
+  const put = await fbFetch(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(JSON.stringify(out)),
+  });
+  if (!put.ok) return { uid: uid, error: 'RTDB PUT ' + put.status };
+
+  await touch(uid);
+  return { uid: uid, changed: true, added: added, updated: updated,
+           total: out.length, full: full, routines: rt };
+}
+
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
-
-  const uid = process.env.HEVY_UID || process.env.INBODY_UID;   // 같은 사람의 Firebase UID 다
-  if (!process.env.HEVY_API_KEY) { res.status(500).json({ error: 'HEVY_API_KEY 미설정' }); return; }
-  if (!uid) { res.status(500).json({ error: 'HEVY_UID / INBODY_UID 미설정' }); return; }
 
   // PING_SECRET 은 바깥 스케줄러(cron-job.org) 몫이다. 자세한 사연은 api/cron-notify.js 참고.
   const NAMES = ['CRON_SECRET', 'HEVY_WEBHOOK_SECRET', 'PING_SECRET'];
@@ -178,67 +281,55 @@ module.exports = async function handler(req, res) {
   // 눈치채지 못한다 — 자세한 사연은 api/cron-notify.js 참고.
   const reply = (code, body) => { if (!replied) { replied = true; res.status(code).json({ endpoint:'hevy', ...body }); } };
 
+  const q       = req.query || {};
+  const wantAll = q.sync === 'all';
+
   try {
-    const prefix = await findPrefix(uid);
-    if (!prefix) { reply(409, { error: '앱 데이터를 찾지 못했습니다. 앱에서 한 번 로그인해 주세요.' }); return; }
-    const path = '/users/' + uid + '/' + prefix + RAW_KEY + '.json';
-
-    const cur  = await readList(path);
-    // 처음이면 전체를 긁는다. 그 뒤로는 최근 한 페이지면 충분하다 —
-    // 웹후크가 즉시 넣고, 크론은 한 시간 안의 빠진 것만 메우면 된다.
-    const full = cur.length === 0 || (req.query && req.query.sync === 'all');
-
-    const fetched = [];
-    let pages = 1;
-    for (let p = 1; p <= (full ? Math.min(pages, MAX_PAGE) : 1); p++) {
-      const r = await hevy('/workouts?page=' + p + '&pageSize=10');
-      if (r.status !== 200) { reply(502, { error: 'Hevy 응답 ' + r.status, head: r.head, page: p }); return; }
-      pages = (r.body && r.body.page_count) || 1;
-      for (const w of ((r.body && r.body.workouts) || [])) {
-        const n = normalize(w);
-        if (n.dt && n.items.length) fetched.push(n);
-      }
-    }
-
-    const byId = new Map(cur.filter(w => w && w.id).map(w => [w.id, w]));
-    let added = 0, updated = 0;
-    for (const w of fetched) {
-      const old = byId.get(w.id);
-      if (!old) { added++; byId.set(w.id, w); continue; }
-      // 같은 운동을 다시 받아온 것뿐이면 건드리지 않는다. 매시간 같은 값을 덮어쓰면
-      // 다른 기기가 매번 '변경됨' 으로 깨어나 토스트를 띄운다.
-      if (JSON.stringify(old) !== JSON.stringify(w)) { updated++; byId.set(w.id, w); }
-    }
-    const out = Array.from(byId.values())
-      .sort((a, b) => String(a.dt).localeCompare(String(b.dt)))
-      .slice(-KEEP);
-
-    // 루틴은 크론(GET)에서만 받아 온다. 웹후크(POST)는 5초 안에 끝나야 해서
-    // 왕복을 하나라도 더 얹으면 안 된다. 루틴은 급할 일이 없다 — 한 시간이면 충분하다.
-    const rt = req.method === 'GET'
-      ? await syncRoutines('/users/' + uid + '/' + prefix + RT_KEY + '.json')
-      : { skipped: true };
-
-    // 바뀐 게 없으면 쓰지 않는다. 매시간 같은 값을 덮어쓰면 다른 기기가 매번 '변경됨' 으로 깨어난다.
-    if (!added && !updated) {
-      // 루틴만 바뀌었을 수도 있다. 그때는 타임스탬프를 올려 다른 기기가 알아채게 한다.
-      if (rt && rt.changed) await touch(uid);
-      reply(200, { ok: true, changed: false, total: out.length, full: full, routines: rt });
+    // ── 웹후크(POST): 한 사람만 ────────────────────────────────
+    // 웹후크는 Hevy 계정 하나에 URL 하나다. 그 URL 을 등록한 사람이 누구인지는
+    // 본문으로 알 수 없으므로 ?u=<uid> 로 받는다. 비밀은 위에서 이미 확인했다 —
+    // 이 비밀은 운영자만 아는 값이라, 웹후크는 사실상 운영자 전용 통로다.
+    // 다른 사람은 웹후크 없이 매시 크론으로 받는다. 한 시간 늦을 뿐 빠지지는 않는다.
+    if (req.method === 'POST') {
+      const uid = q.u || process.env.HEVY_UID || process.env.INBODY_UID;
+      if (!uid) { reply(400, { error: '대상 uid 가 없습니다 (?u=<uid>)' }); return; }
+      const key = await hevyKeyFor(uid);
+      if (!key) { reply(409, { error: 'Hevy API 키가 없습니다', uid: uid }); return; }
+      const r = await syncOne(uid, key, { all: wantAll, routines: false });
+      reply(r.error ? 502 : 200, { ok: !r.error, users: 1, results: [r] });
       return;
     }
 
-    // 앱이 localStorage 문자열로 다루므로 같은 형식(JSON 문자열)으로 저장한다.
-    const put = await fbFetch(path, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(JSON.stringify(out)),
-    });
-    if (!put.ok) throw new Error('RTDB PUT ' + put.status);
+    // ── 크론(GET): 키를 넣어 둔 사람 전부 ──────────────────────
+    // ?u=<uid> 를 주면 그 사람만 돈다. 손으로 한 명을 확인할 때 쓴다.
+    let targets;
+    if (q.u) {
+      const key = await hevyKeyFor(q.u);
+      if (!key) { reply(409, { error: 'Hevy API 키가 없습니다', uid: q.u }); return; }
+      targets = [{ uid: q.u, key: key }];
+    } else {
+      targets = await usersWithKey();
+    }
 
-    await touch(uid);
+    // 아무도 연동하지 않았어도 200 이다. 이건 고장이 아니라 '할 일이 없음' 이다 —
+    // 500 을 내면 크론 실패 메일이 매시간 온다.
+    if (!targets.length) { reply(200, { ok: true, users: 0, note: 'Hevy 키를 넣은 사람이 없습니다' }); return; }
 
-    reply(200, { ok: true, changed: true, added: added, updated: updated, total: out.length,
-                 full: full, routines: rt });
+    const results = [];
+    for (const t of targets) {
+      try {
+        results.push(await syncOne(t.uid, t.key, { all: wantAll, routines: true }));
+      } catch (e) {
+        // 한 사람이 넘어져도 나머지는 마저 돈다.
+        results.push({ uid: t.uid, error: e.message });
+      }
+    }
+
+    const failed  = results.filter(r => r.error).length;
+    const changed = results.filter(r => r.changed).length;
+    reply(failed === results.length ? 502 : 200,
+          { ok: failed < results.length, users: results.length,
+            changed: changed, failed: failed, results: results });
   } catch (e) {
     console.error('[hevy]', e);
     reply(500, { error: e.message });
