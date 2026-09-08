@@ -73,14 +73,31 @@ const Diet = {
   saveHistory(v){ UserStore.set(this._histKey(),JSON.stringify(v.slice(0,200))); FirebaseSync?.scheduleSave(); },
   addToHistory(food){
     const h=this.getHistory();
-    // 중복 제거 후 맨 앞에 추가
-    const filtered=h.filter(f=>f.name!==food.name);
-    filtered.unshift({...food,lastAdded:new Date().toISOString()});
-    this.saveHistory(filtered);
+    const i=h.findIndex(f=>f&&f.name===food.name);
+    // 예전 기록에는 n 이 없다. 목록에 있다는 건 최소 한 번은 먹었다는 뜻이므로 1 로 친다.
+    const n=i>=0 ? (Number(h[i].n)||1)+1 : 1;
+    if(i>=0) h.splice(i,1);
+    h.unshift({...food, n, lastAdded:new Date().toISOString()});
+    this._hIdx=null;                       // 아래 색인을 무효화한다
+    this.saveHistory(h);
   },
   getRecentUnique(n=10){
     return this.getHistory().slice(0,n);
   },
+
+  // 이름 → {n, last} 색인.
+  // getFreqLast30 은 이름 하나당 30일치를 다시 읽는다. 목록 서른 줄을 정렬하려면
+  // 900번을 읽어야 해서 쓸 수가 없다. 히스토리에 세어 둔 값을 한 번만 훑는다.
+  _histIndex(){
+    if(this._hIdx) return this._hIdx;
+    const m=new Map();
+    for(const f of this.getHistory()){
+      if(f&&f.name) m.set(f.name,{ n:Number(f.n)||1, last:f.lastAdded||'' });
+    }
+    this._hIdx=m;
+    return m;
+  },
+  eaten(name){ return this._histIndex().get(name)||null; },
   getFreqLast30(name){
     // 최근 30일간 해당 음식 추가 횟수
     const now=new Date();
@@ -383,35 +400,68 @@ JSON 만 출력해. 다른 말은 붙이지 마.
         else if(this._cho(f.n).includes(q)) rank = 4;   // 한글 자모가 섞여도 잡아준다
       }
       if(rank < 0) continue;
-      // 즐겨찾기는 무조건 위로 (god_life 의 favs.concat(rest) 와 같은 규칙)
-      scored.push([favs.includes(f.n) ? -1 : rank, f.n.length, f]);
+      // 층을 나눈다. 같은 층 안에서만 관련도·횟수로 겨룬다.
+      //   -2 즐겨찾기 / -1 이름이 정확히 같음 / 0 내가 먹어 본 것 / 1 나머지
+      // '닭가슴살' 을 치면 닭가슴살 제품이 수십 개 나온다. 그중 내가 실제로 먹은 게
+      // 맨 위로 와야 한다 — 다만 이름이 딱 맞는 것보다 위로 갈 수는 없다.
+      const ate = this.eaten(f.n);
+      const tier = favs.includes(f.n) ? -2 : (rank===0 ? -1 : (ate ? 0 : 1));
+      scored.push([tier, rank, -(ate ? ate.n : 0), f.n.length, f]);
     }
-    scored.sort((a,b)=>a[0]-b[0] || a[1]-b[1]);
-    return scored.slice(0,30).map(x=>x[2]);
+    scored.sort((a,b)=>a[0]-b[0] || a[1]-b[1] || a[2]-b[2] || a[3]-b[3]);
+    return scored.slice(0,30).map(x=>x[4]);
+  },
+  // 최근 먹은 것. 히스토리에는 이름과 값만 있으므로, 같은 이름이 프리셋·AI 사전에
+  // 있으면 그쪽을 쓴다 — 이모지와 단위가 붙어 있어 목록에서 알아보기 쉽다.
+  _recent(limit=8){
+    const idx=new Map(this._allFoods().map(f=>[f.n,f]));
+    const out=[];
+    for(const h of this.getHistory()){
+      if(!h||!h.name) continue;
+      out.push(idx.get(h.name) || { e:'🍴', n:h.name, u:h.unit||'', c:h.cal||0,
+                                     p:h.protein||0, cb:h.carb||0, ft:h.fat||0 });
+      if(out.length>=limit) break;
+    }
+    return out;
+  },
+  // 검색 결과와 '최근 먹은 것' 이 같은 줄 모양을 쓴다. 둘이 달라 보이면
+  // 위에 있는 게 눌러도 되는 것인지 사람이 한 번 더 생각하게 된다.
+  _foodRowHtml(f, i, meal, ds, favs){
+    const fv=favs.includes(f.n);
+    const ate=this.eaten(f.n);
+    return `<div class="diet-food">
+      <button class="diet-food-fav${fv?' on':''}" title="즐겨찾기"
+        onclick="event.stopPropagation();Diet.favFromSearch(${i},'${meal}','${ds}')">${fv?'★':'☆'}</button>
+      <div class="diet-food-main" onclick="Diet.selectFood(${i},'${meal}','${ds}')">
+        <span class="diet-food-nm">${f.e} ${esc(f.n)}</span>
+        ${f.u?`<span class="diet-food-u">${esc(f.u)}</span>`:''}
+        ${ate?`<span class="diet-food-n" title="지금까지 담은 횟수">${ate.n}회</span>`:''}
+      </div>
+      <span class="diet-food-cal">${f.c}<i>kcal</i></span>
+    </div>`;
   },
   searchFood(q, meal, ds){
     const box=document.getElementById('dietSearchRes'); if(!box) return;
+    const favs=this.getFavs();
+    // 검색어가 없으면 빈 화면 대신 최근 먹은 것을 보여 준다.
+    // 매일 먹는 게 대체로 비슷해서, 대부분은 여기서 바로 끝난다.
+    if(!String(q||'').trim()){
+      const rec=this._recent(8);
+      this._hits=rec;
+      box.innerHTML = rec.length
+        ? `<div class="diet-rec-hd">최근 먹은 것</div>`
+          + rec.map((f,i)=>this._foodRowHtml(f,i,meal,ds,favs)).join('')
+        : '';
+      return;
+    }
     const hits=this._search(q);
     this._hits=hits;
-    if(!String(q||'').trim()){ box.innerHTML=''; return; }
     if(!hits.length){
       box.innerHTML=`<div class="diet-empty-hint">「${esc(q)}」 결과가 없습니다</div>`
         + this._aiBtnHtml(meal, ds);
       return;
     }
-    const favs=this.getFavs();
-    box.innerHTML=hits.map((f,i)=>{
-      const fv=favs.includes(f.n);
-      return `<div class="diet-food">
-        <button class="diet-food-fav${fv?' on':''}" title="즐겨찾기"
-          onclick="event.stopPropagation();Diet.favFromSearch(${i},'${meal}','${ds}')">${fv?'★':'☆'}</button>
-        <div class="diet-food-main" onclick="Diet.selectFood(${i},'${meal}','${ds}')">
-          <span class="diet-food-nm">${f.e} ${esc(f.n)}</span>
-          ${f.u?`<span class="diet-food-u">${esc(f.u)}</span>`:''}
-        </div>
-        <span class="diet-food-cal">${f.c}<i>kcal</i></span>
-      </div>`;
-    }).join('');
+    box.innerHTML=hits.map((f,i)=>this._foodRowHtml(f,i,meal,ds,favs)).join('');
     // 비슷한 게 나왔지만 찾던 게 아닐 수 있다. 이름이 딱 맞는 게 없으면 AI 길도 열어 둔다.
     const exact = hits.some(f=>f.n.toLowerCase()===String(q).trim().toLowerCase());
     if(!exact) box.innerHTML += this._aiBtnHtml(meal, ds);
@@ -596,7 +646,8 @@ JSON 만 출력해. 다른 말은 붙이지 마.
         <button id="dietCommit" onclick="Diet.commitCart('${meal}','${ds}')" class="btn-sm accent" disabled>담은 음식 없음</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
       </div>`);
-    setTimeout(()=>{ this._paintCart(meal, ds); document.getElementById('dietSearch')?.focus(); },50);
+    setTimeout(()=>{ this._paintCart(meal, ds); this.searchFood('', meal, ds);
+                     document.getElementById('dietSearch')?.focus(); },50);
   },
 
   // 빠른 추가도 검색과 같은 흐름을 탄다 — 누르면 선택되고, 수량을 정한 뒤 추가한다.
