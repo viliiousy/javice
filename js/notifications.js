@@ -143,7 +143,7 @@ const Notifications = {
     const body     = { uid, token, settings, deviceId: this.deviceId(), ua: navigator.userAgent };
     if (prev && prev !== uid) body.prevUid = prev;   // 구경로 등록분 삭제 요청
     try {
-      const res  = await fetch('/api/subscribe', {
+      const res  = await fetch(Platform.api('/api/subscribe'), {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(body),
