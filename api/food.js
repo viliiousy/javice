@@ -48,14 +48,30 @@ function rank(nameRaw, qRaw) {
 function normalize(it) {
   const serving = String(it.DISH_ONE_SERVING || it.SERVING_SIZE || '').trim();
   const m = serving.match(/^([\d.]+)\s*(g|mL|ml|ML)?$/);
+  const unit = m && /ml/i.test(m[2] || '') ? 'mL' : 'g';
+
+  // Z10500 은 제품 한 개의 중량이다. '비요뜨 초코링' 은 138.000g —
+  // 이런 건 100g 씩 사는 게 아니라 한 개씩 먹으므로 그 단위로 담을 수 있어야 한다.
+  // 기준량과 단위가 다르면(g vs mL) 환산할 수 없다. 억지로 맞추면 숫자가 틀린다.
+  const pm = String(it.Z10500 || '').trim().match(/^([\d.]+)\s*(g|ml|mL|ML|G)?$/);
+  let pack = null;
+  if (pm) {
+    const pv = Number(pm[1]);
+    const pu = String(pm[2] || 'g').toLowerCase() === 'ml' ? 'mL' : 'g';
+    if (isFinite(pv) && pv > 0 && pv <= 5000 && pu === unit) pack = Math.round(pv * 10) / 10;
+  }
+
   return {
+    pack:    pack,                                   // 제품 1개 중량 (모르면 null)
+    maker:   String(it.MAKER_NM || '').trim(),
+    label:   String(it.NUTRI_AMOUNT_SERVING || '').trim(),   // 포장에 적힌 기준량
     code:    it.FOOD_CD || '',
     name:    it.FOOD_NM_KR || '',
     group:   it.DB_GRP_NM || '',      // 음식 / 가공식품
     cls:     it.DB_CLASS_NM || '',    // 품목대표 / 상용제품 / 외식
     cat:     it.FOOD_CAT1_NM || '',
     per:     m ? Number(m[1]) : null, // 이 값들이 몇 g/mL 기준인지
-    unit:    m && /ml/i.test(m[2] || '') ? 'mL' : 'g',
+    unit:    unit,
     kcal:    num(it.AMT_NUM1),
     protein: num(it.AMT_NUM3),
     fat:     num(it.AMT_NUM4),
