@@ -112,12 +112,35 @@ const Diet = {
     return count;
   },
 
+  // 칼로리는 있는데 단·탄·지가 전부 0 인 항목은 '0' 이 아니라 '모름' 이다.
+  // 프리셋 316개에는 애초에 매크로 칸이 없어서 전부 0 으로 들어온다 —
+  // 그걸 0 으로 보여 주면 닭가슴살 단백질이 0g 이라고 말하는 셈이고, 그건 정반대다.
+  // (칼로리가 0 인 것은 물·블랙커피처럼 실제로 0 일 수 있으므로 건드리지 않는다.)
+  isUnknown(i){
+    return (Number(i.cal)||0) > 0 &&
+           !((Number(i.protein)||0) || (Number(i.carb)||0) || (Number(i.fat)||0));
+  },
+  // 아는 것만 더한다. 모르는 개수는 따로 들고 나가서 화면이 '+' 로 알린다.
+  sumMacros(items){
+    let cal=0,protein=0,carb=0,fat=0,unknown=0,known=0;
+    (items||[]).forEach(i=>{
+      cal+=i.cal||0;
+      if(this.isUnknown(i)){ unknown++; return; }
+      known++;
+      protein+=i.protein||0; carb+=i.carb||0; fat+=i.fat||0;
+    });
+    return {cal,protein,carb,fat,unknown,known};
+  },
   totals(data){
-    let cal=0,protein=0,carb=0,fat=0;
-    Object.values(data).forEach(m=>m.forEach(i=>{
-      cal+=i.cal||0; protein+=i.protein||0; carb+=i.carb||0; fat+=i.fat||0;
-    }));
-    return {cal,protein,carb,fat};
+    return this.sumMacros(Object.values(data||{}).flat());
+  },
+
+  // 모르는 게 섞였는지에 따라 다르게 쓴다.
+  //   아는 게 하나도 없으면 '—'  (0 이라고 말하지 않는다)
+  //   일부만 알면 '12+'          (적어도 이만큼, 더 있을 수 있다)
+  macroTxt(v, t, unit='g'){
+    if(t.known===0 && t.unknown>0) return '—';
+    return Math.round(v) + (unit?`<i>${unit}</i>`:'') + (t.unknown?'<sup class="macro-plus">+</sup>':'');
   },
 
   render(date=new Date()){
@@ -138,15 +161,13 @@ const Diet = {
     const mealsHTML=this.MEALS.map(meal=>{
       const items=data[meal]||[];
       const mealCal=items.reduce((s,i)=>s+(i.cal||0),0);
-      const mp=items.reduce((s,i)=>s+(i.protein||0),0);
-      const mc=items.reduce((s,i)=>s+(i.carb||0),0);
-      const mf=items.reduce((s,i)=>s+(i.fat||0),0);
+      const mt=this.sumMacros(items);
       const open=!!this._open[meal];
       // 접힌 줄 하나로 그 끼니를 다 말한다 — 뭘 먹었고, 몇 kcal 이고, 단탄지가 얼마인지.
       const names=items.map(i=>i.name);
       const sum=items.length
         ? `<b>${esc(names.slice(0,2).join(', '))}${names.length>2?` 외 ${names.length-2}`:''}</b>`
-          + ` · ${mealCal}kcal · 단 ${Math.round(mp)} · 탄 ${Math.round(mc)} · 지 ${Math.round(mf)}`
+          + ` · ${mealCal}kcal · 단 ${this.macroTxt(mt.protein,mt,'')} · 탄 ${this.macroTxt(mt.carb,mt,'')} · 지 ${this.macroTxt(mt.fat,mt,'')}`
         : '기록 없음';
       return `<div class="meal-sec${open?' open':''}">
         <div class="meal-hd" onclick="Diet.toggleMeal('${meal}','${ds}')">
@@ -188,10 +209,11 @@ const Diet = {
         </div>
       </div>
       <div class="diet-macros">
-        <div class="macro"><span class="macro-lbl">단백질</span><span class="macro-val" style="color:var(--cyan)">${Math.round(t.protein)}<i>g</i></span><span class="macro-goal">/${s.proteinGoal}</span></div>
-        <div class="macro"><span class="macro-lbl">탄수</span><span class="macro-val" style="color:var(--yellow)">${Math.round(t.carb)}<i>g</i></span><span class="macro-goal">/${s.carbGoal}</span></div>
-        <div class="macro"><span class="macro-lbl">지방</span><span class="macro-val" style="color:var(--accent-l)">${Math.round(t.fat)}<i>g</i></span><span class="macro-goal">/${s.fatGoal}</span></div>
+        <div class="macro"><span class="macro-lbl">단백질</span><span class="macro-val" style="color:var(--cyan)">${this.macroTxt(t.protein,t)}</span><span class="macro-goal">/${s.proteinGoal}</span></div>
+        <div class="macro"><span class="macro-lbl">탄수</span><span class="macro-val" style="color:var(--yellow)">${this.macroTxt(t.carb,t)}</span><span class="macro-goal">/${s.carbGoal}</span></div>
+        <div class="macro"><span class="macro-lbl">지방</span><span class="macro-val" style="color:var(--accent-l)">${this.macroTxt(t.fat,t)}</span><span class="macro-goal">/${s.fatGoal}</span></div>
       </div>
+      ${t.unknown?`<div class="diet-macro-note">${t.unknown}개 음식은 영양정보가 없어 빠져 있어요 — 눌러서 채울 수 있어요</div>`:''}
       ${mealsHTML}`;
 
     if(typeof App!=='undefined') App._updateStatsBanner();
