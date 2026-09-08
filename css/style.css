@@ -2139,6 +2139,10 @@ html.dark .login-scope{ background:rgba(255,255,255,0.04); }
 /* 다크에서는 연한 파스텔이 그대로 튄다. 배경만 낮추고 글자색을 올린다. */
 html.dark .coach-warn .coach-dot{ background:rgba(220,38,38,0.18); color:#f87171; }
 html.dark .coach-good .coach-dot{ background:rgba(22,163,74,0.18); color:#4ade80; }
+
+/* 모르는 영양정보. '0' 과 눈으로 구분돼야 한다 — 0 은 없다는 뜻이고 —는 모른다는 뜻이다. */
+.macro-plus{ font-size:9px; font-weight:700; color:var(--text3); vertical-align:super; margin-left:1px; }
+.diet-macro-note{ font-size:11px; color:var(--text3); padding:4px 2px 0; line-height:1.5; }
 .diet-food-fav{
   flex:none; width:24px; height:24px; padding:0; cursor:pointer;
   background:transparent; border:none; font-size:14px; color:var(--text4); font-family:inherit;
