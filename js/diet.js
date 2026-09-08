@@ -256,7 +256,9 @@ const Diet = {
       if(!f || !f.n || seen.has(f.n)) continue;
       seen.add(f.n);
       // 🥗 는 식약처 실측, 🤖 는 AI 추정. 목록에서 둘을 구분할 수 있어야 한다.
-      ai.push({ e:f.src==='db'?'🥗':'🤖', n:f.n, u:f.u||'', c:f.c||0, p:f.p||0, cb:f.cb||0, ft:f.ft||0 });
+      // 🥗 식약처 실측 · 📋 포장 영양성분표 · 🤖 AI 추정. 어디서 온 숫자인지 보여야 한다.
+      const em = f.src==='db' ? '🥗' : f.src==='label' ? '📋' : '🤖';
+      ai.push({ e:em, n:f.n, u:f.u||'', c:f.c||0, p:f.p||0, cb:f.cb||0, ft:f.ft||0 });
     }
     const hist = this.getHistory()
       .filter(f => f && f.name && !seen.has(f.name))
@@ -274,7 +276,12 @@ const Diet = {
     list.unshift({ n:f.n, u:f.u, c:f.c, p:f.p, cb:f.cb, ft:f.ft, src:f.src||'ai', at:new Date().toISOString() });
     this.saveAiFoods(list);
   },
-  _attr(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); },
+  // onclick="Diet.x('여기')" 자리로 들어가는 글자다. 두 번 해석된다 — HTML 이 속성을 읽고,
+  // 그 결과를 JS 가 문자열로 읽는다. 따옴표 하나만 막으면 「김단단's」 같은 이름이 함수 호출을
+  // 깨뜨린다. 그래서 역슬래시와 홑따옴표도 같이 막는다.
+  _attr(s){ return String(s==null?'':s).replace(/[&<>"'\\]/g, c => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'\\&#39;', '\\':'\\\\',
+  }[c])); },
 
   _aiBtnHtml(meal, ds){
     return `<button class="diet-ai-btn" id="dietAiBtn" onclick="Diet.aiLookup('${meal}','${ds}')">AI 로 영양정보 찾기</button>
@@ -520,8 +527,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     const cur = (document.getElementById('dietSearch')?.value || '').trim();
     if(cur !== q) return;
     if(!j || !j.ok || !(j.items||[]).length){
-      box.innerHTML = `<div class="diet-empty-hint">식약처 DB 에도 「${esc(q)}」가 없어요</div>`
-        + this._aiBtnHtml(meal, ds);
+      box.innerHTML = this._labelHtml(q, meal, ds) + this._aiBtnHtml(meal, ds);
       return;
     }
     // 값은 100g 기준으로 온다. 제품 한 개의 중량을 알면 그 단위로 환산해서 담는다 —
@@ -550,8 +556,91 @@ JSON 만 출력해. 다른 말은 붙이지 마.
           </div>
           <span class="diet-food-cal">${f.c}<i>kcal</i></span>
         </div>`).join('')
-      + `<div class="diet-macro-note">단·탄·지가 함께 들어옵니다 · 담은 뒤 수량(−/+)으로 개수를 맞추세요</div>`;
+      + `<div class="diet-macro-note">${j.total > this._dbHits.length
+            ? `${Number(j.total).toLocaleString('ko-KR')}건 중 ${this._dbHits.length}개 · 제품명을 더 붙여 치면 좁혀져요 · `
+            : ''}담은 뒤 수량(−/+)으로 개수를 맞추세요</div>`
+      // 목록에 내 제품이 없을 수도 있다. 그때 갈 길을 여기서 같이 연다.
+      + this._labelHtml(q, meal, ds);
   },
+  // ── 영양성분표 촬영 ──────────────────────
+  // 식약처 DB 는 모든 제품을 담고 있지 않다. 실제로 '김단단 닭가슴살' 은 0건이었다.
+  // 그럴 때 AI 에게 '이 제품 몇 칼로리냐' 고 묻는 건 기억을 지어내게 하는 일이다.
+  // 포장의 표를 찍어 옮겨 적게 하는 건 전혀 다른 일이다 — 눈앞의 글자를 읽는 것이라
+  // 지어낼 여지가 없고, 애초에 그 표가 제조사가 신고한 값이라 가장 정확하다.
+  _labelHtml(q, meal, ds){
+    const A = this._attr(q);
+    return `<div class="diet-label-box">
+      <div class="diet-rec-hd">영양성분표 찍기 <i>가장 정확해요</i></div>
+      <div class="diet-label-hint">포장 뒷면의 표를 찍으면 <b>적힌 값을 그대로</b> 읽어 옵니다. 추정하지 않아요.</div>
+      <input id="lblFile" type="file" accept="image/*" capture="environment" style="display:none"
+             onchange="Diet._onLabelPick(this,'${A}','${meal}','${ds}')">
+      <button class="btn-sm dp-rt-btn" onclick="document.getElementById('lblFile').click()">영양성분표 촬영 / 선택</button>
+      <div id="lblResult"></div>
+    </div>`;
+  },
+  _onLabelPick(input, q, meal, ds){
+    const f = input.files && input.files[0];
+    if(!f) return;
+    const r = new FileReader();
+    r.onload = e => { this._lblB64 = String(e.target.result).split(',')[1]; this._readLabel(q, meal, ds); };
+    r.readAsDataURL(f);
+  },
+  async _readLabel(q, meal, ds){
+    const box = document.getElementById('lblResult');
+    if(!box) return;
+    if(!localStorage.getItem('gl_ai_key')){
+      box.innerHTML = `<div class="diet-empty-hint">Bashy API 키를 먼저 설정해주세요 (⚡→🔑)</div>`; return;
+    }
+    box.innerHTML = `<div class="diet-empty-hint">표를 읽는 중…</div>`;
+    // 이 프롬프트의 핵심은 '추정하지 마라' 다. 아는 제품이라도 기억으로 채우면
+    // 사진을 찍은 의미가 없어지고, 다시 지어낸 숫자가 사전에 저장된다.
+    const prompt = `이 사진은 식품 포장의 영양성분표다. 적혀 있는 값을 그대로 옮겨 적어라.
+추정하지 마라. 사진에서 읽을 수 없는 값은 null 로 둔다. 아는 제품이라도 기억으로 채우지 마라.
+기준량은 표에 적힌 문구를 그대로 쓴다 (예: "총 내용량 100g", "1회 제공량 30g").
+총 내용량당 값과 100g당 값이 둘 다 있으면 총 내용량 쪽을 쓴다.
+JSON 만 출력한다. 다른 말은 붙이지 마라.
+{"ok":true,"name":"제품명(읽히면)","basis":"기준량 문구","grams":숫자 또는 null,"kcal":숫자 또는 null,"protein":숫자 또는 null,"carb":숫자 또는 null,"fat":숫자 또는 null}
+영양성분표가 사진에 없으면 {"ok":false} 만 출력한다.`;
+    try{
+      const data = await JARVIS.chat({ max_tokens:700, temperature:0,
+        messages:[{ role:'user', content:[
+          { type:'image_url', image_url:{ url:`data:image/jpeg;base64,${this._lblB64}` } },
+          { type:'text', text: prompt },
+        ]}] }, 'vision');
+      const t = data.choices?.[0]?.message?.content || '';
+      let j = null; try{ const m = t.match(/\{[\s\S]*\}/); j = m ? JSON.parse(m[0]) : null; }catch(e){}
+      if(!j) { box.innerHTML = `<div class="diet-empty-hint">답을 읽지 못했어요. 다시 찍어 주세요</div>`; return; }
+      if(j.ok === false){ box.innerHTML = `<div class="diet-empty-hint">사진에서 영양성분표를 찾지 못했어요. 표가 잘 보이게 다시 찍어 주세요</div>`; return; }
+      if(j.kcal == null){ box.innerHTML = `<div class="diet-empty-hint">열량을 읽지 못했어요. 표가 흐리면 값이 빠집니다 — 다시 찍어 주세요</div>`; return; }
+      const A = s => this._attr(s);
+      const nm = String(j.name || q).trim().slice(0,40) || q;
+      const u  = String(j.basis || '').trim().slice(0,24);
+      box.innerHTML = `<div class="diet-ai-card">
+        <div class="diet-ai-hd"><span class="diet-ai-nm">📋 ${esc(nm)}</span>
+          <span class="diet-ai-u">${esc(u)}</span></div>
+        <div class="diet-label-hint">읽은 값이 맞는지 보고 고칠 수 있어요. 못 읽은 칸은 비어 있습니다.</div>
+        <div class="modal-grid2">
+          <label>열량(kcal)<input id="lbC"  type="number" class="inp inp-sm" value="${j.kcal ?? ''}"></label>
+          <label>단백질(g)<input id="lbP"  type="number" step="0.1" class="inp inp-sm" value="${j.protein ?? ''}"></label>
+          <label>탄수(g)<input id="lbCb" type="number" step="0.1" class="inp inp-sm" value="${j.carb ?? ''}"></label>
+          <label>지방(g)<input id="lbF"  type="number" step="0.1" class="inp inp-sm" value="${j.fat ?? ''}"></label>
+        </div>
+        <button class="btn-sm accent dp-rt-btn" onclick="Diet._saveLabel('${A(nm)}','${A(u)}','${meal}','${ds}')">담기</button>
+      </div>`;
+    }catch(err){
+      box.innerHTML = `<div class="diet-empty-hint">읽기 실패 · ${esc(err.message)}</div>`;
+    }
+  },
+  _saveLabel(name, unit, meal, ds){
+    const num = id => { const e = document.getElementById(id); const v = e ? parseFloat(e.value) : NaN; return isFinite(v) && v >= 0 ? v : 0; };
+    const f = { e:'📋', n:name, u:unit, c:Math.round(num('lbC')), p:num('lbP'), cb:num('lbCb'), ft:num('lbF') };
+    if(!f.c){ App.showToast('열량을 입력해주세요','error'); return; }
+    // 표에서 읽은 값이라는 걸 남긴다. 실측(db)·추정(ai)과 구분돼야 나중에 판단할 수 있다.
+    this._rememberAi({ ...f, src:'label' });
+    this.addToCart(f, meal, ds);
+    this._lblB64 = null;
+  },
+
   selectDbFood(i, meal, ds){
     const f = (this._dbHits||[])[i]; if(!f) return;
     // 사전에 남긴다. 같은 걸 또 검색하지 않아도 되고, 하루 1만 회 한도도 아낀다.
