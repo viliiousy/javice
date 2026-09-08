@@ -128,7 +128,7 @@ const Auth = {
     const idToken = await this._firebaseIdToken();
     if (!idToken) return false;
     try {
-      const r = await fetch('/api/gauth', {
+      const r = await fetch(Platform.api('/api/gauth'), {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ action: 'refresh', idToken }),
@@ -167,7 +167,7 @@ const Auth = {
 
     (async () => {
       try {
-        const r = await fetch('/api/gauth', {
+        const r = await fetch(Platform.api('/api/gauth'), {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({ action: 'exchange', code }),
@@ -202,7 +202,7 @@ const Auth = {
     const idToken = await this._firebaseIdToken();
     if (!idToken) return;
     try {
-      const r = await fetch('/api/gauth', {
+      const r = await fetch(Platform.api('/api/gauth'), {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ action: 'status', idToken }),
