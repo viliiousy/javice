@@ -143,7 +143,7 @@ const Scan = {
     const view = document.querySelector('#scanWrap .scan-view'); if(view) view.remove();
     this._say(`<b>${esc(code)}</b> 찾는 중…`);
     let j = null;
-    try{ const r = await fetch('/api/barcode?code=' + encodeURIComponent(code)); j = await r.json(); }
+    try{ const r = await fetch(Platform.api('/api/barcode?code=' + encodeURIComponent(code))); j = await r.json(); }
     catch(e){ j = null; }
     const box = document.getElementById('scanRes'); if(!box) return;
 
