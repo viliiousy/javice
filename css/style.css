@@ -2143,6 +2143,8 @@ html.dark .coach-good .coach-dot{ background:rgba(22,163,74,0.18); color:#4ade80
 /* 모르는 영양정보. '0' 과 눈으로 구분돼야 한다 — 0 은 없다는 뜻이고 —는 모른다는 뜻이다. */
 .macro-plus{ font-size:9px; font-weight:700; color:var(--text3); vertical-align:super; margin-left:1px; }
 .diet-macro-note{ font-size:11px; color:var(--text3); padding:4px 2px 0; line-height:1.5; }
+/* 환산 전 기준량. 숫자를 의심할 때 확인할 수 있어야 한다. */
+.diet-food-note{ font-size:10.5px; color:var(--text3); flex:none; }
 .diet-food-fav{
   flex:none; width:24px; height:24px; padding:0; cursor:pointer;
   background:transparent; border:none; font-size:14px; color:var(--text4); font-family:inherit;
