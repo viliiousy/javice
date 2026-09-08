@@ -540,7 +540,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     box.innerHTML = `<div class="diet-rec-hd">식약처 영양성분DB 찾는 중…</div>`;
     let j = null;
     try {
-      const r = await fetch('/api/food?q=' + encodeURIComponent(q) + '&rows=8');
+      const r = await fetch(Platform.api('/api/food?q=' + encodeURIComponent(q) + '&rows=8'));
       j = await r.json();
     } catch(e) { j = null; }
     // 오가는 사이에 검색어가 바뀌었으면 늦게 온 답은 버린다.
