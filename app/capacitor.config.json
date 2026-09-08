@@ -1,0 +1,15 @@
+{
+  "appId": "app.bashy",
+  "appName": "Bashy",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "always",
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "server": {
+    "iosScheme": "capacitor"
+  },
+  "plugins": {
+    "PushNotifications": { "presentationOptions": ["badge", "sound", "alert"] }
+  }
+}
