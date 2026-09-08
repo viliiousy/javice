@@ -122,20 +122,27 @@ const Fitness = {
           typeof Icons!=='undefined'?Icons.svg('gear','tf-ic'):'⚙'}</button>`;
 
     const container = document.getElementById('fitnessWrap');
+    const ds = Fitness._dateStr(date);
+
     if (!allEx.length) {
+      // 계획이 휴식일이어도 그날 실제로 운동했으면 기록과 피드백은 보여야 한다.
+      // 예전엔 여기서 그냥 빠져나가서, 계획에 없던 날의 운동은 어디서도 볼 수 없었다.
+      const didWork = typeof Hevy!=='undefined' && (Hevy.byDate(ds)||[]).length;
       container.innerHTML=`
       <div class="fit-tabs">${tabs}</div>
       <div style="text-align:center;padding:20px 16px;color:var(--text2)">
         ${Icons.big('moon')}
-        <p>${plan.name} — 휴식일입니다.<br><span style="color:var(--text3);font-size:12px">다른 요일을 눌러 계획을 볼 수 있어요</span></p>
-      </div>${isToday?'<div class="habit-add-btn" onclick="Fitness.showInlineAdd()">+ 운동 추가</div>':''}`;
+        <p>${plan.name} — 휴식일입니다.${didWork?'<br><span style="color:var(--text3);font-size:12px">계획엔 없었지만 기록이 있어요</span>':'<br><span style="color:var(--text3);font-size:12px">다른 요일을 눌러 계획을 볼 수 있어요</span>'}</p>
+      </div>
+      ${didWork && typeof Hevy!=='undefined'?Hevy.html(ds):''}
+      ${didWork && typeof Coach!=='undefined'?Coach.html(ds):''}
+      ${isToday?'<div class="habit-add-btn" onclick="Fitness.showInlineAdd()">+ 운동 추가</div>':''}`;
       return;
     }
 
     // Hevy 에 같은 이름의 기록이 있으면 손으로 안 눌러도 체크된 것으로 본다.
     // 운동하고 와서 앱에 또 체크하는 일이 없어지는 게 연동의 실질적 이득이다.
     // 다만 저장소는 건드리지 않는다 — 자동 판정은 화면에서만 하고, 손으로 누른 것과 구분해 표시한다.
-    const ds  = Fitness._dateStr(date);
     const auto = i => !chk.includes(i) && typeof Hevy !== 'undefined' && Hevy.isDone(allEx[i].name, ds);
     const on  = i => chk.includes(i) || auto(i);
 
@@ -156,7 +163,7 @@ const Fitness = {
       ${isToday?'<div class="habit-add-btn" onclick="Fitness.showInlineAdd()">+ 운동 추가</div>':''}
       ${typeof Hevy!=='undefined'?Hevy.html(ds):''}
       ${typeof Hevy!=='undefined'?Hevy.weeklyHtml(8):''}
-      ${typeof Coach!=='undefined'?Coach.html():''}
+      ${typeof Coach!=='undefined'?Coach.html(ds):''}
       <div class="fit-progress">
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
         <span class="progress-txt">${done}/${allEx.length} (${pct}%)</span>
