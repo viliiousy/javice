@@ -165,11 +165,52 @@ const Coach = {
                  d:`최고 ${s.top}kg 에서 안 올라가고 있어요(${s.since} 이후). 중량이든 횟수든 하나는 올릴 때예요.` });
     }
 
+    // 운동 순서
+    const oi = this.orderIssues();
+    if(oi.length >= 2){
+      const e = oi[oi.length-1];
+      out.push({ sev:'info', t:`${e.gl} — 단관절을 먼저 하고 있어요 (${oi.length}회)`,
+                 d:`${e.dt}: ${e.iso} → ${e.comp}. 작은 근육이 먼저 지치면 뒤에 오는 다관절에서 들 수 있는 무게가 줄어요. 늘리고 싶은 종목을 앞에 두는 게 보통이에요.` });
+    }
+
+    // 종목 구성
+    for(const g of this.selectionGaps()){
+      out.push({ sev:'info', t:`${g.label}을(를) 단관절로만 하고 있어요`,
+                 d:`최근 ${this.WIN}일 ${g.names.join('·')} 등 ${g.iso}세트. 프레스·로우 같은 다관절 종목이 없어요 — 단관절만으로는 무게를 싣기 어려워요.` });
+    }
+
+    // 주간 구성
+    const wk = this.weekly();
+    for(const b of wk.back.slice(0,2)){
+      out.push({ sev:'warn', t:`${b.label}을(를) 이틀 연속 했어요`,
+                 d:`${b.d0} → ${b.d1}. 같은 부위는 하루 이상 쉬어야 회복돼요.` });
+    }
+    const lbl = id => (this.GROUPS.find(g=>g.id===id)||{}).label;
+    const once = Object.entries(wk.freq).filter(([,n])=>n<=1).map(([id])=>lbl(id)).filter(Boolean);
+    const often= Object.entries(wk.freq).filter(([,n])=>n>=Math.max(4,wk.sessions*0.6)).map(([id])=>lbl(id)).filter(Boolean);
+    if(once.length && often.length){
+      out.push({ sev:'info', t:`${often.join('·')}은 자주, ${once.join('·')}은 ${this.WIN}일에 한 번`,
+                 d:`부위마다 주 2회쯤으로 맞추면 한쪽만 앞서가는 걸 줄일 수 있어요.` });
+    }
+
     // 인바디
     const ms = this.trend('ms', 30), wt = this.trend('wt', 30), bf = this.trend('bf', 30);
     if(ms) out.push({ sev: ms.diff>=0 ? 'good':'warn',
       t:`근육량 ${ms.diff>0?'+':''}${ms.diff}kg (30일)`,
       d:`${ms.d0} ${ms.from}kg → ${ms.d1} ${ms.to}kg${ms.est?' · 마지막 값은 추정치':''}` });
+    // 인바디와 볼륨을 나란히 놓는다. 같이 움직였다는 것이지 원인이라고 말하지 않는다 —
+    // 기록 두 줄로 인과를 단정하면 그건 계산이 아니라 추측이다.
+    if(ms && ms.diff < 0){
+      const vt = this.volTrend();
+      if(vt.prev > 0){
+        const dv = Math.round((vt.now - vt.prev) / vt.prev * 100);
+        const fmt = v => Math.round(v).toLocaleString('ko-KR');
+        if(dv <= -10) out.push({ sev:'warn', t:'볼륨이 줄면서 근육량도 줄었어요',
+          d:`최근 ${vt.half}일 ${fmt(vt.now)}kg · 그전 ${vt.half}일 ${fmt(vt.prev)}kg (${dv}%). 같이 움직인 것이지 원인이라고 단정할 수는 없어요.` });
+        else out.push({ sev:'info', t:'볼륨은 유지인데 근육량이 줄었어요',
+          d:`최근 ${vt.half}일 ${fmt(vt.now)}kg · 그전 ${vt.half}일 ${fmt(vt.prev)}kg (${dv>0?'+':''}${dv}%). 훈련량이 아니라면 먹는 쪽을 먼저 봐요 — 아래 단백질 항목을 확인해 보세요.` });
+      }
+    }
     if(wt && bf) out.push({ sev:'info',
       t:`체중 ${wt.diff>0?'+':''}${wt.diff}kg · 체지방률 ${bf.diff>0?'+':''}${bf.diff}%`,
       d:`${wt.d0} → ${wt.d1}` });
@@ -187,6 +228,94 @@ const Coach = {
       }
     }
     return out;
+  },
+
+  // 최근 절반과 그전 절반의 총 볼륨. 인바디 변화와 나란히 놓고 보기 위한 것이다.
+  volTrend(){
+    const half = Math.floor(this.WIN/2);
+    const mid  = this._daysAgo(half);
+    const all  = this.workouts(this.WIN);
+    const now  = all.filter(w=>w.dt>=mid).reduce((a,w)=>a+(Number(w.vol)||0),0);
+    const prev = all.filter(w=>w.dt< mid).reduce((a,w)=>a+(Number(w.vol)||0),0);
+    return { now, prev, half };
+  },
+
+  // ── 다관절 / 단관절 ─────────────────────
+  // 순서 이야기를 하려면 이 구분이 먼저다. 이름으로 가르는 것이라 완벽하지 않아서,
+  // 못 가른 것은 판단에서 빼고 '모름' 으로 둔다 — 애매한 걸 억지로 넣으면 조언이 틀린다.
+  ISO_KW: ['컬','레이즈','플라이','익스텐션','킥백','푸시다운','슈러그','카프','펙덱','네크',
+           'curl','raise','fly','extension','kickback','pushdown','shrug','calf','pec deck'],
+  COMP_KW: ['스쿼트','데드','벤치','프레스','로우','풀업','친업','풀다운','런지','딥스','클린','스러스터','힙쓰러스트',
+            'squat','deadlift','bench','press','row','pull up','pullup','chin','pulldown','lunge','dip','clean','thrust'],
+  kind(name){
+    const s = String(name||'').toLowerCase();
+    if(this.ISO_KW.some(k=>s.includes(k)))  return 'iso';    // 단관절을 먼저 본다 — '레그 익스텐션' 은 프레스가 아니다
+    if(this.COMP_KW.some(k=>s.includes(k))) return 'comp';
+    return null;
+  },
+
+  // ── 운동 순서 ───────────────────────────
+  // 같은 부위에서 단관절이 다관절보다 먼저 온 세션을 센다.
+  // 한 번은 의도한 것일 수 있다(선피로). 두 번 넘게 되풀이되면 습관이므로 그때만 말한다.
+  orderIssues(){
+    const hits = [];
+    for(const w of this.workouts(this.WIN)){
+      const items = (w.items||[]).map(it => ({ n:it.name, g:this.group(it.name).id,
+                                               gl:this.group(it.name).label, k:this.kind(it.name) }));
+      for(let i=0;i<items.length;i++){
+        if(items[i].k!=='iso') continue;
+        const later = items.slice(i+1).find(x => x.g===items[i].g && x.k==='comp');
+        if(later){ hits.push({ dt:w.dt, iso:items[i].n, comp:later.n, gl:items[i].gl }); break; }
+      }
+    }
+    return hits;
+  },
+
+  // ── 종목 구성 ───────────────────────────
+  // 어떤 부위를 단관절로만 하고 있으면 짚는다. 레이즈만 스무 세트를 해도
+  // 프레스 한 번만큼 무게를 못 싣는다 — 이건 취향이 아니라 지레의 문제다.
+  selectionGaps(){
+    const g = {};
+    for(const w of this.workouts(this.WIN)){
+      for(const it of (w.items||[])){
+        const grp = this.group(it.name), k = this.kind(it.name);
+        if(grp.id==='etc' || !k) continue;
+        (g[grp.id] = g[grp.id] || { label:grp.label, comp:0, iso:0, names:new Set() });
+        g[grp.id][k==='comp'?'comp':'iso']++;
+        g[grp.id].names.add(it.name);
+      }
+    }
+    return Object.values(g)
+      .filter(x => x.iso >= 3 && x.comp === 0)
+      .map(x => ({ label:x.label, iso:x.iso, names:[...x.names].slice(0,3) }));
+  },
+
+  // ── 주간 구성 ───────────────────────────
+  // 같은 부위를 이틀 연속 했는지, 부위별로 주 몇 번인지.
+  weekly(){
+    const byDate = {};
+    for(const w of this.workouts(this.WIN)){
+      const set = (byDate[w.dt] = byDate[w.dt] || new Set());
+      for(const it of (w.items||[])){
+        const grp = this.group(it.name);
+        if(grp.id!=='etc') set.add(grp.id);
+      }
+    }
+    const dates = Object.keys(byDate).sort();
+    const back = [];
+    for(let i=1;i<dates.length;i++){
+      const d0 = new Date(dates[i-1]+'T00:00:00'), d1 = new Date(dates[i]+'T00:00:00');
+      if((d1-d0)/86400000 !== 1) continue;
+      for(const id of byDate[dates[i]]){
+        if(byDate[dates[i-1]].has(id)){
+          const g = this.GROUPS.find(x=>x.id===id);
+          back.push({ label:g?g.label:id, d0:dates[i-1], d1:dates[i] });
+        }
+      }
+    }
+    const freq = {};
+    for(const d of dates) for(const id of byDate[d]) freq[id] = (freq[id]||0)+1;
+    return { back, freq, sessions:dates.length };
   },
 
   html(){
