@@ -254,7 +254,8 @@ const Diet = {
     for(const f of this.getAiFoods()){
       if(!f || !f.n || seen.has(f.n)) continue;
       seen.add(f.n);
-      ai.push({ e:'🤖', n:f.n, u:f.u||'', c:f.c||0, p:f.p||0, cb:f.cb||0, ft:f.ft||0 });
+      // 🥗 는 식약처 실측, 🤖 는 AI 추정. 목록에서 둘을 구분할 수 있어야 한다.
+      ai.push({ e:f.src==='db'?'🥗':'🤖', n:f.n, u:f.u||'', c:f.c||0, p:f.p||0, cb:f.cb||0, ft:f.ft||0 });
     }
     const hist = this.getHistory()
       .filter(f => f && f.name && !seen.has(f.name))
@@ -269,7 +270,7 @@ const Diet = {
   saveAiFoods(v){ UserStore.set(this._aiKey(), JSON.stringify(v.slice(0,500))); FirebaseSync?.scheduleSave(); },
   _rememberAi(f){
     const list=this.getAiFoods().filter(x=>x&&x.n!==f.n);
-    list.unshift({ n:f.n, u:f.u, c:f.c, p:f.p, cb:f.cb, ft:f.ft, at:new Date().toISOString() });
+    list.unshift({ n:f.n, u:f.u, c:f.c, p:f.p, cb:f.cb, ft:f.ft, src:f.src||'ai', at:new Date().toISOString() });
     this.saveAiFoods(list);
   },
   _attr(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); },
@@ -474,20 +475,69 @@ JSON 만 출력해. 다른 말은 붙이지 마.
         ? `<div class="diet-rec-hd">최근 먹은 것</div>`
           + rec.map((f,i)=>this._foodRowHtml(f,i,meal,ds,favs)).join('')
         : '';
+      clearTimeout(this._dbTimer);
+      const empty=document.getElementById('dietDbRes'); if(empty) empty.innerHTML='';
       return;
     }
     const hits=this._search(q);
     this._hits=hits;
-    if(!hits.length){
-      box.innerHTML=`<div class="diet-empty-hint">「${esc(q)}」 결과가 없습니다</div>`
+    box.innerHTML = hits.length
+      ? hits.map((f,i)=>this._foodRowHtml(f,i,meal,ds,favs)).join('')
+      : `<div class="diet-empty-hint">「${esc(q)}」 내 목록에는 없어요</div>`;
+    // 이름이 딱 맞는 게 내 목록에 있으면 굳이 바깥을 뒤지지 않는다.
+    // 그 외에는 식약처 DB 를 본다 — 타자 한 글자마다 부르지 않도록 잠시 기다린다.
+    const exact = hits.some(f=>f.n.toLowerCase()===String(q).trim().toLowerCase());
+    const dbBox = document.getElementById('dietDbRes');
+    clearTimeout(this._dbTimer);
+    if(exact){ if(dbBox) dbBox.innerHTML=''; return; }
+    if(dbBox) dbBox.innerHTML='';
+    const term = String(q).trim();
+    if(term.length >= 2) this._dbTimer = setTimeout(()=>this._dbSearch(term, meal, ds), 350);
+  },
+  // ── 식약처 식품영양성분DB ────────────────
+  // 프리셋과 내 사전에 없으면 여기서 찾는다. AI 추정보다 먼저다 —
+  // '비요뜨' 를 AI 에게 물으면 "요거트 음료 100kcal" 을 지어냈지만,
+  // 이 DB 에는 '비요뜨 초코링 145kcal/100g' 이 실측으로 들어 있다.
+  async _dbSearch(q, meal, ds){
+    const box = document.getElementById('dietDbRes');
+    if(!box) return;
+    box.innerHTML = `<div class="diet-rec-hd">식약처 영양성분DB 찾는 중…</div>`;
+    let j = null;
+    try {
+      const r = await fetch('/api/food?q=' + encodeURIComponent(q) + '&rows=8');
+      j = await r.json();
+    } catch(e) { j = null; }
+    // 오가는 사이에 검색어가 바뀌었으면 늦게 온 답은 버린다.
+    const cur = (document.getElementById('dietSearch')?.value || '').trim();
+    if(cur !== q) return;
+    if(!j || !j.ok || !(j.items||[]).length){
+      box.innerHTML = `<div class="diet-empty-hint">식약처 DB 에도 「${esc(q)}」가 없어요</div>`
         + this._aiBtnHtml(meal, ds);
       return;
     }
-    box.innerHTML=hits.map((f,i)=>this._foodRowHtml(f,i,meal,ds,favs)).join('');
-    // 비슷한 게 나왔지만 찾던 게 아닐 수 있다. 이름이 딱 맞는 게 없으면 AI 길도 열어 둔다.
-    const exact = hits.some(f=>f.n.toLowerCase()===String(q).trim().toLowerCase());
-    if(!exact) box.innerHTML += this._aiBtnHtml(meal, ds);
+    this._dbHits = j.items.map(x => ({
+      e:'🥗', n:x.name, u:`${x.per||100}${x.unit||'g'}`,
+      c:Math.round(x.kcal||0), p:+(x.protein||0), cb:+(x.carb||0), ft:+(x.fat||0),
+      grp:x.group||'',
+    }));
+    box.innerHTML = `<div class="diet-rec-hd">식약처 영양성분DB <i>${Number(j.total||0).toLocaleString('ko-KR')}건 중</i></div>`
+      + this._dbHits.map((f,i) => `<div class="diet-food">
+          <div class="diet-food-main" onclick="Diet.selectDbFood(${i},'${meal}','${ds}')">
+            <span class="diet-food-nm">${f.e} ${esc(f.n)}</span>
+            <span class="diet-food-u">${esc(f.u)}</span>
+            ${f.grp?`<span class="diet-food-n">${esc(f.grp)}</span>`:''}
+          </div>
+          <span class="diet-food-cal">${f.c}<i>kcal</i></span>
+        </div>`).join('')
+      + `<div class="diet-macro-note">단·탄·지가 함께 들어옵니다 · 담은 뒤 수량으로 ${this._dbHits[0].u} 단위를 맞추세요</div>`;
   },
+  selectDbFood(i, meal, ds){
+    const f = (this._dbHits||[])[i]; if(!f) return;
+    // 사전에 남긴다. 같은 걸 또 검색하지 않아도 되고, 하루 1만 회 한도도 아낀다.
+    this._rememberAi({ n:f.n, u:f.u, c:f.c, p:f.p, cb:f.cb, ft:f.ft, src:'db' });
+    this.addToCart(f, meal, ds);
+  },
+
   favFromSearch(i, meal, ds){
     const f=(this._hits||[])[i]; if(!f) return;
     this.toggleFav(f.n);
@@ -650,6 +700,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
         oninput="Diet.searchFood(this.value,'${meal}','${ds}')">
       <div id="dietCart"></div>
       <div id="dietSearchRes"></div>
+      <div id="dietDbRes"></div>
       ${quickHTML}
       <button id="dietManualBtn" class="diet-manual-btn" onclick="Diet.toggleManual()">＋ 직접 입력</button>
       <div id="dietManual" style="display:none">
