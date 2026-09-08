@@ -182,7 +182,7 @@ const Scan = {
       this._say(j.id ? '제품은 찾았는데 영양성분이 어디에도 없어요' : '어느 DB 에도 없는 제품이에요');
       box.innerHTML = head + `<div class="diet-label-hint">
           ${j.id ? '이름을 알았으니 검색창에 넣어 두었어요. 값은 포장의 영양성분표를 찍어 주세요.'
-                 : '포장의 영양성분표를 찍으면 적힌 값을 그대로 읽어 옵니다.'}
+                 : '포장의 영양성분표를 찍으면 적힌 값을 그대로 읽어 옵니다.'}${this._fskNote(j)}
         </div>` + this._retryHtml();
       // 이름을 알아냈으면 검색창에 넣어 준다 — 사용자가 다시 타자할 이유가 없다.
       if(j.id) this._toSearch(j.id.name);
@@ -200,9 +200,17 @@ const Scan = {
           </div>
           <span class="diet-food-cal">${f.c}<i>kcal</i></span>
         </div>`).join('')
-      + `<div class="diet-macro-note">🥗 식약처 실측 · 🌍 Open Food Facts${
-            j.fsk ? '' : ' · 식품안전나라 키가 없어 제품 특정은 건너뛰었어요'}</div>`
+      + `<div class="diet-macro-note">🥗 식약처 실측 · 🌍 Open Food Facts${this._fskNote(j)}</div>`
       + this._retryHtml();
+  },
+
+  // 식약처에 못 물어봤으면 그 이유를 말한다. '못 찾음' 과 '못 물어봄' 은 다른 일이고,
+  // 갈라 주지 않으면 낮에는 안 되고 밤에는 되는 이유를 사용자가 영영 알 수 없다.
+  _fskNote(j){
+    if(j.fsk === 'ok' || j.fsk === 'none') return '';
+    if(j.fsk === 'closed') return ' · 식약처 오픈API 가 09~19시에는 닫혀 있어요 — 저녁에 다시 스캔하면 제품까지 특정돼요';
+    if(j.fsk === 'nokey')  return ' · 식품안전나라 키가 없어 제품 특정은 건너뛰었어요';
+    return ' · 식약처에 물어보지 못했어요';
   },
 
   _retryHtml(){
