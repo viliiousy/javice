@@ -113,7 +113,7 @@ const Diet = {
   },
 
   // 칼로리는 있는데 단·탄·지가 전부 0 인 항목은 '0' 이 아니라 '모름' 이다.
-  // 프리셋 316개에는 애초에 매크로 칸이 없어서 전부 0 으로 들어온다 —
+  // 예전 프리셋으로 담아 둔 기록이 이 모양이다 (칼로리만 있고 매크로가 0).
   // 그걸 0 으로 보여 주면 닭가슴살 단백질이 0g 이라고 말하는 셈이고, 그건 정반대다.
   // (칼로리가 0 인 것은 물·블랙커피처럼 실제로 0 일 수 있으므로 건드리지 않는다.)
   isUnknown(i){
@@ -244,12 +244,13 @@ const Diet = {
     }
     return out;
   },
-  // 프리셋 + 내가 직접 입력했던 음식을 한 목록으로. 프리셋이 먼저, 중복 이름은 프리셋 우선.
+  // 내 사전 + 히스토리. 프리셋(FOOD_DB 316개)은 2026-09-08 에 뺐다 —
+  // 이름과 칼로리만 있고 단·탄·지가 없어서, 담을 때마다 매크로가 0 으로 들어갔다.
+  // 이제 모르는 음식은 식약처 실측 DB 에서 받아 오고, 받아 온 것만 여기 쌓인다.
+  // 쌓인 것은 오프라인에서도 검색된다.
   _allFoods(){
-    const db = (typeof FOOD_DB!=='undefined' ? FOOD_DB : [])
-      .map(([e,n,u,c]) => ({ e, n, u, c, p:0, cb:0, ft:0 }));
-    const seen = new Set(db.map(f=>f.n));
-    // AI 사전이 히스토리보다 앞이다 — 영양소가 전부 들어 있다.
+    const seen = new Set();
+    // 사전이 히스토리보다 앞이다 — 영양소가 전부 들어 있다.
     const ai = [];
     for(const f of this.getAiFoods()){
       if(!f || !f.n || seen.has(f.n)) continue;
@@ -260,10 +261,10 @@ const Diet = {
     const hist = this.getHistory()
       .filter(f => f && f.name && !seen.has(f.name))
       .map(f => ({ e:'🍴', n:f.name, u:'', c:f.cal||0, p:f.protein||0, cb:f.carb||0, ft:f.fat||0 }));
-    return db.concat(ai, hist);
+    return ai.concat(hist);
   },
   // ── AI 음식 사전 ──────────────────────
-  // 프리셋에 없는 음식은 AI 에게 물어서 만든다. 만든 건 저장해 둔다 —
+  // 사전에도 식약처 DB 에도 없는 음식만 AI 에게 묻는다. 만든 건 저장해 둔다 —
   // 같은 걸 두 번 물으면 숫자가 매번 조금씩 달라지고, 그때마다 또 기다려야 한다.
   _aiKey(){ return 'gl_food_ai'; },
   getAiFoods(){ try{ return JSON.parse(UserStore.get(this._aiKey())||'[]'); }catch{ return []; } },
@@ -434,7 +435,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     scored.sort((a,b)=>a[0]-b[0] || a[1]-b[1] || a[2]-b[2] || a[3]-b[3]);
     return scored.slice(0,30).map(x=>x[4]);
   },
-  // 최근 먹은 것. 히스토리에는 이름과 값만 있으므로, 같은 이름이 프리셋·AI 사전에
+  // 최근 먹은 것. 히스토리에는 이름과 값만 있으므로, 같은 이름이 사전에
   // 있으면 그쪽을 쓴다 — 이모지와 단위가 붙어 있어 목록에서 알아보기 쉽다.
   _recent(limit=8){
     const idx=new Map(this._allFoods().map(f=>[f.n,f]));
@@ -481,13 +482,15 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     }
     const hits=this._search(q);
     this._hits=hits;
+    // 내 목록이 비어도 부정 문구를 띄우지 않는다. 프리셋을 뺀 뒤로는 그게 기본 상태다 —
+    // 매번 '없어요' 를 읽게 하는 대신, 아래 식약처 칸이 무슨 일이 벌어지는지 말한다.
     box.innerHTML = hits.length
       ? hits.map((f,i)=>this._foodRowHtml(f,i,meal,ds,favs)).join('')
-      : `<div class="diet-empty-hint">「${esc(q)}」 내 목록에는 없어요</div>`;
+      : '';
     // 이름이 딱 맞는 게 내 목록에 있으면 굳이 바깥을 뒤지지 않는다.
     // 그 외에는 식약처 DB 를 본다 — 타자 한 글자마다 부르지 않도록 잠시 기다린다.
     // 이름이 맞아도 영양정보가 비어 있으면 바깥을 봐야 한다.
-    // 프리셋 316개에는 매크로 칸이 없어서 '닭가슴살' 이 정확히 있는데도
+    // 예전 프리셋에는 매크로 칸이 없어서 '닭가슴살' 이 정확히 있는데도
     // 단·탄·지를 못 채웠다 — 이름이 맞는다는 이유로 실측을 막고 있었다.
     const lower = String(q).trim().toLowerCase();
     const hit   = hits.find(f=>f.n.toLowerCase()===lower);
@@ -498,9 +501,10 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     if(dbBox) dbBox.innerHTML='';
     const term = String(q).trim();
     if(term.length >= 2) this._dbTimer = setTimeout(()=>this._dbSearch(term, meal, ds), 350);
+    else if(dbBox) dbBox.innerHTML = `<div class="diet-empty-hint">두 글자 이상 입력하면 식약처 DB 에서 찾아요</div>`;
   },
   // ── 식약처 식품영양성분DB ────────────────
-  // 프리셋과 내 사전에 없으면 여기서 찾는다. AI 추정보다 먼저다 —
+  // 내 사전에 없으면 여기서 찾는다. AI 추정보다 먼저다 —
   // '비요뜨' 를 AI 에게 물으면 "요거트 음료 100kcal" 을 지어냈지만,
   // 이 DB 에는 '비요뜨 초코링 145kcal/100g' 이 실측으로 들어 있다.
   async _dbSearch(q, meal, ds){
@@ -634,7 +638,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     this.addToCart({ e:'🍴', n:f.name, u:f.unit||'', c:f.cal||0,
                      p:f.protein||0, cb:f.carb||0, ft:f.fat||0 }, meal, ds);
   },
-  // 직접 입력은 기본으로 접어 둔다 — 프리셋 316개로 대부분 해결된다
+  // 직접 입력은 기본으로 접어 둔다 — 대부분은 식약처 DB 에서 해결된다
   toggleManual(){
     const box=document.getElementById('dietManual');
     const btn=document.getElementById('dietManualBtn');
@@ -710,7 +714,6 @@ JSON 만 출력해. 다른 말은 붙이지 마.
         </div>
       </div>`:'';
 
-    const dbN = (typeof FOOD_DB!=='undefined' ? FOOD_DB.length : 0);
     App.openModal(`${this.EMOJIS[meal]} ${meal} 추가`,`
       <input id="dietSearch" class="inp diet-search" autocomplete="off"
         placeholder="음식 검색 — 초성도 됩니다 (예: ㄷㄱㅅㅅ)"
@@ -721,7 +724,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
       ${quickHTML}
       <button id="dietManualBtn" class="diet-manual-btn" onclick="Diet.toggleManual()">＋ 직접 입력</button>
       <div id="dietManual" style="display:none">
-        <div style="font-size:11px;color:var(--text3);margin:8px 0 6px">프리셋 ${dbN}개에 없는 음식</div>
+        <div style="font-size:11px;color:var(--text3);margin:8px 0 6px">식약처 DB 에도 없는 음식 — 포장의 영양성분표를 보고 적어주세요</div>
         <div class="modal-row"><label class="modal-lbl">음식 이름 *</label>
           <input id="fName" type="text" placeholder="예: 엄마표 된장찌개" class="inp"></div>
         <div class="modal-grid2">
