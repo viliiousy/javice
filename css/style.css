@@ -2808,6 +2808,57 @@ html.dark .stat-chip.stat-green{ background:rgba(5,150,105,0.14); border-color:r
 .diet-label-hint{ font-size:11.5px; color:var(--text3); line-height:1.5; margin:2px 0 8px; }
 .diet-label-hint b{ color:var(--text2); font-weight:600; }
 
+/* ── 바코드 스캔 ─────────────────────────
+   이름으로 51건 중에서 고르는 대신 제품 하나를 가리킨다. 그래서 검색창 바로 아래 둔다. */
+.scan-btn{
+  width:100%; margin:8px 0 4px; padding:11px 12px;
+  display:flex; align-items:baseline; justify-content:center; gap:8px;
+  font-size:13px; font-weight:600; color:var(--text);
+  background:var(--card2); border:1px solid var(--border); border-radius:var(--r-sm);
+  cursor:pointer;
+}
+.scan-btn i{ font-style:normal; font-size:11px; font-weight:400; color:var(--text3); }
+.scan-btn:active{ background:var(--bg2); }
+
+.scan-wrap{
+  position:fixed; inset:0; z-index:9000;
+  display:flex; flex-direction:column; gap:10px; padding:14px;
+  background:var(--bg); overflow-y:auto;
+}
+.scan-hd{
+  display:flex; align-items:center; justify-content:space-between;
+  font-size:15px; font-weight:700; color:var(--text);
+}
+.scan-x{
+  width:32px; height:32px; font-size:16px; line-height:1;
+  color:var(--text2); background:var(--card2);
+  border:1px solid var(--border); border-radius:var(--r-sm); cursor:pointer;
+}
+.scan-view{ position:relative; border-radius:var(--r-sm); overflow:hidden; background:#000; }
+.scan-view video{ display:block; width:100%; max-height:52vh; object-fit:cover; }
+/* 테두리는 장식이 아니라 안내다. 여백까지 안 들어오면 못 읽으므로 넉넉히 그린다. */
+.scan-frame{
+  position:absolute; left:8%; right:8%; top:28%; bottom:28%;
+  border:2px solid var(--accent); border-radius:6px;
+  box-shadow:0 0 0 100vmax rgba(0,0,0,.35);
+}
+.scan-msg{ font-size:12.5px; color:var(--text2); line-height:1.6; text-align:center; }
+.scan-msg i{ font-style:normal; display:block; font-size:11px; color:var(--text3); }
+.scan-msg b{ font-weight:700; color:var(--text); }
+.scan-foot{ display:flex; gap:8px; }
+.scan-foot .inp{ flex:1; min-width:0; }
+.scan-again{ display:flex; gap:8px; margin-top:10px; }
+.scan-again .btn-sm{ flex:1; }
+
+.scan-id{
+  padding:10px; margin-bottom:8px;
+  background:var(--card2); border:1px solid var(--border); border-radius:var(--r-sm);
+}
+.scan-id-nm{ font-size:14px; font-weight:700; color:var(--text); }
+.scan-id-sub{ font-size:11.5px; color:var(--text3); margin-top:2px; }
+.scan-sure{ font-size:11.5px; color:var(--accent); margin-top:6px; font-weight:600; }
+.scan-warn{ font-size:11.5px; color:var(--text3); margin-top:4px; }
+
 /* 세트를 구성품으로 쪼개 보여 준다. 합계 하나만 있으면 틀렸는지조차 알 수 없다 —
    '감자 470' 을 봐야 '내 건 미디엄인데' 라고 고칠 수 있다. */
 .diet-ai-parts{
