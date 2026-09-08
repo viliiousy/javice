@@ -6,79 +6,110 @@
 //
 // 왜 이걸 만들었는가:
 //   AI 에게 물으면 모르는 제품에도 그럴듯한 숫자를 지어냈다. '비요뜨' 를 물었더니
-//   "요거트 음료 200ml, 100kcal" 이라고 답했다 — 비요뜨는 마시는 게 아니라
-//   토핑이 붙은 떠먹는 컵이고 230kcal 대다. 추정이 사전에 영영 저장되는 게 제일 나쁘다.
-//   그래서 실측값을 가진 곳을 먼저 본다. 여기에 없으면 '없다' 고 말한다.
+//   "요거트 음료 200ml, 100kcal" 이라고 답했다 — 실제로는 떠먹는 컵이고,
+//   이 DB 에는 '비요뜨 초코링 145kcal/100g' 처럼 열 종류가 실측값으로 들어 있다.
+//   추정이 사전에 영영 저장되는 게 제일 나쁘다. 그래서 실측을 먼저 본다.
 //
-// 인증키는 두 가지 모양으로 발급된다(Encoding / Decoding).
-// Decoding 키에는 + / = 가 들어 있어 그대로 URL 에 붙이면 깨진다. 여기서 갈라 준다.
+// AMT_NUM 의 뜻은 문서가 아니라 산수로 확인했다.
+//   국밥_돼지머리 100g: 단백질 6.70×4 + 지방 5.16×9 + 탄수화물 15.94×4 = 137.0
+//   = AMT_NUM1(에너지). 그래서 3=단백질, 4=지방, 6=탄수화물이 맞다. (2=수분, 5=회분)
 
 const BASE = 'http://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02/getFoodNtrCpntDbInq02';
+const SCAN = 100;   // 한 번에 훑는 개수. 이름이 겹치는 음식이 많아 넉넉히 받아 우리가 고른다.
 
+// 인증키는 Encoding / Decoding 두 모양으로 발급된다.
+// Decoding 키에는 + / = 가 들어 있어 그대로 URL 에 붙이면 깨진다. 여기서 갈라 준다.
 function keyParam() {
   const raw = process.env.FOOD_API_KEY;
   if (!raw) return null;
   const k = raw.trim();
-  // 이미 퍼센트 인코딩된 키(Encoding)면 다시 인코딩하면 망가진다. %XX 가 있으면 그대로 쓴다.
   return /%[0-9A-Fa-f]{2}/.test(k) ? k : encodeURIComponent(k);
 }
 
-// 웜 인스턴스 동안만 사는 캐시. 같은 검색을 반복해도 하루 1만 회를 축내지 않는다.
 const cache = new Map();
-const TTL = 6 * 3600 * 1000;
+const TTL = 12 * 3600 * 1000;
 
-async function call(params) {
+const num = v => { const n = Number(v); return isFinite(n) ? Math.round(n * 100) / 100 : null; };
+
+// 이름이 질문에 얼마나 가까운가. 낮을수록 위로 간다.
+// '닭가슴살' 을 물었는데 '샌드위치_닭가슴살' 이 먼저 나오면 안 된다.
+function rank(nameRaw, qRaw) {
+  const n = String(nameRaw || '').replace(/\s+/g, '');
+  const q = String(qRaw   || '').replace(/\s+/g, '');
+  if (!n || !q) return 9;
+  if (n === q) return 0;
+  if (n.startsWith(q)) return 1;
+  // 이 DB 는 '샌드위치_닭가슴살' 처럼 밑줄로 갈래를 나눈다. 조각이 정확히 같으면 그다음.
+  if (n.split(/[_()]/).includes(q)) return 2;
+  if (n.includes(q)) return 3;
+  return 4;
+}
+
+function normalize(it) {
+  const serving = String(it.DISH_ONE_SERVING || it.SERVING_SIZE || '').trim();
+  const m = serving.match(/^([\d.]+)\s*(g|mL|ml|ML)?$/);
+  return {
+    code:    it.FOOD_CD || '',
+    name:    it.FOOD_NM_KR || '',
+    group:   it.DB_GRP_NM || '',      // 음식 / 가공식품
+    cls:     it.DB_CLASS_NM || '',    // 품목대표 / 상용제품 / 외식
+    cat:     it.FOOD_CAT1_NM || '',
+    per:     m ? Number(m[1]) : null, // 이 값들이 몇 g/mL 기준인지
+    unit:    m && /ml/i.test(m[2] || '') ? 'mL' : 'g',
+    kcal:    num(it.AMT_NUM1),
+    protein: num(it.AMT_NUM3),
+    fat:     num(it.AMT_NUM4),
+    carb:    num(it.AMT_NUM6),
+  };
+}
+
+async function search(q) {
   const key = keyParam();
   if (!key) throw new Error('FOOD_API_KEY 미설정');
-  const qs = Object.entries(params)
-    .map(([k, v]) => k + '=' + encodeURIComponent(String(v)))
-    .join('&');
-  const url = `${BASE}?serviceKey=${key}&${qs}`;
+  const url = `${BASE}?serviceKey=${key}&FOOD_NM_KR=${encodeURIComponent(q)}`
+            + `&pageNo=1&numOfRows=${SCAN}&type=json`;
   const r = await fetch(url, { headers: { Accept: 'application/json' } });
   const text = await r.text();
-  let body = null;
-  try { body = JSON.parse(text); } catch (e) { /* XML 오류 응답일 수 있다 */ }
-  // 키를 절대 밖으로 내보내지 않는다. 진단용으로도 안 된다.
-  return { status: r.status, body, head: text.slice(0, 400) };
+  let b = null;
+  try { b = JSON.parse(text); } catch (e) { /* 오류는 XML 로 올 때가 있다 */ }
+  if (!b) throw new Error('응답을 읽지 못했습니다: ' + text.slice(0, 120));
+  const body  = b.body || b;
+  const items = Array.isArray(body.items) ? body.items : (body.items ? [body.items] : []);
+  return { total: Number(body.totalCount || 0), items: items };
 }
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
-  const q = String((req.query && req.query.q) || '').trim();
-  const raw = !!(req.query && req.query.raw);
-  const rows = Math.min(Number((req.query && req.query.rows) || 10) || 10, 30);
-
+  const qy   = req.query || {};
+  const q    = String(qy.q || '').trim();
+  const rows = Math.min(Number(qy.rows || 12) || 12, 30);
   if (!q) { res.status(400).json({ error: '검색어(q)가 없습니다' }); return; }
 
-  const ck = q + '|' + rows;
+  const ck  = q + '|' + rows;
   const hit = cache.get(ck);
-  if (hit && Date.now() - hit.t < TTL && !raw) { res.status(200).json({ ...hit.v, cached: true }); return; }
+  if (hit && Date.now() - hit.t < TTL) { res.status(200).json({ ...hit.v, cached: true }); return; }
 
   try {
-    // 검색 파라미터 이름이 확실해질 때까지 후보를 순서대로 시도한다.
-    // 추측한 이름 하나로 0건이 나오면 '없는 음식' 과 '파라미터가 틀림' 을 구분할 수 없다.
-    const NAMES = ['FOOD_NM_KR', 'FOOD_NM', 'DESC_KOR'];
-    const tried = [];
-    for (const nm of NAMES) {
-      const r = await call({ [nm]: q, pageNo: 1, numOfRows: rows, type: 'json' });
-      const b = r.body || {};
-      const items = (b.body && b.body.items) || b.items || null;
-      const total = (b.body && b.body.totalCount);
-      tried.push({ param: nm, status: r.status, total: total === undefined ? null : total,
-                   n: Array.isArray(items) ? items.length : (items ? 1 : 0),
-                   head: r.status !== 200 || !items ? r.head : undefined });
-      if (Array.isArray(items) && items.length) {
-        const out = { ok: true, q, param: nm, total: total, count: items.length,
-                      items: raw ? items : items.slice(0, rows) };
-        cache.set(ck, { t: Date.now(), v: out });
-        res.status(200).json(out); return;
-      }
-    }
-    // 못 찾은 것과 고장난 것을 구분해서 돌려준다.
-    res.status(200).json({ ok: false, q, reason: '검색 결과 없음', tried });
+    const { total, items } = await search(q);
+
+    // 열량조차 없는 줄은 버린다. 이름만 있고 값이 빈 기록이 섞여 있다.
+    const out = items
+      .map(normalize)
+      .filter(x => x.name && x.kcal !== null)
+      .map(x => ({ x, r: rank(x.name, q) }))
+      .sort((a, b) => a.r - b.r || a.x.name.length - b.x.name.length)
+      .slice(0, rows)
+      .map(o => o.x);
+
+    // 찾은 게 없으면 '없다' 고 분명히 말한다. 숫자를 지어내지 않는다 —
+    // 그건 앱이 사용자에게 직접 입력을 받거나 영양성분표를 찍게 할 신호다.
+    const v = { ok: out.length > 0, q, total, scanned: items.length, count: out.length, items: out,
+                source: '식품의약품안전처 식품영양성분DB' };
+    cache.set(ck, { t: Date.now(), v });
+    res.status(200).json(v);
   } catch (e) {
     console.error('[food]', e);
-    res.status(500).json({ error: e.message });
+    res.status(502).json({ error: e.message });
   }
 };
