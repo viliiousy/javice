@@ -325,12 +325,245 @@ const Coach = {
     return { back, freq, sessions:dates.length };
   },
 
-  html(){
-    let f;
-    try { f = this.findings(); } catch(e){ console.warn('[coach]', e); return ''; }
-    if(!f.length) return '';
+  // ══ 그날 하나를 본다 ══════════════════════
+  //
+  // 위의 findings() 는 28일 총평이다. 그건 "요즘 어깨가 많다" 는 말은 해 주지만
+  // "어제 그 세션이 어땠나" 는 말해 주지 못한다. 여기서 그날치를 따로 본다.
+  //
+  // 비교 대상은 언제나 '네 지난 기록' 이다. 권장 세트수 같은 바깥 숫자를 들이대지 않는다 —
+  // 출처를 확인할 수 없는 기준으로 남의 훈련을 평가하는 건 지어내는 것과 같다.
+
+  // ds 이전의 기록만. 그날을 평가하려면 그날은 빼고 봐야 한다.
+  _prior(ds){
+    if(typeof Hevy==='undefined') return [];
+    return Hevy.all().filter(w => w && w.dt && w.dt < ds)
+                     .sort((a,b)=>String(a.dt).localeCompare(String(b.dt)));
+  },
+  _median(a){
+    const v = a.filter(x=>isFinite(x)).slice().sort((x,y)=>x-y);
+    if(!v.length) return null;
+    const m = Math.floor(v.length/2);
+    return v.length%2 ? v[m] : (v[m-1]+v[m])/2;
+  },
+  _gapDays(a, b){
+    return Math.round((new Date(b+'T00:00:00') - new Date(a+'T00:00:00')) / 86400000);
+  },
+  _dLabel(ds){
+    const d = new Date(ds+'T00:00:00');
+    return `${d.getMonth()+1}월 ${d.getDate()}일`;
+  },
+
+  // 그날 세트에서 볼 수 있는 것만 본다.
+  // 맨몸·유산소는 중량이 없으니 중량 이야기를 하지 않는다 — 0kg 이라고 말하면 거짓이다.
+  _setStat(sets){
+    const ws = (sets||[]).filter(s=>Number(s.w)>0);
+    const rs = (sets||[]).filter(s=>Number(s.r)>0);
+    return {
+      n: (sets||[]).length,
+      loaded: ws.length,                       // 중량이 실린 세트
+      top: ws.length ? Math.max(...ws.map(s=>Number(s.w))) : null,
+      firstR: rs.length ? Number(rs[0].r) : null,
+      lastR:  rs.length ? Number(rs[rs.length-1].r) : null,
+      reps: rs.length,
+    };
+  },
+
+  session(ds){
+    if(!ds || typeof Hevy==='undefined') return null;
+    let ws = [];
+    try { ws = Hevy.byDate(ds) || []; } catch(e){ return null; }
+    if(!ws.length) return null;
+
+    // 순서를 지켜서 편다. 순서 이야기를 하려면 편 순서가 실제 순서여야 한다.
+    const items = ws.flatMap(w => w.items || []);
+    if(!items.length) return null;
+
+    const prior = this._prior(ds);
+    const out = [];
+
+    // ── 개요 ───────────────────────────────
+    const vol   = items.reduce((a,it)=>a+(Number(it.vol)||0), 0);
+    const sets  = items.reduce((a,it)=>a+((it.sets||[]).length), 0);
+    const min   = ws.reduce((a,w)=>a+(Number(w.min)||0), 0);
+    const byG   = {};
+    for(const it of items){
+      const g = this.group(it.name);
+      (byG[g.id] = byG[g.id] || { label:g.label, push:g.push, vol:0, sets:0, names:[] });
+      byG[g.id].vol  += Number(it.vol)||0;
+      byG[g.id].sets += (it.sets||[]).length;
+      byG[g.id].names.push(it.name);
+    }
+    const parts = Object.values(byG).sort((a,b)=>b.sets-a.sets);
+    out.push({ sev:'info', t:`${parts.map(p=>`${p.label} ${p.sets}세트`).join(' · ')}`,
+      d:`종목 ${items.length}개 · 총 ${sets}세트`
+        + (vol ? ` · 볼륨 ${vol.toLocaleString('ko-KR')}kg` : '')
+        + (min ? ` · ${min}분` : '') });
+
+    // ── 이 세션의 크기 ─────────────────────
+    // 지난 세션들의 중앙값과 견준다. 평균이 아니라 중앙값인 이유는
+    // 유난히 길었던 하루가 기준을 통째로 끌어올리기 때문이다.
+    const past = prior.slice(-8).map(w=>Number(w.vol)||0).filter(v=>v>0);
+    const med  = this._median(past);
+    if(med && vol > 0){
+      const r = vol / med;
+      if(r >= 1.4) out.push({ sev:'info', t:`평소보다 큰 세션이었어요`,
+        d:`직전 ${past.length}회 중앙값 ${Math.round(med).toLocaleString('ko-KR')}kg 대비 ${Math.round((r-1)*100)}% 많아요` });
+      else if(r <= 0.6) out.push({ sev:'info', t:`평소보다 가벼운 세션이었어요`,
+        d:`직전 ${past.length}회 중앙값 ${Math.round(med).toLocaleString('ko-KR')}kg 대비 ${Math.round((1-r)*100)}% 적어요` });
+    }
+
+    // ── 순서 ───────────────────────────────
+    // 같은 부위에서 단관절을 다관절보다 먼저 했는가. 그날 실제 순서를 그대로 본다.
+    for(let i=0;i<items.length;i++){
+      const k = this.kind(items[i].name);
+      if(k!=='iso') continue;
+      const g = this.group(items[i].name);
+      const later = items.slice(i+1).find(x => this.group(x.name).id===g.id && this.kind(x.name)==='comp');
+      if(later){
+        out.push({ sev:'warn', t:`${g.label}: ${items[i].name} 을 ${later.name} 보다 먼저 했어요`,
+          d:`단관절로 먼저 지치면 다관절에서 실을 수 있는 무게가 줄어요. 선피로를 노린 게 아니라면 순서를 바꿔 보세요` });
+        break;   // 한 번만 말한다. 같은 말을 종목마다 반복하면 읽히지 않는다
+      }
+    }
+
+    // ── 종목별로 지난번과 견준다 ────────────
+    const bestBefore = {};   // 종목 → { top, dt }
+    const lastSeen   = {};   // 종목 → 마지막으로 한 날
+    for(const w of prior){
+      for(const it of (w.items||[])){
+        lastSeen[it.name] = w.dt;
+        const t = Number(it.top)||0;
+        if(t > 0 && (!bestBefore[it.name] || t > bestBefore[it.name].top))
+          bestBefore[it.name] = { top:t, dt:w.dt };
+      }
+    }
+    const pr = [], down = [], fresh = [];
+    for(const it of items){
+      const st = this._setStat(it.sets);
+      if(!lastSeen[it.name]){ fresh.push(it.name); continue; }
+      if(st.top == null) continue;                    // 중량이 없는 종목은 중량으로 말하지 않는다
+      const b = bestBefore[it.name];
+      if(!b) continue;
+      if(st.top > b.top)            pr.push({ n:it.name, now:st.top, was:b.top, dt:b.dt });
+      else if(st.top < b.top * 0.9) down.push({ n:it.name, now:st.top, was:b.top, dt:b.dt });
+    }
+    if(pr.length) out.push({ sev:'good', t:`최고 중량을 갱신했어요 — ${pr.map(p=>p.n).join(', ')}`,
+      d: pr.map(p=>`${p.n} ${p.was}→${p.now}kg`).join(' · ') });
+    if(down.length) out.push({ sev:'info', t:`지난 최고보다 가볍게 들었어요`,
+      d: down.map(p=>`${p.n} ${p.now}kg (최고 ${p.was}kg · ${this._dLabel(p.dt)})`).join(' · ')
+         + ` — 세트수를 늘렸거나 컨디션 때문일 수 있어요` });
+    if(fresh.length) out.push({ sev:'info', t:`처음 해 본 종목 ${fresh.length}개`,
+      d: fresh.slice(0,4).join(', ') + ` — 다음에 같은 걸 해야 늘었는지 볼 수 있어요` });
+
+    // ── 세트 안에서의 하락 ──────────────────
+    // 첫 세트와 마지막 세트의 반복수 차이. 절반 아래로 떨어졌으면 그 종목에서 이미 다 쓴 것이다.
+    const fade = [];
+    for(const it of items){
+      const st = this._setStat(it.sets);
+      if(st.n < 3 || st.reps < 3 || !st.firstR || !st.lastR) continue;
+      if(st.lastR <= st.firstR * 0.5) fade.push({ n:it.name, a:st.firstR, b:st.lastR, s:st.n });
+    }
+    if(fade.length) out.push({ sev:'info', t:`뒤 세트에서 반복수가 많이 떨어졌어요`,
+      d: fade.map(f=>`${f.n} ${f.a}회→${f.b}회 (${f.s}세트)`).join(' · ')
+         + ` — 무게를 조금 내리거나 세트를 줄이면 마지막까지 같은 질로 할 수 있어요` });
+
+    // ── 부위 간격 ──────────────────────────
+    // 같은 부위를 며칠 만에 다시 했는가. 하루 만이면 회복이 안 끝났을 수 있다.
+    const lastGroup = {};
+    for(const w of prior){
+      for(const it of (w.items||[])){
+        const g = this.group(it.name);
+        if(g.id!=='etc') lastGroup[g.id] = w.dt;
+      }
+    }
+    const tight = [], longGap = [];
+    for(const id in byG){
+      if(id==='etc' || !lastGroup[id]) continue;
+      const g = this._gapDays(lastGroup[id], ds);
+      if(g <= 1)      tight.push({ label:byG[id].label, g, dt:lastGroup[id] });
+      else if(g >= 10) longGap.push({ label:byG[id].label, g, dt:lastGroup[id] });
+    }
+    if(tight.length) out.push({ sev:'warn', t:`${tight.map(x=>x.label).join('·')}를 ${tight[0].g===0?'같은 날':'바로 전날'} 또 했어요`,
+      d:`직전 ${this._dLabel(tight[0].dt)}에 같은 부위를 했어요. 근육은 쉬는 동안 자라요` });
+    if(longGap.length) out.push({ sev:'info', t:`${longGap.map(x=>`${x.label} ${x.g}일 만`).join(' · ')}`,
+      d:`오래 쉬었다 하면 처음 한두 번은 무게가 안 나올 수 있어요` });
+
+    // ── 그날 먹은 것 ───────────────────────
+    // 운동 전후로 나눠 볼 수는 없다. 기록에 시각이 없으니까. 하루 총량만 말한다.
+    if(typeof Diet!=='undefined'){
+      try{
+        const d = new Date(ds+'T00:00:00');
+        const data = Diet.getData(d);
+        const all  = Object.values(data||{}).flat();
+        if(all.length){
+          const m = Diet.sumMacros(all);
+          const goals = (typeof Diet.getGoalsForDate==='function') ? Diet.getGoalsForDate(d) : null;
+          const pTxt = m.unknown && !m.known ? '—' : `${Math.round(m.protein)}g${m.unknown?'⁺':''}`;
+          const cTxt = `${Math.round(m.cal)}kcal`;
+          let d2 = `단백질 ${pTxt} · ${cTxt}`;
+          if(goals) d2 += ` (목표 ${goals.pro}g · ${goals.cal}kcal)`;
+          if(m.unknown) d2 += ` · 영양정보 없는 음식 ${m.unknown}개는 빠져 있어요`;
+          d2 += ' — 하루 총량이에요. 운동 전후로 나눠 볼 수는 없어요';
+          const low = goals && m.known && m.protein < goals.pro * 0.7;
+          out.push({ sev: low ? 'warn' : 'info',
+            t: low ? `운동한 날인데 단백질이 목표의 ${Math.round(m.protein/goals.pro*100)}% 였어요` : `그날 먹은 것`,
+            d: d2 });
+        } else {
+          out.push({ sev:'info', t:`그날 식단 기록이 없어요`,
+            d:`먹은 걸 남겨 두면 운동한 날과 나란히 볼 수 있어요` });
+        }
+      }catch(e){ /* 식단을 못 읽어도 운동 피드백은 나와야 한다 */ }
+    }
+
+    // ── 그 무렵 인바디 ─────────────────────
+    // 같이 움직인 것을 나란히 놓을 뿐, 원인이라고 말하지 않는다.
+    if(typeof InBody!=='undefined'){
+      try{
+        const recs = InBody.getRecords().filter(r=>r&&r.dt);
+        const near = recs.filter(r => Math.abs(this._gapDays(r.dt, ds)) <= 10)
+                         .sort((a,b)=>Math.abs(this._gapDays(a.dt,ds))-Math.abs(this._gapDays(b.dt,ds)))[0];
+        if(near){
+          const bits = [];
+          if(Number(near.wt)>0) bits.push(`체중 ${near.wt}kg`);
+          if(Number(near.ms)>0) bits.push(`근육량 ${near.ms}kg${near.msEst?'(추정)':''}`);
+          if(Number(near.bf)>0) bits.push(`체지방률 ${near.bf}%`);
+          if(bits.length) out.push({ sev:'info', t:`그 무렵 인바디 — ${bits.join(' · ')}`,
+            d:`${this._dLabel(near.dt)} 측정. 이 세션 하나로 몸이 달라지진 않아요, 흐름으로 보세요` });
+        }
+      }catch(e){ /* 인바디가 없어도 나머지는 나와야 한다 */ }
+    }
+
+    return { ds, out, vol, sets, items:items.length, parts };
+  },
+
+  sessionHtml(ds){
+    let s;
+    try { s = this.session(ds); } catch(e){ console.warn('[coach:session]', e); return ''; }
+    if(!s) return '';
     const ICON = { warn:'!', good:'✓', info:'·' };
-    return `<details class="coach">
+    const warn = s.out.filter(x=>x.sev==='warn').length;
+    return `<details class="coach coach-day" open>
+      <summary class="coach-sum">${this._dLabel(ds)} 운동 되짚기
+        <i>${warn ? `확인 ${warn}건` : `${s.sets}세트`}</i></summary>
+      <div class="coach-body">
+        ${s.out.map(x=>`<div class="coach-item coach-${x.sev}">
+          <span class="coach-dot">${ICON[x.sev]||'·'}</span>
+          <div><b>${esc(x.t)}</b>${x.d?`<span>${esc(x.d)}</span>`:''}</div>
+        </div>`).join('')}
+        <div class="coach-foot">기준은 바깥 훈련법이 아니라 네 지난 기록이에요.</div>
+      </div>
+    </details>`;
+  },
+
+  // ds 를 주면 그날 되짚기를 먼저 보여 준다. 총평은 그 아래 접힌 채로 둔다 —
+  // 매일 보는 화면에서 알고 싶은 건 대개 '오늘/어제 그거 어땠나' 다.
+  html(ds){
+    const day = ds ? this.sessionHtml(ds) : '';
+    let f;
+    try { f = this.findings(); } catch(e){ console.warn('[coach]', e); return day; }
+    if(!f.length) return day;
+    const ICON = { warn:'!', good:'✓', info:'·' };
+    return day + `<details class="coach">
       <summary class="coach-sum">운동 피드백 <i>${f.filter(x=>x.sev==='warn').length}건 확인 필요</i></summary>
       <div class="coach-body">
         ${f.map(x=>`<div class="coach-item coach-${x.sev}">
