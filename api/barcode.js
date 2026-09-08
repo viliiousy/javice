@@ -46,14 +46,29 @@ async function getJson(url, ms = 6000) {
 
 // 식약처 C005 — 바코드로 제품의 '정체' 를 묻는다. 영양성분은 여기 없다.
 // 키가 없으면 조용히 건너뛴다. 이 단계가 빠져도 Open Food Facts 는 여전히 동작한다.
+//
+// 못 찾은 것과 못 물어본 것을 반드시 갈라서 돌려준다. 안 그러면
+// '낮에는 안 되고 밤에는 되는' 이유를 영영 알 수 없다 — 아래 closed 를 보라.
 async function identify(code) {
   const key = (process.env.FOODSAFETY_API_KEY || '').trim();
-  if (!key) return null;
+  if (!key) return { why: 'nokey' };
   const j = await getJson(`${FSK}/${encodeURIComponent(key)}/C005/json/1/5/BAR_CD=${code}`);
-  const rows = (j && j.C005 && j.C005.row) || [];
+  const body = j && j.C005;
+  if (!body) return { why: 'error' };
+  const rc = (body.RESULT || {}).CODE || '';
+
+  // 식약처 오픈API 는 09~19시(KST)에 닫힌다. C005 만이 아니라 사이트 전체다 —
+  // 같은 시각에 C002·I0490·I2570·I0930 이 전부 똑같이 ERROR-503 을 줬고,
+  // 없는 서비스만 ERROR-310 으로 갈렸다. 그러니 이건 우리 키 문제가 아니다.
+  if (rc === 'ERROR-503') return { why: 'closed' };
+  // INFO-200 은 '조건에 맞는 자료가 없음' 이다. 진짜로 없는 것.
+  if (rc && rc !== 'INFO-000') return { why: rc === 'INFO-200' ? 'none' : 'error', code: rc };
+
+  const rows = body.row || [];
   const r = Array.isArray(rows) ? rows[0] : rows;
-  if (!r || !r.PRDLST_NM) return null;
+  if (!r || !r.PRDLST_NM) return { why: 'none' };
   return {
+    ok:     true,
     name:   String(r.PRDLST_NM || '').trim(),
     maker:  String(r.BSSH_NM || '').trim(),
     kind:   String(r.PRDLST_DCNM || '').trim(),   // 식품 유형
@@ -179,7 +194,11 @@ module.exports = async function handler(req, res) {
   if (hit && Date.now() - hit.t < TTL) { res.status(200).json({ ...hit.v, cached: true }); return; }
 
   // 정체 확인과 Open Food Facts 는 서로를 기다릴 이유가 없다. 같이 보낸다.
-  const [id, off] = await Promise.all([identify(code).catch(() => null), offLookup(code).catch(() => null)]);
+  const [idr, off] = await Promise.all([
+    identify(code).catch(() => ({ why: 'error' })),
+    offLookup(code).catch(() => null),
+  ]);
+  const id  = idr && idr.ok ? idr : null;
   const nut = id ? await nutrition(id).catch(() => ({ sure: null, maybe: [] })) : { sure: null, maybe: [] };
 
   // 순서가 곧 신뢰도다. 품목보고번호까지 맞은 실측 → OFF 실측 → 이름만 맞은 후보.
@@ -195,8 +214,9 @@ module.exports = async function handler(req, res) {
     id: id || null,
     exact: !!nut.sure,
     hits,
-    // 키가 없으면 절반만 쓰고 있는 것이다. 조용히 덜 찾아 주는 것보다 말하는 게 낫다.
-    fsk: !!(process.env.FOODSAFETY_API_KEY || '').trim(),
+    // 식약처 쪽이 어떤 상태였는지 그대로 넘긴다. 조용히 덜 찾아 주는 것보다 말하는 게 낫다.
+    //   ok / nokey(키 없음) / closed(09~19시 휴무) / none(그 바코드가 없음) / error
+    fsk: id ? 'ok' : ((idr && idr.why) || 'error'),
   };
   cache.set(code, { t: Date.now(), v: out });
   res.status(200).json(out);
