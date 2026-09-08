@@ -12,13 +12,14 @@
 //
 // 호출과 AMT_NUM 매핑은 lib/mfds.js 에 있다 — api/barcode.js 도 같은 것을 쓴다.
 // 두 벌 두면 한쪽만 고치는 날이 오고, 그날부터 두 화면이 다른 단백질을 말한다.
+const { cors } = require('../lib/cors');
 const { rank, normalize, search } = require('../lib/mfds');
 
 const cache = new Map();
 const TTL = 12 * 3600 * 1000;
 
 module.exports = async function handler(req, res) {
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (cors(req, res)) return;
 
   const qy   = req.query || {};
   const q    = String(qy.q || '').trim();
