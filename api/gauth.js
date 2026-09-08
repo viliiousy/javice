@@ -6,10 +6,12 @@
 //
 // 리프레시 토큰 자체는 어떤 응답에도 실리지 않는다.
 
+const { cors } = require('../lib/cors');
 const { exchangeCode, accessTokenFor, loadRefresh, googleSubFromFirebaseIdToken }
   = require('../lib/google-oauth');
 
 module.exports = async (req, res) => {
+  if (cors(req, res)) return;
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST만 허용' }); return; }
 
   try {
