@@ -148,7 +148,31 @@ async function nutrition(id) {
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
-  const code = validBarcode((req.query || {}).code);
+  const qy = req.query || {};
+
+  // 키가 함수까지 왔는지 확인하는 칸. 값은 절대 내보내지 않는다 — 있고 없고, 그리고 길이만.
+  // 길이를 주는 이유: 붙여넣다 잘리는 일이 실제로 있고, 그러면 '없음' 이 아니라 '틀림' 이다.
+  // 식약처에 한 번 물어 본 결과도 같이 보여 준다. 우리 쪽이 문제인지 저쪽이 문제인지 갈려야 한다.
+  if (qy.diag) {
+    const len = n => (process.env[n] || '').trim().length;
+    const out = { ok: true, env: {
+      FOODSAFETY_API_KEY:  len('FOODSAFETY_API_KEY'),
+      FOOD_SAFETY_API_KEY: len('FOOD_SAFETY_API_KEY'),
+      FOODSAFETY_KEY:      len('FOODSAFETY_KEY'),
+      FOOD_API_KEY:        len('FOOD_API_KEY'),
+    }};
+    const key = (process.env.FOODSAFETY_API_KEY || '').trim();
+    if (key) {
+      const j = await getJson(`${FSK}/${encodeURIComponent(key)}/C005/json/1/5/BAR_CD=8801007880440`);
+      const r = j && j.C005;
+      out.c005 = !r ? '응답을 읽지 못했습니다'
+        : { total: r.total_count, code: (r.RESULT || {}).CODE, msg: (r.RESULT || {}).MSG,
+            name: (Array.isArray(r.row) ? r.row[0] : r.row || {}).PRDLST_NM };
+    }
+    res.status(200).json(out); return;
+  }
+
+  const code = validBarcode(qy.code);
   if (!code) { res.status(400).json({ ok: false, error: 'bad_barcode' }); return; }
 
   const hit = cache.get(code);
