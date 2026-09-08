@@ -94,9 +94,17 @@ module.exports = async function handler(req, res) {
     const { total, items } = await search(q);
 
     // 열량조차 없는 줄은 버린다. 이름만 있고 값이 빈 기록이 섞여 있다.
+    // 같은 이름·같은 값이 여러 줄로 들어 있다. '햇반' 은 똑같은 150kcal 짜리가 셋이었다.
+    // 목록에서 고를 게 없어 보이므로 하나만 남긴다 (코드는 다르지만 사람에겐 같은 음식이다).
+    const seen = new Set();
     const out = items
       .map(normalize)
       .filter(x => x.name && x.kcal !== null)
+      .filter(x => {
+        const k = [x.name, x.kcal, x.protein, x.carb, x.fat].join('|');
+        if (seen.has(k)) return false;
+        seen.add(k); return true;
+      })
       .map(x => ({ x, r: rank(x.name, q) }))
       .sort((a, b) => a.r - b.r || a.x.name.length - b.x.name.length)
       .slice(0, rows)
