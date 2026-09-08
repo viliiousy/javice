@@ -1,0 +1,5 @@
+# 앱 래퍼는 웹 배포에 들어갈 이유가 없다.
+# 루트에 package.json 을 두면 Vercel 이 빌드를 시도해 정적 배포가 달라질 수 있어서
+# Capacitor 는 통째로 app/ 안에 가둬 뒀다.
+app/
+node_modules/
