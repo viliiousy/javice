@@ -2103,6 +2103,12 @@ html.dark .login-scope{ background:rgba(255,255,255,0.04); }
 .diet-food-u{ font-size:12px; color:var(--text3); flex:none; }
 .diet-food-cal{ font-size:12.5px; font-weight:700; color:var(--text2); font-variant-numeric:tabular-nums; flex:none; }
 .diet-food-cal i{ font-size:12px; font-weight:500; color:var(--text3); font-style:normal; margin-left:1px; }
+/* 담은 횟수. 숫자가 이름을 밀어내지 않도록 flex:none 으로 고정 폭을 갖는다. */
+.diet-food-n{ font-size:11px; font-weight:600; color:var(--text3); flex:none;
+  background:var(--bg2); border-radius:999px; padding:1px 6px; font-variant-numeric:tabular-nums; }
+/* '최근 먹은 것' 머리. 검색 결과와 섞이지 않게 한 칸 띄우고 작게 둔다. */
+.diet-rec-hd{ font-size:11px; font-weight:600; color:var(--text3); letter-spacing:0.2px;
+  padding:10px 4px 4px; }
 .diet-food-fav{
   flex:none; width:24px; height:24px; padding:0; cursor:pointer;
   background:transparent; border:none; font-size:14px; color:var(--text4); font-family:inherit;
