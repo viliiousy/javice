@@ -177,8 +177,18 @@ const Fitness = {
       ? `Hevy 에서 짠 루틴 ${rs.length}개를 불러왔습니다. 루틴을 고치면 한 시간 안에 여기에도 반영됩니다.`
       : `아직 받아온 루틴이 없습니다. Hevy 에 루틴을 만들어 두면 한 시간 안에 여기 목록에 나타납니다.`;
 
+    // 루틴마다 Hevy 가 준 마지막 수정 시각을 드러낸다.
+    // 이게 없으면 '앱이 낡은 걸 보여 준다' 고 느꼈을 때 원인이 둘 중 어느 쪽인지 알 수가 없다 —
+    // 아직 안 받아왔는지(시각이 옛날), 받아왔는데 화면이 안 고쳐졌는지(시각은 최신).
+    const rtList = rs.length ? `<div class="dp-rt-list">${rs.map(r => `
+      <div class="dp-rt"><span class="dp-rt-nm">${esc(r.title)}</span>
+        <i class="dp-rt-at">${esc(this._agoLabel(r.updated))}</i></div>`).join('')}
+      <button class="btn-sm dp-rt-btn" onclick="Fitness.reloadRoutines()">클라우드에서 다시 읽기</button>
+    </div>` : '';
+
     App.openModal('@dumbbell 요일별 운동', `
       <div class="dp-note">${note}</div>
+      ${rtList}
       <div class="dp-list">${rows}</div>
       <div style="height:1px;background:var(--border);margin:14px 0"></div>
       <div class="dp-note" id="hevyLinkNote">Hevy 연동 상태 확인 중…</div>
@@ -223,6 +233,35 @@ const Fitness = {
     inp.value = '';
     App.showToast('Hevy 연동 저장됨 ✓ — 다음 정시에 기록을 받아옵니다', 'success');
     this._loadHevyLink();
+  },
+
+  // '3시간 전' 처럼 읽는다. 절대 시각은 길고, 우리가 알고 싶은 건 '얼마나 낡았나' 다.
+  _agoLabel(iso) {
+    const t = new Date(iso || '').getTime();
+    if (!isFinite(t)) return '수정 시각 없음';
+    const m = Math.floor((Date.now() - t) / 60000);
+    if (m < 1)    return '방금';
+    if (m < 60)   return m + '분 전';
+    if (m < 1440) return Math.floor(m / 60) + '시간 전';
+    return Math.floor(m / 1440) + '일 전';
+  },
+
+  // 크론은 매시 17분에 Hevy 를 읽어 클라우드에 넣는다. 그런데 앱이 그걸 다시 읽지 않으면
+  // 화면은 그대로다 — 기다릴 필요 없이 지금 다시 읽는 길을 둔다.
+  async reloadRoutines() {
+    if (typeof FirebaseSync === 'undefined' || !FirebaseSync.ready()) {
+      App.showToast('로그인이 필요합니다', 'error'); return;
+    }
+    App.showToast('클라우드에서 다시 읽는 중…', '');
+    const before = JSON.stringify(this.routines());
+    await FirebaseSync.load();
+    const after = JSON.stringify(this.routines());
+    this.render(App && App.S && App.S.selDate ? App.S.selDate : new Date());
+    App.closeModal();
+    setTimeout(() => this.showDayPlan(), 60);
+    App.showToast(before === after
+      ? '클라우드에도 같은 루틴입니다 — 아직 Hevy 에서 안 받아왔어요'
+      : '루틴을 새로 받았습니다 ✓', before === after ? '' : 'success');
   },
 
   _saveDayPlan() {
