@@ -93,6 +93,11 @@ module.exports = async function handler(req, res) {
   try {
     const { total, items } = await search(q);
 
+    // ?raw=1 은 손대지 않은 원본을 그대로 준다. 필드 이름을 알아야 매핑을 고칠 수 있는데
+    // 문서에 목록이 없다 — 실제 응답을 보는 것 말고는 방법이 없다.
+    if (qy.raw) { res.status(200).json({ total, keys: Object.keys(items[0]||{}).filter(k=>!/^AMT_NUM/.test(k)),
+                                         sample: items.slice(0,2).map(o=>{ const c={}; for(const k in o) if(!/^AMT_NUM/.test(k)) c[k]=o[k]; return c; }) }); return; }
+
     // 열량조차 없는 줄은 버린다. 이름만 있고 값이 빈 기록이 섞여 있다.
     // 같은 이름·같은 값이 여러 줄로 들어 있다. '햇반' 은 똑같은 150kcal 짜리가 셋이었다.
     // 목록에서 고를 게 없어 보이므로 하나만 남긴다 (코드는 다르지만 사람에겐 같은 음식이다).
