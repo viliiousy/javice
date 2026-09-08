@@ -149,7 +149,7 @@ const Econ = {
       // (실측: 같은 값이 4분 넘게 고정) 그래서 서버가 Firebase 에서 바로 준다.
       const idToken = await Auth._firebaseIdToken();
       if (!idToken) throw new Error('로그인이 필요합니다');
-      const r = await fetch('/api/econ-data', {
+      const r = await fetch(Platform.api('/api/econ-data'), {
         headers: { Authorization: 'Bearer ' + idToken }, cache: 'no-store',
       });
       if (r.status === 404) throw new Error('아직 수집된 시세가 없습니다');
