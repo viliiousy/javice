@@ -113,7 +113,11 @@ const Fitness = {
     // 예전엔 휴식일이면 탭 없이 return 해서, 일요일(휴무)을 누르는 순간
     // 다른 요일로 돌아갈 방법이 사라졌다. 카드가 막다른 길이 됐다.
     const DOW=['일','월','화','수','목','금','토'];
-    const tabs=DOW.map((d,i)=>`<button class="fit-tab${i===dow?' active':''}" onclick="Fitness.render(new Date('${Fitness._dateStr(date)}T00:00:00'),${i})">${d}</button>`).join('')
+    // 요일 단추는 '그 주의 그 요일' 로 날짜째 옮긴다.
+    // 예전에는 날짜는 그대로 두고 계획만 바꿨다. 그래서 화요일에 '월' 을 누르면
+    // 월요일 계획이 뜨는데 아래 실제 운동 기록과 체크는 화요일 것이었다 —
+    // 제목도 '오늘의 운동' 그대로여서, 지금 보고 있는 게 언제인지 알 수가 없었다.
+    const tabs=DOW.map((d,i)=>`<button class="fit-tab${i===dow?' active':''}" onclick="Fitness.render(Fitness._dowDate(${i}, new Date('${Fitness._dateStr(date)}T00:00:00')))">${d}</button>`).join('')
       + `<button class="fit-tab fit-plan-btn" onclick="Fitness.showDayPlan()" title="요일별 루틴 배정">${
           typeof Icons!=='undefined'?Icons.svg('gear','tf-ic'):'⚙'}</button>`;
 
@@ -156,6 +160,13 @@ const Fitness = {
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
         <span class="progress-txt">${done}/${allEx.length} (${pct}%)</span>
       </div>`;
+  },
+
+  // 같은 주(일요일 시작)의 i 요일 날짜. DOW[0] 이 '일' 이므로 getDay() 와 자리가 같다.
+  _dowDate(i, base) {
+    const d = new Date(base);
+    d.setDate(d.getDate() + (i - d.getDay()));
+    return d;
   },
 
   // ── 요일별 루틴 배정 ───────────────────
