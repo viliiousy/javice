@@ -2115,6 +2115,30 @@ html.dark .login-scope{ background:rgba(255,255,255,0.04); }
 .dp-rt-nm{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2); }
 .dp-rt-at{ flex:none; font-size:11px; color:var(--text3); font-style:normal; }
 .dp-rt-btn{ width:100%; margin-top:6px; }
+
+/* ── 운동 피드백 ────────────────────────────────────────────
+   접어 둔다. 매일 보는 화면에 잔소리가 펼쳐져 있으면 곧 눈이 무시한다. */
+.coach{ margin-top:10px; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.coach-sum{ list-style:none; cursor:pointer; padding:9px 12px; font-size:12.5px; font-weight:600;
+  color:var(--text2); display:flex; align-items:center; gap:6px; background:var(--bg2); }
+.coach-sum::-webkit-details-marker{ display:none; }
+.coach-sum::after{ content:'▾'; margin-left:auto; font-size:11px; color:var(--text3); transition:transform .15s; }
+.coach[open] .coach-sum::after{ transform:rotate(180deg); }
+.coach-sum i{ font-style:normal; font-size:11px; font-weight:500; color:var(--text3); }
+.coach-body{ padding:4px 12px 10px; }
+.coach-item{ display:flex; gap:8px; padding:7px 0; border-top:1px solid var(--border); }
+.coach-item:first-child{ border-top:0; }
+.coach-item b{ display:block; font-size:12.5px; font-weight:600; color:var(--text1); }
+.coach-item span{ display:block; font-size:11.5px; color:var(--text3); margin-top:2px; line-height:1.5; }
+.coach-dot{ flex:none; width:16px; height:16px; border-radius:50%; margin-top:1px;
+  font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center;
+  background:var(--bg2); color:var(--text3); }
+.coach-warn .coach-dot{ background:#fee2e2; color:#b91c1c; }
+.coach-good .coach-dot{ background:#dcfce7; color:#15803d; }
+.coach-foot{ font-size:10.5px; color:var(--text3); padding-top:8px; line-height:1.5; }
+/* 다크에서는 연한 파스텔이 그대로 튄다. 배경만 낮추고 글자색을 올린다. */
+html.dark .coach-warn .coach-dot{ background:rgba(220,38,38,0.18); color:#f87171; }
+html.dark .coach-good .coach-dot{ background:rgba(22,163,74,0.18); color:#4ade80; }
 .diet-food-fav{
   flex:none; width:24px; height:24px; padding:0; cursor:pointer;
   background:transparent; border:none; font-size:14px; color:var(--text4); font-family:inherit;
