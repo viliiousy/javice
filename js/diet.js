@@ -486,10 +486,15 @@ JSON 만 출력해. 다른 말은 붙이지 마.
       : `<div class="diet-empty-hint">「${esc(q)}」 내 목록에는 없어요</div>`;
     // 이름이 딱 맞는 게 내 목록에 있으면 굳이 바깥을 뒤지지 않는다.
     // 그 외에는 식약처 DB 를 본다 — 타자 한 글자마다 부르지 않도록 잠시 기다린다.
-    const exact = hits.some(f=>f.n.toLowerCase()===String(q).trim().toLowerCase());
+    // 이름이 맞아도 영양정보가 비어 있으면 바깥을 봐야 한다.
+    // 프리셋 316개에는 매크로 칸이 없어서 '닭가슴살' 이 정확히 있는데도
+    // 단·탄·지를 못 채웠다 — 이름이 맞는다는 이유로 실측을 막고 있었다.
+    const lower = String(q).trim().toLowerCase();
+    const hit   = hits.find(f=>f.n.toLowerCase()===lower);
+    const full  = hit && ((Number(hit.p)||0) || (Number(hit.cb)||0) || (Number(hit.ft)||0));
     const dbBox = document.getElementById('dietDbRes');
     clearTimeout(this._dbTimer);
-    if(exact){ if(dbBox) dbBox.innerHTML=''; return; }
+    if(full){ if(dbBox) dbBox.innerHTML=''; return; }
     if(dbBox) dbBox.innerHTML='';
     const term = String(q).trim();
     if(term.length >= 2) this._dbTimer = setTimeout(()=>this._dbSearch(term, meal, ds), 350);
@@ -515,21 +520,33 @@ JSON 만 출력해. 다른 말은 붙이지 마.
         + this._aiBtnHtml(meal, ds);
       return;
     }
-    this._dbHits = j.items.map(x => ({
-      e:'🥗', n:x.name, u:`${x.per||100}${x.unit||'g'}`,
-      c:Math.round(x.kcal||0), p:+(x.protein||0), cb:+(x.carb||0), ft:+(x.fat||0),
-      grp:x.group||'',
-    }));
+    // 값은 100g 기준으로 온다. 제품 한 개의 중량을 알면 그 단위로 환산해서 담는다 —
+    // 비요뜨를 100g 씩 먹지는 않으니까. 모르면 기준량(100g) 그대로 둔다.
+    this._dbHits = j.items.map(x => {
+      const base = Number(x.per) || 100;
+      const k    = x.pack ? x.pack / base : 1;
+      const r1   = v => Math.round((Number(v)||0) * k * 10) / 10;
+      return {
+        e:'🥗', n:x.name,
+        u:  x.pack ? `1개(${x.pack}${x.unit||'g'})` : `${base}${x.unit||'g'}`,
+        c:  Math.round((Number(x.kcal)||0) * k),
+        p:  r1(x.protein), cb: r1(x.carb), ft: r1(x.fat),
+        grp: x.maker || x.group || '',
+        // 환산했으면 원래 기준을 같이 보여 준다. 숫자를 확인할 길이 있어야 한다.
+        note: x.pack ? `${base}${x.unit||'g'}당 ${Math.round(x.kcal||0)}kcal` : '',
+      };
+    });
     box.innerHTML = `<div class="diet-rec-hd">식약처 영양성분DB <i>${Number(j.total||0).toLocaleString('ko-KR')}건 중</i></div>`
       + this._dbHits.map((f,i) => `<div class="diet-food">
           <div class="diet-food-main" onclick="Diet.selectDbFood(${i},'${meal}','${ds}')">
             <span class="diet-food-nm">${f.e} ${esc(f.n)}</span>
             <span class="diet-food-u">${esc(f.u)}</span>
             ${f.grp?`<span class="diet-food-n">${esc(f.grp)}</span>`:''}
+            ${f.note?`<span class="diet-food-note">${esc(f.note)}</span>`:''}
           </div>
           <span class="diet-food-cal">${f.c}<i>kcal</i></span>
         </div>`).join('')
-      + `<div class="diet-macro-note">단·탄·지가 함께 들어옵니다 · 담은 뒤 수량으로 ${this._dbHits[0].u} 단위를 맞추세요</div>`;
+      + `<div class="diet-macro-note">단·탄·지가 함께 들어옵니다 · 담은 뒤 수량(−/+)으로 개수를 맞추세요</div>`;
   },
   selectDbFood(i, meal, ds){
     const f = (this._dbHits||[])[i]; if(!f) return;
