@@ -1,0 +1,22 @@
+{
+  "name": "bashy-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bashy iOS 래퍼 (Capacitor)",
+  "scripts": {
+    "www": "node scripts/build-www.mjs",
+    "sync": "npm run www && npx cap sync ios",
+    "open": "npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/browser": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/ios": "^8.0.0",
+    "@capacitor/push-notifications": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.0.0"
+  }
+}
