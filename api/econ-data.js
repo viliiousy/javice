@@ -13,6 +13,7 @@
 // 저장 위치 /econ_prices/<FirebaseUID> 는 보안 규칙이 없다 → 클라이언트는 기본 거부.
 // 서비스 계정만 읽고 쓴다. (/google_refresh 와 같은 방식)
 
+const { cors } = require('../lib/cors');
 const { fbFetch, fbGet } = require('../lib/fb-admin');
 
 const FIREBASE_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyBWrrQLSK-krXQMwuueI_dw893bK5-hmPY';
@@ -41,6 +42,7 @@ async function readBody(req) {
 }
 
 module.exports = async (req, res) => {
+  if (cors(req, res)) return;
   try {
     // ── 쓰기: 크론만 ─────────────────────────────
     if (req.method === 'POST') {
