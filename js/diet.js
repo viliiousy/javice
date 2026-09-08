@@ -256,8 +256,9 @@ const Diet = {
       if(!f || !f.n || seen.has(f.n)) continue;
       seen.add(f.n);
       // 🥗 는 식약처 실측, 🤖 는 AI 추정. 목록에서 둘을 구분할 수 있어야 한다.
-      // 🥗 식약처 실측 · 📋 포장 영양성분표 · 🤖 AI 추정. 어디서 온 숫자인지 보여야 한다.
-      const em = f.src==='db' ? '🥗' : f.src==='label' ? '📋' : '🤖';
+      // 🥗 식약처 실측 · 🌍 Open Food Facts · 📋 포장 영양성분표 · 🤖 AI 추정.
+      // 어디서 온 숫자인지 보여야 한다 — 앞의 셋은 읽은 것이고 마지막만 지어낸 것이다.
+      const em = f.src==='db' ? '🥗' : f.src==='off' ? '🌍' : f.src==='label' ? '📋' : '🤖';
       ai.push({ e:em, n:f.n, u:f.u||'', c:f.c||0, p:f.p||0, cb:f.cb||0, ft:f.ft||0 });
     }
     const hist = this.getHistory()
@@ -514,6 +515,25 @@ JSON 만 출력해. 다른 말은 붙이지 마.
   // 내 사전에 없으면 여기서 찾는다. AI 추정보다 먼저다 —
   // '비요뜨' 를 AI 에게 물으면 "요거트 음료 100kcal" 을 지어냈지만,
   // 이 DB 에는 '비요뜨 초코링 145kcal/100g' 이 실측으로 들어 있다.
+  // 식약처 한 줄을 담을 수 있는 모양으로 바꾼다. 바코드 조회(js/barcode.js)도 이걸 쓴다 —
+  // 환산 공식이 두 벌이면 같은 제품이 화면마다 다른 칼로리로 보인다.
+  //
+  // 값은 100g 기준으로 온다. 제품 한 개의 중량을 알면 그 단위로 환산해서 담는다 —
+  // 비요뜨를 100g 씩 먹지는 않으니까. 모르면 기준량(100g) 그대로 둔다.
+  _fromDb(x){
+    const base = Number(x.per) || 100;
+    const k    = x.pack ? x.pack / base : 1;
+    const r1   = v => Math.round((Number(v)||0) * k * 10) / 10;
+    return {
+      e: x.e || '🥗', n: x.name,
+      u:  x.pack ? `1개(${x.pack}${x.unit||'g'})` : `${base}${x.unit||'g'}`,
+      c:  Math.round((Number(x.kcal)||0) * k),
+      p:  r1(x.protein), cb: r1(x.carb), ft: r1(x.fat),
+      grp: x.maker || x.group || '',
+      // 환산했으면 원래 기준을 같이 보여 준다. 숫자를 확인할 길이 있어야 한다.
+      note: x.pack ? `${base}${x.unit||'g'}당 ${Math.round(x.kcal||0)}kcal` : '',
+    };
+  },
   async _dbSearch(q, meal, ds){
     const box = document.getElementById('dietDbRes');
     if(!box) return;
@@ -530,22 +550,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
       box.innerHTML = this._labelHtml(q, meal, ds) + this._aiBtnHtml(meal, ds);
       return;
     }
-    // 값은 100g 기준으로 온다. 제품 한 개의 중량을 알면 그 단위로 환산해서 담는다 —
-    // 비요뜨를 100g 씩 먹지는 않으니까. 모르면 기준량(100g) 그대로 둔다.
-    this._dbHits = j.items.map(x => {
-      const base = Number(x.per) || 100;
-      const k    = x.pack ? x.pack / base : 1;
-      const r1   = v => Math.round((Number(v)||0) * k * 10) / 10;
-      return {
-        e:'🥗', n:x.name,
-        u:  x.pack ? `1개(${x.pack}${x.unit||'g'})` : `${base}${x.unit||'g'}`,
-        c:  Math.round((Number(x.kcal)||0) * k),
-        p:  r1(x.protein), cb: r1(x.carb), ft: r1(x.fat),
-        grp: x.maker || x.group || '',
-        // 환산했으면 원래 기준을 같이 보여 준다. 숫자를 확인할 길이 있어야 한다.
-        note: x.pack ? `${base}${x.unit||'g'}당 ${Math.round(x.kcal||0)}kcal` : '',
-      };
-    });
+    this._dbHits = j.items.map(x => this._fromDb(x));
     box.innerHTML = `<div class="diet-rec-hd">식약처 영양성분DB <i>${Number(j.total||0).toLocaleString('ko-KR')}건 중</i></div>`
       + this._dbHits.map((f,i) => `<div class="diet-food">
           <div class="diet-food-main" onclick="Diet.selectDbFood(${i},'${meal}','${ds}')">
@@ -807,6 +812,8 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
       <input id="dietSearch" class="inp diet-search" autocomplete="off"
         placeholder="음식 검색 — 초성도 됩니다 (예: ㄷㄱㅅㅅ)"
         oninput="Diet.searchFood(this.value,'${meal}','${ds}')">
+      <button class="scan-btn" onclick="Scan.open('${meal}','${ds}')">
+        바코드 스캔<i>이름으로 고르지 않아도 돼요</i></button>
       <div id="dietCart"></div>
       <div id="dietSearchRes"></div>
       <div id="dietDbRes"></div>
