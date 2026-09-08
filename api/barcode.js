@@ -13,6 +13,7 @@
 //          → 품목보고번호가 같은 줄이 있으면 그게 확실히 내 제품이다.
 // 이름이 겹쳐도 번호는 안 겹치므로, 이 마지막 한 칸이 추측을 사실로 바꾼다.
 
+const { cors } = require('../lib/cors');
 const { rank, normalize, search } = require('../lib/mfds');
 
 const FSK = 'http://openapi.foodsafetykorea.go.kr/api';
@@ -161,7 +162,7 @@ async function nutrition(id) {
 }
 
 module.exports = async function handler(req, res) {
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (cors(req, res)) return;
 
   const qy = req.query || {};
 
