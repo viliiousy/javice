@@ -103,16 +103,20 @@ const Coach = {
   // ── 단백질 ─────────────────────────────
   proteinAvg(days){
     if(typeof Diet==='undefined') return null;
-    let sum=0, n=0;
+    let sum=0, n=0, skip=0;
     for(let i=1;i<=days;i++){
       const d=new Date(); d.setDate(d.getDate()-i);
       let data; try { data = Diet.getData(d); } catch(e){ continue; }
       const t = Object.values(data||{}).flat();
       if(!t.length) continue;                       // 기록이 없는 날은 0 이 아니라 '모름' 이다
-      sum += t.reduce((a,x)=>a+(Number(x.protein)||0),0);
+      // 영양정보가 없는 음식이 섞인 날도 빼야 한다. 그걸 0 으로 더하면 평균이 실제보다 낮게
+      // 나오고, 그 숫자로 '단백질이 모자라다' 고 말하면 없는 문제를 만들어 내는 셈이다.
+      const m = (typeof Diet.sumMacros === 'function') ? Diet.sumMacros(t) : null;
+      if(m && m.unknown){ skip++; continue; }
+      sum += m ? m.protein : t.reduce((a,x)=>a+(Number(x.protein)||0),0);
       n++;
     }
-    return n ? { avg:Math.round(sum/n), days:n } : null;
+    return n ? { avg:Math.round(sum/n), days:n, skip } : (skip ? { avg:null, days:0, skip } : null);
   },
 
   // ── 판단 ───────────────────────────────
@@ -217,14 +221,17 @@ const Coach = {
 
     // 단백질
     const p = this.proteinAvg(14);
-    if(p){
+    if(p && p.avg === null){
+      out.push({ sev:'info', t:'단백질을 아직 볼 수 없어요',
+        d:`최근 ${p.skip}일치 식단에 영양정보가 없는 음식이 섞여 있어요. 그 값을 0 으로 더하면 실제보다 낮게 나와서 세지 않았어요.` });
+    } else if(p){
       let goal=null;
       try { goal = Diet.getSettings().proteinGoal; } catch(e){}
       if(goal){
         const pct = Math.round(p.avg/goal*100);
         out.push({ sev: pct<80 ? 'warn':'good',
           t:`단백질 하루 평균 ${p.avg}g (목표 ${goal}g · ${pct}%)`,
-          d:`기록이 있는 ${p.days}일 기준. ${pct<80?'운동을 늘려도 단백질이 모자라면 근육량은 안 늘어요.':''}` });
+          d:`영양정보가 온전한 ${p.days}일 기준${p.skip?` (${p.skip}일은 정보가 빠져 제외)`:''}. ${pct<80?'운동을 늘려도 단백질이 모자라면 근육량은 안 늘어요.':''}` });
       }
     }
     return out;
