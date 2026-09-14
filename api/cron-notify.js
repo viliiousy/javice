@@ -439,6 +439,55 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // ?devices=1 — 아무것도 보내지 않고 '등록 상태' 를 그대로 보여 준다.
+  //
+  // 이게 없어서 매번 막혔다. 크론은 200 을 주고 FCM 도 200 을 주는데 폰에는 안 뜨는 상황이
+  // 실제로 있는데(토큰이 죽었는데 FCM 이 아직 받아 주는 경우), 그때 물어볼 곳이 없었다.
+  // 알고 싶은 건 셋이다 — 이 기기가 언제 등록됐나, 오늘 어느 칸이 처리됐나, 설정이 켜져 있나.
+  //
+  // 토큰 값은 절대 내보내지 않는다. 길이와 모양만 준다 — 그것만으로 '문자열인가 구버전
+  // JSON인가', '길이가 그럴듯한가' 는 다 판단할 수 있고, 값은 알아 봐야 쓸 데가 없다.
+  if (req.query?.devices === '1') {
+    try {
+      const tokens = await fbGet('/fcm_tokens.json') || {};
+      const today  = dateStr();
+      const out = Object.entries(tokens).map(([uid, d]) => {
+        const { devices, skipped } = deviceList(d || {});
+        const sent = (d && d.sent) || {};
+        // 오늘 처리된 칸과, 처리된 지 오래된 칸을 갈라 준다.
+        // '어제 날짜로 멈춰 있다' 는 곧 '그날 이후로 크론이 이 칸을 못 건드렸다' 는 뜻이다.
+        const todayDone = Object.keys(sent).filter(k => sent[k] === today).sort();
+        const stale = {};
+        for (const [k, v] of Object.entries(sent)) if (v !== today) stale[k] = v;
+        return {
+          uid: uid.slice(0, 8) + '…',
+          enabled: !!(d && d.settings && d.settings.enabled),
+          settings: d && d.settings ? Object.fromEntries(
+            Object.entries(d.settings).filter(([k]) => k !== 'enabled')
+              .map(([k, v]) => [k, v && typeof v === 'object'
+                ? { enabled: v.enabled !== false, ...Object.fromEntries(Object.entries(v).filter(([kk]) => kk !== 'enabled')) }
+                : v])) : null,
+          devices: devices.map(x => ({
+            id: x.id,
+            shape: tokenShape(x.token),
+            sendable: !!toFcmToken(x.token),
+            ua: x.ua || null,
+            updatedAt: (d.devices && d.devices[x.id] && d.devices[x.id].updatedAt)
+              ? new Date(d.devices[x.id].updatedAt).toISOString() : null,
+          })),
+          invalidDevices: skipped,
+          today,
+          sentToday: todayDone,
+          sentOlder: stale,
+        };
+      });
+      res.status(200).json({ endpoint:'cron-notify', mode:'devices', now:new Date().toISOString(), users: out });
+    } catch (e) {
+      res.status(500).json({ ok:false, error:e.message });
+    }
+    return;
+  }
+
   // ?check=1 — 알림을 보내지 않고 DB 인증만 점검한다 (배포 검증용)
   if (req.query?.check === '1') {
     try {
