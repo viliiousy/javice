@@ -680,18 +680,29 @@ textarea.inp{ resize:vertical; min-height:64px; }
 .progress-txt{ font-size:12px; color:var(--text2); white-space:nowrap; font-weight:500; }
 
 /* ── 메모 ────────────────────────────── */
+/* 메모 글씨 크기는 여기 한 곳에서 퍼진다(js/memo.js 의 FS 가 이 값을 바꾼다).
+   카드와 편집창이 같은 변수를 보므로 둘이 어긋날 수가 없다. */
+:root{ --mm-fs:12px; }
 .memo-wrap{ padding:8px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:6px; }
 .memo-item{
-  display:flex; align-items:flex-start; gap:7px;
+  display:flex; align-items:flex-start; gap:7px; position:relative;
   padding:10px 12px; background:var(--card);
   border:1.5px solid var(--border); border-radius:10px;
   cursor:pointer; transition:all 0.15s; box-shadow:var(--shadow-sm);
 }
 .memo-item:hover{ border-color:var(--border2); box-shadow:var(--shadow); }
 .memo-content-wrap{ flex:1; min-width:0; }
-.memo-title{ font-size:13px; font-weight:600; color:var(--text); margin-bottom:3px; }
+/* 날짜를 제목과 같은 줄에 앉힌다. 오른쪽에 제 칸을 두면 그 폭만큼 본문이 일찍 접힌다 —
+   한 줄이면 될 메모가 두 줄이 되던 이유였다.
+   대신 제목이 길면 말줄임으로 잘린다. 잘린 제목은 마우스를 올리면 전부 보이고,
+   눌러서 열면 어차피 온전히 나온다 — 본문 한 줄을 얻는 값으로는 싸다. */
+.memo-head{ display:flex; align-items:baseline; gap:8px; margin-bottom:3px; }
+.memo-title{
+  flex:1; min-width:0; font-size:calc(var(--mm-fs) + 1px); font-weight:600; color:var(--text);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
 .memo-preview{
-  font-size:12px; color:var(--text2); line-height:1.55; word-break:break-word;
+  font-size:var(--mm-fs); color:var(--text2); line-height:1.55; word-break:break-word;
 }
 /* 접힌 상태에서만 세 줄로 자른다. 펼치면 통째로 보인다 —
    읽으려고 편집창을 여는 건 읽기가 아니라 편집이다. */
@@ -733,11 +744,11 @@ textarea.inp{ resize:vertical; min-height:64px; }
 }
 .mm-check li.on{ color:var(--text3); text-decoration:line-through; }
 
-/* 복사칩 — 문구를 몸에 지니고 다니는 단추.
-   글줄 안에 앉으므로 글자보다 작고, 눌러야 색이 든다. */
-/* 크기를 px 로 박아 두니(19px) 13px 글자 옆에서 저 혼자 컸다.
-   글줄 상자보다 큰 물건이 한 줄에 끼면 그 줄만 키가 커져서 문단이 층계처럼 어긋난다.
-   em 으로 바꿔 글자를 따라가게 하고, 높이를 줄 상자(1.6em) 안에 들어오게 잡는다. */
+/* 옛 복사칩 — 이제 새로 만들지 않는다(복사 링크가 대신한다).
+   이미 쓴 메모에 남아 있으므로 보이고 눌리기는 해야 한다.
+   끌어 옮기는 기능이 없어졌으니 grab 커서와 touch-action:none 도 같이 걷어냈다 —
+   못 옮기는 물건에 '잡으세요' 커서를 주면 거짓말이고, touch-action 을 막아 두면
+   칩에 손가락이 닿았을 때 화면이 안 굴러간다. */
 .mm-cp{
   display:inline-flex; align-items:center; justify-content:center;
   width:1.15em; height:1.15em; margin:0 .15em; vertical-align:-0.2em;
@@ -749,14 +760,25 @@ textarea.inp{ resize:vertical; min-height:64px; }
 .mm-cp .ic{ width:.7em; height:.7em; }
 .mm-cp:hover{ color:var(--accent); border-color:var(--accent); }
 .mm-cp.cp-ok{ color:var(--green); border-color:var(--green); }
-/* 편집창 안에서는 옮길 수 있는 물건이다 — 커서로 그렇게 말한다. */
-/* 손가락으로 잡으려면 브라우저에게서 그 터치를 먼저 뺏어와야 한다.
-   touch-action 을 안 막으면 끌기가 전부 화면 스크롤로 먹혔다.
-   iOS 는 꾹 누르면 돋보기와 '복사' 풍선을 띄우는데, 그것도 여기서는 방해다. */
-.mm-cp{ touch-action:none; -webkit-touch-callout:none; }
-.mm-ed .mm-cp{ cursor:grab; }
-.mm-ed .mm-cp.cp-drag{ transform:scale(1.25); box-shadow:var(--shadow); }
-.mm-ed .mm-cp.cp-drag{ cursor:grabbing; opacity:.55; border-color:var(--accent); }
+
+/* 복사 링크 — 누르면 제 글자를 복사하는 밑줄.
+   파란 링크처럼 칠하면 '다른 데로 간다' 는 뜻이 되어 버린다. 글자 색은 그대로 두고
+   밑줄만 점선으로 둔다 — 서식으로 그은 밑줄(U)과 눈으로 갈려야 해서다. */
+.mm-lk{
+  text-decoration:underline; text-decoration-style:dashed;
+  text-decoration-color:var(--accent); text-underline-offset:2.5px;
+  border-radius:3px; cursor:pointer; transition:color .12s, background .12s;
+}
+.memo-preview .mm-lk:hover{ color:var(--accent); background:var(--accent-bg); }
+.mm-lk.cp-ok{ color:var(--green); text-decoration-color:var(--green); background:transparent; }
+/* 편집창 안에서는 고치라고 있는 글자다. 손가락 커서를 주면 여기서도 복사될 것처럼 보인다. */
+.mm-ed .mm-lk{ cursor:text; }
+
+/* 메모 글씨 크기 단추 — 작은 가·큰 가. 지금 크기를 글자 모양으로 보여 준다. */
+.memo-fs{ display:flex; gap:4px; }
+.memo-fs .btn-sm{ padding:3px 9px; line-height:1.2; }
+.memo-fs .mfs-s{ font-size:10px; }
+.memo-fs .mfs-l{ font-size:15px; }
 
 /* ── 메모 편집창 ──────────────────────── */
 .mm-bar{
@@ -777,7 +799,7 @@ textarea.inp{ resize:vertical; min-height:64px; }
 .mm-bar-sep{ width:1px; height:15px; background:var(--border2); margin:0 3px; }
 .mm-ed{
   min-height:150px; max-height:44vh; overflow-y:auto;
-  padding:11px 13px; font-size:13.5px; line-height:1.6; color:var(--text);
+  padding:11px 13px; font-size:calc(var(--mm-fs) + 1.5px); line-height:1.6; color:var(--text);
   background:var(--bg2); border:1.5px solid var(--border);
   border-radius:0 0 var(--r-sm) var(--r-sm);
   outline:none; word-break:break-word;
@@ -785,8 +807,14 @@ textarea.inp{ resize:vertical; min-height:64px; }
 .mm-ed:focus{ border-color:var(--accent); }
 .mm-hint{ margin-top:6px; font-size:11px; line-height:1.5; color:var(--text3); }
 .mm-hint b{ color:var(--text2); }
-.memo-right{ display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0; }
-.memo-date{ font-size:12px; color:var(--text3); white-space:nowrap; }
+/* 날짜는 본문을 따라 커지지 않는다 — 크게 보고 싶은 건 메모 내용이지 도장이 아니다. */
+.memo-date{ flex:none; font-size:11.5px; color:var(--text3); white-space:nowrap; transition:opacity .15s; }
+/* PC 의 ✕ 도 줄 안에 자리를 먹고 있었다(안 보일 때도 폭은 그대로다).
+   띄워서 얹고, 겹치는 동안에만 날짜를 비운다. 자리를 뺏지 않으니 본문이 밀리지 않는다. */
+.memo-item > .rw-x{ position:absolute; top:7px; right:8px; z-index:2; }
+@media (hover:hover){
+  .rw:hover .memo-item .memo-date, .rw:focus-within .memo-item .memo-date{ opacity:0; }
+}
 
 /* ── 모달 ────────────────────────────── */
 .modal{
