@@ -6,8 +6,12 @@
 // 그래서 세 가지를 바꿨다.
 //   하나, 내용이 서식을 갖는다 — 굵게·밑줄·취소선, 글머리·번호·체크리스트, 들여쓰기.
 //   둘,  긴 메모는 눌러서 펼친다. 읽으려고 편집창을 열 이유가 없다.
-//   셋,  자주 쓰는 문구에는 복사칩을 단다. 칩은 제가 복사할 문구를 몸에 지니고 다녀서
-//        메모 안 어디로 옮겨도 늘 같은 것을 복사한다.
+//   셋,  자주 쓰는 문구에는 밑줄을 긋는다. 그 글씨를 누르면 그 글이 복사된다.
+//        예전엔 문구 '뒤에' 복사칩(작은 단추)을 달았다. 단추가 글줄에 끼어 자리를 차지했고,
+//        옮기려면 꾹 눌러야 했고, 제가 복사할 문구를 따로 지니고 다녀서 보이는 글과
+//        복사되는 글이 갈라질 수 있었다. 복사할 것은 글 자체이지 글 옆의 물건이 아니다.
+//        옛 메모에 남은 칩은 그대로 눌러 쓸 수 있게 두되, 새로 만들지는 않는다.
+//   넷,  글씨 크기는 내가 정한다. 메모는 사람마다 읽는 거리가 다르다.
 //
 // 저장은 HTML 로 한다. 남이 쓴 HTML 이 아니라 내가 쓴 것이지만, 파이어베이스를 한 바퀴
 // 돌아 오는 문자열이므로 들어올 때도 나갈 때도 허용 목록으로 한 번 거른다.
@@ -22,7 +26,7 @@ const Memo = {
   // 허용한 것만 남기고 나머지는 통째로 버린다. 태그 이름을 지우는 게 아니라
   // 노드를 들어내고 자식만 끌어올린다 — 글이 사라지진 않는다.
   TAGS: new Set(['B','STRONG','I','EM','U','S','STRIKE','BR','DIV','P','UL','OL','LI','SPAN']),
-  CLS:  new Set(['mm-check','on','mm-cp','mm-i1','mm-i2','mm-i3','mm-i4']),
+  CLS:  new Set(['mm-check','on','mm-cp','mm-lk','mm-i1','mm-i2','mm-i3','mm-i4']),
   // 이것들은 껍데기만 벗기면 안 된다 — 알맹이가 코드라서 글로 남으면 그것도 쓰레기다.
   DROP: new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','LINK','META','NOSCRIPT','TEMPLATE','SVG','MATH']),
 
@@ -62,7 +66,8 @@ const Memo = {
     return esc(m.content || '').replace(/\n/g, '<br>');
   },
 
-  // 미리보기·검색·알림에 쓸 평문. 칩은 제 문구로 되돌려 놓는다.
+  // 미리보기·검색·알림에 쓸 평문. 옛 칩은 제 문구로 되돌려 놓는다 —
+  // 칩은 글이 아니라 글을 가리키는 물건이었다. 복사 링크는 글 자체라 손댈 게 없다.
   textOf(html){
     const box = document.createElement('div');
     box.innerHTML = String(html || '');
@@ -72,22 +77,55 @@ const Memo = {
     return (box.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
   },
 
-  // 저장된 HTML 을 화면에 올릴 수 있게 만든다. 칩에 아이콘과 손잡이를 달아 준다.
-  // 붙여넣기·되돌리기로 새로 들어온 칩도 이 길로 다시 꾸며진다.
-  paintChips(root){
+  // 저장된 HTML 을 화면에 올릴 수 있게 만든다.
+  // 복사 링크는 제 글자를 그대로 복사하므로 따로 지닐 게 없다 — 안내만 붙인다.
+  // 그래서 링크 안의 글을 고치면 복사되는 것도 같이 바뀐다.
+  paintMarks(root){
+    root.querySelectorAll('.mm-lk').forEach(a => {
+      a.setAttribute('title', `눌러서 복사: ${a.textContent || ''}`);
+    });
+    // 옛 메모에 남은 복사칩. 새로 만들지는 않지만, 있던 것은 계속 눌러 쓸 수 있어야 한다.
     root.querySelectorAll('.mm-cp').forEach(c => {
       c.setAttribute('contenteditable', 'false');
-      c.setAttribute('draggable', 'true');
       c.setAttribute('title', `복사: ${c.dataset.cp || ''}`);
       if (!c.querySelector('svg')) c.innerHTML = (typeof Icons !== 'undefined') ? Icons.svg('copy') : '⧉';
     });
   },
 
+  // ── 글씨 크기 ─────────────────────────
+  // 메모만 따로 정한다. 앱 전체 글씨를 키우면 달력 숫자와 칸이 전부 흐트러지는데,
+  // 정작 크게 보고 싶은 건 메모 본문이었다.
+  // 값은 CSS 변수 한 곳에만 둔다 — 카드와 편집창에 따로 쓰면 카드에서 크게 해 놓고
+  // 편집창을 열었을 때 글이 도로 작아진다. 같은 메모가 두 크기로 보이면 안 된다.
+  FS: [10, 11, 12, 13, 14, 16, 18],
+  _fsKey(){ return 'gl_memo_fs'; },
+  fs(){
+    const v = parseInt(UserStore.get(this._fsKey()) || '', 10);
+    return this.FS.includes(v) ? v : 12;      // 모르는 값이 들어오면 원래 크기로
+  },
+  applyFs(){ document.documentElement.style.setProperty('--mm-fs', this.fs() + 'px'); },
+  stepFs(dir){
+    const i = this.FS.indexOf(this.fs());
+    const n = Math.max(0, Math.min(this.FS.length - 1, i + dir));
+    // 끝에 닿았으면 조용히 넘기지 않는다. 눌렀는데 아무 일도 안 일어나면
+    // 단추가 고장 난 건지 끝인 건지 알 수가 없다.
+    if (n === i) { App?.showToast(dir > 0 ? '가장 큰 글씨입니다' : '가장 작은 글씨입니다', 'error'); return; }
+    UserStore.set(this._fsKey(), String(this.FS[n]));
+    FirebaseSync?.scheduleSave();
+    this.applyFs();
+    Sounds?.click();
+    App?.showToast(`메모 글씨 ${this.FS[n]}px`, 'success');
+  },
+
   // ── 카드 ──────────────────────────────
+  // 날짜는 제목과 같은 줄에 둔다. 예전엔 오른쪽에 제 칸을 차지하고 서 있었고,
+  // PC 의 ✕ 단추가 그 옆에 또 한 칸을 먹었다. 그래서 본문은 늘 줄 끝에서
+  // 100px 쯤 앞서 접혔다 — 한 줄이면 될 메모가 두 줄이 되던 이유다.
   _open: {},   // 펼쳐 둔 메모
 
   render(){
     const wrap = document.getElementById('memoWrap'); if(!wrap) return;
+    this.applyFs();
     const items = this.getItems();
 
     wrap.innerHTML = items.map(m => {
@@ -100,19 +138,19 @@ const Memo = {
           data-reorderable="${m.id}"${Memo._reorderMode?'':` data-row data-i="${m.id}" data-label="${esc(m.title)}"`}>
         ${Memo._reorderMode?'<div class="memo-drag-hint">⠿</div>':''}
         <div class="memo-content-wrap">
-          <div class="memo-title" data-edit>${esc(m.title)}</div>
+          <div class="memo-head">
+            <div class="memo-title" data-edit title="${esc(m.title)}">${esc(m.title)}</div>
+            <div class="memo-date">${_fmtMemoDate(m.updatedAt)}</div>
+          </div>
           ${html?`<div class="memo-preview${open?'':' clamp'}" data-edit>${html}</div>`:''}
           ${long?`<button type="button" class="memo-toggle">${open?'접기':'더보기'}</button>`:''}
         </div>
-        <div class="memo-right">
-          ${Memo._reorderMode?`<button class="cl-del-btn edit-del-btn" onclick="event.stopPropagation();Memo.remove('${m.id}')" title="삭제">✕</button>`:''}
-          <div class="memo-date">${_fmtMemoDate(m.updatedAt)}</div>
-        </div>
+        ${Memo._reorderMode?`<button class="cl-del-btn edit-del-btn" onclick="event.stopPropagation();Memo.remove('${m.id}')" title="삭제">✕</button>`:''}
       </div>`;
     }).join('')
     + `<div class="habit-add-btn" onclick="Memo.showAdd()">+ 메모 추가</div>`;
 
-    this.paintChips(wrap);
+    this.paintMarks(wrap);
 
     // 줄 하나를 어떻게 다루는지는 체크리스트·습관과 같은 규칙을 쓴다.
     // 손가락은 길게 눌러 수정·왼쪽으로 밀어 삭제, 마우스는 글씨를 눌러 수정·올리면 ✕.
@@ -126,8 +164,12 @@ const Memo = {
       row.dataset.mmOn = '1';
       row.addEventListener('click', (e) => {
         if (Memo._reorderMode) return;
+        // 밑줄 그은 글씨 → 그 글을 복사한다. 메모를 여는 것보다 먼저다.
+        // 누르면 복사된다고 밑줄로 약속해 뒀으니 그 약속이 먼저 지켜져야 한다.
+        const lk = e.target.closest('.mm-lk');
+        if (lk) { e.stopPropagation(); Memo.copy(lk.textContent, lk); return; }
         const chip = e.target.closest('.mm-cp');
-        if (chip) { e.stopPropagation(); Memo.copyChip(chip); return; }
+        if (chip) { e.stopPropagation(); Memo.copy(chip.dataset.cp, chip); return; }
         if (e.target.closest('.rw-x, .rw-del, .cl-del-btn')) return;
         // 글씨를 누르면 수정, 그 밖의 빈 곳을 누르면 펼친다.
         if (e.target.closest('.memo-toggle') || !e.target.closest('[data-edit]')) {
@@ -150,10 +192,10 @@ const Memo = {
     this.render();
   },
 
-  copyChip(chip){
-    const t = chip.dataset.cp || '';
+  copy(text, el){
+    const t = String(text || '').trim();
     if (!t) return;
-    const done = () => { chip.classList.add('cp-ok'); setTimeout(()=>chip.classList.remove('cp-ok'), 900);
+    const done = () => { el?.classList.add('cp-ok'); setTimeout(()=>el?.classList.remove('cp-ok'), 900);
                          App?.showToast('복사됨 ✓','success'); Sounds?.click(); };
     if (navigator.clipboard?.writeText) navigator.clipboard.writeText(t).then(done).catch(()=>this._copyFallback(t,done));
     else this._copyFallback(t, done);
@@ -182,7 +224,7 @@ const Memo = {
       ${b('outdent','⇤','내어쓰기')}
       ${b('indent','⇥','들여쓰기')}
       <span class="mm-bar-sep"></span>
-      ${b('chip','복사칩','고른 문구 뒤에 복사 단추를 단다','wide')}
+      ${b('link','복사 링크','고른 문구에 밑줄 — 누르면 복사된다 (한 번 더 누르면 해제)','wide')}
     </div>`;
   },
 
@@ -192,7 +234,7 @@ const Memo = {
       <div class="modal-row"><label class="modal-lbl">내용</label>
         ${this._bar()}
         <div id="mBody" class="mm-ed" contenteditable="true" spellcheck="false"></div>
-        <div class="mm-hint">문구를 끌어서 고른 뒤 <b>복사칩</b> 을 누르면 그 자리에 복사 단추가 생깁니다. 칩은 옮겨도 제 문구를 기억합니다.</div>
+        <div class="mm-hint">문구를 끌어서 고른 뒤 <b>복사 링크</b> 를 누르면 밑줄이 그어집니다. 메모 카드에서 그 글씨를 누르면 복사됩니다. 링크 안에 커서를 두고 한 번 더 누르면 밑줄이 풀립니다.</div>
       </div>`;
   },
 
@@ -217,7 +259,7 @@ const Memo = {
   _wire(html){
     const ed = document.getElementById('mBody'); if(!ed) return;
     ed.innerHTML = html || '';
-    this.paintChips(ed);
+    this.paintMarks(ed);
     try { document.execCommand('defaultParagraphSeparator', false, 'div'); } catch {}
 
     // 마지막으로 고른 자리를 기억한다. 도구 단추를 누르는 순간 편집창은 초점을 잃어서
@@ -239,73 +281,10 @@ const Memo = {
       }
     });
 
-    // 칩 옮기기.
-    // 처음엔 눌렀을 때 바로 복사만 하게 해 뒀는데, 그 preventDefault 때문에 칩을
-    // 고를 수가 없어서 잘라내기도 끌기도 막혀 있었다 — 만들고 나면 못 움직이는 물건이었다.
-    // HTML5 드래그는 contenteditable 안에서 브라우저마다 제각각이라 포인터로 직접 옮긴다.
-    // 누른 채 움직이면 커서를 따라 칩이 실제로 이동하고, 안 움직이고 떼면 복사다.
-    //
-    // 손가락은 마우스와 사정이 다르다. 폰에서 이게 안 됐던 이유가 셋이었다.
-    //   1. pointermove 를 ed 에 걸어 뒀다. 손가락이 칩 밖으로 나가는 순간 이벤트가 끊긴다.
-    //      → setPointerCapture 로 칩이 끝까지 받게 한다.
-    //   2. 브라우저가 그 터치를 스크롤로 먼저 가져갔다. → CSS 의 touch-action:none.
-    //   3. 조금만 움직여도 끌기로 쳐서, 누르려던 것이 자꾸 끌려갔다.
-    //      → 아이폰처럼 '꾹 눌러야 들린다'. 250ms 지나면 칩이 들리고, 그 전에 떼면 복사다.
-    ed.addEventListener('pointerdown', (e) => {
-      const chip = e.target.closest('.mm-cp');
-      if (!chip) return;
-      e.preventDefault();
-      const touch = e.pointerType !== 'mouse';
-      const sx = e.clientX, sy = e.clientY;
-      let moved = false, armed = !touch;      // 마우스는 곧바로, 손가락은 꾹 눌러야
-      try { chip.setPointerCapture(e.pointerId); } catch {}
-
-      // 손가락: 꾹 누르고 있으면 칩이 '들린다'. 들렸다는 걸 몸으로 알려 준다.
-      const arm = touch ? setTimeout(() => {
-        armed = true; chip.classList.add('cp-drag');
-        navigator.vibrate?.(12);
-      }, 250) : null;
-
-      const move = (ev) => {
-        const far = Math.abs(ev.clientX-sx) >= 6 || Math.abs(ev.clientY-sy) >= 6;
-        // 들리기 전에 손가락이 크게 움직였으면 끌기가 아니라 스크롤이다. 없던 일로 한다.
-        if (!armed) { if (far) { clearTimeout(arm); cancel(); } return; }
-        if (!moved && !far) return;
-        if (!moved) { moved = true; chip.classList.add('cp-drag'); }
-        const r = Memo._caretAt(ev.clientX, ev.clientY);
-        if (!r || !ed.contains(r.startContainer) || chip.contains(r.startContainer)) return;
-        r.insertNode(chip);                    // 이미 문서에 있는 노드라 '옮기기' 가 된다
-      };
-      const cleanup = () => {
-        clearTimeout(arm);
-        chip.removeEventListener('pointermove', move);
-        chip.removeEventListener('pointerup', up);
-        chip.removeEventListener('pointercancel', cancel);
-        try { chip.releasePointerCapture(e.pointerId); } catch {}
-        chip.classList.remove('cp-drag');
-      };
-      const cancel = () => cleanup();
-      const up = () => {
-        const didMove = moved;
-        cleanup();
-        if (didMove) {
-          // 옮긴 뒤 칩 바로 뒤에 커서를 둔다. 그래야 이어서 글을 칠 수 있다.
-          const after = document.createRange();
-          after.setStartAfter(chip); after.collapse(true);
-          const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(after);
-          this._sel = after.cloneRange();
-          App?.showToast('칩 옮김 ✓','success');
-        } else {
-          this.copyChip(chip);
-          // 복사한 김에 칩을 골라 둔다 — 바로 Ctrl+X 로 잘라내 옮길 수 있게.
-          const r = document.createRange(); r.selectNode(chip);
-          const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
-        }
-      };
-      chip.addEventListener('pointermove', move);
-      chip.addEventListener('pointerup', up);
-      chip.addEventListener('pointercancel', cancel);
-    });
+    // 복사칩의 '옮기기' 는 없앴다.
+    // 칩은 문구 뒤에 붙는 별개의 물건이라, 만들고 나면 어디 두었는지가 또 하나의 상태였다.
+    // 꾹 눌러 들고 끌어 옮기는 코드가 50 줄 넘게 있었고 폰에서 세 번 고쳤다.
+    // 복사 링크는 글 자체에 그어지므로 옮길 일이 없다 — 글을 옮기면 밑줄이 따라간다.
 
     // ── 목록에서의 엔터·백스페이스 ──────────────
     // 워드에서 몸에 익은 동작을 그대로 가져온다.
@@ -340,11 +319,11 @@ const Memo = {
       e.preventDefault();
       const frag = this.clean(html || esc(text).replace(/\n/g,'<br>'));
       document.execCommand('insertHTML', false, frag);
-      this.paintChips(ed);
+      this.paintMarks(ed);
     });
 
-    // 되돌리기·끌어놓기 등 우리가 모르는 길로 들어온 칩도 꾸며 준다.
-    new MutationObserver(() => this.paintChips(ed))
+    // 되돌리기·붙여넣기 등 우리가 모르는 길로 들어온 표시도 꾸며 준다.
+    new MutationObserver(() => this.paintMarks(ed))
       .observe(ed, { childList:true, subtree:true });
 
     document.querySelectorAll('.mm-bar .mm-b').forEach(b => {
@@ -352,19 +331,6 @@ const Memo = {
       b.addEventListener('mousedown', e => e.preventDefault());
       b.addEventListener('click', () => this._cmd(b.dataset.cmd, ed));
     });
-  },
-
-  // 포인터가 가리키는 글자 사이 자리. 크롬·사파리와 파이어폭스가 이름이 다르다.
-  _caretAt(x, y){
-    if (document.caretRangeFromPoint) return document.caretRangeFromPoint(x, y);
-    if (document.caretPositionFromPoint) {
-      const p = document.caretPositionFromPoint(x, y);
-      if (!p) return null;
-      const r = document.createRange();
-      r.setStart(p.offsetNode, p.offset); r.collapse(true);
-      return r;
-    }
-    return null;
   },
 
   _restore(ed){
@@ -376,7 +342,7 @@ const Memo = {
 
   _cmd(cmd, ed){
     this._restore(ed);
-    if (cmd === 'chip')      return this._insertChip(ed);
+    if (cmd === 'link')      return this._toggleLink(ed);
     if (cmd === 'checklist') return this._checklist(ed);
     if (cmd === 'indent')    return this._indent(ed,  1);
     if (cmd === 'outdent')   return this._indent(ed, -1);
@@ -485,32 +451,64 @@ const Memo = {
     ed.focus();
   },
 
-  // 고른 문구를 몸에 지닌 칩을 그 문구 바로 뒤에 놓는다.
-  // 문구 자체는 지우지 않는다 — 주소는 읽을 수 있어야 하고, 칩은 그걸 가져가는 손잡이다.
-  _insertChip(ed){
+  // 고른 문구에 밑줄을 긋는다. 링크 안에 커서가 있으면 반대로 밑줄을 푼다 —
+  // 긋는 길과 푸는 길이 한 단추여야 '이 단추가 밑줄을 담당한다' 가 눈에 남는다.
+  //
+  // 고른 범위를 통째로 감싸지 않고 글자만 꺼내 다시 넣는다. surroundContents 는
+  // 고른 범위가 태그 경계를 넘으면(굵게 반쪽 + 보통 반쪽) 그냥 실패한다.
+  // 밑줄 안의 굵게를 잃는 건 아쉽지만, 눌렀는데 아무 일도 안 일어나는 것보다 낫다.
+  _toggleLink(ed){
     const s = window.getSelection();
     if (!s || !s.rangeCount) { App.showToast('먼저 문구를 끌어서 고르세요','error'); return; }
     const r = s.getRangeAt(0);
+
+    const hits = this._linksIn(ed, r);
+    if (hits.length) {
+      hits.forEach(a => { while (a.firstChild) a.parentNode.insertBefore(a.firstChild, a); a.remove(); });
+      ed.normalize();                     // 쪼개진 글자 토막을 도로 하나로
+      ed.focus();
+      App.showToast('복사 링크 해제됨','success');
+      return;
+    }
+
     const text = String(r.toString() || '').trim();
     if (!text) { App.showToast('먼저 문구를 끌어서 고르세요','error'); return; }
 
-    const chip = document.createElement('span');
-    chip.className = 'mm-cp';
-    chip.setAttribute('contenteditable','false');
-    chip.dataset.cp = text;
-    chip.title = `복사: ${text}`;
-    chip.innerHTML = (typeof Icons !== 'undefined') ? Icons.svg('copy') : '⧉';
+    const a = document.createElement('span');
+    a.className = 'mm-lk';
+    a.textContent = text;
+    r.deleteContents();
+    r.insertNode(a);
 
-    const end = r.cloneRange();
-    end.collapse(false);                 // 고른 문구의 끝
-    end.insertNode(chip);
-    // 칩 뒤에 커서를 놓아 준다. 안 그러면 다음에 친 글자가 칩 안으로 들어간다.
+    // 링크 바로 뒤에 커서를 둔다. 안 그러면 이어서 친 글자가 밑줄 안으로 들어간다.
     const after = document.createRange();
-    after.setStartAfter(chip); after.collapse(true);
+    after.setStartAfter(a); after.collapse(true);
     s.removeAllRanges(); s.addRange(after);
     this._sel = after.cloneRange();
     ed.focus();
-    App.showToast('복사칩 추가됨 ✓','success');
+    this.paintMarks(ed);
+    App.showToast('복사 링크 만듦 ✓','success');
+  },
+
+  // 고른 범위에 걸린 복사 링크들.
+  // 커서를 한 점에 찍어 둔 경우(collapsed)에는 '걸쳐 있는지' 를 아예 묻지 않는다.
+  // 규격대로라면 점 하나짜리 범위는 어차피 아무것과도 안 겹치지만, 경계 판정은
+  // 엔진마다 미묘하다. 링크 바로 뒤에 커서를 둔 것이 '겹침' 으로 읽히면
+  // 새 링크를 그으려다 옆 링크가 풀린다. 그래서 규칙으로 못 박는다 —
+  // 커서만 있을 때 잡히는 링크는 '커서가 그 안에 있는' 링크뿐이다.
+  _linksIn(ed, r){
+    const out = [];
+    const up = n => { while (n && n !== ed) {
+      if (n.nodeType === 1 && n.classList && n.classList.contains('mm-lk')) return n;
+      n = n.parentNode;
+    } return null; };
+    const a = up(r.startContainer), b = up(r.endContainer);
+    if (a) out.push(a);
+    if (b && b !== a) out.push(b);
+    if (!r.collapsed) ed.querySelectorAll('.mm-lk').forEach(x => {
+      if (!out.includes(x) && r.intersectsNode(x)) out.push(x);
+    });
+    return out;
   },
 
   _read(){
