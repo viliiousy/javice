@@ -8,13 +8,22 @@ name: Send Notifications
 # 늦게라도 오는 보험보다, 같은 알림이 두 번 오는 쪽이 실제로 더 성가시다.
 #
 # 수동 실행은 남겨 둔다 — cron-job.org 가 죽었을 때 여기서 한 번 돌리면 된다.
+#
+# 손으로 돌릴 때 셋 중 하나를 고른다.
+#   send    — 평소와 같다. 지금 보낼 게 있으면 보낸다.
+#   force   — 시각 판정을 무시하고 지금 다 보낸다(전달 경로 시험용).
+#   devices — 아무것도 안 보낸다. 등록된 기기와 오늘 발송 표식만 본다.
+#
+# devices 를 따로 둔 이유: 크론도 200, FCM 도 200 인데 폰에는 안 뜨는 상황이 실제로 있다.
+# 그때 물어볼 곳이 없어서 매번 강제 발송으로 폰을 울려 가며 확인해야 했다.
 on:
-  workflow_dispatch:  # 수동 실행 가능
+  workflow_dispatch:
     inputs:
-      force:
-        description: '설정 시각을 무시하고 지금 즉시 발송 (테스트용)'
-        type: boolean
-        default: false
+      mode:
+        description: '무엇을 할지'
+        type: choice
+        default: send
+        options: [send, force, devices]
 
 jobs:
   notify:
@@ -26,11 +35,18 @@ jobs:
           # javice.vercel.app 은 308 리다이렉트라 curl 이 따라가지 않고,
           # -L 을 붙여도 호스트가 바뀌면 Authorization 헤더가 빠진다.
           # 그래서 크론이 아무 일도 안 한 채 초록불로 끝나 버렸다.
-          # force=1 은 수동 실행에서만 붙는다. 예약 실행에서는 inputs 가 비어 있어 그냥 ''.
+          # 질의문자열은 고른 모드에서 나온다. 예약 실행에는 inputs 가 없으므로 그냥 평소 발송이다.
+          case "${{ inputs.mode }}" in
+            force)   Q='?force=1'   ;;
+            devices) Q='?devices=1' ;;
+            *)       Q=''           ;;
+          esac
+          echo "mode=${{ inputs.mode }} query=$Q"
           code=$(curl -sS -o /tmp/cron.json -w '%{http_code}' \
-            "https://bashy.app/api/cron-notify${{ inputs.force && '?force=1' || '' }}" \
+            "https://bashy.app/api/cron-notify$Q" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
           echo "HTTP $code"
-          cat /tmp/cron.json; echo
+          # 읽으라고 찍는 것이므로 한 줄로 뭉개지 않는다.
+          python3 -m json.tool --indent 2 /tmp/cron.json 2>/dev/null || cat /tmp/cron.json; echo
           # 실패를 초록불로 넘기지 않는다
           [ "$code" = "200" ] || exit 1
