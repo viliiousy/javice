@@ -46,7 +46,7 @@ const Checklist = {
     +`<div class="habit-add-btn" onclick="Checklist.showAdd()">+ 항목 추가</div>`;
 
     try { RowUI.paint(wrap, {
-      edit: id => this._bodyTap(id),
+      edit: id => this.showEdit(id),
       del:  id => this.remove(id),
     }); } catch(e) { console.warn('RowUI', e); }
   },
@@ -67,14 +67,10 @@ const Checklist = {
   _lpStart(e,id){ this._lpTimer=setTimeout(()=>Checklist.showEdit(id),600); },
   _lpEnd(){ clearTimeout(this._lpTimer); },
 
-  _bodyTap(id) {
-    // 모바일: 탭으로 바로 체크
-    if(window.matchMedia('(max-width:640px)').matches){
-      this.toggle(id);
-    } else {
-      this.showEdit(id);
-    }
-  },
+  // 글씨를 누르면 수정, 네모를 누르면 체크 — 폰과 PC 가 같다.
+  // 예전엔 폰에서 글씨를 눌러도 체크가 됐고, 길게 눌러 수정도 이 함수를 거쳐
+  // 결국 체크로 끝났다. 폰에서는 항목을 고칠 길이 아예 없었다.
+  _bodyTap(id) { this.showEdit(id); },
 
   _reorderMode: false,
 
