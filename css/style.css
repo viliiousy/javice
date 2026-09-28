@@ -684,6 +684,11 @@ textarea.inp{ resize:vertical; min-height:64px; }
    카드와 편집창이 같은 변수를 보므로 둘이 어긋날 수가 없다. */
 :root{ --mm-fs:12px; }
 .memo-wrap{ padding:8px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:6px; }
+/* 줄은 절대 눌려 줄어들지 않는다. RowUI 가 줄을 overflow:hidden 인 .rw 로 감싸는데,
+   overflow 가 hidden 인 flex 항목은 최소 높이가 0 으로 풀린다. 그래서 칸의 max-height 를
+   넘기는 순간 스크롤이 생기는 대신 펼친 메모가 잘려 나갔다 — 폰에서 '펼쳐도 조금만
+   나오고 아래 복사 링크를 못 누르던' 이유다. 줄은 제 키를 지키고, 넘치는 건 칸이 굴린다. */
+.memo-wrap > *, .checklist-wrap > *{ flex-shrink:0; }
 .memo-item{
   display:flex; align-items:flex-start; gap:7px; position:relative;
   padding:10px 12px; background:var(--card);
@@ -1027,6 +1032,10 @@ html.dark .btn-danger:hover{ background:rgba(220,38,38,0.24); }
   /* 체크리스트 */
   .cl-item{ padding:10px 10px; }
   .cl-title{ font-size:14px; }
+  /* 이제 글씨는 수정, 체크는 네모만 한다. 18px 네모를 손가락으로 맞히라는 건 무리라
+     네모는 조금 키우고, 누를 수 있는 판은 사방 10px 씩 더 넓힌다(눈에는 안 보인다). */
+  .cl-check{ width:22px; height:22px; position:relative; }
+  .cl-check::before{ content:''; position:absolute; inset:-10px; }
 
   /* 습관 */
   .habit-item{ padding:11px 12px; }
@@ -1041,6 +1050,9 @@ html.dark .btn-danger:hover{ background:rgba(220,38,38,0.24); }
   .checklist-wrap{ max-height:300px; }
   .events-wrap{ max-height:220px; }
   .memo-wrap{ max-height:280px; }
+  /* 펼친 메모가 있으면 창을 키운다. 280px 안에서 긴 메모를 읽으라는 건
+     열쇠구멍으로 방을 보라는 것과 같다. */
+  .memo-wrap:has(.memo-item.open){ max-height:75vh; }
   .habits-wrap{ max-height:300px; }
   .diet-wrap{ max-height:400px; }
 }
