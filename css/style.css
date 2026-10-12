@@ -3082,10 +3082,10 @@ body, .empty, .card-title, .modal-lbl, .habit-name, .task-text,
   padding:8px 10px; border-radius:8px; background:var(--bg2); color:var(--text); user-select:all; }
 .aiu-a{ text-decoration:none; display:inline-flex; align-items:center; justify-content:center; color:inherit; }
 /* AI 사용량 게이지 — 헤더에서는 숫자 없이 고리 + 이름 */
-.ts-row.ts-ai{ padding:2px 0; }
+.ts-row.ts-ai{ padding:0; line-height:1; }
 .aiu-gs{ display:inline-flex; gap:10px; align-items:flex-start; }
-.aiu-it{ display:inline-flex; flex-direction:column; align-items:center; gap:2px; }
-.aiu-nm{ font-size:9.5px; line-height:1; font-weight:600; color:var(--text3); letter-spacing:-.01em; white-space:nowrap; }
+.aiu-it{ display:inline-flex; flex-direction:column; align-items:center; gap:1px; }
+.aiu-nm{ font-size:8.5px; line-height:1; font-weight:600; color:var(--text3); letter-spacing:-.01em; white-space:nowrap; }
 .aiu-g{ display:block; color:var(--text); flex:none; }
 .ts-ai:hover .aiu-nm{ color:var(--accent); }
 .aiu-head .aiu-g{ margin-right:2px; align-self:center; }
@@ -3093,15 +3093,15 @@ body, .empty, .card-title, .modal-lbl, .habit-name, .task-text,
 @media (max-width:640px){ .aiu-gs{ gap:7px; } .aiu-nm{ font-size:9px; } }
 
 /* 헤더 AI 사용량 자리 — PC: 오른쪽 두 줄의 왼쪽 / 폰: 헤더 가운데 */
-.h-ai{ display:flex; align-items:center; margin-left:auto; margin-right:16px; }
+.h-ai{ display:flex; align-items:center; margin-left:auto; margin-right:14px; }
 .h-ai.is-empty{ display:none; }
 .nm-short{ display:none; }
 @media (max-width:640px){
   .nm-full{ display:none; } .nm-short{ display:inline; }
   .h-left{ flex:none !important; }
-  .h-ai{ margin:0 auto; padding:0 2px; flex:none; }
+  .h-ai{ margin:0 6px 0 auto; padding:0; flex:none; }
   .h-ai .aiu-gs{ gap:5px; }
-  .h-ai .aiu-g{ width:19px; height:19px; }
+  .h-ai .aiu-g{ width:22px; height:22px; }
   .h-ai .aiu-nm{ font-size:8px; letter-spacing:-.02em; }
   .h-left{ gap:7px !important; }
   .h-logo img{ width:28px !important; height:28px !important; }
@@ -3124,7 +3124,7 @@ body, .empty, .card-title, .modal-lbl, .habit-name, .task-text,
   .ts-row{ font-size:9.5px; }
   .ts-body s{ margin:0 2px; }
   .h-ai .aiu-gs{ gap:3px; }
-  .h-ai .aiu-g{ width:17px; height:17px; }
+  .h-ai .aiu-g{ width:20px; height:20px; }
   .h-right{ gap:4px; }
   .header{ padding:5px 7px !important; }
 }
