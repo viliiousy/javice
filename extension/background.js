@@ -6,7 +6,7 @@
 //
 //   Claude      /api/organizations → /api/organizations/<org>/usage
 //   ChatGPT     /api/auth/session → /backend-api/wham/usage   (Codex·플러스 한도)
-//   Higgsfield  열려 있는 higgsfield.ai 탭 안에서 /fnf/user 를 읽는다
+//   Higgsfield  higgsfield.ai 탭 안에서 /fnf/user 를 읽는다 (탭이 없으면 뒤에서 잠깐 열었다 닫는다)
 //               (로그인 토큰이 페이지 안에서만 만들어지기 때문)
 //
 // 직접 부르기가 막히면(봇 차단 등) 열려 있는 그 사이트 탭 안에서 같은 호출을 한다.
@@ -41,15 +41,35 @@ async function getJSON(url, opts = {}) {
   return r.json();
 }
 
-// 열려 있는 탭 안(페이지 세계)에서 함수를 돌려 결과만 받는다
-async function inTab(urlPattern, func) {
+// 탭 안(페이지 세계)에서 함수를 돌려 결과만 받는다.
+// 열린 탭이 없으면 뒤쪽에 조용히 하나 열어 읽고 바로 닫는다 — 사용자가 탭을 열어 둘 필요가 없다.
+async function inTab(urlPattern, func, openUrl = urlPattern.replace(/\*$/, '')) {
   const tabs = await chrome.tabs.query({ url: urlPattern });
-  const tab = tabs.find(t => t.status === 'complete') || tabs[0];
-  if (!tab) return { skipped: '열린 탭 없음' };
-  const [res] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func });
-  if (!res || res.result == null) throw new Error('탭에서 결과를 못 받음');
-  if (res.result.error) throw new Error(res.result.error);
-  return res.result;
+  let tab = tabs.find(t => t.status === 'complete') || tabs[0], temp = null;
+  if (!tab) {
+    if (!openUrl) return { skipped: '열린 탭 없음' };
+    temp = await chrome.tabs.create({ url: openUrl, active: false, pinned: false });
+    await waitLoaded(temp.id, 30000);
+    await new Promise(r => setTimeout(r, 3000));   // 페이지가 로그인 토큰을 준비할 시간
+    tab = temp;
+  }
+  try {
+    const [res] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func });
+    if (!res || res.result == null) throw new Error('탭에서 결과를 못 받음');
+    if (res.result.error) throw new Error(res.result.error);
+    return res.result;
+  } finally {
+    if (temp) chrome.tabs.remove(temp.id).catch(() => {});
+  }
+}
+
+function waitLoaded(tabId, ms) {
+  return new Promise((resolve, reject) => {
+    const done = (id, info) => { if (id === tabId && info.status === 'complete') { clear(); resolve(); } };
+    const timer = setTimeout(() => { clear(); reject(new Error('페이지 로딩 시간 초과')); }, ms);
+    const clear = () => { clearTimeout(timer); chrome.tabs.onUpdated.removeListener(done); };
+    chrome.tabs.onUpdated.addListener(done);
+  });
 }
 
 // ── Claude ─────────────────────────────────────────
