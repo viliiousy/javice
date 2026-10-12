@@ -39,25 +39,54 @@ const AIUsage = {
   },
 
   // ── 헤더 한 줄 ────────────────────────
-  // 5시간 한도가 '지금 쓸 수 있나' 를 알려 준다. 7일은 자세히 화면에서.
+  // 숫자 없이 모양으로만 보여 준다. (자세한 숫자는 눌렀을 때 창에서)
+  //   Claude · ChatGPT : 바깥 고리 = 7일 한도 남은 양, 안쪽 원 = 5시간 한도 남은 양
+  //                      (안쪽은 가득 찬 물이 쓴 만큼 위에서부터 줄어드는 모양)
+  //   Higgsfield      : 파이 — 이번 구독 기간 크레딧 남은 몫
+  COLORS: { claude: '#d97757', chatgpt: '#10a37f', higgsfield: '#8fb32b' },
+  _left(w) { return w && w.pct != null ? Math.max(0, Math.min(1, 1 - Number(w.pct) / 100)) : null; },
+  _tone(left, base) { return left == null ? base : left <= 0.1 ? 'var(--red)' : left <= 0.3 ? 'var(--yellow)' : base; },
+  _gid: 0,
+
+  gauge(key, size) {
+    const s = (this.data || {})[key];
+    if (!s) return '';
+    const base = this.COLORS[key], id = 'aiug' + (++this._gid);
+    const R = 16.5, C = 2 * Math.PI * R;
+    if (key === 'higgsfield') {
+      const tot = Number(s.total) || 0;
+      const f = tot ? Math.max(0, Math.min(1, Number(s.credits) / tot)) : 0;
+      const col = f <= 0.1 ? 'var(--red)' : base;
+      const ang = f * 2 * Math.PI, x = 20 + 16.5 * Math.sin(ang), y = 20 - 16.5 * Math.cos(ang);
+      const slice = f >= 0.999 ? `<circle cx="20" cy="20" r="16.5" fill="${col}"/>`
+        : f <= 0.001 ? '' : `<path d="M20 20 L20 3.5 A16.5 16.5 0 ${f > 0.5 ? 1 : 0} 1 ${x.toFixed(2)} ${y.toFixed(2)} Z" fill="${col}"/>`;
+      return `<svg class="aiu-g" width="${size}" height="${size}" viewBox="0 0 40 40" role="img" aria-label="Higgsfield 크레딧 ${Math.round(f * 100)}% 남음">
+        <circle cx="20" cy="20" r="16.5" fill="currentColor" opacity=".12"/>${slice}
+        <circle cx="20" cy="20" r="16.5" fill="none" stroke="currentColor" stroke-opacity=".18" stroke-width="1"/></svg>`;
+    }
+    const w7 = this._left(s.d7), h5 = this._left(s.h5);
+    const ring = w7 == null ? 0 : w7;
+    const lvl = h5 == null ? 0 : h5;
+    const top = 20 - 11 + (1 - lvl) * 22;      // 물 높이: 가득(위)에서 쓴 만큼 아래로
+    return `<svg class="aiu-g" width="${size}" height="${size}" viewBox="0 0 40 40" role="img"
+        aria-label="${this.NAMES[key]} 5시간 ${h5 == null ? '—' : Math.round(lvl * 100) + '%'} · 7일 ${w7 == null ? '—' : Math.round(ring * 100) + '%'} 남음">
+      <defs><clipPath id="${id}"><circle cx="20" cy="20" r="11"/></clipPath></defs>
+      <circle cx="20" cy="20" r="${R}" fill="none" stroke="currentColor" stroke-opacity=".14" stroke-width="3.5"/>
+      <circle cx="20" cy="20" r="${R}" fill="none" stroke="${this._tone(w7, base)}" stroke-width="3.5" stroke-linecap="round"
+        stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - ring)}" transform="rotate(-90 20 20)"/>
+      <circle cx="20" cy="20" r="11" fill="currentColor" opacity=".1"/>
+      <rect x="9" y="${top.toFixed(2)}" width="22" height="24" fill="${this._tone(h5, base)}" clip-path="url(#${id})"/>
+    </svg>`;
+  },
+
   row() {
     const d = this.data;
     if (!d || !Object.keys(d).length) return '';
-    const parts = [];
-    const p = (name, s) => {
-      if (!s || !s.h5) return;
-      const v = Math.round(s.h5.pct);
-      const cls = v >= 90 ? 'ts-up' : '';
-      parts.push(`${name} <b class="${cls}">${v}</b><i>%</i>`);
-    };
-    p('C', d.claude);
-    p('G', d.chatgpt);
-    if (d.higgsfield && d.higgsfield.credits != null) {
-      parts.push(`H <b>${this._num(d.higgsfield.credits)}</b>`);
-    }
-    if (!parts.length) return '';
-    return `<button class="ts-row" id="tsAI" onclick="AIUsage.open()" title="AI 사용량 (5시간 한도 · Higgsfield 남은 크레딧)">
-      ${(typeof Icons !== 'undefined') ? Icons.svg('sparkle', 'ts-ic') : ''}<span class="ts-body">${parts.join('<s></s>')}</span></button>`;
+    const g = ['claude', 'chatgpt', 'higgsfield'].map(k => this.gauge(k, 26)).filter(Boolean);
+    if (!g.length) return '';
+    return `<button class="ts-row ts-ai" id="tsAI" onclick="AIUsage.open()"
+      title="AI 남은 사용량 — Claude · ChatGPT: 바깥 고리 7일, 안쪽 5시간 / Higgsfield: 남은 크레딧">
+      <span class="ts-body aiu-gs">${g.join('')}</span></button>`;
   },
 
   _num(v) {
@@ -85,11 +114,11 @@ const AIUsage = {
 
   _bar(label, w) {
     if (!w) return '';
-    const v = Math.max(0, Math.min(100, Number(w.pct) || 0));
-    const tone = v >= 90 ? 'var(--red)' : v >= 70 ? 'var(--yellow)' : 'var(--accent)';
+    const left = Math.max(0, Math.min(100, Math.round(100 - (Number(w.pct) || 0))));
+    const tone = left <= 10 ? 'var(--red)' : left <= 30 ? 'var(--yellow)' : 'var(--accent)';
     return `<div class="aiu-bar">
-      <div class="aiu-bar-top"><span>${label}</span><b>${Math.round(v)}%</b></div>
-      <div class="aiu-track"><div class="aiu-fill" style="width:${v}%;background:${tone}"></div></div>
+      <div class="aiu-bar-top"><span>${label}</span><b>${left}% 남음</b></div>
+      <div class="aiu-track"><div class="aiu-fill" style="width:${left}%;background:${tone}"></div></div>
       <div class="aiu-sub">${w.reset ? this._until(w.reset) : ''}</div>
     </div>`;
   },
@@ -99,7 +128,7 @@ const AIUsage = {
     const name = this.NAMES[key];
     if (!s) return `<div class="aiu-svc"><div class="aiu-head"><b>${name}</b><span class="aiu-sub">아직 받은 값 없음</span></div></div>`;
     const stale = Date.now() - Date.parse(s.at) > 30 * 60000;
-    const head = `<div class="aiu-head"><b>${name}</b><span class="aiu-plan">${esc(s.plan || '')}</span>
+    const head = `<div class="aiu-head">${this.gauge(key, 34)}<b>${name}</b><span class="aiu-plan">${esc(s.plan || '')}</span>
       <span class="aiu-sub${stale ? ' aiu-stale' : ''}">${this._ago(s.at)}</span></div>`;
     if (key === 'higgsfield') {
       const tot = Number(s.total) || 0;
@@ -112,7 +141,7 @@ const AIUsage = {
           <div class="aiu-sub">${s.ends ? '구독 갱신 ' + new Date(s.ends).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }) : ''}</div>
         </div></div>`;
     }
-    return `<div class="aiu-svc">${head}${this._bar('5시간', s.h5)}${this._bar('7일', s.d7)}</div>`;
+    return `<div class="aiu-svc">${head}${this._bar('5시간 한도', s.h5)}${this._bar('7일 한도', s.d7)}</div>`;
   },
 
   open() {
