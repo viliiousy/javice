@@ -12,9 +12,13 @@
 // 쓰는 곳은 /users/<uid>/_usage 하나뿐이다. 사용자 데이터(u_*)에는 손대지 않는다.
 //   _usage/latest/<서비스>   마지막으로 본 값 (서비스별로 따로 덮어쓴다)
 //   _usage/hist/<10분칸>     그래프용 압축 이력 { c5, c7, g5, g7, hf }
+//
+//   tasks : 허브 왼쪽의 구글 할일. 서버에 있는 리프레시 토큰(/google_refresh/<구글 sub>)으로
+//           읽기만 한다. 구글 sub 는 사용자 데이터 키의 접두사(u_<sub>_)에서 얻는다.
 
 const crypto = require('crypto');
 const { fbFetch, fbGet } = require('../lib/fb-admin');
+const { accessTokenFor } = require('../lib/google-oauth');
 
 const HIST_DAYS = 8;          // 일주일 그래프 + 여유 하루
 const SLOT_MIN  = 10;         // 이력 칸 크기(분). 확장이 5분마다 올려도 칸은 10분
@@ -140,6 +144,42 @@ async function state(uid, days) {
   return { latest: latest || {}, hist: hist || {} };
 }
 
+// ── 구글 할일 ─────────────────────────────────────
+async function googleSub(uid) {
+  const keys = await fbGet(`/users/${uid}.json?shallow=true`);
+  for (const k of Object.keys(keys || {})) {
+    const m = k.match(/^u_(\d{6,})_gl_/);   // 접두사가 이메일인 옛 계정은 sub 가 아니다
+    if (m) return m[1];
+  }
+  return null;
+}
+
+async function gget(tok, url) {
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${tok}` } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`Tasks API ${r.status}: ${(j.error && j.error.message) || ''}`);
+  return j;
+}
+
+async function tasks(uid) {
+  const sub = await googleSub(uid);
+  if (!sub) return { needConsent: true, reason: '구글 계정을 찾지 못했습니다' };
+  const t = await accessTokenFor(sub);
+  if (t.needConsent || !t.access_token) return { needConsent: true, reason: t.reason || 'bashy.app 에서 구글 접근을 한 번 더 허용해 주세요' };
+  const tok = t.access_token;
+  const base = 'https://tasks.googleapis.com/tasks/v1';
+  const ls = await gget(tok, `${base}/users/@me/lists?maxResults=100`);
+  const lists = (ls.items || []).map(l => ({ id: l.id, title: l.title }));
+  const per = await Promise.all(lists.map(l =>
+    gget(tok, `${base}/lists/${encodeURIComponent(l.id)}/tasks?showCompleted=false&showHidden=false&maxResults=100`)
+      .then(j => (j.items || []).filter(x => x.title && x.status !== 'completed').map(x => ({
+        id: x.id, list: l.id, title: String(x.title).slice(0, 200),
+        due: x.due ? x.due.slice(0, 10) : null, pos: x.position || '', sub: !!x.parent,
+      })))
+      .catch(() => [])));
+  return { lists, tasks: per.flat() };
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -155,8 +195,9 @@ module.exports = async (req, res) => {
 
     if (body.act === 'push')  { res.status(200).json({ ok: true, ...(await push(uid, body.usage)) }); return; }
     if (body.act === 'state') { res.status(200).json({ ok: true, ...(await state(uid, body.days)) }); return; }
+    if (body.act === 'tasks') { res.status(200).json({ ok: true, ...(await tasks(uid)) }); return; }
     if (body.act === 'ping')  { res.status(200).json({ ok: true }); return; }
-    res.status(400).json({ error: 'act 는 push / state / ping 중 하나' });
+    res.status(400).json({ error: 'act 는 push / state / tasks / ping 중 하나' });
   } catch (e) {
     console.error('[hub]', e);
     res.status(500).json({ error: e.message });

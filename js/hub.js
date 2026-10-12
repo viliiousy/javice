@@ -3,7 +3,7 @@
 // 이 화면은 bashy 본 앱과 따로 돈다. 구글 로그인을 하지 않는다 — 태블릿 앱(WebView)에서는
 // 구글이 OAuth 를 막기 때문이다. 대신 세 가지 연결을 이 기기의 localStorage 에 둔다.
 //
-//   연결 코드        → /api/hub 에서 AI 사용량(Claude·ChatGPT·Higgsfield)을 받는다
+//   연결 코드        → /api/hub 에서 AI 사용량과 구글 할일을 받는다
 //   Home Assistant  → 집 안 Wi-Fi 로 직접 WebSocket. SmartThings·Tuya·샤오미를 HA 가 묶어 준다
 //   OpenClaw (선택) → HA 가 못 알아들은 말을 맥미니의 ChatGPT 구독으로 보낸다
 //
@@ -16,20 +16,31 @@
 const $  = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const HUB_API = 'https://bashy.app/api/hub';
-const CFG_KEY = 'hub_cfg_v1';
+const CFG_KEY  = 'hub_cfg_v1';
 const AREA_KEY = 'hub_area';
+const DEV_KEY  = 'hub_dev_v1';      // 기기별 { hide, icon, name } — 이 태블릿에만 둔다
 const LAT = 37.2848, LON = 127.0447;   // 광교
 
 // ── 설정 ─────────────────────────────────────────
-const Cfg = {
-  get() { try { return JSON.parse(localStorage.getItem(CFG_KEY)) || {}; } catch { return {}; } },
-  set(v) { try { localStorage.setItem(CFG_KEY, JSON.stringify(v)); } catch {} },
+const store = {
+  get(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
+const Cfg = { get: () => store.get(CFG_KEY, {}), set: v => store.set(CFG_KEY, v) };
 
 function toast(msg, ms = 2600) {
   const t = $('toast');
   t.textContent = msg; t.classList.add('show');
   clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+async function hubCall(body) {
+  const code = Cfg.get().code;
+  if (!code) throw new Error('연결 코드가 없습니다');
+  const r = await fetch(HUB_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, ...body }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
 }
 
 // ── 네이티브(Capacitor) 연결 ──────────────────────
@@ -56,18 +67,33 @@ const Clock = {
 };
 
 const Weather = {
-  CODES: [[0,'맑음'],[1,'대체로 맑음'],[2,'구름 조금'],[3,'흐림'],[45,'안개'],[48,'안개'],[51,'이슬비'],[53,'이슬비'],[55,'이슬비'],
-          [61,'비'],[63,'비'],[65,'강한 비'],[66,'어는 비'],[67,'어는 비'],[71,'눈'],[73,'눈'],[75,'많은 눈'],[77,'싸락눈'],
-          [80,'소나기'],[81,'소나기'],[82,'강한 소나기'],[85,'눈 소나기'],[86,'눈 소나기'],[95,'뇌우'],[96,'뇌우'],[99,'뇌우']],
+  // [코드, 이름, 아이콘]
+  CODES: [[0,'맑음','sun'],[1,'대체로 맑음','sun'],[2,'구름 조금','part'],[3,'흐림','cloud'],[45,'안개','fog'],[48,'안개','fog'],
+          [51,'이슬비','rain'],[53,'이슬비','rain'],[55,'이슬비','rain'],[61,'비','rain'],[63,'비','rain'],[65,'강한 비','rain'],
+          [66,'어는 비','rain'],[67,'어는 비','rain'],[71,'눈','snow'],[73,'눈','snow'],[75,'많은 눈','snow'],[77,'싸락눈','snow'],
+          [80,'소나기','rain'],[81,'소나기','rain'],[82,'강한 소나기','rain'],[85,'눈 소나기','snow'],[86,'눈 소나기','snow'],
+          [95,'뇌우','storm'],[96,'뇌우','storm'],[99,'뇌우','storm']],
+  ICON: {
+    sun:   '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/>',
+    moon:  '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/>',
+    part:  '<path d="M8 3.5v1.2M3.5 8h1.2M4.8 4.8l.9.9M11.2 4.8l-.9.9"/><path d="M5.6 10.5a3 3 0 0 1 5.2-3"/><path d="M17 20a4 4 0 0 0 .4-8 5.5 5.5 0 0 0-10.6 1.6A3.2 3.2 0 0 0 7 20Z"/>',
+    cloud: '<path d="M17.5 19a4.5 4.5 0 0 0 .5-8.97A6 6 0 0 0 6.2 11.3 3.5 3.5 0 0 0 6.5 19Z"/>',
+    fog:   '<path d="M17.5 14a4.5 4.5 0 0 0 .5-8.97A6 6 0 0 0 6.2 6.3"/><path d="M3 14h13M5 18h14M3 22h10"/>',
+    rain:  '<path d="M17.5 15a4.5 4.5 0 0 0 .5-8.97A6 6 0 0 0 6.2 7.3 3.5 3.5 0 0 0 6.5 15Z"/><path d="m8 18-1 3M12 18l-1 3M16 18l-1 3"/>',
+    snow:  '<path d="M17.5 15a4.5 4.5 0 0 0 .5-8.97A6 6 0 0 0 6.2 7.3 3.5 3.5 0 0 0 6.5 15Z"/><path d="M8 19h.01M12 18h.01M16 19h.01M10 21.5h.01M14 21.5h.01"/>',
+    storm: '<path d="M17.5 15a4.5 4.5 0 0 0 .5-8.97A6 6 0 0 0 6.2 7.3 3.5 3.5 0 0 0 6.5 15Z"/><path d="m13 14-3 4h4l-3 4"/>',
+  },
   init() { this.load(); setInterval(() => this.load(), 30 * 60000); },
   async load() {
     try {
       const u = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}` +
-        '&current=temperature_2m,weather_code,relative_humidity_2m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FSeoul&forecast_days=1';
+        '&current=temperature_2m,weather_code,relative_humidity_2m,is_day&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FSeoul&forecast_days=1';
       const j = await fetch(u).then(r => r.json());
       const c = j.current, d = j.daily;
-      const label = (this.CODES.find(x => x[0] === c.weather_code) || [0, ''])[1];
-      $('weather').innerHTML = `<b>${Math.round(c.temperature_2m)}°</b><span>${esc(label)}</span>` +
+      const [, label, ic0] = this.CODES.find(x => x[0] === c.weather_code) || [0, '', 'cloud'];
+      const ic = ic0 === 'sun' && !c.is_day ? 'moon' : ic0;
+      $('weather').innerHTML = `<svg class="w-ic w-${ic}" viewBox="0 0 24 24" aria-hidden="true">${this.ICON[ic]}</svg>` +
+        `<b>${Math.round(c.temperature_2m)}°</b><span>${esc(label)}</span>` +
         `<span class="w-sub">${Math.round(d.temperature_2m_min[0])}° / ${Math.round(d.temperature_2m_max[0])}°` +
         `${d.precipitation_probability_max[0] >= 30 ? ` · 비 ${d.precipitation_probability_max[0]}%` : ''} · 습도 ${c.relative_humidity_2m}%</span>`;
     } catch (e) { /* 날씨는 없어도 된다 */ }
@@ -75,25 +101,22 @@ const Weather = {
 };
 
 // ── AI 사용량 ────────────────────────────────────
+// 원은 '남은 양'이다. 5시간 한도는 남은 %, Higgsfield 는 남은 크레딧.
+// 그 아래 선 그래프는 최근 24시간 동안 그 남은 양이 어떻게 움직였는지,
+// 맨 아래 막대는 7일 한도(Higgsfield 는 이번 구독 기간 크레딧)의 남은 양이다.
 const Usage = {
   data: null,
   SVC: [
-    { k: 'claude',     name: 'Claude',     color: 'var(--claude)', c: '#e08a63', h: 'c5', d: 'c7' },
-    { k: 'chatgpt',    name: 'ChatGPT',    color: 'var(--gpt)',    c: '#3fbf95', h: 'g5', d: 'g7' },
+    { k: 'claude',     name: 'Claude',     color: 'var(--claude)', c: '#e08a63', h: 'c5' },
+    { k: 'chatgpt',    name: 'ChatGPT',    color: 'var(--gpt)',    c: '#3fbf95', h: 'g5' },
     { k: 'higgsfield', name: 'Higgsfield', color: 'var(--higgs)',  c: '#b9d84a', h: 'hf' },
   ],
   init() { this.load(); setInterval(() => { if (!document.hidden) this.load(); }, 60000); },
 
   async load() {
-    const code = Cfg.get().code;
-    if (!code) { this.render(null, '연결 코드를 넣으면 보입니다'); return; }
+    if (!Cfg.get().code) { this.render(null, '연결 코드를 넣으면 보입니다'); return; }
     try {
-      const r = await fetch(HUB_API, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ act: 'state', code, days: 1 }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      const j = await hubCall({ act: 'state', days: 1 });
       this.data = j;
       this.render(j);
     } catch (e) {
@@ -116,6 +139,8 @@ const Usage = {
     return `${Math.round(m / 1440)}일 뒤`;
   },
   _num(v) { const n = Number(v); return !isFinite(n) ? '—' : n >= 100 ? Math.round(n).toLocaleString('ko-KR') : String(Math.round(n * 10) / 10); },
+  _left(w) { return w && w.pct != null ? Math.max(0, Math.min(100, Math.round(100 - w.pct))) : null; },
+  _tone(left, base) { return left == null ? base : left <= 10 ? 'var(--bad)' : left <= 30 ? 'var(--warn)' : base; },
 
   _ring(frac, color, inner) {
     const R = 32, C = 2 * Math.PI * R, f = Math.max(0, Math.min(1, frac || 0));
@@ -124,11 +149,19 @@ const Usage = {
       `<div class="num">${inner}</div></div>`;
   },
 
+  _bar(label, frac, value, sub, color) {
+    const f = Math.max(0, Math.min(1, frac || 0));
+    return `<div class="u-week">
+      <div class="u-week-top"><span>${label}</span><b>${value}</b></div>
+      <div class="u-week-trk"><div class="u-week-fill" style="width:${f * 100}%;background:${color}"></div></div>
+      ${sub ? `<div class="u-week-sub">${sub}</div>` : ''}</div>`;
+  },
+
   render(j, note) {
     const box = $('usageCards');
     const latest = (j && j.latest) || {};
     $('usageNote').classList.remove('bad');
-    $('usageNote').textContent = note || '5시간 한도 · 남은 크레딧';
+    $('usageNote').textContent = note || '남은 양 · 선 그래프는 최근 24시간';
     if (!j && note) {
       box.innerHTML = `<div class="u-empty">${esc(note)} — 오른쪽 아래 ⚙에서 설정합니다.</div>`;
       return;
@@ -140,23 +173,27 @@ const Usage = {
       const age = `<br><span class="u-age${stale ? ' stale' : ''}">${this._ago(v.at)} 갱신</span>`;
       if (s.k === 'higgsfield') {
         const tot = Number(v.total) || 0, left = Number(v.credits) || 0;
-        return `<div class="u-card">${this._ring(tot ? left / tot : 0, s.color, this._num(left))}
+        const frac = tot ? left / tot : 0;
+        const tone = tot && frac <= 0.1 ? 'var(--bad)' : s.color;
+        return `<div class="u-card">${this._ring(frac, tone, this._num(left))}
           <div class="u-name">${s.name}<span class="plan">${esc(v.plan || '')}</span></div>
-          <div class="u-meta">남은 크레딧${tot ? ` / <b>${this._num(tot)}</b>` : ''}${v.ends ? `<br>구독 ${new Date(v.ends).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })} 갱신` : ''}${age}</div>
-          <canvas class="u-spark" data-svc="${s.k}"></canvas></div>`;
+          <div class="u-meta">남은 크레딧${tot ? ` / <b>${this._num(tot)}</b>` : ''}${age}</div>
+          <canvas class="u-spark" data-svc="${s.k}"></canvas>
+          ${this._bar('이번 구독 기간', frac, `${tot ? Math.round(frac * 100) : '—'}% 남음`,
+            v.ends ? `${new Date(v.ends).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} 갱신` : '', tone)}</div>`;
       }
-      const h5 = v.h5 ? Math.round(v.h5.pct) : null;
-      const d7 = v.d7 ? Math.round(v.d7.pct) : null;
-      const tone = h5 >= 90 ? 'var(--bad)' : h5 >= 70 ? 'var(--warn)' : s.color;
-      return `<div class="u-card">${this._ring((h5 || 0) / 100, tone, h5 == null ? '—' : `${h5}<small>%</small>`)}
+      const h5 = this._left(v.h5), d7 = this._left(v.d7);
+      return `<div class="u-card">${this._ring((h5 || 0) / 100, this._tone(h5, s.color), h5 == null ? '—' : `${h5}<small>%</small>`)}
         <div class="u-name">${s.name}<span class="plan">${esc(v.plan || '')}</span></div>
-        <div class="u-meta">${v.h5 && v.h5.reset ? `${this._until(v.h5.reset)} 초기화<br>` : ''}7일 <b>${d7 == null ? '—' : d7 + '%'}</b>${age}</div>
-        <canvas class="u-spark" data-svc="${s.k}"></canvas></div>`;
+        <div class="u-meta">5시간 한도 남음${v.h5 && v.h5.reset ? `<br>${this._until(v.h5.reset)} 초기화` : ''}${age}</div>
+        <canvas class="u-spark" data-svc="${s.k}"></canvas>
+        ${this._bar('7일 한도', (d7 || 0) / 100, d7 == null ? '—' : `${d7}% 남음`,
+          v.d7 && v.d7.reset ? `${this._until(v.d7.reset)} 초기화` : '', this._tone(d7, s.color))}</div>`;
     }).join('');
     requestAnimationFrame(() => this.sparks((j && j.hist) || {}));
   },
 
-  // 최근 24시간. 실선 = 5시간 한도(또는 크레딧), 점선 = 7일 한도
+  // 최근 24시간의 '남은 양' (5시간 한도 남은 % · 남은 크레딧)
   sparks(hist) {
     const keys = Object.keys(hist).sort();
     const toT = k => Date.UTC(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8), +k.slice(8, 10), +k.slice(10, 12));
@@ -168,40 +205,97 @@ const Usage = {
       if (!W || !H) return;
       cv.width = W * dpr; cv.height = H * dpr;
       const g = cv.getContext('2d'); g.scale(dpr, dpr);
-      const series = f => keys.map(k => [toT(k), hist[k][f]]).filter(p => p[1] != null && p[0] >= t0);
-      const main = series(s.h);
-      const week = s.d ? series(s.d) : [];
+      const hf = s.k === 'higgsfield';
+      const pts = keys.map(k => [toT(k), hist[k][s.h]]).filter(p => p[1] != null && p[0] >= t0)
+        .map(p => [p[0], hf ? p[1] : 100 - p[1]]);
       let max = 100;
-      if (s.k === 'higgsfield') {
-        const v = main.map(p => p[1]);
-        max = Math.max(1, ...v, Number(((this.data || {}).latest || {}).higgsfield?.total) || 0);
-      }
+      if (hf) max = Math.max(1, ...pts.map(p => p[1]), Number((((this.data || {}).latest || {}).higgsfield || {}).total) || 0);
       const X = t => (t - t0) / (t1 - t0) * (W - 2) + 1;
       const Y = v => H - 3 - (v / max) * (H - 8);
-      // 바닥선
       g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = 1;
       g.beginPath(); g.moveTo(0, H - 2.5); g.lineTo(W, H - 2.5); g.stroke();
-      const line = (pts, dash, alpha) => {
-        if (pts.length < 1) return;
-        g.setLineDash(dash); g.globalAlpha = alpha; g.strokeStyle = s.c; g.lineWidth = 2; g.lineJoin = 'round';
-        g.beginPath();
-        pts.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))));
-        if (pts.length === 1) g.lineTo(X(t1), Y(pts[0][1]));
-        g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
-      };
-      line(week, [3, 4], 0.45);
-      line(main, [], 1);
-      if (!main.length && !week.length) {
+      if (!pts.length) {
         g.fillStyle = 'rgba(255,255,255,.25)'; g.font = '11px sans-serif'; g.fillText('그래프는 몇 시간 쌓이면 보입니다', 2, H / 2 + 4);
+        return;
       }
+      // 아래를 옅게 채워 '얼마나 남았나' 가 면적으로 보이게
+      const grad = g.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, s.c + '40'); grad.addColorStop(1, s.c + '00');
+      g.beginPath();
+      pts.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))));
+      const lastX = pts.length === 1 ? X(t1) : X(pts[pts.length - 1][0]);
+      if (pts.length === 1) g.lineTo(lastX, Y(pts[0][1]));
+      g.strokeStyle = s.c; g.lineWidth = 2; g.lineJoin = 'round'; g.stroke();
+      g.lineTo(lastX, H - 2.5); g.lineTo(X(pts[0][0]), H - 2.5); g.closePath();
+      g.fillStyle = grad; g.fill();
     });
   },
+};
+
+// ── 구글 할일 ────────────────────────────────────
+// 서버(bashy)가 갖고 있는 구글 권한으로 읽기만 한다. 목록(카테고리)별로 고를 수 있고,
+// 앱을 열 때마다 '전체' 로 시작한다.
+const Tasks = {
+  data: null, sel: 'all',
+  init() {
+    this.load(); setInterval(() => { if (!document.hidden) this.load(); }, 5 * 60000);
+    $('taskTabs').addEventListener('click', e => {
+      const b = e.target.closest('[data-list]'); if (!b) return;
+      this.sel = b.dataset.list; this.render();
+    });
+  },
+  async load() {
+    if (!Cfg.get().code) { this.note('연결 코드를 넣으면 보입니다'); return; }
+    try {
+      const j = await hubCall({ act: 'tasks' });
+      if (j.needConsent) { this.note(j.reason || '구글 할일 권한이 필요합니다'); return; }
+      this.data = j; this.render();
+    } catch (e) { if (!this.data) this.note('불러오기 실패: ' + e.message); }
+  },
+  note(t) { $('taskTabs').innerHTML = ''; $('taskList').innerHTML = `<li class="tk-empty">${esc(t)}</li>`; $('taskCount').textContent = ''; },
+
+  _due(d) {
+    if (!d) return null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const dt = new Date(d + 'T00:00:00');
+    const n = Math.round((dt - today) / 86400000);
+    if (n < 0) return { t: `${-n}일 지남`, cls: 'late' };
+    if (n === 0) return { t: '오늘', cls: 'today' };
+    if (n === 1) return { t: '내일', cls: '' };
+    if (n < 7) return { t: dt.toLocaleDateString('ko-KR', { weekday: 'short' }), cls: '' };
+    return { t: `${dt.getMonth() + 1}/${dt.getDate()}`, cls: '' };
+  },
+
+  render() {
+    const { lists = [], tasks = [] } = this.data || {};
+    if (this.sel !== 'all' && !lists.some(l => l.id === this.sel)) this.sel = 'all';
+    const used = lists.filter(l => tasks.some(t => t.list === l.id));
+    $('taskTabs').innerHTML = [`<button class="chip${this.sel === 'all' ? ' sel' : ''}" data-list="all">전체</button>`]
+      .concat(used.map(l => `<button class="chip${this.sel === l.id ? ' sel' : ''}" data-list="${esc(l.id)}">${esc(l.title)}</button>`)).join('');
+    const name = Object.fromEntries(lists.map(l => [l.id, l.title]));
+    const rows = tasks.filter(t => this.sel === 'all' || t.list === this.sel)
+      .sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || String(a.pos).localeCompare(String(b.pos)));
+    $('taskCount').textContent = rows.length ? `${rows.length}개` : '';
+    $('taskList').innerHTML = rows.length ? rows.map(t => {
+      const d = this._due(t.due);
+      return `<li class="tk${t.sub ? ' tk-sub' : ''}"><span class="tk-dot"></span>
+        <span class="tk-title">${esc(t.title)}${this.sel === 'all' && used.length > 1 ? `<small>${esc(name[t.list] || '')}</small>` : ''}</span>
+        ${d ? `<span class="tk-due ${d.cls}">${d.t}</span>` : ''}</li>`;
+    }).join('') : '<li class="tk-empty">남은 할일이 없습니다</li>';
+  },
+};
+
+// ── 기기 설정 (표시 · 아이콘 · 이름) ──────────────────
+const Dev = {
+  all() { return store.get(DEV_KEY, {}); },
+  get(id) { return this.all()[id] || {}; },
+  save(map) { store.set(DEV_KEY, map); },
 };
 
 // ── Home Assistant ──────────────────────────────
 const HA = {
   ws: null, id: 1, pending: new Map(), states: {}, areas: {}, entArea: {}, hidden: new Set(),
-  ready: false, area: localStorage.getItem(AREA_KEY) || 'all', _retry: 0,
+  ready: false, area: localStorage.getItem(AREA_KEY) || 'all', _retry: 0, unitF: false,
 
   DOMAINS: ['light', 'switch', 'fan', 'climate', 'cover', 'input_boolean', 'humidifier', 'media_player', 'lock', 'vacuum', 'sensor', 'binary_sensor', 'scene', 'script'],
 
@@ -256,12 +350,15 @@ const HA = {
 
   async bootstrap() {
     try {
-      const [states, areas, ents, devs] = await Promise.all([
+      const [states, areas, ents, devs, conf] = await Promise.all([
         this.send({ type: 'get_states' }),
         this.send({ type: 'config/area_registry/list' }).catch(() => []),
         this.send({ type: 'config/entity_registry/list' }).catch(() => []),
         this.send({ type: 'config/device_registry/list' }).catch(() => []),
+        this.send({ type: 'get_config' }).catch(() => ({})),
       ]);
+      // HA 가 미국식 단위(°F)로 설정돼 있으면 온도 조절기 값도 °F 로 온다. 화면은 °C 로 바꿔 보여준다.
+      this.unitF = /F/.test(((conf || {}).unit_system || {}).temperature || '');
       this.states = Object.fromEntries(states.map(s => [s.entity_id, s]));
       this.areas = Object.fromEntries(areas.map(a => [a.area_id, a.name]));
       const devArea = Object.fromEntries(devs.map(d => [d.id, d.area_id]));
@@ -278,15 +375,24 @@ const HA = {
 
   schedule() { if (this._raf) return; this._raf = requestAnimationFrame(() => { this._raf = 0; this.render(); }); },
 
-  name(s) {
+  // °F → °C. 센서는 자기 단위를 갖고 있고, 온도 조절기는 HA 전체 단위를 따른다.
+  cel(v, unit) {
+    const n = parseFloat(v);
+    if (!isFinite(n)) return null;
+    const f = unit ? /F/.test(unit) : this.unitF;
+    return Math.round((f ? (n - 32) * 5 / 9 : n) * 10) / 10;
+  },
+
+  baseName(s) {
     let n = (s.attributes && s.attributes.friendly_name) || s.entity_id;
     const a = this.areas[this.entArea[s.entity_id]];
     if (a && n.startsWith(a + ' ')) n = n.slice(a.length + 1);   // '거실 거실등' 같은 겹침을 줄인다
     return n;
   },
+  name(s) { return Dev.get(s.entity_id).name || this.baseName(s); },
 
-  // 화면에 올릴 것: 조작할 수 있는 것 + 온도·습도 센서. 나머지(배터리·신호세기 등)는 뺀다.
-  visible() {
+  // 화면에 올릴 수 있는 것: 조작할 수 있는 것 + 온도·습도 센서. (배터리·신호세기 등은 처음부터 뺀다)
+  candidates() {
     const out = [];
     for (const s of Object.values(this.states)) {
       const [dom] = s.entity_id.split('.');
@@ -297,42 +403,33 @@ const HA = {
     }
     return out;
   },
+  visible() { const prefs = Dev.all(); return this.candidates().filter(s => !(prefs[s.entity_id] || {}).hide); },
 
   isOn(s) { return ['on', 'open', 'opening', 'heat', 'cool', 'heat_cool', 'auto', 'dry', 'fan_only', 'playing', 'unlocked', 'cleaning'].includes(s.state); },
 
-  icon(s) {
+  autoIcon(s) {
     const dom = s.entity_id.split('.')[0], dc = s.attributes.device_class;
-    const P = {
-      light:   '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3Z"/>',
-      switch:  '<rect x="6" y="3" width="12" height="18" rx="3"/><path d="M12 7v4"/>',
-      outlet:  '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9.5 9v2M14.5 9v2M10 15h4"/>',
-      fan:     '<circle cx="12" cy="12" r="1.5"/><path d="M12 10.5C12 6 13 3 15.5 3S19 6 12 10.5ZM13.5 12c4.5 0 7.5 1 7.5 3.5S18 19 13.5 12ZM12 13.5c0 4.5-1 7.5-3.5 7.5S5 18 12 13.5ZM10.5 12C6 12 3 11 3 8.5S6 5 10.5 12Z"/>',
-      climate: '<path d="M10 14.5V5a2 2 0 1 1 4 0v9.5a4 4 0 1 1-4 0Z"/><path d="M12 11v6"/>',
-      cover:   '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M4 8h16M4 13h16"/>',
-      media:   '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8"/>',
-      lock:    '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
-      vacuum:  '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.5"/>',
-      temp:    '<path d="M10 14.5V5a2 2 0 1 1 4 0v9.5a4 4 0 1 1-4 0Z"/>',
-      drop:    '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z"/>',
-      door:    '<path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17M4 21h16"/><path d="M14 12h.01"/>',
-      motion:  '<circle cx="12" cy="5" r="2"/><path d="m10 22 2-8 3 3v5M8 10l3-2 3 2 2 3"/>',
-      toggle:  '<rect x="3" y="7" width="18" height="10" rx="5"/><circle cx="16" cy="12" r="3"/>',
-    };
-    let k = { light: 'light', fan: 'fan', climate: 'climate', cover: 'cover', media_player: 'media', lock: 'lock', vacuum: 'vacuum', humidifier: 'drop', input_boolean: 'toggle' }[dom] || 'switch';
-    if (dom === 'switch' && dc === 'outlet') k = 'outlet';
-    if (dom === 'sensor') k = dc === 'humidity' ? 'drop' : 'temp';
-    if (dom === 'binary_sensor') k = ['motion', 'occupancy'].includes(dc) ? 'motion' : 'door';
-    return `<svg class="t-ic" viewBox="0 0 24 24">${P[k]}</svg>`;
+    if (dom === 'switch' && dc === 'outlet') return 'outlet';
+    if (dom === 'sensor') return dc === 'humidity' ? 'drop' : 'temp';
+    if (dom === 'binary_sensor') return ['motion', 'occupancy'].includes(dc) ? 'motion' : dc === 'window' ? 'window' : 'door';
+    if (dom === 'cover') return dc === 'curtain' ? 'curtain' : dc === 'blind' || dc === 'shade' ? 'blind' : 'blind';
+    if (dom === 'media_player') return dc === 'tv' ? 'tv' : dc === 'speaker' ? 'speaker' : 'media';
+    return { light: 'bulb', fan: 'fan', climate: 'ac', lock: 'lock', vacuum: 'vacuum', humidifier: 'humidifier', input_boolean: 'toggle', scene: 'star', script: 'star' }[dom] || 'switch';
   },
+  iconKey(s) { return Dev.get(s.entity_id).icon || this.autoIcon(s); },
 
   stateText(s) {
     const dom = s.entity_id.split('.')[0], a = s.attributes;
     if (s.state === 'unavailable') return '연결 안 됨';
-    if (dom === 'sensor') return `${s.state}${a.unit_of_measurement || ''}`;
+    if (dom === 'sensor') {
+      if (a.device_class === 'temperature') { const c = this.cel(s.state, a.unit_of_measurement); return c == null ? s.state : `${c}°C`; }
+      return `${s.state}${a.unit_of_measurement || ''}`;
+    }
     if (dom === 'binary_sensor') return s.state === 'on' ? (['motion', 'occupancy'].includes(a.device_class) ? '감지됨' : '열림') : (['motion', 'occupancy'].includes(a.device_class) ? '없음' : '닫힘');
     if (dom === 'climate') {
       const MODES = { off: '꺼짐', heat: '난방', cool: '냉방', heat_cool: '자동', auto: '자동', dry: '제습', fan_only: '송풍' };
-      return `${a.current_temperature != null ? `현재 ${a.current_temperature}° · ` : ''}${MODES[s.state] || s.state}${a.temperature != null && s.state !== 'off' ? ` ${a.temperature}°` : ''}`;
+      const cur = this.cel(a.current_temperature), tgt = this.cel(a.temperature);
+      return `${cur != null ? `현재 ${cur}° · ` : ''}${MODES[s.state] || s.state}${tgt != null && s.state !== 'off' ? ` ${tgt}°` : ''}`;
     }
     if (dom === 'light' && s.state === 'on' && a.brightness != null) return `켜짐 · ${Math.round(a.brightness / 2.55)}%`;
     if (dom === 'cover') return { open: '열림', closed: '닫힘', opening: '여는 중', closing: '닫는 중' }[s.state] || s.state;
@@ -345,6 +442,7 @@ const HA = {
   renderEmpty() {
     $('areas').innerHTML = ''; $('scenes').innerHTML = '';
     this.note('');
+    $('indoor').innerHTML = '';
     $('tiles').innerHTML = `<div class="empty-home">
       <b>Home Assistant 를 연결하면</b> SmartThings · Smart Life(Tuya) · 샤오미 기기를 여기서 함께 켜고 끌 수 있습니다.<br>
       음성으로 "거실 불 꺼 줘" 같은 명령도 Home Assistant 가 알아듣습니다.<br>
@@ -352,22 +450,24 @@ const HA = {
   },
 
   // 왼쪽 날씨 아래 '실내' 한 줄. 거실(또는 첫 공간)의 온도·습도 센서.
-  indoor(all) {
+  indoor() {
+    const all = this.candidates();
     const pick = dc => {
       const c = all.filter(s => s.entity_id.startsWith('sensor.') && s.attributes.device_class === dc && isFinite(parseFloat(s.state)));
       const living = c.find(s => /거실|living/i.test(this.areas[this.entArea[s.entity_id]] || ''));
       return living || c[0];
     };
     const t = pick('temperature'), h = pick('humidity');
-    $('indoor').innerHTML = t || h
-      ? `<span class="w-sub">실내</span>${t ? `<b>${esc(Math.round(parseFloat(t.state) * 10) / 10)}°</b>` : ''}${h ? `<span>습도 ${esc(Math.round(parseFloat(h.state)))}%</span>` : ''}`
+    const tc = t ? this.cel(t.state, t.attributes.unit_of_measurement) : null;
+    $('indoor').innerHTML = tc != null || h
+      ? `<span class="w-sub">실내</span>${tc != null ? `<b>${esc(tc)}°</b>` : ''}${h ? `<span>습도 ${esc(Math.round(parseFloat(h.state)))}%</span>` : ''}`
       : '';
   },
 
   render() {
     if (!this.ready) return;
+    this.indoor();
     const all = this.visible();
-    this.indoor(all);
     const used = [...new Set(all.map(s => this.entArea[s.entity_id]).filter(Boolean))]
       .sort((a, b) => String(this.areas[a]).localeCompare(String(this.areas[b]), 'ko'));
     if (this.area !== 'all' && !used.includes(this.area)) this.area = 'all';
@@ -378,15 +478,12 @@ const HA = {
     const scenes = all.filter(s => /^(scene|script)\./.test(s.entity_id) && inArea(s));
     $('scenes').innerHTML = scenes.map(s => `<button class="chip" data-run="${esc(s.entity_id)}">${esc(this.name(s))}</button>`).join('');
 
-    const rank = s => {
-      const d = s.entity_id.split('.')[0];
-      return ['light', 'switch', 'fan', 'climate', 'cover', 'input_boolean', 'humidifier', 'media_player', 'lock', 'vacuum', 'binary_sensor', 'sensor'].indexOf(d);
-    };
+    const rank = s => ['light', 'switch', 'fan', 'climate', 'cover', 'input_boolean', 'humidifier', 'media_player', 'lock', 'vacuum', 'binary_sensor', 'sensor'].indexOf(s.entity_id.split('.')[0]);
     const tiles = all.filter(s => !/^(scene|script)\./.test(s.entity_id) && inArea(s))
       .sort((a, b) => rank(a) - rank(b) || this.name(a).localeCompare(this.name(b), 'ko'));
 
     if (!tiles.length && !scenes.length) {
-      $('tiles').innerHTML = `<div class="empty-home">이 공간에 표시할 기기가 없습니다.</div>`;
+      $('tiles').innerHTML = `<div class="empty-home">이 공간에 표시할 기기가 없습니다. 오른쪽 위 ⚙에서 보일 기기를 고를 수 있습니다.</div>`;
       return;
     }
     $('tiles').innerHTML = tiles.map(s => this.tile(s)).join('');
@@ -397,12 +494,13 @@ const HA = {
     const ro = dom === 'sensor' || dom === 'binary_sensor';
     const cls = ['tile', dom, this.isOn(s) && !ro ? 'on' : '', s.state === 'unavailable' ? 'off-line' : '', ro ? 'ro' : ''].filter(Boolean).join(' ');
     const id = esc(s.entity_id);
+    const ic = HubIcons.svg(this.iconKey(s), 't-ic');
     if (dom === 'climate') {
-      return `<div class="${cls}" data-id="${id}" data-tap="toggle">${this.icon(s)}
+      return `<div class="${cls}" data-id="${id}">${ic}
         <div class="t-name">${esc(this.name(s))}</div><div class="t-state">${esc(this.stateText(s))}</div>
         <div class="t-ctl"><button data-temp="-1" aria-label="낮추기">−</button><button data-temp="1" aria-label="높이기">+</button></div></div>`;
     }
-    return `<button class="${cls}" data-id="${id}"${ro ? ' disabled' : ''}>${this.icon(s)}
+    return `<button class="${cls}" data-id="${id}"${ro ? ' disabled' : ''}>${ic}
       <span class="t-name">${esc(this.name(s))}</span><span class="t-state">${esc(this.stateText(s))}</span></button>`;
   },
 
@@ -410,25 +508,31 @@ const HA = {
     const s = this.states[id];
     if (!s || s.state === 'unavailable') return;
     const dom = id.split('.')[0];
-    let domain = dom, service = 'toggle', data = { entity_id: id };
-    if (dom === 'climate') { domain = 'climate'; service = s.state === 'off' ? 'turn_on' : 'turn_off'; }
-    if (dom === 'lock') service = s.state === 'locked' ? 'unlock' : 'lock';
+    let domain = dom, service = 'toggle';
+    if (dom === 'climate') service = s.state === 'off' ? 'turn_on' : 'turn_off';
+    if (dom === 'lock') { if (s.state === 'locked') { toast('문 잠금 해제는 여기서 하지 않습니다'); return; } service = 'lock'; }
     if (dom === 'vacuum') service = s.state === 'cleaning' ? 'return_to_base' : 'start';
     if (dom === 'media_player') service = 'media_play_pause';
-    if (dom === 'lock' && service === 'unlock') { toast('문 잠금 해제는 여기서 하지 않습니다'); return; }
     const el = document.querySelector(`[data-id="${CSS.escape(id)}"]`);
     if (el) el.classList.add('pending');
-    try { await this.send({ type: 'call_service', domain, service, service_data: data }); }
+    try { await this.send({ type: 'call_service', domain, service, service_data: { entity_id: id } }); }
     catch (e) { toast('실패: ' + e.message); if (el) el.classList.remove('pending'); }
   },
 
+  // 화면은 °C 기준 0.5° 씩. HA 가 °F 면 그 단위로 바꿔 보낸다.
   async temp(id, delta) {
     const s = this.states[id];
     if (!s) return;
-    const cur = Number(s.attributes.temperature);
-    if (!isFinite(cur)) { toast('희망 온도를 바꿀 수 없는 기기입니다'); return; }
-    const step = Number(s.attributes.target_temp_step) || 0.5;
-    try { await this.send({ type: 'call_service', domain: 'climate', service: 'set_temperature', service_data: { entity_id: id, temperature: cur + delta * step } }); }
+    const raw = Number(s.attributes.temperature);
+    if (!isFinite(raw)) { toast('희망 온도를 바꿀 수 없는 기기입니다'); return; }
+    let next;
+    if (this.unitF) {
+      const c = Math.round(((raw - 32) * 5 / 9 + delta * 0.5) * 2) / 2;
+      next = Math.round(c * 9 / 5 + 32);
+    } else {
+      next = raw + delta * (Number(s.attributes.target_temp_step) || 0.5);
+    }
+    try { await this.send({ type: 'call_service', domain: 'climate', service: 'set_temperature', service_data: { entity_id: id, temperature: next } }); }
     catch (e) { toast('실패: ' + e.message); }
   },
 
@@ -476,6 +580,73 @@ const HA = {
       if (t) { this.temp(tile.dataset.id, Number(t.dataset.temp)); return; }
       this.toggle(tile.dataset.id);
     });
+  },
+};
+
+// ── 기기 설정 창 ──────────────────────────────────
+const DevSettings = {
+  draft: null, openIcon: null,
+  init() {
+    $('devGear').addEventListener('click', () => this.open());
+    $('devSet').addEventListener('close', () => { if ($('devSet').returnValue === 'save') this.save(); });
+    $('devList').addEventListener('click', e => this.onClick(e));
+    $('devList').addEventListener('input', e => {
+      const inp = e.target.closest('[data-name]'); if (!inp) return;
+      this.row(inp.dataset.name).name = inp.value.trim();
+    });
+    $('devReset').addEventListener('click', () => { this.draft = {}; this.openIcon = null; this.render(); });
+  },
+  row(id) { return this.draft[id] || (this.draft[id] = {}); },
+  open() {
+    if (!HA.ready) { toast('Home Assistant 에 연결된 뒤에 설정할 수 있습니다'); return; }
+    this.draft = JSON.parse(JSON.stringify(Dev.all()));
+    this.openIcon = null;
+    this.render();
+    $('devSet').showModal();
+  },
+  render() {
+    const list = HA.candidates();
+    const groups = {};
+    for (const s of list) (groups[HA.entArea[s.entity_id] || ''] = groups[HA.entArea[s.entity_id] || ''] || []).push(s);
+    const order = Object.keys(groups).sort((a, b) => (a ? HA.areas[a] || a : '힣').localeCompare(b ? HA.areas[b] || b : '힣', 'ko'));
+    $('devList').innerHTML = order.map(a => `
+      <div class="dv-group">${esc(a ? HA.areas[a] || a : '공간 없음')}</div>
+      ${groups[a].sort((x, y) => HA.baseName(x).localeCompare(HA.baseName(y), 'ko')).map(s => {
+        const p = this.draft[s.entity_id] || {};
+        const key = p.icon || HA.autoIcon(s);
+        const id = esc(s.entity_id);
+        return `<div class="dv-row${p.hide ? ' dv-off' : ''}">
+          <button type="button" class="dv-ic" data-pick="${id}" aria-label="아이콘 바꾸기">${HubIcons.svg(key)}</button>
+          <input class="dv-name" data-name="${id}" value="${esc(p.name || '')}" placeholder="${esc(HA.baseName(s))}" autocomplete="off" spellcheck="false">
+          <button type="button" class="dv-sw${p.hide ? '' : ' on'}" data-vis="${id}" aria-label="화면에 보이기">${p.hide ? '숨김' : '표시'}</button>
+        </div>
+        ${this.openIcon === s.entity_id ? `<div class="dv-icons">
+          <button type="button" class="dv-opt${!p.icon ? ' sel' : ''}" data-set="${id}" data-key="">${HubIcons.svg(HA.autoIcon(s))}<span>자동</span></button>
+          ${HubIcons.LIST.map(([k, label]) => `<button type="button" class="dv-opt${p.icon === k ? ' sel' : ''}" data-set="${id}" data-key="${k}">${HubIcons.svg(k)}<span>${label}</span></button>`).join('')}
+        </div>` : ''}`;
+      }).join('')}`).join('') || '<p class="s-help">표시할 수 있는 기기가 없습니다.</p>';
+  },
+  onClick(e) {
+    const pick = e.target.closest('[data-pick]');
+    if (pick) { this.openIcon = this.openIcon === pick.dataset.pick ? null : pick.dataset.pick; this.render(); return; }
+    const set = e.target.closest('[data-set]');
+    if (set) { const r = this.row(set.dataset.set); if (set.dataset.key) r.icon = set.dataset.key; else delete r.icon; this.openIcon = null; this.render(); return; }
+    const vis = e.target.closest('[data-vis]');
+    if (vis) { const r = this.row(vis.dataset.vis); r.hide = !r.hide; this.render(); }
+  },
+  save() {
+    // 빈 칸은 지워서 저장한다 — '자동' 과 '아무것도 안 바꿈' 을 같은 것으로 둔다
+    const clean = {};
+    for (const [id, p] of Object.entries(this.draft || {})) {
+      const q = {};
+      if (p.hide) q.hide = true;
+      if (p.icon) q.icon = p.icon;
+      if (p.name) q.name = p.name;
+      if (Object.keys(q).length) clean[id] = q;
+    }
+    Dev.save(clean);
+    HA.render();
+    toast('기기 설정을 저장했습니다');
   },
 };
 
@@ -621,7 +792,7 @@ const Settings = {
   save() {
     const prev = Cfg.get(), v = this.read();
     Cfg.set(v);
-    if (v.code !== prev.code) Usage.load();
+    if (v.code !== prev.code) { Usage.load(); Tasks.load(); }
     if (v.haUrl !== prev.haUrl || v.haToken !== prev.haToken) { HA._retry = 0; HA.connect(); }
     Clock.tick();
     toast('저장했습니다');
@@ -679,17 +850,17 @@ function nativeSetup() {
 }
 
 function boot() {
-  Clock.init(); Weather.init(); Usage.init();
+  Clock.init(); Weather.init(); Usage.init(); Tasks.init();
   HA.bind(); HA.connect();
-  Voice.init(); Settings.init();
+  Voice.init(); Settings.init(); DevSettings.init();
   nativeSetup();
   window.addEventListener('resize', () => { if (Usage.data) Usage.sparks(Usage.data.hist || {}); });
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { Usage.load(); if (!HA.ready && Cfg.get().haUrl) { HA._retry = 0; HA.connect(); } }
+    if (!document.hidden) { Usage.load(); Tasks.load(); if (!HA.ready && Cfg.get().haUrl) { HA._retry = 0; HA.connect(); } }
   });
   if (!Cfg.get().code && !Cfg.get().haUrl) setTimeout(() => Settings.open(), 600);
 }
 
-window.Hub = { HA, Usage, Voice, Cfg };   // 디버깅용
+window.Hub = { HA, Usage, Voice, Tasks, Cfg };   // 디버깅용
 boot();
 })();

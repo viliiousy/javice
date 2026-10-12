@@ -23,6 +23,15 @@
       <div id="weather" class="weather"></div>
       <div id="indoor" class="indoor"></div>
 
+      <section class="tasks" aria-label="할 일">
+        <header class="p-head tk-head">
+          <h2>할 일</h2>
+          <span id="taskCount" class="p-note"></span>
+        </header>
+        <div id="taskTabs" class="areas tk-tabs" role="tablist" aria-label="목록"></div>
+        <ul id="taskList" class="tk-list"></ul>
+      </section>
+
       <section class="voice" aria-label="음성 명령">
         <button id="mic" class="mic" aria-label="말하기">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg>
@@ -52,6 +61,9 @@
           <h2>집</h2>
           <div id="areas" class="areas" role="tablist" aria-label="공간"></div>
           <span id="haNote" class="p-note"></span>
+          <button id="devGear" class="ic-btn" aria-label="기기 설정">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+          </button>
         </header>
         <div id="scenes" class="scenes"></div>
         <div id="tiles" class="tiles"></div>
@@ -112,8 +124,23 @@
     </form>
   </dialog>
 
+  <dialog id="devSet" class="settings dev-set">
+    <form method="dialog">
+      <h2>기기 설정</h2>
+      <p class="s-help">아이콘을 눌러 모양을 고르고, 이름을 바꾸고, 화면에 보일지 정합니다. 이 태블릿에만 저장됩니다.</p>
+      <div id="devList" class="dv-list"></div>
+      <div class="s-btns">
+        <button type="button" id="devReset" class="chip">처음 상태로</button>
+        <span class="s-sp"></span>
+        <button value="cancel" class="chip">닫기</button>
+        <button value="save" class="chip chip-acc">저장</button>
+      </div>
+    </form>
+  </dialog>
+
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+  <script src="js/hub-icons.js"></script>
   <script src="js/hub.js"></script>
 </body>
 </html>
