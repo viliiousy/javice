@@ -445,8 +445,21 @@ const HA = {
     this._conv = r.conversation_id;
     const resp = r.response || {};
     const speech = resp.speech && resp.speech.plain && resp.speech.plain.speech;
-    if (resp.response_type === 'error' && ['no_intent_match', 'no_valid_targets'].includes(resp.data && resp.data.code)) return null;
+    if (resp.response_type === 'error' && ['no_intent_match', 'no_valid_targets'].includes(resp.data && resp.data.code)) return this.converseAI(text);
     return speech || '알겠습니다.';
+  },
+
+  // 기기 명령이 아닌 말 → HA 에 등록된 AI 대화 에이전트(예: 맥미니 OpenClaw)에게 넘긴다.
+  // HA 가 https 로 열려 있으니 밖(LTE)에서도 이 길로 간다. 에이전트가 없으면 null.
+  async converseAI(text) {
+    const agent = Object.keys(this.states).find(id => id.startsWith('conversation.') && id !== 'conversation.home_assistant');
+    if (!agent) return null;
+    const r = await this.send({ type: 'conversation/process', text, language: 'ko', agent_id: agent, conversation_id: this._aiConv || undefined });
+    this._aiConv = r.conversation_id;
+    const resp = r.response || {};
+    const speech = resp.speech && resp.speech.plain && resp.speech.plain.speech;
+    if (resp.response_type === 'error' || !speech) return null;
+    return speech;
   },
 
   bind() {
