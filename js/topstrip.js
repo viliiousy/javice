@@ -13,9 +13,13 @@ const TopStrip = {
   render() {
     const el = document.getElementById(this.SLOT);
     if (!el) return;
-    const rows = [this._inbody(), this._econ(), this._ai()].filter(Boolean);
+    const rows = [this._inbody(), this._econ()].filter(Boolean);
     el.innerHTML = rows.join('');
     el.classList.toggle('is-empty', !rows.length);
+    // AI 사용량은 두 줄 안에 끼우지 않는다 — 줄이 늘어 헤더가 높아졌다.
+    // PC 에서는 두 줄 왼쪽, 폰에서는 헤더 가운데에 따로 선다.
+    const ai = document.getElementById('hAI');
+    if (ai) { const r = this._ai(); ai.innerHTML = r; ai.classList.toggle('is-empty', !r); }
   },
 
   _ic(name) {
@@ -72,7 +76,7 @@ const TopStrip = {
       const pct = (Econ.PRICES[Econ.keyOf(it)] || {}).pct;
       const cls = pct > 0 ? 'ts-up' : pct < 0 ? 'ts-dn' : '';
       const ar  = pct > 0 ? '▲' : pct < 0 ? '▼' : '–';
-      return `${esc(String(it.name || '').slice(0, 5))} <b class="${cls}">${
+      return `${this._nm(it.name)} <b class="${cls}">${
         pct == null ? '—' : ar + Math.abs(pct).toFixed(1) + '%'}</b>`;
     }).join('<s></s>');
     const title = favs.length > SHOW ? `관심종목 ${favs.length}개` : '관심종목';
@@ -84,6 +88,15 @@ const TopStrip = {
   _ai() {
     if (typeof AIUsage === 'undefined') return '';
     try { return AIUsage.row(); } catch (e) { return ''; }
+  },
+
+  // 폰에서는 이름을 줄인다 — '금(국내)' → '금', '원/달러' → '환율'. 화면 폭이 바뀌어도 맞도록
+  // 두 이름을 다 넣고 CSS 가 하나만 보이게 한다.
+  SHORT: { '금(국내)': '금', '원/달러': '환율', '달러/원': '환율', '원/엔': '엔화', '원/유로': '유로' },
+  _nm(name) {
+    const full = String(name || '').slice(0, 5);
+    const short = this.SHORT[String(name || '').trim()];
+    return short ? `<span class="nm-full">${esc(full)}</span><span class="nm-short">${esc(short)}</span>` : esc(full);
   },
 
   // 카드로 데려간다. 스크롤만 하면 어디로 갔는지 모르니 잠깐 테두리를 밝힌다.

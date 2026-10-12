@@ -12,6 +12,7 @@
 const AIUsage = {
   data: null,
   _timer: null,
+  SHORT_NAMES: { claude: 'Claude', chatgpt: 'GPT', higgsfield: 'Higgs' },
   NAMES: { claude: 'Claude', chatgpt: 'ChatGPT', higgsfield: 'Higgsfield' },
   HUB_URL: 'https://bashy.app/hub.html',
 
@@ -82,7 +83,7 @@ const AIUsage = {
     const d = this.data;
     if (!d || !Object.keys(d).length) return '';
     const items = ['claude', 'chatgpt', 'higgsfield'].filter(k => d[k]).map(k =>
-      `<span class="aiu-it">${this.gauge(k, 24)}<span class="aiu-nm">${this.NAMES[k]}</span></span>`);
+      `<span class="aiu-it">${this.gauge(k, 24)}<span class="aiu-nm"><span class="nm-full">${this.NAMES[k]}</span><span class="nm-short">${this.SHORT_NAMES[k]}</span></span></span>`);
     if (!items.length) return '';
     return `<button class="ts-row ts-ai" id="tsAI" onclick="AIUsage.open()"
       title="AI 남은 사용량 — Claude·ChatGPT: 바깥 고리 7일 · 안쪽 고리 5시간 / Higgsfield: 남은 크레딧">

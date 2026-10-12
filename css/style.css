@@ -3091,3 +3091,40 @@ body, .empty, .card-title, .modal-lbl, .habit-name, .task-text,
 .aiu-head .aiu-g{ margin-right:2px; align-self:center; }
 .aiu-head{ align-items:center; }
 @media (max-width:640px){ .aiu-gs{ gap:7px; } .aiu-nm{ font-size:9px; } }
+
+/* 헤더 AI 사용량 자리 — PC: 오른쪽 두 줄의 왼쪽 / 폰: 헤더 가운데 */
+.h-ai{ display:flex; align-items:center; margin-left:auto; margin-right:16px; }
+.h-ai.is-empty{ display:none; }
+.nm-short{ display:none; }
+@media (max-width:640px){
+  .nm-full{ display:none; } .nm-short{ display:inline; }
+  .h-left{ flex:none !important; }
+  .h-ai{ margin:0 auto; padding:0 2px; flex:none; }
+  .h-ai .aiu-gs{ gap:5px; }
+  .h-ai .aiu-g{ width:19px; height:19px; }
+  .h-ai .aiu-nm{ font-size:8px; letter-spacing:-.02em; }
+  .h-left{ gap:7px !important; }
+  .h-logo img{ width:28px !important; height:28px !important; }
+  .h-logo span{ font-size:8.5px !important; }
+  .h-date-main{ font-size:12px; }
+  .h-date-sub{ font-size:11px; }
+  .h-right{ gap:6px; }
+  .h-sum{ max-width:none; flex:none; }
+  .ts-row{ font-size:10.5px; gap:3px; }
+  .ts-ic{ display:none; }
+  .ts-body s{ margin:0 3px; }
+  .h-avatar{ width:26px !important; height:26px !important; }
+  .h-user{ padding:2px !important; }
+}
+@media (max-width:380px){
+  .h-left{ gap:5px !important; }
+  .h-logo span{ display:none; }
+  .h-date-main{ font-size:11px; letter-spacing:-.02em; }
+  .h-date-sub{ font-size:10px; }
+  .ts-row{ font-size:9.5px; }
+  .ts-body s{ margin:0 2px; }
+  .h-ai .aiu-gs{ gap:3px; }
+  .h-ai .aiu-g{ width:17px; height:17px; }
+  .h-right{ gap:4px; }
+  .header{ padding:5px 7px !important; }
+}
