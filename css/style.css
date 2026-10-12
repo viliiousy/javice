@@ -3081,10 +3081,13 @@ body, .empty, .card-title, .modal-lbl, .habit-name, .task-text,
 .aiu-code{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11.5px; word-break:break-all;
   padding:8px 10px; border-radius:8px; background:var(--bg2); color:var(--text); user-select:all; }
 .aiu-a{ text-decoration:none; display:inline-flex; align-items:center; justify-content:center; color:inherit; }
-/* AI 사용량 게이지 — 헤더에서는 숫자 없이 모양만 */
-.aiu-gs{ display:inline-flex !important; gap:6px; align-items:center; }
+/* AI 사용량 게이지 — 헤더에서는 숫자 없이 고리 + 이름 */
+.ts-row.ts-ai{ padding:2px 0; }
+.aiu-gs{ display:inline-flex; gap:10px; align-items:flex-start; }
+.aiu-it{ display:inline-flex; flex-direction:column; align-items:center; gap:2px; }
+.aiu-nm{ font-size:9.5px; line-height:1; font-weight:600; color:var(--text3); letter-spacing:-.01em; white-space:nowrap; }
 .aiu-g{ display:block; color:var(--text); flex:none; }
-.ts-ai .aiu-g{ transition:transform .15s ease; }
-.ts-ai:hover .aiu-g{ transform:scale(1.08); }
+.ts-ai:hover .aiu-nm{ color:var(--accent); }
 .aiu-head .aiu-g{ margin-right:2px; align-self:center; }
 .aiu-head{ align-items:center; }
+@media (max-width:640px){ .aiu-gs{ gap:7px; } .aiu-nm{ font-size:9px; } }

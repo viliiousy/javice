@@ -48,58 +48,45 @@ const AIUsage = {
   _tone(left, base) { return left == null ? base : left <= 0.1 ? 'var(--red)' : left <= 0.3 ? 'var(--yellow)' : base; },
   _gid: 0,
 
-  // 가운데에는 각 서비스의 공식 아이콘(파비콘)을 그대로 동그랗게 넣는다 — 그려 넣지 않고 불러 쓴다.
-  // 아이콘 바탕색으로 원을 꽉 채워 테두리까지 이어지게 하고, 남은 양은 테두리 고리로만 보인다.
-  //   Claude·ChatGPT : 바깥 고리 = 7일 한도, 안쪽 고리 = 5시간 한도
-  //   Higgsfield     : 고리 하나 = 남은 크레딧
-  LOGO: k => `https://www.google.com/s2/favicons?sz=128&domain=${{ claude: 'claude.ai', chatgpt: 'chatgpt.com', higgsfield: 'higgsfield.ai' }[k]}`,
-  LOGO_BG: { claude: '#d97757', chatgpt: '#ffffff', higgsfield: '#d2fe17' },
-  LOGO_ZOOM: { claude: 1.5, chatgpt: 1.12, higgsfield: 1.12 },
-
+  // 헤더에는 숫자 없이 고리 모양만, 그 아래에 서비스 이름.
+  //   Claude·ChatGPT : 바깥 고리 = 7일 한도 남은 양, 안쪽 고리 = 5시간 한도 남은 양
+  //   Higgsfield     : 고리 하나 = 이번 구독 기간 크레딧 남은 양
+  // 남은 양이 30% 아래면 노랑, 10% 아래면 빨강.
   _arc(r, frac, color, w) {
     const C = 2 * Math.PI * r, f = Math.max(0, Math.min(1, frac || 0));
-    return `<circle cx="20" cy="20" r="${r}" fill="none" stroke="currentColor" stroke-opacity=".13" stroke-width="${w}"/>` +
-      (f > 0 ? `<circle cx="20" cy="20" r="${r}" fill="none" stroke="${color}" stroke-width="${w}" stroke-linecap="round"
-        stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - f)}" transform="rotate(-90 20 20)"/>` : '');
+    return `<circle cx="20" cy="20" r="${r}" fill="none" stroke="currentColor" stroke-opacity=".12" stroke-width="${w}"/>` +
+      (f > 0.005 ? `<circle cx="20" cy="20" r="${r}" fill="none" stroke="${color}" stroke-width="${w}" stroke-linecap="round"
+        stroke-dasharray="${C.toFixed(2)}" stroke-dashoffset="${(C * (1 - f)).toFixed(2)}" transform="rotate(-90 20 20)"/>` : '');
   },
+
 
   gauge(key, size) {
     const s = (this.data || {})[key];
     if (!s) return '';
-    const base = this.COLORS[key], id = 'aiug' + (++this._gid);
-    const tone = r => r == null ? base : r <= 0.1 ? 'var(--red)' : r <= 0.3 ? 'var(--yellow)' : base;
-    let rings, label, logoR;
+    const base = this.COLORS[key];
+    let rings, label;
     if (key === 'higgsfield') {
       const tot = Number(s.total) || 0;
       const f = tot ? Math.max(0, Math.min(1, Number(s.credits) / tot)) : 0;
-      rings = this._arc(17.5, f, tone(f), 3.2);
-      logoR = 13.5;
+      rings = this._arc(15, f, this._tone(f, base), 6);
       label = `Higgsfield 크레딧 ${Math.round(f * 100)}% 남음`;
     } else {
       const w7 = this._left(s.d7), h5 = this._left(s.h5);
-      rings = this._arc(18, w7, tone(w7), 2.6) + this._arc(14.4, h5, tone(h5), 2.6);
-      logoR = 11.6;
+      rings = this._arc(16.5, w7, this._tone(w7, base), 4.5) + this._arc(9.5, h5, this._tone(h5, base), 4.5);
       label = `${this.NAMES[key]} 5시간 ${h5 == null ? '—' : Math.round(h5 * 100) + '%'} · 7일 ${w7 == null ? '—' : Math.round(w7 * 100) + '%'} 남음`;
     }
-    // 파비콘은 네모 안에 둥근 여백이 있어서 조금 크게 깔아 원을 꽉 채운다
-    const im = logoR * 2 * (this.LOGO_ZOOM[key] || 1.12), o = 20 - im / 2;
-    return `<svg class="aiu-g" width="${size}" height="${size}" viewBox="0 0 40 40" role="img" aria-label="${label}">
-      <defs><clipPath id="${id}"><circle cx="20" cy="20" r="${logoR}"/></clipPath></defs>
-      ${rings}
-      <circle cx="20" cy="20" r="${logoR}" fill="${this.LOGO_BG[key]}"/>
-      <image href="${this.LOGO(key)}" x="${o.toFixed(2)}" y="${o.toFixed(2)}" width="${im.toFixed(2)}" height="${im.toFixed(2)}" clip-path="url(#${id})" preserveAspectRatio="xMidYMid slice"/>
-      ${key !== 'higgsfield' ? `<circle cx="20" cy="20" r="${logoR}" fill="none" stroke="currentColor" stroke-opacity=".12" stroke-width=".6"/>` : ''}
-    </svg>`;
+    return `<svg class="aiu-g" width="${size}" height="${size}" viewBox="0 0 40 40" role="img" aria-label="${label}"><title>${label}</title>${rings}</svg>`;
   },
 
   row() {
     const d = this.data;
     if (!d || !Object.keys(d).length) return '';
-    const g = ['claude', 'chatgpt', 'higgsfield'].map(k => this.gauge(k, 26)).filter(Boolean);
-    if (!g.length) return '';
+    const items = ['claude', 'chatgpt', 'higgsfield'].filter(k => d[k]).map(k =>
+      `<span class="aiu-it">${this.gauge(k, 24)}<span class="aiu-nm">${this.NAMES[k]}</span></span>`);
+    if (!items.length) return '';
     return `<button class="ts-row ts-ai" id="tsAI" onclick="AIUsage.open()"
-      title="AI 남은 사용량 — Claude · ChatGPT: 바깥 고리 7일, 안쪽 5시간 / Higgsfield: 남은 크레딧">
-      <span class="ts-body aiu-gs">${g.join('')}</span></button>`;
+      title="AI 남은 사용량 — Claude·ChatGPT: 바깥 고리 7일 · 안쪽 고리 5시간 / Higgsfield: 남은 크레딧">
+      <span class="aiu-gs">${items.join('')}</span></button>`;
   },
 
   _num(v) {
