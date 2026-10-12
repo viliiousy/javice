@@ -650,13 +650,17 @@ const Settings = {
     return new Promise(res => {
       const url = HA.wsUrl(v.haUrl);
       if (!url) { res('✗ Home Assistant: 주소는 http:// 또는 https:// 로 시작해야 합니다'); return; }
-      let ws, done = false;
+      let ws, done = false, ver = '';
       const fin = m => { if (done) return; done = true; try { ws.close(); } catch {} res(m); };
       try { ws = new WebSocket(url); } catch (e) { fin('✗ Home Assistant: ' + e.message); return; }
       ws.onmessage = ev => {
         const m = JSON.parse(ev.data);
         if (m.type === 'auth_required') ws.send(JSON.stringify({ type: 'auth', access_token: v.haToken }));
-        else if (m.type === 'auth_ok') fin('✓ Home Assistant ' + (m.ha_version || ''));
+        else if (m.type === 'auth_ok') { ver = m.ha_version || ''; ws.send(JSON.stringify({ id: 1, type: 'get_states' })); }
+        else if (m.id === 1 && m.type === 'result') {
+          const ag = (m.result || []).map(s => s.entity_id).filter(id => id.startsWith('conversation.') && id !== 'conversation.home_assistant');
+          fin('✓ Home Assistant ' + ver + (ag.length ? '\n✓ 음성 AI: Home Assistant 경유 (' + ag[0] + ') — 아래 OpenClaw 칸은 비워 두셔도 됩니다' : '\n· 음성 AI: Home Assistant 에 AI 대화 연동이 없습니다'));
+        }
         else if (m.type === 'auth_invalid') fin('✗ Home Assistant: 토큰이 맞지 않습니다');
       };
       ws.onerror = () => fin('✗ Home Assistant: 접속할 수 없습니다' + (location.protocol === 'https:' && url.startsWith('ws:') ? ' (브라우저에서는 http 주소가 막힙니다 — 태블릿 앱에서 확인해 주세요)' : ''));
