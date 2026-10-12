@@ -136,15 +136,15 @@ const AIUsage = {
   _code: null,
   async _loadCode() {
     const box = document.getElementById('aiuCodeBox');
-    if (!box) return;
-    if (!this._authed()) { box.textContent = '로그인하면 연결 코드를 만들 수 있습니다.'; return; }
+    const show = t => { if (box) box.textContent = t; };
+    if (!this._authed()) { this._code = null; show('로그인하면 연결 코드를 만들 수 있습니다.'); return; }
     const link = await FirebaseSync.getLink();
     if (link && link.hubKey) {
       this._code = `${FirebaseSync._uid}.${link.hubKey}`;
-      box.textContent = this._code;
+      show(this._code);
     } else {
       this._code = null;
-      box.textContent = '아직 연결 코드가 없습니다 — "새 코드 만들기" 를 눌러 주세요.';
+      show('아직 연결 코드가 없습니다 — "새 코드 만들기" 를 눌러 주세요.');
     }
   },
 
