@@ -19,9 +19,8 @@
       <div class="clock">
         <div id="time" class="time">--:--</div>
         <div id="date" class="date"></div>
+        <div class="wx-row"><span id="weather" class="weather"></span><span id="indoor" class="indoor"></span></div>
       </div>
-      <div id="weather" class="weather"></div>
-      <div id="indoor" class="indoor"></div>
 
       <section class="tasks" aria-label="할 일">
         <header class="p-head tk-head">
@@ -33,15 +32,13 @@
       </section>
 
       <section class="voice" aria-label="음성 명령">
-        <button id="mic" class="mic" aria-label="말하기">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg>
+        <button id="mic" class="mic" aria-label="지금 말하기">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3.5" width="6" height="10.5" rx="3"/><path d="M6 11.5a6 6 0 0 0 12 0M12 17.5V20.5"/></svg>
         </button>
-        <div id="vHint" class="v-hint">눌러서 말하기 — "거실 불 꺼 줘"</div>
-        <div id="vHeard" class="v-heard"></div>
-        <div id="vReply" class="v-reply"></div>
-        <div class="v-apps">
-          <button class="chip" data-app="chatgpt">ChatGPT 열기</button>
-          <button class="chip" data-app="claude">Claude 열기</button>
+        <div class="v-text">
+          <div id="vHint" class="v-hint">눌러서 말하기</div>
+          <div id="vHeard" class="v-heard"></div>
+          <div id="vReply" class="v-reply"></div>
         </div>
       </section>
     </aside>
@@ -110,6 +107,15 @@
           <input name="aiModel" autocomplete="off" spellcheck="false" placeholder="openclaw">
         </label>
         <p class="s-help">Home Assistant 에 OpenClaw 연동(Extended OpenAI Conversation)이 있으면 <b>비워 두세요</b> — 기기 명령이 아닌 말은 HA 를 거쳐 맥미니 OpenClaw 로 가므로 밖(LTE)에서도 됩니다. 여기에 넣는 직접 연결은 집 Wi-Fi 에서만 동작합니다. 둘 다 없으면 ChatGPT 앱을 열도록 안내합니다.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>음성 호출</legend>
+        <label class="s-check"><input type="checkbox" name="wakeOn"> 항상 듣다가 호출어를 들으면 깨어나기</label>
+        <label>호출어
+          <input name="wakeWord" autocomplete="off" spellcheck="false" placeholder="자비스">
+        </label>
+        <p class="s-help">"자비스" 하고 부르면 띠링 소리가 나고, 이어서 하는 말을 알아듣습니다. "자비스 거실 불 꺼 줘" 처럼 한 번에 말해도 됩니다. 태블릿 앱에서만 동작합니다.</p>
       </fieldset>
 
       <label class="s-check"><input type="checkbox" name="night"> 밤(23시~7시)에는 화면을 어둡게</label>

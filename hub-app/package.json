@@ -1,6 +1,6 @@
 {
   "name": "bashy-hub",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Bashy 태블릿 허브 — 안드로이드 래퍼 (Capacitor). 화면은 bashy.app/hub.html 을 그대로 띄운다.",
   "scripts": {

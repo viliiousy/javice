@@ -92,10 +92,11 @@ const Weather = {
       const c = j.current, d = j.daily;
       const [, label, ic0] = this.CODES.find(x => x[0] === c.weather_code) || [0, '', 'cloud'];
       const ic = ic0 === 'sun' && !c.is_day ? 'moon' : ic0;
-      $('weather').innerHTML = `<svg class="w-ic w-${ic}" viewBox="0 0 24 24" aria-hidden="true">${this.ICON[ic]}</svg>` +
-        `<b>${Math.round(c.temperature_2m)}°</b><span>${esc(label)}</span>` +
-        `<span class="w-sub">${Math.round(d.temperature_2m_min[0])}° / ${Math.round(d.temperature_2m_max[0])}°` +
-        `${d.precipitation_probability_max[0] >= 30 ? ` · 비 ${d.precipitation_probability_max[0]}%` : ''} · 습도 ${c.relative_humidity_2m}%</span>`;
+      $('weather').title = label;
+      $('weather').innerHTML = `<svg class="w-ic w-${ic}" viewBox="0 0 24 24" aria-label="${esc(label)}">${this.ICON[ic]}</svg>` +
+        `<b>${Math.round(c.temperature_2m)}°</b>` +
+        `<span class="w-sub">${Math.round(d.temperature_2m_min[0])}°/${Math.round(d.temperature_2m_max[0])}°` +
+        `${d.precipitation_probability_max[0] >= 30 ? ` · 비 ${d.precipitation_probability_max[0]}%` : ''}</span>`;
     } catch (e) { /* 날씨는 없어도 된다 */ }
   },
 };
@@ -384,10 +385,27 @@ const HA = {
   },
 
   baseName(s) {
-    let n = (s.attributes && s.attributes.friendly_name) || s.entity_id;
+    let n = String((s.attributes && s.attributes.friendly_name) || s.entity_id);
+    // 샤오미 공식 통합은 '청공  Air Purifier Switch Status' 처럼 기기 이름 뒤에 영어 설명을 붙인다.
+    // 두 칸 띄움 앞의 한글 이름만 쓴다. '로청 로청' 같은 되풀이도 하나로.
+    const two = n.split(/\s{2,}/);
+    if (two.length > 1 && /[가-힣]/.test(two[0])) n = two[0];
+    const w = n.split(' ');
+    if (w.length === 2 && w[0] === w[1]) n = w[0];
+    if (/_machine_state$/.test(s.entity_id)) n = n.replace(/\s*(장치\s*상태|machine\s*state)$/i, '');
     const a = this.areas[this.entArea[s.entity_id]];
     if (a && n.startsWith(a + ' ')) n = n.slice(a.length + 1);   // '거실 거실등' 같은 겹침을 줄인다
-    return n;
+    return n.trim() || s.entity_id;
+  },
+
+  // 처음부터 숨겨 두는 것: 기기의 '설정 항목'(알림음·어린이 잠금·전원 복귀 동작 등)과
+  // 샤오미 통합의 부가 항목('*' 가 붙은 이름). 기기 설정에서 언제든 다시 켤 수 있다.
+  noise(s) {
+    const id = s.entity_id, n = String(s.attributes.friendly_name || '');
+    if (/\s\*\s/.test(n)) return true;
+    if (/(alarm|child_?lock|physical|default_power|save_state|delay_off|double_click|long_press|pomodoro|no_disturb|wrinkle|bubble|backlight|power_on_behavior|indicator|led_)/i.test(id)) return true;
+    if (/_p_\d+_\d+$/.test(id) && !/(_on_p_|switch_status|_power_p_)/i.test(id + n)) return true;
+    return false;
   },
   name(s) { return Dev.get(s.entity_id).name || this.baseName(s); },
 
@@ -397,18 +415,37 @@ const HA = {
     for (const s of Object.values(this.states)) {
       const [dom] = s.entity_id.split('.');
       if (!this.DOMAINS.includes(dom) || this.hidden.has(s.entity_id)) continue;
-      if (dom === 'sensor' && !['temperature', 'humidity', 'pm25', 'carbon_dioxide'].includes(s.attributes.device_class)) continue;
+      if (dom === 'sensor' && !['temperature', 'humidity', 'pm25', 'carbon_dioxide'].includes(s.attributes.device_class) && !/_machine_state$/.test(s.entity_id)) continue;
       if (dom === 'binary_sensor' && !['door', 'window', 'opening', 'motion', 'occupancy'].includes(s.attributes.device_class)) continue;
       out.push(s);
     }
     return out;
   },
-  visible() { const prefs = Dev.all(); return this.candidates().filter(s => !(prefs[s.entity_id] || {}).hide); },
+  hiddenNow(s, prefs) { const p = (prefs || Dev.all())[s.entity_id] || {}; return p.hide != null ? !!p.hide : this.noise(s); },
+  visible() { const prefs = Dev.all(); return this.candidates().filter(s => !this.hiddenNow(s, prefs)); },
 
   isOn(s) { return ['on', 'open', 'opening', 'heat', 'cool', 'heat_cool', 'auto', 'dry', 'fan_only', 'playing', 'unlocked', 'cleaning'].includes(s.state); },
 
+  // 이름으로 먼저 고른다 (내 집 기기 이름이 곧 무엇인지 말해 준다). 못 고르면 종류로.
+  NAME_ICONS: [
+    [/엘베|엘리베이터|elevator/i, 'elevator'], [/로청|로봇\s*청소|청소기|vacuum/i, 'vacuum'], [/청공|공기\s*청정|purifier/i, 'purifier'],
+    [/세탁기|washer/i, 'washer'], [/건조기|dryer/i, 'dryer'], [/식기\s*세척|식세기/i, 'dishwasher'], [/스타일러|에어드레서/i, 'styler'],
+    [/모니터\s*(조명|등|라이트)|라이트\s*바|lightbar/i, 'monitorlight'], [/침대|무드|수면등|취침/i, 'nightlight'], [/스탠드/i, 'lamp'],
+    [/천장|거실등|방등|메인\s*등/i, 'ceiling'], [/led|줄\s*조명|스트립/i, 'strip'], [/컴퓨터|pc|데스크탑/i, 'pc'], [/모니터/i, 'monitor'],
+    [/셋톱|셋탑|set.?top|iptv|btv|올레/i, 'settop'], [/tv|티비|텔레비전/i, 'tv'], [/스피커|speaker|홈팟|nest/i, 'speaker'],
+    [/멀티탭|플러그|plug/i, 'plug'], [/콘센트|소켓|socket|outlet/i, 'outlet'], [/에어컨|냉방/i, 'ac'], [/보일러|난방|히터/i, 'heater'],
+    [/제습/i, 'dehumidifier'], [/가습/i, 'humidifier'], [/서큘|순환/i, 'circulator'], [/선풍기|팬/i, 'fan'], [/환기|전열\s*교환/i, 'vent'],
+    [/정수기/i, 'purifierwater'], [/냉장고/i, 'fridge'], [/전자\s*레인지/i, 'microwave'], [/오븐|에어\s*프라이어/i, 'oven'],
+    [/인덕션|전기\s*레인지|하이라이트|가스/i, 'cooktop'], [/밥솥/i, 'ricecooker'], [/커피/i, 'coffee'], [/포트|주전자/i, 'kettle'],
+    [/커튼/i, 'curtain'], [/블라인드|롤스크린/i, 'blind'], [/창문/i, 'window'], [/현관|도어락|잠금/i, 'lock'], [/문\b|방문|도어/i, 'door'],
+    [/인터폰|초인종|벨/i, 'doorbell'], [/카메라|cctv|캠/i, 'camera'], [/장판|매트/i, 'heatmat'], [/안마/i, 'massage'],
+    [/프린터/i, 'printer'], [/공유기|와이파이|wifi|라우터/i, 'router'], [/게임|플스|ps5|닌텐도|xbox/i, 'game'], [/충전/i, 'charger'],
+  ],
   autoIcon(s) {
     const dom = s.entity_id.split('.')[0], dc = s.attributes.device_class;
+    const nm = this.baseName(s) + ' ' + (s.attributes.friendly_name || '');
+    if (/_machine_state$/.test(s.entity_id)) return /건조|dryer/i.test(nm + s.entity_id) ? 'dryer' : 'washer';
+    if (dom !== 'sensor' && dom !== 'binary_sensor') { const hit = this.NAME_ICONS.find(([re]) => re.test(nm)); if (hit) return hit[1]; }
     if (dom === 'switch' && dc === 'outlet') return 'outlet';
     if (dom === 'sensor') return dc === 'humidity' ? 'drop' : 'temp';
     if (dom === 'binary_sensor') return ['motion', 'occupancy'].includes(dc) ? 'motion' : dc === 'window' ? 'window' : 'door';
@@ -421,6 +458,16 @@ const HA = {
   stateText(s) {
     const dom = s.entity_id.split('.')[0], a = s.attributes;
     if (s.state === 'unavailable') return '연결 안 됨';
+    if (/_machine_state$/.test(s.entity_id)) {
+      const M = { stop: '대기', run: '동작 중', pause: '일시정지', none: '대기', finished: '완료' };
+      let t = M[s.state] || s.state;
+      if (s.state === 'run') {
+        const fin = this.states[s.entity_id.replace(/_machine_state$/, '_completion_time')];
+        const at = fin && Date.parse(fin.state);
+        if (at && at > Date.now()) t += ` · ${new Date(at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })} 완료`;
+      }
+      return t;
+    }
     if (dom === 'sensor') {
       if (a.device_class === 'temperature') { const c = this.cel(s.state, a.unit_of_measurement); return c == null ? s.state : `${c}°C`; }
       return `${s.state}${a.unit_of_measurement || ''}`;
@@ -460,7 +507,7 @@ const HA = {
     const t = pick('temperature'), h = pick('humidity');
     const tc = t ? this.cel(t.state, t.attributes.unit_of_measurement) : null;
     $('indoor').innerHTML = tc != null || h
-      ? `<span class="w-sub">실내</span>${tc != null ? `<b>${esc(tc)}°</b>` : ''}${h ? `<span>습도 ${esc(Math.round(parseFloat(h.state)))}%</span>` : ''}`
+      ? `<span class="w-sub">실내</span>${tc != null ? `<b>${esc(Math.round(tc))}°</b>` : ''}${h ? `<span>${esc(Math.round(parseFloat(h.state)))}%</span>` : ''}`
       : '';
   },
 
@@ -492,7 +539,8 @@ const HA = {
   tile(s) {
     const dom = s.entity_id.split('.')[0];
     const ro = dom === 'sensor' || dom === 'binary_sensor';
-    const cls = ['tile', dom, this.isOn(s) && !ro ? 'on' : '', s.state === 'unavailable' ? 'off-line' : '', ro ? 'ro' : ''].filter(Boolean).join(' ');
+    const busy = /_machine_state$/.test(s.entity_id) && s.state === 'run';
+    const cls = ['tile', dom, (this.isOn(s) && !ro) || busy ? 'on' : '', /_machine_state$/.test(s.entity_id) ? 'appl' : '', s.state === 'unavailable' ? 'off-line' : '', ro ? 'ro' : ''].filter(Boolean).join(' ');
     const id = esc(s.entity_id);
     const ic = HubIcons.svg(this.iconKey(s), 't-ic');
     if (dom === 'climate') {
@@ -611,14 +659,15 @@ const DevSettings = {
     const order = Object.keys(groups).sort((a, b) => (a ? HA.areas[a] || a : '힣').localeCompare(b ? HA.areas[b] || b : '힣', 'ko'));
     $('devList').innerHTML = order.map(a => `
       <div class="dv-group">${esc(a ? HA.areas[a] || a : '공간 없음')}</div>
-      ${groups[a].sort((x, y) => HA.baseName(x).localeCompare(HA.baseName(y), 'ko')).map(s => {
+      ${groups[a].sort((x, y) => (HA.noise(x) - HA.noise(y)) || HA.baseName(x).localeCompare(HA.baseName(y), 'ko')).map(s => {
         const p = this.draft[s.entity_id] || {};
+        const off = p.hide != null ? !!p.hide : HA.noise(s);
         const key = p.icon || HA.autoIcon(s);
         const id = esc(s.entity_id);
-        return `<div class="dv-row${p.hide ? ' dv-off' : ''}">
+        return `<div class="dv-row${off ? ' dv-off' : ''}">
           <button type="button" class="dv-ic" data-pick="${id}" aria-label="아이콘 바꾸기">${HubIcons.svg(key)}</button>
           <input class="dv-name" data-name="${id}" value="${esc(p.name || '')}" placeholder="${esc(HA.baseName(s))}" autocomplete="off" spellcheck="false">
-          <button type="button" class="dv-sw${p.hide ? '' : ' on'}" data-vis="${id}" aria-label="화면에 보이기">${p.hide ? '숨김' : '표시'}</button>
+          <button type="button" class="dv-sw${off ? '' : ' on'}" data-vis="${id}" aria-label="화면에 보이기">${off ? '숨김' : '표시'}</button>
         </div>
         ${this.openIcon === s.entity_id ? `<div class="dv-icons">
           <button type="button" class="dv-opt${!p.icon ? ' sel' : ''}" data-set="${id}" data-key="">${HubIcons.svg(HA.autoIcon(s))}<span>자동</span></button>
@@ -632,14 +681,19 @@ const DevSettings = {
     const set = e.target.closest('[data-set]');
     if (set) { const r = this.row(set.dataset.set); if (set.dataset.key) r.icon = set.dataset.key; else delete r.icon; this.openIcon = null; this.render(); return; }
     const vis = e.target.closest('[data-vis]');
-    if (vis) { const r = this.row(vis.dataset.vis); r.hide = !r.hide; this.render(); }
+    if (vis) {
+      const id = vis.dataset.vis, r = this.row(id), st = HA.states[id];
+      const off = r.hide != null ? !!r.hide : (st ? HA.noise(st) : false);
+      r.hide = !off; this.render();
+    }
   },
   save() {
     // 빈 칸은 지워서 저장한다 — '자동' 과 '아무것도 안 바꿈' 을 같은 것으로 둔다
     const clean = {};
     for (const [id, p] of Object.entries(this.draft || {})) {
       const q = {};
-      if (p.hide) q.hide = true;
+      const st = HA.states[id];
+      if (p.hide != null && st && !!p.hide !== HA.noise(st)) q.hide = !!p.hide;   // 기본과 다를 때만 적어 둔다
       if (p.icon) q.icon = p.icon;
       if (p.name) q.name = p.name;
       if (Object.keys(q).length) clean[id] = q;
@@ -651,30 +705,100 @@ const DevSettings = {
 };
 
 // ── 음성 ─────────────────────────────────────────
+// 두 가지 길이 있다.
+//   1) 항상 듣기: "자비스" 하고 부르면 띠링 → 이어지는 말을 명령으로 받는다.
+//      태블릿 앱에서는 네이티브 JarvisListener 가 듣고, 브라우저에서는 웹 음성 인식으로 흉내 낸다.
+//   2) 마이크 단추: 호출어 없이 바로 한 마디를 듣는다.
+// 받은 말은 Home Assistant(기기 → AI 에이전트) → OpenClaw 순서로 넘긴다.
 const Voice = {
-  busy: false, history: [],
+  busy: false, history: [], wakeOn: false, _web: null, _webWoke: false,
 
   init() {
-    $('mic').addEventListener('click', () => this.listen());
-    document.querySelectorAll('[data-app]').forEach(b => b.addEventListener('click', () => this.openApp(b.dataset.app)));
+    $('mic').addEventListener('click', () => this.tapMic());
+    this.applyWake();
   },
+
+  wakeWords() {
+    const w = (Cfg.get().wakeWord || '자비스').trim() || '자비스';
+    const base = [w];
+    if (w === '자비스') base.push('쟈비스', '자비쓰', '자빗스', '잡이스', '자비스야', 'jarvis', '재비스', '저비스');
+    return base;
+  },
+  enabled() { const c = Cfg.get(); return c.wakeOn !== false; },   // 기본은 켜짐
 
   set(state) {
     $('mic').classList.toggle('listening', state === 'listen');
     $('mic').classList.toggle('busy', state === 'busy');
+    const idle = this.wakeOn ? `"${esc(this.wakeWords()[0])}" 하고 불러 주세요` : '눌러서 말하기';
+    if (state === 'listen') $('vHint').textContent = '듣고 있습니다…';
+    else if (state === 'busy') $('vHint').textContent = '생각 중…';
+    else $('vHint').innerHTML = idle;
+    $('mic').classList.toggle('armed', this.wakeOn && !state);
   },
 
-  async listen() {
-    if (this.busy) { this.stopListening(); return; }
-    this.busy = true; this.set('listen');
-    $('vHeard').textContent = ''; $('vReply').textContent = '';
+  // 띠링 — 두 음을 짧게. 파일 없이 만들어서 어디서든 같은 소리.
+  chime() {
     try {
-      const text = await this.recognize();
-      if (!text) { $('vReply').textContent = '잘 못 들었습니다. 다시 눌러 말씀해 주세요.'; return; }
-      $('vHeard').textContent = text;
-      this.set('busy');
+      const C = window.AudioContext || window.webkitAudioContext;
+      const ctx = this._ac || (this._ac = new C());
+      if (ctx.state === 'suspended') ctx.resume();
+      const t = ctx.currentTime;
+      [[1318.5, 0], [1760, 0.11]].forEach(([f, d]) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t + d);
+        g.gain.exponentialRampToValueAtTime(0.35, t + d + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.32);
+        o.connect(g).connect(ctx.destination); o.start(t + d); o.stop(t + d + 0.34);
+      });
+    } catch (e) {}
+  },
+
+  // ── 항상 듣기 켜고 끄기 ──
+  async applyWake() {
+    const want = this.enabled();
+    const J = Native.plugin('JarvisListener');
+    if (J) {
+      if (!this._bound) {
+        this._bound = true;
+        J.addListener('wake', () => this.onWake());
+        J.addListener('command', e => this.onCommand((e && e.text) || ''));
+        J.addListener('error', e => { this.wakeOn = false; this.set(''); toast((e && e.message) || '음성 대기 오류'); });
+      }
+      try {
+        if (want) { await J.start({ wakeWords: this.wakeWords(), lang: 'ko-KR' }); this.wakeOn = true; }
+        else { await J.stop(); this.wakeOn = false; }
+      } catch (e) { this.wakeOn = false; toast(e.message || '마이크 권한이 필요합니다'); }
+      this.set(''); return;
+    }
+    // 브라우저: 연속 인식으로 흉내 (크롬 데스크톱 등)
+    this.webStop();
+    if (want && (window.SpeechRecognition || window.webkitSpeechRecognition)) { this.wakeOn = true; this.webStart(); }
+    else this.wakeOn = false;
+    this.set('');
+  },
+
+  onWake() {
+    if (this.busy) return;
+    this.chime();
+    $('vHeard').textContent = ''; $('vReply').textContent = '';
+    this.set('listen');
+  },
+
+  async onCommand(text) {
+    text = String(text || '').trim();
+    if (!text) { this.set(''); $('vReply').textContent = '잘 못 들었습니다. 다시 불러 주세요.'; return; }
+    await this.run(text);
+  },
+
+  async run(text) {
+    if (this.busy) return;
+    this.busy = true;
+    $('vHeard').textContent = text; $('vReply').textContent = '';
+    this.set('busy');
+    try {
       const reply = await this.handle(text);
-      if (reply) { $('vReply').textContent = reply; this.speak(reply); }
+      if (reply) { $('vReply').textContent = reply; await this.speak(reply); }
     } catch (e) {
       $('vReply').textContent = e.message || String(e);
     } finally {
@@ -682,13 +806,27 @@ const Voice = {
     }
   },
 
-  stopListening() {
-    const SR = Native.plugin('SpeechRecognition');
-    if (SR) SR.stop().catch(() => {});
-    if (this._web) try { this._web.stop(); } catch {}
+  async tapMic() {
+    const J = Native.plugin('JarvisListener');
+    if (J && this.wakeOn) {                // 호출어 없이 바로 명령 듣기
+      this.chime(); this.set('listen');
+      $('vHeard').textContent = ''; $('vReply').textContent = '';
+      try { await J.listenNow(); } catch (e) {}
+      return;
+    }
+    if (this.busy) return;
+    this.set('listen');
+    $('vHeard').textContent = ''; $('vReply').textContent = '';
+    try {
+      this.webStop();
+      const text = await this.recognizeOnce();
+      if (text) await this.run(text);
+      else { this.set(''); $('vReply').textContent = '잘 못 들었습니다. 다시 눌러 말씀해 주세요.'; }
+    } catch (e) { this.set(''); $('vReply').textContent = e.message || String(e); }
+    finally { if (this.wakeOn && !Native.plugin('JarvisListener')) this.webStart(); }
   },
 
-  async recognize() {
+  async recognizeOnce() {
     const SR = Native.plugin('SpeechRecognition');
     if (SR) {
       const perm = await SR.requestPermissions().catch(() => null);
@@ -699,7 +837,7 @@ const Voice = {
     const W = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!W) throw new Error('이 브라우저는 음성 인식을 지원하지 않습니다 (태블릿 앱에서는 됩니다)');
     return new Promise((res, rej) => {
-      const r = new W(); this._web = r;
+      const r = new W();
       r.lang = 'ko-KR'; r.interimResults = false; r.maxAlternatives = 1;
       let got = '';
       r.onresult = e => { got = e.results[0][0].transcript; };
@@ -709,13 +847,65 @@ const Voice = {
     });
   },
 
-  speak(text) {
+  // 호출어 뒤의 말. 호출어가 없으면 null.
+  afterWake(raw) {
+    const norm = x => String(x).toLowerCase().replace(/[\s.,!?~]/g, '');
+    const n = norm(raw);
+    for (const w of this.wakeWords().map(norm)) {
+      const at = n.indexOf(w);
+      if (at < 0) continue;
+      let seen = 0, cut = raw.length;
+      for (let k = 0; k < raw.length; k++) { if (!/[\s.,!?~]/.test(raw[k])) seen++; if (seen === at + w.length) { cut = k + 1; break; } }
+      return raw.slice(cut).replace(/^\s*(야|아|님|씨)?[\s,.!?]*/, '').trim();
+    }
+    return null;
+  },
+
+  webStart() {
+    const W = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!W || this._web) return;
+    const r = new W(); this._web = r;
+    r.lang = 'ko-KR'; r.continuous = true; r.interimResults = true;
+    let pendingCmd = false;
+    r.onresult = e => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (pendingCmd) { if (e.results[i].isFinal) { pendingCmd = false; this.onCommand(t); } continue; }
+        const rest = this.afterWake(t);
+        if (rest == null) continue;
+        if (!this._webWoke) { this._webWoke = true; this.onWake(); }
+        if (e.results[i].isFinal) {
+          this._webWoke = false;
+          if (rest.length >= 2) this.onCommand(rest); else pendingCmd = true;
+        }
+      }
+    };
+    r.onend = () => { if (this._web === r) { this._web = null; if (this.wakeOn) setTimeout(() => this.webStart(), 300); } };
+    r.onerror = e => { if (e.error === 'not-allowed') { this.wakeOn = false; this.set(''); } };
+    try { r.start(); } catch (e) { this._web = null; }
+  },
+  webStop() { const r = this._web; this._web = null; if (r) try { r.abort(); } catch (e) {} },
+
+  // 말하는 동안에는 듣지 않는다 (자기 목소리에 깨지 않게)
+  async speak(text) {
     const clean = String(text).replace(/[*#`_>]/g, '').slice(0, 600);
+    const J = Native.plugin('JarvisListener');
     const TTS = Native.plugin('TextToSpeech');
-    if (TTS) { TTS.speak({ text: clean, lang: 'ko-KR', rate: 1.0 }).catch(() => {}); return; }
+    if (TTS) {
+      if (J && this.wakeOn) await J.pause().catch(() => {});
+      try { await TTS.speak({ text: clean, lang: 'ko-KR', rate: 1.0 }); } catch (e) {}
+      if (J && this.wakeOn) await J.resume().catch(() => {});
+      return;
+    }
     if ('speechSynthesis' in window) {
-      const u = new SpeechSynthesisUtterance(clean); u.lang = 'ko-KR';
-      speechSynthesis.cancel(); speechSynthesis.speak(u);
+      this.webStop();
+      await new Promise(res => {
+        const u = new SpeechSynthesisUtterance(clean); u.lang = 'ko-KR';
+        u.onend = u.onerror = () => res();
+        speechSynthesis.cancel(); speechSynthesis.speak(u);
+        setTimeout(res, 20000);
+      });
+      if (this.wakeOn) this.webStart();
     }
   },
 
@@ -733,8 +923,8 @@ const Voice = {
     const c = Cfg.get();
     if (c.aiUrl) return this.askAI(text, c);
     return HA.ready
-      ? '집 기기 명령으로는 알아듣지 못했습니다. 일반 질문은 ChatGPT 앱에서 물어봐 주세요.'
-      : '아직 연결된 곳이 없습니다. ⚙ 설정에서 Home Assistant 나 OpenClaw 를 연결해 주세요.';
+      ? '집 기기 명령으로는 알아듣지 못했습니다.'
+      : '아직 연결된 곳이 없습니다. ⚙ 설정에서 Home Assistant 를 연결해 주세요.';
   },
 
   async askAI(text, c) {
@@ -762,7 +952,7 @@ const Voice = {
     const L = Native.plugin('AppLauncher');
     if (L) {
       try { await L.openUrl({ url: PKG[which] }); return; }
-      catch (e) { toast('앱이 설치되어 있지 않습니다 — Play 스토어에서 설치해 주세요'); return; }
+      catch (e) { toast('앱이 설치되어 있지 않습니다'); return; }
     }
     window.open(WEB[which], '_blank', 'noopener');
   },
@@ -780,6 +970,8 @@ const Settings = {
     const c = Cfg.get(), f = $('setForm');
     for (const k of ['code', 'haUrl', 'haToken', 'aiUrl', 'aiToken', 'aiModel']) f.elements[k].value = c[k] || '';
     f.elements.night.checked = !!c.night;
+    f.elements.wakeOn.checked = c.wakeOn !== false;
+    f.elements.wakeWord.value = c.wakeWord || '';
     $('setStatus').textContent = '';
     $('settings').showModal();
   },
@@ -787,6 +979,8 @@ const Settings = {
     const f = $('setForm'), v = {};
     for (const k of ['code', 'haUrl', 'haToken', 'aiUrl', 'aiToken', 'aiModel']) v[k] = f.elements[k].value.trim();
     v.night = f.elements.night.checked;
+    v.wakeOn = f.elements.wakeOn.checked;
+    v.wakeWord = f.elements.wakeWord.value.trim();
     return v;
   },
   save() {
@@ -794,6 +988,7 @@ const Settings = {
     Cfg.set(v);
     if (v.code !== prev.code) { Usage.load(); Tasks.load(); }
     if (v.haUrl !== prev.haUrl || v.haToken !== prev.haToken) { HA._retry = 0; HA.connect(); }
+    if (v.wakeOn !== (prev.wakeOn !== false) || v.wakeWord !== (prev.wakeWord || '')) Voice.applyWake();
     Clock.tick();
     toast('저장했습니다');
   },

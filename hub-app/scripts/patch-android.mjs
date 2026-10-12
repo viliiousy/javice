@@ -43,4 +43,29 @@ for (const d of fs.readdirSync(path.join(root, 'icons'))) {
     fs.copyFileSync(path.join(root, 'icons', d, f), path.join(dst, f));
   }
 }
+// 6) 호출어("자비스") 상시 듣기 — 이 앱만의 네이티브 플러그인을 넣고 등록한다
+const pkgDir = path.join(root, 'android/app/src/main/java/app/bashy/hub');
+fs.copyFileSync(path.join(root, 'native/JarvisListener.java'), path.join(pkgDir, 'JarvisListener.java'));
+fs.writeFileSync(path.join(pkgDir, 'MainActivity.java'), `package app.bashy.hub;
+
+import android.os.Bundle;
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(JarvisListener.class);
+        super.onCreate(savedInstanceState);
+    }
+}
+`);
+
+// 7) 다시 깔 때 '업데이트' 로 인식되도록 버전 번호를 매번 올린다 (분 단위 시각)
+const gradle = path.join(root, 'android/app/build.gradle');
+const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+let g = fs.readFileSync(gradle, 'utf8');
+g = g.replace(/versionCode \d+/, `versionCode ${Math.floor(Date.now() / 60000) - 29000000}`)
+     .replace(/versionName "[^"]*"/, `versionName "${pkg.version}"`);
+fs.writeFileSync(gradle, g);
+
 console.log('android 패치 완료');
