@@ -48,41 +48,45 @@ const AIUsage = {
   _tone(left, base) { return left == null ? base : left <= 0.1 ? 'var(--red)' : left <= 0.3 ? 'var(--yellow)' : base; },
   _gid: 0,
 
+  // 가운데 작은 로고는 각 서비스의 공식 파비콘을 그대로 불러 쓴다 (그려 넣지 않는다)
+  LOGO: k => `https://www.google.com/s2/favicons?sz=64&domain=${{ claude: 'claude.ai', chatgpt: 'chatgpt.com', higgsfield: 'higgsfield.ai' }[k]}`,
+
   gauge(key, size) {
     const s = (this.data || {})[key];
     if (!s) return '';
     const base = this.COLORS[key], id = 'aiug' + (++this._gid);
-    const R = 16.5, C = 2 * Math.PI * R;
+    const R = 17, C = 2 * Math.PI * R;
+    let ring, inner = '';
+    let label;
     if (key === 'higgsfield') {
       const tot = Number(s.total) || 0;
-      const f = tot ? Math.max(0, Math.min(1, Number(s.credits) / tot)) : 0;
-      const col = f <= 0.1 ? 'var(--red)' : base;
-      const ang = f * 2 * Math.PI, x = 20 + 16.5 * Math.sin(ang), y = 20 - 16.5 * Math.cos(ang);
-      const slice = f >= 0.999 ? `<circle cx="20" cy="20" r="16.5" fill="${col}"/>`
-        : f <= 0.001 ? '' : `<path d="M20 20 L20 3.5 A16.5 16.5 0 ${f > 0.5 ? 1 : 0} 1 ${x.toFixed(2)} ${y.toFixed(2)} Z" fill="${col}"/>`;
-      return `<svg class="aiu-g" width="${size}" height="${size}" viewBox="0 0 40 40" role="img" aria-label="Higgsfield 크레딧 ${Math.round(f * 100)}% 남음">
-        <circle cx="20" cy="20" r="16.5" fill="currentColor" opacity=".12"/>${slice}
-        <circle cx="20" cy="20" r="16.5" fill="none" stroke="currentColor" stroke-opacity=".18" stroke-width="1"/></svg>`;
+      ring = tot ? Math.max(0, Math.min(1, Number(s.credits) / tot)) : 0;
+      label = `Higgsfield 크레딧 ${Math.round(ring * 100)}% 남음`;
+      inner = `<circle cx="20" cy="20" r="12" fill="currentColor" opacity=".08"/>`;
+    } else {
+      const w7 = this._left(s.d7), h5 = this._left(s.h5);
+      ring = w7 == null ? 0 : w7;
+      const lvl = h5 == null ? 0 : h5;
+      const top = 8 + (1 - lvl) * 24;          // 물 높이: 가득(위)에서 쓴 만큼 아래로
+      label = `${this.NAMES[key]} 5시간 ${h5 == null ? '—' : Math.round(lvl * 100) + '%'} · 7일 ${w7 == null ? '—' : Math.round(ring * 100) + '%'} 남음`;
+      inner = `<circle cx="20" cy="20" r="12" fill="currentColor" opacity=".08"/>
+        <rect x="8" y="${top.toFixed(2)}" width="24" height="26" fill="${this._tone(h5, base)}" opacity=".55" clip-path="url(#${id})"/>`;
     }
-    const w7 = this._left(s.d7), h5 = this._left(s.h5);
-    const ring = w7 == null ? 0 : w7;
-    const lvl = h5 == null ? 0 : h5;
-    const top = 20 - 11 + (1 - lvl) * 22;      // 물 높이: 가득(위)에서 쓴 만큼 아래로
-    return `<svg class="aiu-g" width="${size}" height="${size}" viewBox="0 0 40 40" role="img"
-        aria-label="${this.NAMES[key]} 5시간 ${h5 == null ? '—' : Math.round(lvl * 100) + '%'} · 7일 ${w7 == null ? '—' : Math.round(ring * 100) + '%'} 남음">
-      <defs><clipPath id="${id}"><circle cx="20" cy="20" r="11"/></clipPath></defs>
-      <circle cx="20" cy="20" r="${R}" fill="none" stroke="currentColor" stroke-opacity=".14" stroke-width="3.5"/>
-      <circle cx="20" cy="20" r="${R}" fill="none" stroke="${this._tone(w7, base)}" stroke-width="3.5" stroke-linecap="round"
+    const tone = key === 'higgsfield' ? (ring <= 0.1 ? 'var(--red)' : ring <= 0.3 ? 'var(--yellow)' : base) : this._tone(ring, base);
+    return `<svg class="aiu-g" width="${size}" height="${size}" viewBox="0 0 40 40" role="img" aria-label="${label}">
+      <defs><clipPath id="${id}"><circle cx="20" cy="20" r="12"/></clipPath></defs>
+      <circle cx="20" cy="20" r="${R}" fill="none" stroke="currentColor" stroke-opacity=".14" stroke-width="3"/>
+      <circle cx="20" cy="20" r="${R}" fill="none" stroke="${tone}" stroke-width="3" stroke-linecap="round"
         stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - ring)}" transform="rotate(-90 20 20)"/>
-      <circle cx="20" cy="20" r="11" fill="currentColor" opacity=".1"/>
-      <rect x="9" y="${top.toFixed(2)}" width="22" height="24" fill="${this._tone(h5, base)}" clip-path="url(#${id})"/>
+      ${inner}
+      <image href="${this.LOGO(key)}" x="13" y="13" width="14" height="14" clip-path="url(#${id})" preserveAspectRatio="xMidYMid meet"/>
     </svg>`;
   },
 
   row() {
     const d = this.data;
     if (!d || !Object.keys(d).length) return '';
-    const g = ['claude', 'chatgpt', 'higgsfield'].map(k => this.gauge(k, 26)).filter(Boolean);
+    const g = ['claude', 'chatgpt', 'higgsfield'].map(k => this.gauge(k, 22)).filter(Boolean);
     if (!g.length) return '';
     return `<button class="ts-row ts-ai" id="tsAI" onclick="AIUsage.open()"
       title="AI 남은 사용량 — Claude · ChatGPT: 바깥 고리 7일, 안쪽 5시간 / Higgsfield: 남은 크레딧">
