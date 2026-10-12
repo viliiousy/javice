@@ -3128,3 +3128,10 @@ body, .empty, .card-title, .modal-lbl, .habit-name, .task-text,
   .h-right{ gap:4px; }
   .header{ padding:5px 7px !important; }
 }
+
+/* PC 헤더 위아래 여백을 줄인다. 가장 키 큰 건 로고(아이콘+Bashy 글자)라
+   글자 줄 높이도 1 로 맞춰 아래 남는 틈을 없앤다. */
+@media (min-width:641px){
+  .header{ padding-top:6px; padding-bottom:6px; }
+  .h-logo span{ line-height:1; }
+}
