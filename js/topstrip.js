@@ -13,7 +13,7 @@ const TopStrip = {
   render() {
     const el = document.getElementById(this.SLOT);
     if (!el) return;
-    const rows = [this._inbody(), this._econ()].filter(Boolean);
+    const rows = [this._inbody(), this._econ(), this._ai()].filter(Boolean);
     el.innerHTML = rows.join('');
     el.classList.toggle('is-empty', !rows.length);
   },
@@ -77,6 +77,13 @@ const TopStrip = {
     }).join('<s></s>');
     const title = favs.length > SHOW ? `관심종목 ${favs.length}개` : '관심종목';
     return this._row('tsEcon', 'trend', parts, "Econ.open('main')", title);
+  },
+
+  // ── AI 사용량 ────────────────────────
+  // 연동한 사람에게만 보인다. 값과 모양은 AIUsage 가 가진다.
+  _ai() {
+    if (typeof AIUsage === 'undefined') return '';
+    try { return AIUsage.row(); } catch (e) { return ''; }
   },
 
   // 카드로 데려간다. 스크롤만 하면 어디로 갔는지 모르니 잠깐 테두리를 밝힌다.

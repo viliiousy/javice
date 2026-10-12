@@ -1,0 +1,24 @@
+{
+  "name": "bashy-hub",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bashy 태블릿 허브 — 안드로이드 래퍼 (Capacitor). 화면은 bashy.app/hub.html 을 그대로 띄운다.",
+  "scripts": {
+    "android:add": "cap add android",
+    "android:sync": "cap sync android",
+    "android:patch": "node scripts/patch-android.mjs",
+    "apk": "npm run android:sync && npm run android:patch && cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor-community/keep-awake": "^8.0.1",
+    "@capacitor-community/speech-recognition": "^7.0.1",
+    "@capacitor-community/text-to-speech": "^8.0.2",
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app-launcher": "^8.0.1",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/status-bar": "^8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.0"
+  }
+}

@@ -1,0 +1,167 @@
+// js/ai-usage.js — AI 구독 사용량 (Claude · ChatGPT · Higgsfield)
+//
+// 값은 이 앱이 만들지 않는다. PC 크롬의 '사용량 수집기' 확장이 5분마다 읽어
+// /api/hub 로 올리고, 서버가 /users/<uid>/_usage 에 넣어 둔다. 여기서는 읽어서 보여주기만 한다.
+//
+// 헤더 오른쪽 줄(TopStrip)에 한 줄로 요약하고, 누르면 자세히 + 연결 설정이 열린다.
+// 연동을 안 한 사람에게는 줄 자체가 안 보인다 — 없는 숫자를 0% 로 그리지 않는다.
+//
+// 연결 코드(<FirebaseUID>.<hubKey>) 하나를 확장과 태블릿 허브가 같이 쓴다.
+// hubKey 는 /users/<uid>/_link 에 있어 localStorage 로 내려오지 않는다.
+
+const AIUsage = {
+  data: null,
+  _timer: null,
+  NAMES: { claude: 'Claude', chatgpt: 'ChatGPT', higgsfield: 'Higgsfield' },
+  HUB_URL: 'https://bashy.app/hub.html',
+
+  init() {
+    // 로그인(Firebase 인증)이 끝나야 읽을 수 있다. 끝날 때까지 가볍게 기다린다.
+    const wait = setInterval(() => {
+      if (this._authed()) { clearInterval(wait); this.refresh(); }
+    }, 1500);
+    setTimeout(() => clearInterval(wait), 120000);
+    this._timer = setInterval(() => { if (this._authed() && !document.hidden) this.refresh(); }, 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && this._authed()) this.refresh(); });
+  },
+
+  _authed() {
+    return typeof FirebaseSync !== 'undefined' && FirebaseSync.ready() && FirebaseSync._authed;
+  },
+
+  async refresh() {
+    try {
+      const r = await fetch(`${FirebaseSync._dbUrl}/users/${FirebaseSync._uid}/_usage/latest.json${await FirebaseSync._q()}`);
+      if (!r.ok) return;
+      this.data = await r.json();
+      if (typeof TopStrip !== 'undefined') TopStrip.render();
+    } catch (e) { console.warn('[AIUsage]', e.message); }
+  },
+
+  // ── 헤더 한 줄 ────────────────────────
+  // 5시간 한도가 '지금 쓸 수 있나' 를 알려 준다. 7일은 자세히 화면에서.
+  row() {
+    const d = this.data;
+    if (!d || !Object.keys(d).length) return '';
+    const parts = [];
+    const p = (name, s) => {
+      if (!s || !s.h5) return;
+      const v = Math.round(s.h5.pct);
+      const cls = v >= 90 ? 'ts-up' : '';
+      parts.push(`${name} <b class="${cls}">${v}</b><i>%</i>`);
+    };
+    p('C', d.claude);
+    p('G', d.chatgpt);
+    if (d.higgsfield && d.higgsfield.credits != null) {
+      parts.push(`H <b>${this._num(d.higgsfield.credits)}</b>`);
+    }
+    if (!parts.length) return '';
+    return `<button class="ts-row" id="tsAI" onclick="AIUsage.open()" title="AI 사용량 (5시간 한도 · Higgsfield 남은 크레딧)">
+      ${(typeof Icons !== 'undefined') ? Icons.svg('sparkle', 'ts-ic') : ''}<span class="ts-body">${parts.join('<s></s>')}</span></button>`;
+  },
+
+  _num(v) {
+    const n = Number(v);
+    return !isFinite(n) ? '—' : n >= 100 ? Math.round(n).toLocaleString('ko-KR') : String(Math.round(n * 10) / 10);
+  },
+
+  _ago(iso) {
+    const m = Math.round((Date.now() - Date.parse(iso)) / 60000);
+    if (!isFinite(m)) return '';
+    if (m < 1) return '방금';
+    if (m < 60) return `${m}분 전`;
+    if (m < 60 * 24) return `${Math.round(m / 60)}시간 전`;
+    return `${Math.round(m / 1440)}일 전`;
+  },
+
+  _until(iso) {
+    const m = Math.round((Date.parse(iso) - Date.now()) / 60000);
+    if (!isFinite(m)) return '';
+    if (m <= 0) return '곧 초기화';
+    if (m < 60) return `${m}분 뒤 초기화`;
+    if (m < 60 * 24) return `${Math.floor(m / 60)}시간 ${m % 60}분 뒤 초기화`;
+    return `${Math.round(m / 1440)}일 뒤 초기화`;
+  },
+
+  _bar(label, w) {
+    if (!w) return '';
+    const v = Math.max(0, Math.min(100, Number(w.pct) || 0));
+    const tone = v >= 90 ? 'var(--red)' : v >= 70 ? 'var(--yellow)' : 'var(--accent)';
+    return `<div class="aiu-bar">
+      <div class="aiu-bar-top"><span>${label}</span><b>${Math.round(v)}%</b></div>
+      <div class="aiu-track"><div class="aiu-fill" style="width:${v}%;background:${tone}"></div></div>
+      <div class="aiu-sub">${w.reset ? this._until(w.reset) : ''}</div>
+    </div>`;
+  },
+
+  _svc(key) {
+    const s = (this.data || {})[key];
+    const name = this.NAMES[key];
+    if (!s) return `<div class="aiu-svc"><div class="aiu-head"><b>${name}</b><span class="aiu-sub">아직 받은 값 없음</span></div></div>`;
+    const stale = Date.now() - Date.parse(s.at) > 30 * 60000;
+    const head = `<div class="aiu-head"><b>${name}</b><span class="aiu-plan">${esc(s.plan || '')}</span>
+      <span class="aiu-sub${stale ? ' aiu-stale' : ''}">${this._ago(s.at)}</span></div>`;
+    if (key === 'higgsfield') {
+      const tot = Number(s.total) || 0;
+      const left = Number(s.credits) || 0;
+      const pctLeft = tot > 0 ? Math.max(0, Math.min(100, left / tot * 100)) : null;
+      return `<div class="aiu-svc">${head}
+        <div class="aiu-bar">
+          <div class="aiu-bar-top"><span>남은 크레딧</span><b>${this._num(left)}${tot ? ` / ${this._num(tot)}` : ''}</b></div>
+          ${pctLeft == null ? '' : `<div class="aiu-track"><div class="aiu-fill" style="width:${pctLeft}%;background:${pctLeft < 10 ? 'var(--red)' : 'var(--accent)'}"></div></div>`}
+          <div class="aiu-sub">${s.ends ? '구독 갱신 ' + new Date(s.ends).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }) : ''}</div>
+        </div></div>`;
+    }
+    return `<div class="aiu-svc">${head}${this._bar('5시간', s.h5)}${this._bar('7일', s.d7)}</div>`;
+  },
+
+  open() {
+    App.openModal('@sparkle AI 사용량 · 허브', `
+      <div class="aiu-wrap">
+        ${['claude', 'chatgpt', 'higgsfield'].map(k => this._svc(k)).join('')}
+        <div class="aiu-link">
+          <div class="aiu-head"><b>연결 코드</b><span class="aiu-sub">PC 수집 확장 · 태블릿 허브에 붙여 넣습니다</span></div>
+          <div id="aiuCodeBox" class="aiu-code aiu-sub">확인 중…</div>
+          <div class="modal-btns" style="justify-content:flex-start;flex-wrap:wrap">
+            <button class="btn-sm" onclick="AIUsage.copyCode()">복사</button>
+            <button class="btn-sm" onclick="AIUsage.newCode()">새 코드 만들기</button>
+            <a class="btn-sm aiu-a" href="${this.HUB_URL}" target="_blank" rel="noopener">태블릿 허브 열기</a>
+          </div>
+          <div class="aiu-sub" style="margin-top:6px">새 코드를 만들면 예전 코드를 쓰던 기기는 연결이 끊깁니다.</div>
+        </div>
+      </div>`, () => this._loadCode());
+    this.refresh();
+  },
+
+  _code: null,
+  async _loadCode() {
+    const box = document.getElementById('aiuCodeBox');
+    if (!box) return;
+    if (!this._authed()) { box.textContent = '로그인하면 연결 코드를 만들 수 있습니다.'; return; }
+    const link = await FirebaseSync.getLink();
+    if (link && link.hubKey) {
+      this._code = `${FirebaseSync._uid}.${link.hubKey}`;
+      box.textContent = this._code;
+    } else {
+      this._code = null;
+      box.textContent = '아직 연결 코드가 없습니다 — "새 코드 만들기" 를 눌러 주세요.';
+    }
+  },
+
+  async newCode() {
+    if (!this._authed()) { App.showToast('로그인이 필요합니다', 'error'); return; }
+    const b = new Uint8Array(24);
+    crypto.getRandomValues(b);
+    const key = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const ok = await FirebaseSync.setLink({ hubKey: key });
+    if (!ok) { App.showToast('저장 실패 — 잠시 뒤 다시 시도해 주세요', 'error'); return; }
+    await this._loadCode();
+    App.showToast('새 연결 코드를 만들었습니다', 'success');
+  },
+
+  async copyCode() {
+    if (!this._code) { App.showToast('먼저 코드를 만들어 주세요', 'error'); return; }
+    try { await navigator.clipboard.writeText(this._code); App.showToast('복사했습니다', 'success'); }
+    catch { App.showToast('복사 실패 — 코드를 길게 눌러 복사해 주세요', 'error'); }
+  },
+};

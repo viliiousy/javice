@@ -1,0 +1,48 @@
+name: Hub APK
+
+# 태블릿 허브(hub.html)를 감싼 안드로이드 앱을 빌드해 'hub-latest' 릴리스에 올린다.
+# 화면 자체는 bashy.app/hub.html 을 그대로 띄우므로, 화면만 바뀐 커밋은 앱을 다시 깔 필요가 없다.
+# 이 워크플로는 앱 껍데기(hub-app/)가 바뀔 때만 돈다.
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'hub-app/**', '.github/workflows/hub-apk.yml' ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hub-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - run: npm ci || npm install
+      - run: npx cap add android
+      - run: npx cap sync android
+      - run: node scripts/patch-android.mjs
+      - run: ./gradlew assembleDebug --no-daemon
+        working-directory: hub-app/android
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk bashy-hub.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: hub-latest
+          name: Bashy 허브 (태블릿 앱)
+          body: |
+            태블릿에서 이 페이지를 열고 bashy-hub.apk 를 받아 설치합니다.
+            (설치 중 '출처를 알 수 없는 앱 허용'을 한 번 켜야 합니다)
+          files: hub-app/bashy-hub.apk
+          make_latest: false

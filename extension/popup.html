@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>Bashy 사용량</title>
+<style>
+  :root{--bg:#fff;--fg:#1a1d24;--mut:#6b7280;--line:#e5e7eb;--acc:#5b5bd6;--bad:#c2410c;--ok:#15803d}
+  @media (prefers-color-scheme:dark){:root{--bg:#16181d;--fg:#e8eaee;--mut:#9aa1ad;--line:#2a2e36;--acc:#8b8bf5;--bad:#fb923c;--ok:#4ade80}}
+  body{margin:0;width:320px;font:13px/1.45 -apple-system,"Pretendard","Malgun Gothic",sans-serif;background:var(--bg);color:var(--fg)}
+  header{padding:12px 14px;border-bottom:1px solid var(--line);font-weight:700}
+  main{padding:12px 14px;display:grid;gap:10px}
+  .row{display:flex;gap:6px}
+  input{flex:1;min-width:0;padding:7px 8px;border:1px solid var(--line);border-radius:7px;background:transparent;color:inherit;font:inherit}
+  button{padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:transparent;color:inherit;font:inherit;cursor:pointer}
+  button.acc{background:var(--acc);border-color:var(--acc);color:#fff}
+  .svc{display:grid;grid-template-columns:80px 1fr;gap:2px 8px;padding:8px 0;border-top:1px solid var(--line)}
+  .svc b{font-weight:600}.mut{color:var(--mut)}.bad{color:var(--bad)}.ok{color:var(--ok)}
+  small{font-size:11px}
+</style></head>
+<body>
+<header>Bashy 사용량 수집기</header>
+<main>
+  <div>
+    <div class="mut" style="margin-bottom:4px">bashy.app 설정 → <b>AI 사용량 · 허브</b>에서 받은 연결 코드</div>
+    <div class="row"><input id="code" placeholder="연결 코드 붙여넣기" spellcheck="false"><button id="save" class="acc">저장</button></div>
+    <small id="codeMsg" class="mut"></small>
+  </div>
+  <div id="list"></div>
+  <div class="row"><button id="now" style="flex:1">지금 수집</button></div>
+  <small class="mut">5분마다 자동으로 읽습니다. Higgsfield 는 higgsfield.ai 탭이 열려 있을 때만 읽을 수 있습니다.</small>
+</main>
+<script src="popup.js"></script>
+</body></html>

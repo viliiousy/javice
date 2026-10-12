@@ -3062,3 +3062,22 @@ body, .empty, .card-title, .modal-lbl, .habit-name, .task-text,
 
 /* 5. 숫자를 읽는 자리는 자간을 조금 좁힌다. 큰 수가 늘어질 때 덩어리로 안 읽힌다. */
 .ib-tile-val, .wm-cnt, .hw-val, .ec-price, .stat-chip{ letter-spacing:-0.01em; }
+
+/* ── AI 사용량 (js/ai-usage.js) ─────────────────────────── */
+.aiu-wrap{ display:grid; gap:14px; }
+.aiu-svc, .aiu-link{ display:grid; gap:8px; padding-bottom:12px; border-bottom:1px solid var(--border); }
+.aiu-link{ border-bottom:0; padding-bottom:0; }
+.aiu-head{ display:flex; align-items:baseline; gap:8px; }
+.aiu-head b{ font-size:14px; }
+.aiu-plan{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text3); }
+.aiu-head .aiu-sub{ margin-left:auto; }
+.aiu-sub{ font-size:11.5px; color:var(--text3); }
+.aiu-stale{ color:var(--yellow); }
+.aiu-bar{ display:grid; gap:4px; }
+.aiu-bar-top{ display:flex; justify-content:space-between; font-size:12.5px; }
+.aiu-bar-top b{ font-variant-numeric:tabular-nums; }
+.aiu-track{ height:8px; border-radius:99px; background:var(--bg2); overflow:hidden; }
+.aiu-fill{ height:100%; border-radius:99px; transition:width .4s ease; }
+.aiu-code{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11.5px; word-break:break-all;
+  padding:8px 10px; border-radius:8px; background:var(--bg2); color:var(--text); user-select:all; }
+.aiu-a{ text-decoration:none; display:inline-flex; align-items:center; justify-content:center; color:inherit; }

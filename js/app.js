@@ -68,6 +68,7 @@ const App = {
     try { Memo.render(); }          catch(e){ console.warn('Memo render',e); }
     try { InBody.init(); }          catch(e){ console.warn('InBody init',e); }
     try { Econ.init(); }            catch(e){ console.warn('Econ init',e); }
+    try { AIUsage.init(); }         catch(e){ console.warn('AIUsage init',e); }
     try { TopStrip.render(); }      catch(e){ console.warn('TopStrip',e); }
     try { CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,[],this.S.selDate); } catch(e){ console.warn('Cal render',e); }
     this._updateStatsBanner();

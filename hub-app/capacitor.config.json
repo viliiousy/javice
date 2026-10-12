@@ -1,0 +1,17 @@
+{
+  "appId": "app.bashy.hub",
+  "appName": "Bashy 허브",
+  "webDir": "www",
+  "server": {
+    "url": "https://bashy.app/hub.html",
+    "allowNavigation": ["bashy.app", "*.bashy.app"]
+  },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#0b0d10"
+  },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true },
+    "StatusBar": { "overlaysWebView": true, "style": "DARK" }
+  }
+}

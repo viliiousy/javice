@@ -3,3 +3,6 @@
 # Capacitor 는 통째로 app/ 안에 가둬 뒀다.
 app/
 node_modules/
+# 태블릿 허브 안드로이드 래퍼와 PC 크롬 확장도 웹 배포와 상관없다.
+hub-app/
+extension/

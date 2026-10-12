@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0b0d10">
+  <meta name="robots" content="noindex">
+  <title>Bashy 허브</title>
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="manifest" href="hub.webmanifest">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="css/hub.css">
+</head>
+<body>
+  <div class="hub">
+    <!-- 왼쪽: 시계 · 날씨 · 음성 -->
+    <aside class="h-left">
+      <div class="clock">
+        <div id="time" class="time">--:--</div>
+        <div id="date" class="date"></div>
+      </div>
+      <div id="weather" class="weather"></div>
+      <div id="indoor" class="indoor"></div>
+
+      <section class="voice" aria-label="음성 명령">
+        <button id="mic" class="mic" aria-label="말하기">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg>
+        </button>
+        <div id="vHint" class="v-hint">눌러서 말하기 — "거실 불 꺼 줘"</div>
+        <div id="vHeard" class="v-heard"></div>
+        <div id="vReply" class="v-reply"></div>
+        <div class="v-apps">
+          <button class="chip" data-app="chatgpt">ChatGPT 열기</button>
+          <button class="chip" data-app="claude">Claude 열기</button>
+        </div>
+      </section>
+    </aside>
+
+    <!-- 오른쪽: 사용량 · 집 -->
+    <main class="h-right">
+      <section class="panel usage">
+        <header class="p-head">
+          <h2>AI 사용량</h2>
+          <span id="usageNote" class="p-note"></span>
+        </header>
+        <div id="usageCards" class="u-cards"></div>
+      </section>
+
+      <section class="panel home">
+        <header class="p-head">
+          <h2>집</h2>
+          <div id="areas" class="areas" role="tablist" aria-label="공간"></div>
+          <span id="haNote" class="p-note"></span>
+        </header>
+        <div id="scenes" class="scenes"></div>
+        <div id="tiles" class="tiles"></div>
+      </section>
+    </main>
+
+    <button id="gear" class="gear" aria-label="설정">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+    </button>
+  </div>
+
+  <dialog id="settings" class="settings">
+    <form method="dialog" id="setForm">
+      <h2>허브 설정</h2>
+
+      <fieldset>
+        <legend>AI 사용량</legend>
+        <label>연결 코드
+          <input name="code" autocomplete="off" spellcheck="false" placeholder="bashy.app → 프로필 → AI 사용량 · 허브">
+        </label>
+        <p class="s-help">bashy.app 프로필 메뉴의 <b>AI 사용량 · 허브</b>에서 복사한 코드입니다.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Home Assistant (스마트홈)</legend>
+        <label>주소
+          <input name="haUrl" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://192.168.0.10:8123">
+        </label>
+        <label>장기 액세스 토큰
+          <input name="haToken" type="password" autocomplete="off" spellcheck="false" placeholder="HA 프로필 → 보안 → 장기 액세스 토큰">
+        </label>
+        <p class="s-help">SmartThings · Smart Life(Tuya) · 샤오미 기기를 Home Assistant 에 연결해 두면 여기서 함께 켜고 끕니다.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>음성 AI (선택)</legend>
+        <label>OpenClaw 주소
+          <input name="aiUrl" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://맥미니IP:18789/v1/chat/completions">
+        </label>
+        <label>토큰
+          <input name="aiToken" type="password" autocomplete="off" spellcheck="false">
+        </label>
+        <label>모델 이름
+          <input name="aiModel" autocomplete="off" spellcheck="false" placeholder="openclaw">
+        </label>
+        <p class="s-help">집 기기로 처리하지 못한 말은 여기로 보냅니다 (맥미니의 ChatGPT 구독). 비워 두면 ChatGPT 앱을 열도록 안내합니다.</p>
+      </fieldset>
+
+      <label class="s-check"><input type="checkbox" name="night"> 밤(23시~7시)에는 화면을 어둡게</label>
+
+      <div id="setStatus" class="s-status" role="status"></div>
+      <div class="s-btns">
+        <button type="button" id="setTest" class="chip">연결 확인</button>
+        <span class="s-sp"></span>
+        <button value="cancel" class="chip">닫기</button>
+        <button value="save" id="setSave" class="chip chip-acc">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/hub.js"></script>
+</body>
+</html>
