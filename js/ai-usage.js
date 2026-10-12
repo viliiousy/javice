@@ -48,38 +48,54 @@ const AIUsage = {
   _tone(left, base) { return left == null ? base : left <= 0.1 ? 'var(--red)' : left <= 0.3 ? 'var(--yellow)' : base; },
   _gid: 0,
 
-  // 가운데 작은 로고는 각 서비스의 공식 파비콘을 그대로 불러 쓴다 (그려 넣지 않는다)
-  LOGO: k => `https://www.google.com/s2/favicons?sz=64&domain=${{ claude: 'claude.ai', chatgpt: 'chatgpt.com', higgsfield: 'higgsfield.ai' }[k]}`,
+  // 가운데 로고는 각 서비스의 공식 파비콘을 불러와, 배경을 걷어 낸 '모양' 만 쓴다(그려 넣지 않는다).
+  //   Claude 는 주황 바탕의 밝은 무늬, ChatGPT·Higgsfield 는 밝은 바탕의 어두운 무늬라
+  //   밝기로 문턱을 넘긴 부분만 남긴다. 그 모양 안을 남은 양만큼 아래부터 채운다.
+  LOGO: k => `https://www.google.com/s2/favicons?sz=128&domain=${{ claude: 'claude.ai', chatgpt: 'chatgpt.com', higgsfield: 'higgsfield.ai' }[k]}`,
+  MARK: { claude: 'light', chatgpt: 'dark', higgsfield: 'dark' },
 
   gauge(key, size) {
     const s = (this.data || {})[key];
     if (!s) return '';
     const base = this.COLORS[key], id = 'aiug' + (++this._gid);
     const R = 17, C = 2 * Math.PI * R;
-    let ring, inner = '';
-    let label;
+    let ring, fill, label;
     if (key === 'higgsfield') {
       const tot = Number(s.total) || 0;
       ring = tot ? Math.max(0, Math.min(1, Number(s.credits) / tot)) : 0;
+      fill = ring;
       label = `Higgsfield 크레딧 ${Math.round(ring * 100)}% 남음`;
-      inner = `<circle cx="20" cy="20" r="12" fill="currentColor" opacity=".08"/>`;
     } else {
       const w7 = this._left(s.d7), h5 = this._left(s.h5);
       ring = w7 == null ? 0 : w7;
-      const lvl = h5 == null ? 0 : h5;
-      const top = 8 + (1 - lvl) * 24;          // 물 높이: 가득(위)에서 쓴 만큼 아래로
-      label = `${this.NAMES[key]} 5시간 ${h5 == null ? '—' : Math.round(lvl * 100) + '%'} · 7일 ${w7 == null ? '—' : Math.round(ring * 100) + '%'} 남음`;
-      inner = `<circle cx="20" cy="20" r="12" fill="currentColor" opacity=".08"/>
-        <rect x="8" y="${top.toFixed(2)}" width="24" height="26" fill="${this._tone(h5, base)}" opacity=".55" clip-path="url(#${id})"/>`;
+      fill = h5 == null ? 0 : h5;
+      label = `${this.NAMES[key]} 5시간 ${h5 == null ? '—' : Math.round(fill * 100) + '%'} · 7일 ${w7 == null ? '—' : Math.round(ring * 100) + '%'} 남음`;
     }
-    const tone = key === 'higgsfield' ? (ring <= 0.1 ? 'var(--red)' : ring <= 0.3 ? 'var(--yellow)' : base) : this._tone(ring, base);
+    const tone = r => r <= 0.1 ? 'var(--red)' : r <= 0.3 ? 'var(--yellow)' : base;
+    const light = this.MARK[key] === 'light';
+    const slope = light ? 10 : -10, icpt = light ? -8 : 5;   // 밝은 무늬: 밝기>0.8 / 어두운 무늬: 밝기<0.5
+    const L = 8, S = 24;                                      // 로고 자리 (viewBox 40 기준)
+    const top = L + (1 - fill) * S;                           // 남은 만큼 아래부터 찬다
     return `<svg class="aiu-g" width="${size}" height="${size}" viewBox="0 0 40 40" role="img" aria-label="${label}">
-      <defs><clipPath id="${id}"><circle cx="20" cy="20" r="12"/></clipPath></defs>
+      <defs>
+        <filter id="${id}f" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">
+          <feColorMatrix type="matrix" values="0.299 0.587 0.114 0 0 0.299 0.587 0.114 0 0 0.299 0.587 0.114 0 0 0 0 0 1 0"/>
+          <feComponentTransfer>
+            <feFuncR type="linear" slope="${slope}" intercept="${icpt}"/>
+            <feFuncG type="linear" slope="${slope}" intercept="${icpt}"/>
+            <feFuncB type="linear" slope="${slope}" intercept="${icpt}"/>
+          </feComponentTransfer>
+        </filter>
+        <mask id="${id}m" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40">
+          <image href="${this.LOGO(key)}" x="${L}" y="${L}" width="${S}" height="${S}" filter="url(#${id}f)" preserveAspectRatio="xMidYMid meet"/>
+        </mask>
+        <clipPath id="${id}c"><rect x="0" y="${top.toFixed(2)}" width="40" height="40"/></clipPath>
+      </defs>
       <circle cx="20" cy="20" r="${R}" fill="none" stroke="currentColor" stroke-opacity=".14" stroke-width="3"/>
-      <circle cx="20" cy="20" r="${R}" fill="none" stroke="${tone}" stroke-width="3" stroke-linecap="round"
+      <circle cx="20" cy="20" r="${R}" fill="none" stroke="${tone(ring)}" stroke-width="3" stroke-linecap="round"
         stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - ring)}" transform="rotate(-90 20 20)"/>
-      ${inner}
-      <image href="${this.LOGO(key)}" x="13" y="13" width="14" height="14" clip-path="url(#${id})" preserveAspectRatio="xMidYMid meet"/>
+      <rect x="${L}" y="${L}" width="${S}" height="${S}" fill="currentColor" opacity=".26" mask="url(#${id}m)"/>
+      <g clip-path="url(#${id}c)"><rect x="${L}" y="${L}" width="${S}" height="${S}" fill="${tone(fill)}" mask="url(#${id}m)"/></g>
     </svg>`;
   },
 
