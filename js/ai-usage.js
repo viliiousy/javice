@@ -110,7 +110,13 @@ const AIUsage = {
     if (m <= 0) return '곧 초기화';
     if (m < 60) return `${m}분 뒤 초기화`;
     if (m < 60 * 24) return `${Math.floor(m / 60)}시간 ${m % 60}분 뒤 초기화`;
-    return `${Math.round(m / 1440)}일 뒤 초기화`;
+    return `${Math.floor(m / 1440)}일 ${Math.floor((m % 1440) / 60)}시간 뒤 초기화 · ${this._when(iso)}`;
+  },
+
+  _when(iso) {
+    const d = new Date(iso);
+    const w = '일월화수목금토'[d.getDay()];
+    return `${d.getMonth() + 1}/${d.getDate()}(${w}) ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   },
 
   _bar(label, w) {

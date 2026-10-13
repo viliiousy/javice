@@ -137,7 +137,9 @@ const Usage = {
     if (m <= 0) return '곧';
     if (m < 60) return `${m}분 뒤`;
     if (m < 1440) return `${Math.floor(m / 60)}시간 ${m % 60}분 뒤`;
-    return `${Math.round(m / 1440)}일 뒤`;
+    const d = new Date(iso), w = '일월화수목금토'[d.getDay()];
+    const at = `${d.getMonth() + 1}/${d.getDate()}(${w}) ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return `${Math.floor(m / 1440)}일 ${Math.floor((m % 1440) / 60)}시간 뒤(${at})`;
   },
   _num(v) { const n = Number(v); return !isFinite(n) ? '—' : n >= 100 ? Math.round(n).toLocaleString('ko-KR') : String(Math.round(n * 10) / 10); },
   _left(w) { return w && w.pct != null ? Math.max(0, Math.min(100, Math.round(100 - w.pct))) : null; },
