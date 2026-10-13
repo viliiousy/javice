@@ -6,8 +6,8 @@
 //
 //   Claude      /api/organizations → /api/organizations/<org>/usage
 //   ChatGPT     /api/auth/session → /backend-api/wham/usage   (Codex·플러스 한도)
-//   Higgsfield  higgsfield.ai 탭 안에서 /fnf/user 를 읽는다 (탭이 없으면 뒤에서 잠깐 열었다 닫는다)
-//               (로그인 토큰이 페이지 안에서만 만들어지기 때문)
+//   Higgsfield  /_clerk 프록시로 토큰 → /fnf/user  (막히면 탭 안에서 같은 호출)
+//
 //
 // 직접 부르기가 막히면(봇 차단 등) 열려 있는 그 사이트 탭 안에서 같은 호출을 한다.
 
@@ -152,6 +152,29 @@ async function gptInTab() {
 }
 
 // ── Higgsfield ─────────────────────────────────────
+// 로그인(Clerk) 은 higgsfield.ai/_clerk 프록시로 돌아서, 같은 쿠키로 토큰을 바로 받을 수 있다 — 탭이 필요 없다.
+function shapeHiggs(j) {
+  const n = v => Number(v) || 0;
+  const extra = n(j.package_credits) + n(j.bonus_credits) + n(j.daily_credits);
+  return {
+    plan: j.plan_type, credits: n(j.subscription_credits) + extra, extra,
+    total: j.total_plan_credits, ends: j.plan_ends_at, at: new Date().toISOString(),
+  };
+}
+
+async function higgsDirect() {
+  const c = await getJSON('https://higgsfield.ai/_clerk/v1/client');
+  const r = c.response || {};
+  const s = (r.sessions || []).find(x => x.id === r.last_active_session_id) || (r.sessions || [])[0];
+  if (!s) throw new Error('Higgsfield 로그인 필요');
+  const t = await getJSON(`https://higgsfield.ai/_clerk/v1/client/sessions/${s.id}/tokens`, { method: 'POST' });
+  if (!t.jwt) throw new Error('Higgsfield 토큰 없음');
+  const j = await getJSON('https://fnf-api-gw.higgsfield.ai/fnf/user', {
+    credentials: 'omit', headers: { Authorization: 'Bearer ' + t.jwt },
+  });
+  return shapeHiggs(j);
+}
+
 async function higgsInTab() {
   const r = await inTab('https://higgsfield.ai/*', async () => {
     try {
@@ -190,7 +213,11 @@ async function collectAll(only) {
   const jobs = [];
   if (want('claude'))     jobs.push(tryBoth(claudeDirect, claudeInTab).then(v => usage.claude = v, e => errors.claude = e.message));
   if (want('chatgpt'))    jobs.push(tryBoth(gptDirect, gptInTab).then(v => usage.chatgpt = v, e => errors.chatgpt = e.message));
-  if (want('higgsfield')) jobs.push(higgsInTab().then(v => v.skipped ? (skipped.higgsfield = v.skipped) : (usage.higgsfield = v), e => errors.higgsfield = e.message));
+  if (want('higgsfield')) jobs.push(tryBoth(higgsDirect, async () => {
+    const v = await higgsInTab();
+    if (v.skipped) throw new Error(v.skipped);
+    return v;
+  }).then(v => usage.higgsfield = v, e => errors.higgsfield = e.message));
   await Promise.all(jobs);
 
   let sent = null;
