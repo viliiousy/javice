@@ -21,6 +21,28 @@ function schedule() {
 }
 chrome.alarms.onAlarm.addListener(a => { if (a.name === 'collect') collectAll(); });
 
+// Higgsfield 로그인 서버(Clerk)는 요청의 Origin 이 higgsfield.ai 가 아니면 400 을 준다.
+// 이 확장이 보내는 /_clerk 요청에만 Origin 을 higgsfield.ai 로 맞춘다 (다른 탭·사이트 요청은 건드리지 않음).
+const ORIGIN_RULE = 1;
+async function ensureOriginRule() {
+  try {
+    await chrome.declarativeNetRequest.updateSessionRules({
+      removeRuleIds: [ORIGIN_RULE],
+      addRules: [{
+        id: ORIGIN_RULE, priority: 1,
+        action: { type: 'modifyHeaders', requestHeaders: [
+          { header: 'origin', operation: 'set', value: 'https://higgsfield.ai' },
+          { header: 'referer', operation: 'set', value: 'https://higgsfield.ai/' },
+        ] },
+        condition: {
+          urlFilter: '||higgsfield.ai/_clerk/', initiatorDomains: [chrome.runtime.id],
+          resourceTypes: ['xmlhttprequest', 'other'],
+        },
+      }],
+    });
+  } catch (e) { console.warn('origin rule', e); }
+}
+
 // Higgsfield 는 탭이 열려 있을 때만 읽을 수 있으니, 탭이 뜨면 바로 한 번 읽는다
 chrome.tabs.onUpdated.addListener((id, info, tab) => {
   if (info.status === 'complete' && /^https:\/\/higgsfield\.ai\//.test(tab.url || '')) {
@@ -163,6 +185,7 @@ function shapeHiggs(j) {
 }
 
 async function higgsDirect() {
+  await ensureOriginRule();
   const c = await getJSON('https://higgsfield.ai/_clerk/v1/client');
   const r = c.response || {};
   const s = (r.sessions || []).find(x => x.id === r.last_active_session_id) || (r.sessions || [])[0];
