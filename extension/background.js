@@ -45,10 +45,18 @@ async function getJSON(url, opts = {}) {
 // 열린 탭이 없으면 뒤쪽에 조용히 하나 열어 읽고 바로 닫는다 — 사용자가 탭을 열어 둘 필요가 없다.
 async function inTab(urlPattern, func, openUrl = urlPattern.replace(/\*$/, '')) {
   const tabs = await chrome.tabs.query({ url: urlPattern });
-  let tab = tabs.find(t => t.status === 'complete') || tabs[0], temp = null;
+  let tab = tabs.find(t => t.status === 'complete') || tabs[0], temp = null, tempWin = null;
   if (!tab) {
     if (!openUrl) return { skipped: '열린 탭 없음' };
-    temp = await chrome.tabs.create({ url: openUrl, active: false, pinned: false });
+    // 크롬 창이 하나도 없으면(맥에서 창을 다 닫아 둔 경우) tabs.create 가 실패한다.
+    // 그때는 최소화된 창을 잠깐 만들어 읽고 창째 닫는다.
+    const wins = await chrome.windows.getAll({ windowTypes: ['normal'] });
+    if (wins.length) {
+      temp = await chrome.tabs.create({ url: openUrl, active: false, pinned: false });
+    } else {
+      tempWin = await chrome.windows.create({ url: openUrl, focused: false, state: 'minimized' });
+      temp = tempWin.tabs[0];
+    }
     await waitLoaded(temp.id, 30000);
     await new Promise(r => setTimeout(r, 3000));   // 페이지가 로그인 토큰을 준비할 시간
     tab = temp;
@@ -59,7 +67,8 @@ async function inTab(urlPattern, func, openUrl = urlPattern.replace(/\*$/, '')) 
     if (res.result.error) throw new Error(res.result.error);
     return res.result;
   } finally {
-    if (temp) chrome.tabs.remove(temp.id).catch(() => {});
+    if (tempWin) chrome.windows.remove(tempWin.id).catch(() => {});
+    else if (temp) chrome.tabs.remove(temp.id).catch(() => {});
   }
 }
 
@@ -69,6 +78,7 @@ function waitLoaded(tabId, ms) {
     const timer = setTimeout(() => { clear(); reject(new Error('페이지 로딩 시간 초과')); }, ms);
     const clear = () => { clearTimeout(timer); chrome.tabs.onUpdated.removeListener(done); };
     chrome.tabs.onUpdated.addListener(done);
+    chrome.tabs.get(tabId).then(t => { if (t.status === 'complete') { clear(); resolve(); } }).catch(() => {});
   });
 }
 
