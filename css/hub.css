@@ -245,3 +245,17 @@ body.night .hub{ filter:brightness(.45); }
 @media (prefers-reduced-motion:reduce){
   *{ animation:none !important; transition:none !important; }
 }
+
+/* 밝기 조절 — 조명 타일 아래 얇은 막대가 지금 밝기. 꾹 누른 채 좌우로 끌면 바뀐다. */
+.tile.dim{ position:relative; overflow:hidden; touch-action:pan-y; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+.tile.dim .t-bri{ position:absolute; left:0; right:0; bottom:0; height:4px; background:var(--line); }
+.tile.dim .t-bri::after{ content:''; position:absolute; inset:0 auto 0 0; width:var(--b); background:var(--on); border-radius:0 2px 2px 0; transition:width .15s ease; }
+.tile.dim .t-big{ display:none; }
+.tile.dimming{ transform:none !important; border-color:var(--on);
+  background:linear-gradient(90deg, var(--on-bg) var(--b), var(--panel2) var(--b)); }
+.tile.dimming .t-bri::after{ transition:none; }
+.tile.dimming .t-big{ display:block; position:absolute; right:12px; top:10px; font-size:26px; font-weight:700; color:var(--on);
+  font-variant-numeric:tabular-nums; }
+.tile.dimming .t-state{ visibility:hidden; }
+/* HA 와 끊긴 동안 — 마지막 상태를 흐리게 보여준다 */
+.tiles.stale .tile{ opacity:.55; }

@@ -19,6 +19,7 @@ const HUB_API = 'https://bashy.app/api/hub';
 const CFG_KEY  = 'hub_cfg_v1';
 const AREA_KEY = 'hub_area';
 const DEV_KEY  = 'hub_dev_v1';      // 기기별 { hide, icon, name } — 이 태블릿에만 둔다
+const SNAP_KEY = 'hub_ha_snap_v1';  // 마지막으로 받은 기기 목록. HA 가 잠깐 끊겨도 타일이 사라지지 않게.
 const LAT = 37.2848, LON = 127.0447;   // 광교
 
 // ── 설정 ─────────────────────────────────────────
@@ -312,6 +313,7 @@ const HA = {
     const c = Cfg.get();
     this.close();
     if (!c.haUrl || !c.haToken) { this.renderEmpty(); return; }
+    if (!this.ready && !Object.keys(this.states).length) this.loadSnap();
     const url = this.wsUrl(c.haUrl);
     if (!url) { this.note('주소 형식을 확인해 주세요 (http://… 로 시작)', true); return; }
     this.note('연결 중…');
@@ -319,11 +321,46 @@ const HA = {
     try { ws = new WebSocket(url); } catch (e) { this.note('연결 실패: ' + e.message, true); this.retry(); return; }
     this.ws = ws;
     ws.onmessage = ev => this.onMsg(JSON.parse(ev.data));
-    ws.onclose = () => { this.ready = false; if (this.ws === ws) { this.note('연결 끊김 — 다시 시도 중', true); this.retry(); } };
+    ws.onclose = () => { this.ready = false; if (this.ws === ws) { this.note('연결 끊김 — 마지막 상태 표시 중', true); this.markStale(true); this.retry(); } };
     ws.onerror = () => {};
   },
   close() { if (this.ws) { const w = this.ws; this.ws = null; try { w.close(); } catch {} } this.ready = false; },
-  retry() { clearTimeout(this._rt); this._rt = setTimeout(() => this.connect(), Math.min(60000, 3000 * 2 ** this._retry++)); },
+  // 다시 붙는 간격은 최대 20초. 맥미니가 재시작돼도 금방 돌아온다.
+  retry() { clearTimeout(this._rt); this._rt = setTimeout(() => this.connect(), Math.min(20000, 2000 * 2 ** this._retry++)); },
+
+  // 끊긴 줄도 모르고 붙잡고 있는 연결(맥미니가 멈췄다 깨어난 경우 등)을 30초마다 확인해 끊고 다시 붙는다.
+  keepAlive() {
+    clearInterval(this._ka);
+    this._ka = setInterval(async () => {
+      if (!this.ready || document.hidden) return;
+      try { await this.send({ type: 'ping' }); }
+      catch { const w = this.ws; this.ws = null; this.ready = false; try { w && w.close(); } catch {} this.note('연결 끊김 — 다시 연결 중', true); this.markStale(true); this._retry = 0; this.connect(); }
+    }, 30000);
+  },
+
+  // ── 마지막 상태 저장/복원 ──
+  // 화면에 쓰는 것만 줄여서 둔다. HA 에 다시 붙으면 곧바로 최신 값으로 바뀐다.
+  saveSnap() {
+    clearTimeout(this._snapT);
+    this._snapT = setTimeout(() => {
+      const keep = ['friendly_name', 'device_class', 'unit_of_measurement', 'brightness', 'supported_color_modes', 'current_temperature', 'temperature', 'target_temp_step'];
+      const st = {};
+      for (const x of this.candidates()) {
+        const a = {}; for (const k of keep) if (x.attributes[k] != null) a[k] = x.attributes[k];
+        st[x.entity_id] = { entity_id: x.entity_id, state: x.state, attributes: a };
+      }
+      for (const id of Object.keys(this.states)) if (/_completion_time$/.test(id)) st[id] = { entity_id: id, state: this.states[id].state, attributes: {} };
+      store.set(SNAP_KEY, { at: Date.now(), states: st, areas: this.areas, entArea: this.entArea, unitF: this.unitF });
+    }, 2000);
+  },
+  loadSnap() {
+    const sn = store.get(SNAP_KEY, null);
+    if (!sn || !sn.states) return false;
+    this.states = sn.states; this.areas = sn.areas || {}; this.entArea = sn.entArea || {}; this.unitF = !!sn.unitF; this.hidden = new Set();
+    this.draw(); this.markStale(true);
+    return true;
+  },
+  markStale(on) { this.stale = on; const t = $('tiles'); if (t) t.classList.toggle('stale', on); },
   note(t, bad) { $('haNote').textContent = t || ''; $('haNote').classList.toggle('bad', !!bad); },
 
   send(msg) {
@@ -339,7 +376,8 @@ const HA = {
   async onMsg(m) {
     if (m.type === 'auth_required') { this.ws.send(JSON.stringify({ type: 'auth', access_token: Cfg.get().haToken })); return; }
     if (m.type === 'auth_invalid') { this.note('토큰이 맞지 않습니다', true); this.close(); return; }
-    if (m.type === 'auth_ok') { this._retry = 0; this.ready = true; this.note('연결됨'); this.bootstrap(); return; }
+    if (m.type === 'auth_ok') { this._retry = 0; this.ready = true; this.note('연결됨'); this.keepAlive(); this.bootstrap(); return; }
+    if (m.type === 'pong' && this.pending.has(m.id)) { const p = this.pending.get(m.id); this.pending.delete(m.id); p.res(true); return; }
     if (m.type === 'event' && m.event && m.event.event_type === 'state_changed') {
       const d = m.event.data;
       if (d.new_state) this.states[d.entity_id] = d.new_state; else delete this.states[d.entity_id];
@@ -372,6 +410,7 @@ const HA = {
         if (e.hidden_by || e.disabled_by || e.entity_category) this.hidden.add(e.entity_id);
       }
       await this.send({ type: 'subscribe_events', event_type: 'state_changed' });
+      this.markStale(false);
       this.render();
     } catch (e) { this.note('불러오기 실패: ' + e.message, true); }
   },
@@ -515,6 +554,12 @@ const HA = {
 
   render() {
     if (!this.ready) return;
+    if (this._dimActive) { this._dimDirty = true; return; }   // 밝기를 끄는 중에는 타일을 다시 그리지 않는다
+    this.draw();
+    this.saveSnap();
+  },
+
+  draw() {
     this.indoor();
     const all = this.visible();
     const used = [...new Set(all.map(s => this.entArea[s.entity_id]).filter(Boolean))]
@@ -550,8 +595,75 @@ const HA = {
         <div class="t-name">${esc(this.name(s))}</div><div class="t-state">${esc(this.stateText(s))}</div>
         <div class="t-ctl"><button data-temp="-1" aria-label="낮추기">−</button><button data-temp="1" aria-label="높이기">+</button></div></div>`;
     }
+    if (this.dimmable(s)) {
+      const pct = s.state === 'on' ? Math.max(1, Math.round((s.attributes.brightness || 0) / 2.55)) : 0;
+      return `<button class="${cls} dim" data-id="${id}" style="--b:${pct}%">${ic}
+        <span class="t-name">${esc(this.name(s))}</span><span class="t-state">${esc(this.stateText(s))}</span>
+        <span class="t-bri" aria-hidden="true"></span><span class="t-big" aria-hidden="true"></span></button>`;
+    }
     return `<button class="${cls}" data-id="${id}"${ro ? ' disabled' : ''}>${ic}
       <span class="t-name">${esc(this.name(s))}</span><span class="t-state">${esc(this.stateText(s))}</span></button>`;
+  },
+
+  // 밝기를 바꿀 수 있는 조명인가 — 켜고 끄기만 되는 조명은 빼고.
+  dimmable(s) {
+    if (!s.entity_id.startsWith('light.') || s.state === 'unavailable') return false;
+    const m = s.attributes.supported_color_modes;
+    return Array.isArray(m) ? m.some(x => x !== 'onoff') : s.attributes.brightness != null;
+  },
+
+  async setBrightness(id, pct) {
+    const data = pct <= 0 ? { entity_id: id } : { entity_id: id, brightness_pct: Math.max(1, Math.min(100, Math.round(pct))) };
+    try { await this.send({ type: 'call_service', domain: 'light', service: pct <= 0 ? 'turn_off' : 'turn_on', service_data: data }); }
+    catch (e) { toast('실패: ' + e.message); }
+  },
+
+  // 조명 타일을 꾹 누르면(0.4초) 밝기 모드. 그대로 좌우로 끌면 밝기가 바뀌고, 손을 떼면 그 값으로 맞춘다.
+  // 짧게 누르면 지금처럼 켜고 끈다. 위아래로 끌면 화면이 스크롤된다.
+  bindDim() {
+    const box = $('tiles');
+    let d = null;
+    const end = (apply) => {
+      if (!d) return;
+      clearTimeout(d.timer);
+      if (d.on) {
+        d.el.classList.remove('dimming');
+        this._dimActive = false; if (this._dimDirty) { this._dimDirty = false; this.schedule(); }
+        if (apply && d.pct !== d.sent) this.setBrightness(d.id, d.pct);
+        this._swallow = true; setTimeout(() => { this._swallow = false; }, 400);
+      }
+      d = null;
+    };
+    box.addEventListener('pointerdown', e => {
+      const el = e.target.closest('.tile.dim'); if (!el || e.button > 0) return;
+      const s = this.states[el.dataset.id]; if (!s) return;
+      const base = s.state === 'on' ? Math.round((s.attributes.brightness || 0) / 2.55) : 0;
+      d = { el, id: el.dataset.id, x: e.clientX, y: e.clientY, base, pct: base, sent: base, on: false, pid: e.pointerId };
+      d.timer = setTimeout(() => {
+        if (!d) return;
+        d.on = true; this._dimActive = true; el.classList.add('dimming');
+        try { el.setPointerCapture(d.pid); } catch {}
+        el.style.setProperty('--b', d.pct + '%');
+        el.querySelector('.t-big').textContent = d.pct + '%';
+        if (navigator.vibrate) navigator.vibrate(15);
+      }, 400);
+    });
+    box.addEventListener('pointermove', e => {
+      if (!d || e.pointerId !== d.pid) return;
+      const dx = e.clientX - d.x, dy = e.clientY - d.y;
+      if (!d.on) { if (Math.hypot(dx, dy) > 8) { clearTimeout(d.timer); d = null; } return; }
+      e.preventDefault();
+      const w = d.el.getBoundingClientRect().width;
+      d.pct = Math.max(0, Math.min(100, Math.round(d.base + dx / (w * 1.2) * 100)));
+      d.el.style.setProperty('--b', d.pct + '%');
+      d.el.querySelector('.t-big').textContent = d.pct ? d.pct + '%' : '끄기';
+      // 끄는 동안에도 불빛이 따라오게, 0.35초마다 한 번씩 보낸다.
+      const now = Date.now();
+      if (now - (d.last || 0) > 350 && d.pct !== d.sent) { d.last = now; d.sent = d.pct; this.setBrightness(d.id, d.pct); }
+    });
+    box.addEventListener('pointerup', () => end(true));
+    box.addEventListener('pointercancel', () => end(false));
+    box.addEventListener('contextmenu', e => { if (e.target.closest('.tile')) e.preventDefault(); });
   },
 
   async toggle(id) {
@@ -623,7 +735,9 @@ const HA = {
       this.render();
     });
     $('scenes').addEventListener('click', e => { const b = e.target.closest('[data-run]'); if (b) this.run(b.dataset.run); });
+    this.bindDim();
     $('tiles').addEventListener('click', e => {
+      if (this._swallow) return;
       const t = e.target.closest('[data-temp]');
       const tile = e.target.closest('[data-id]');
       if (!tile) return;
