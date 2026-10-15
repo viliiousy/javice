@@ -267,3 +267,11 @@ body.night .hub{ filter:brightness(.45); }
 .tile.dimming .t-state{ visibility:hidden; }
 /* HA 와 끊긴 동안 — 마지막 상태를 흐리게 보여준다 */
 .tiles.stale .tile{ opacity:.55; }
+
+/* bashy 계정 연결 */
+.pair-box{ display:grid; gap:10px; justify-items:start; }
+.pair-wait{ display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+.pair-qr{ background:#fff; padding:8px; border-radius:12px; line-height:0; }
+.pair-qr svg, .pair-qr img{ width:148px; height:148px; display:block; }
+.pair-pin{ font:700 34px/1 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.18em; color:var(--fg); }
+.pair-txt{ display:grid; gap:6px; font-size:13px; color:var(--fg2); line-height:1.5; }

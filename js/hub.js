@@ -1206,22 +1206,118 @@ const Voice = {
   },
 };
 
+
+// ── 클라우드 설정 · bashy 계정 연결 ───────────────────
+// 연결 코드 하나만 있으면 나머지 설정(HA·OpenClaw·호출어)은 /api/hub 의 cfgGet/cfgPut 으로 오간다.
+// 새 기기는 '연결' 을 눌러 6자리 번호를 띄우고, 로그인된 bashy.app 에서 승인하면 코드와 설정을 함께 받는다.
+const CLOUD_KEYS = ['haUrl', 'haToken', 'aiUrl', 'aiToken', 'aiModel', 'wakeWord', 'wakeOn', 'night'];
+const Cloud = {
+  pick(c) { const o = {}; for (const k of CLOUD_KEYS) if (c[k] !== undefined) o[k] = c[k]; return o; },
+  // 받은 설정을 이 기기에 적용한다. 바뀐 것만 다시 연결한다.
+  apply(cfg, code) {
+    const prev = Cfg.get(), next = { ...prev, ...(code ? { code } : {}) };
+    if (cfg) { for (const k of CLOUD_KEYS) if (cfg[k] !== undefined) next[k] = cfg[k]; next.cfgAt = cfg.at || new Date().toISOString(); }
+    Cfg.set(next);
+    if (next.code !== prev.code) { Usage.load(); Tasks.load(); }
+    if (next.haUrl !== prev.haUrl || next.haToken !== prev.haToken) { HA._retry = 0; HA.connect(); }
+    if (next.wakeOn !== prev.wakeOn || next.wakeWord !== prev.wakeWord) Voice.applyWake();
+    Clock.tick();
+  },
+  async push() {
+    const c = Cfg.get();
+    if (!c.code) return;
+    try { const j = await hubCall({ act: 'cfgPut', cfg: this.pick(c) }); Cfg.set({ ...Cfg.get(), cfgAt: j.at }); }
+    catch (e) { console.warn('[hub] cfgPut', e); }
+  },
+  // 켤 때마다: 클라우드가 더 새것이면 받고, 클라우드가 비었거나 이 기기가 더 새것이면 올린다.
+  async sync() {
+    const c = Cfg.get();
+    if (!c.code) return;
+    try {
+      const { cfg } = await hubCall({ act: 'cfgGet' });
+      if (cfg && cfg.at && (!c.cfgAt || cfg.at > c.cfgAt)) this.apply(cfg);
+      else if ((!cfg || !cfg.at || c.cfgAt > cfg.at) && (c.haUrl || c.aiUrl)) await this.push();
+    } catch (e) { console.warn('[hub] cfg sync', e); }
+  },
+
+  _poll: null,
+  async startPair() {
+    const box = $('pairBox');
+    this.stopPair();
+    box.innerHTML = '<p class="s-help">번호를 받는 중…</p>';
+    let p;
+    try {
+      const r = await fetch(HUB_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ act: 'pairStart' }) });
+      p = await r.json();
+      if (!r.ok) throw new Error(p.error || r.status);
+    } catch (e) { box.innerHTML = `<p class="s-help">연결 준비 실패: ${esc(e.message)}</p><button type="button" class="chip" id="pairBtn">다시 시도</button>`; $('pairBtn').onclick = () => this.startPair(); return; }
+    const url = `https://bashy.app/?pair=${p.pin}`;
+    let qr = '';
+    try { if (window.qrcode) { const q = qrcode(0, 'M'); q.addData(url); q.make(); qr = q.createSvgTag({ cellSize: 4, margin: 0 }); } } catch {}
+    box.innerHTML = `<div class="pair-wait">
+        ${qr ? `<div class="pair-qr">${qr}</div>` : ''}
+        <div class="pair-txt">
+          <div class="pair-pin">${p.pin.slice(0, 3)} ${p.pin.slice(3)}</div>
+          <div>휴대폰 카메라로 QR 을 찍거나,<br><b>bashy.app → 프로필 → 기기 연결</b> 에 이 번호를 넣고 승인해 주세요.</div>
+          <div id="pairLeft" class="s-help"></div>
+        </div>
+      </div>
+      <button type="button" class="chip" id="pairCancel">취소</button>`;
+    $('pairCancel').onclick = () => { this.stopPair(); this.renderAcct(); };
+    const tick = async () => {
+      const left = Math.max(0, Math.round((p.exp - Date.now()) / 1000));
+      const el = $('pairLeft'); if (el) el.textContent = `${Math.floor(left / 60)}분 ${left % 60}초 안에 승인해 주세요`;
+      if (left <= 0) { this.stopPair(); this.renderAcct('번호가 만료되었습니다. 다시 눌러 주세요.'); return; }
+      try {
+        const r = await fetch(HUB_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ act: 'pairPoll', pin: p.pin, pairId: p.pairId }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { this.stopPair(); this.renderAcct(j.error || '연결 실패'); return; }
+        if (j.code) {
+          this.stopPair();
+          this.apply(j.cfg, j.code);
+          if (!j.cfg && (Cfg.get().haUrl || Cfg.get().aiUrl)) await this.push();   // 클라우드가 비어 있으면 이 기기 설정을 올린다
+          Settings.fill();
+          this.renderAcct();
+          toast('bashy 계정에 연결했습니다');
+          return;
+        }
+      } catch {}
+      this._poll = setTimeout(tick, 2500);
+    };
+    tick();
+  },
+  stopPair() { clearTimeout(this._poll); this._poll = null; },
+  renderAcct(msg) {
+    const box = $('pairBox'), c = Cfg.get();
+    const on = !!c.code;
+    box.innerHTML = `<p class="s-help">${msg ? esc(msg) + '<br>' : ''}${on
+      ? '✓ bashy 계정에 연결되어 있습니다. 아래 설정을 바꾸고 저장하면 클라우드에도 저장되어, 같은 계정으로 연결한 다른 기기에도 그대로 적용됩니다.'
+      : 'bashy 계정으로 연결하면 AI 사용량·할 일·Home Assistant·음성 AI 설정을 클라우드에서 한 번에 받아 옵니다. 다른 기기도 같은 계정으로 연결만 하면 바로 씁니다.'}</p>
+      <button type="button" id="pairBtn" class="chip ${on ? '' : 'chip-acc'}">${on ? '다른 계정으로 다시 연결' : 'bashy 계정으로 연결'}</button>`;
+    $('pairBtn').onclick = () => this.startPair();
+  },
+};
+
 // ── 설정 창 ──────────────────────────────────────
 const Settings = {
   init() {
     $('gear').addEventListener('click', () => this.open());
     const dlg = $('settings');
-    dlg.addEventListener('close', () => { if (dlg.returnValue === 'save') this.save(); });
+    dlg.addEventListener('close', () => { Cloud.stopPair(); if (dlg.returnValue === 'save') this.save(); });
     $('setTest').addEventListener('click', () => this.test());
   },
   open() {
+    this.fill();
+    Cloud.renderAcct();
+    $('setStatus').textContent = '';
+    $('settings').showModal();
+  },
+  fill() {
     const c = Cfg.get(), f = $('setForm');
     for (const k of ['code', 'haUrl', 'haToken', 'aiUrl', 'aiToken', 'aiModel']) f.elements[k].value = c[k] || '';
     f.elements.night.checked = !!c.night;
     f.elements.wakeOn.checked = c.wakeOn !== false;
     f.elements.wakeWord.value = c.wakeWord || '';
-    $('setStatus').textContent = '';
-    $('settings').showModal();
   },
   read() {
     const f = $('setForm'), v = {};
@@ -1233,7 +1329,8 @@ const Settings = {
   },
   save() {
     const prev = Cfg.get(), v = this.read();
-    Cfg.set(v);
+    Cfg.set({ ...prev, ...v, cfgAt: new Date().toISOString() });
+    Cloud.push();
     if (v.code !== prev.code) { Usage.load(); Tasks.load(); }
     if (v.haUrl !== prev.haUrl || v.haToken !== prev.haToken) { HA._retry = 0; HA.connect(); }
     if (v.wakeOn !== (prev.wakeOn !== false) || v.wakeWord !== (prev.wakeWord || '')) Voice.applyWake();
@@ -1297,13 +1394,14 @@ function boot() {
   HA.bind(); HA.connect();
   Voice.init(); Settings.init(); DevSettings.init();
   nativeSetup();
+  Cloud.sync();
   window.addEventListener('resize', () => { if (Usage.data) Usage.sparks(Usage.data.hist || {}); });
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { Usage.load(); Tasks.load(); if (!HA.ready && Cfg.get().haUrl) { HA._retry = 0; HA.connect(); } }
+    if (!document.hidden) { Usage.load(); Tasks.load(); Cloud.sync(); if (!HA.ready && Cfg.get().haUrl) { HA._retry = 0; HA.connect(); } }
   });
   if (!Cfg.get().code && !Cfg.get().haUrl) setTimeout(() => Settings.open(), 600);
 }
 
-window.Hub = { HA, Usage, Voice, Tasks, Cfg };   // 디버깅용
+window.Hub = { HA, Usage, Voice, Tasks, Cfg, Cloud };   // 디버깅용
 boot();
 })();

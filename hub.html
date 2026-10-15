@@ -76,6 +76,14 @@
     <form method="dialog" id="setForm">
       <h2>허브 설정</h2>
 
+      <fieldset class="s-acct">
+        <legend>bashy 계정</legend>
+        <div id="pairBox" class="pair-box">
+          <p id="acctState" class="s-help">bashy 계정으로 연결하면 AI 사용량·할 일·Home Assistant·음성 AI 설정을 클라우드에서 한 번에 받아 옵니다. 다른 기기도 같은 계정으로 연결만 하면 바로 씁니다.</p>
+          <button type="button" id="pairBtn" class="chip chip-acc">bashy 계정으로 연결</button>
+        </div>
+      </fieldset>
+
       <fieldset>
         <legend>AI 사용량</legend>
         <label>연결 코드
@@ -146,6 +154,7 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" defer></script>
   <script src="js/hub-icons.js"></script>
   <script src="js/hub.js"></script>
 </body>

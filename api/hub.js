@@ -235,6 +235,92 @@ async function taskDone(uid, list, id, undo) {
   return { status: j.status };
 }
 
+// ── 클라우드 설정 · 기기 연결 ─────────────────────────
+// 허브 설정(HA 주소·토큰, OpenClaw 등)은 /users/<uid>/_link/hubCfg 에 한 번 저장해 두고,
+// 새 기기는 '연결 코드' 를 손으로 넣는 대신 bashy.app(구글 로그인)에서 승인만 하면 받아 간다.
+//   pairStart   : 새 기기가 6자리 번호와 비밀 pairId 를 받는다 (10분 유효)
+//   pairApprove : 로그인한 bashy.app 이 그 번호를 승인한다 (Firebase ID 토큰으로 사용자 확인)
+//   pairPoll    : 새 기기가 pairId 로 결과(연결 코드 + 설정)를 가져간다 — 한 번 받으면 지운다
+//   cfgGet / cfgPut : 연결 코드로 설정을 읽고 쓴다
+const FIREBASE_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyBWrrQLSK-krXQMwuueI_dw893bK5-hmPY';
+const PAIR_TTL = 10 * 60 * 1000;
+const CFG_FIELDS = { haUrl: 300, haToken: 600, aiUrl: 300, aiToken: 600, aiModel: 60, wakeWord: 30 };
+const CFG_FLAGS  = ['wakeOn', 'night'];
+
+async function uidFromIdToken(idToken) {
+  if (!idToken || typeof idToken !== 'string') return null;
+  const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_KEY}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }) });
+  if (!r.ok) return null;
+  const u = ((await r.json().catch(() => ({}))).users || [])[0];
+  return u && u.localId ? safeUid(u.localId) : null;
+}
+
+function cleanCfg(c) {
+  const out = {};
+  if (!c || typeof c !== 'object') return out;
+  for (const [k, n] of Object.entries(CFG_FIELDS)) if (typeof c[k] === 'string') out[k] = c[k].trim().slice(0, n);
+  for (const k of CFG_FLAGS) if (typeof c[k] === 'boolean') out[k] = c[k];
+  out.at = new Date().toISOString();
+  return out;
+}
+
+const cfgGet = async uid => (await fbGet(`/users/${uid}/_link/hubCfg.json`)) || null;
+async function cfgPut(uid, cfg) {
+  const v = cleanCfg(cfg);
+  const r = await fbFetch(`/users/${uid}/_link/hubCfg.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(v) });
+  if (!r.ok) throw new Error('설정 저장 실패 HTTP ' + r.status);
+  return { at: v.at };
+}
+
+const sha = s => crypto.createHash('sha256').update(String(s)).digest('hex');
+
+async function pairStart() {
+  for (let i = 0; i < 5; i++) {
+    const pin = String(crypto.randomInt(0, 1e6)).padStart(6, '0');
+    const cur = await fbGet(`/hub_pair/${pin}.json`);
+    if (cur && cur.exp > Date.now()) continue;
+    const pairId = crypto.randomBytes(24).toString('base64url');
+    const r = await fbFetch(`/hub_pair/${pin}.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ h: sha(pairId), exp: Date.now() + PAIR_TTL }) });
+    if (!r.ok) throw new Error('연결 준비 실패 HTTP ' + r.status);
+    return { pin, pairId, exp: Date.now() + PAIR_TTL };
+  }
+  throw new Error('잠시 뒤 다시 시도해 주세요');
+}
+
+async function pairApprove(idToken, pin) {
+  const uid = await uidFromIdToken(idToken);
+  if (!uid) return { status: 401, error: '로그인이 필요합니다' };
+  pin = String(pin || '').replace(/\D/g, '');
+  const cur = pin.length === 6 ? await fbGet(`/hub_pair/${pin}.json`) : null;
+  if (!cur || !(cur.exp > Date.now())) return { status: 404, error: '번호가 없거나 만료되었습니다 — 기기 화면의 번호를 다시 확인해 주세요' };
+  if (cur.uid) return { status: 409, error: '이미 승인된 번호입니다' };
+  let key = await fbGet(`/users/${uid}/_link/hubKey.json`);
+  if (!key) {   // 처음이면 연결 키를 만든다 (이미 있으면 그대로 써서 PC 확장 연결을 끊지 않는다)
+    key = crypto.randomBytes(24).toString('base64url');
+    const w = await fbFetch(`/users/${uid}/_link/hubKey.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(key) });
+    if (!w.ok) throw new Error('연결 키 생성 실패 HTTP ' + w.status);
+  }
+  const r = await fbFetch(`/hub_pair/${pin}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uid, code: `${uid}.${key}` }) });
+  if (!r.ok) throw new Error('승인 저장 실패 HTTP ' + r.status);
+  return { status: 200, ok: true };
+}
+
+async function pairPoll(pin, pairId) {
+  pin = String(pin || '').replace(/\D/g, '');
+  if (pin.length !== 6 || !pairId) return { status: 400, error: '잘못된 요청' };
+  const cur = await fbGet(`/hub_pair/${pin}.json`);
+  if (!cur || !sameSecret(cur.h, sha(pairId))) return { status: 404, error: '만료되었습니다 — 다시 시작해 주세요' };
+  if (!cur.code) return { status: 200, ok: true, waiting: true, exp: cur.exp };
+  await fbFetch(`/hub_pair/${pin}.json`, { method: 'DELETE' });
+  const cfg = await cfgGet(safeUid(cur.uid)).catch(() => null);
+  return { status: 200, ok: true, code: cur.code, cfg };
+}
+
+const send = (res, r) => { const { status, ...rest } = r; res.status(status || 200).json(rest); };
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -245,6 +331,9 @@ module.exports = async (req, res) => {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+    if (body.act === 'pairStart')   { res.status(200).json({ ok: true, ...(await pairStart()) }); return; }
+    if (body.act === 'pairApprove') { send(res, await pairApprove(body.idToken, body.pin)); return; }
+    if (body.act === 'pairPoll')    { send(res, await pairPoll(body.pin, body.pairId)); return; }
     const uid  = await verify(body.code);
     if (!uid) { res.status(401).json({ error: '연결 코드가 맞지 않습니다 — bashy.app 설정에서 다시 확인해 주세요' }); return; }
 
@@ -254,7 +343,9 @@ module.exports = async (req, res) => {
     if (body.act === 'taskAdd') { res.status(200).json({ ok: true, ...(await taskAdd(uid, body.title)) }); return; }
     if (body.act === 'taskDone') { res.status(200).json({ ok: true, ...(await taskDone(uid, body.list, body.id, !!body.undo)) }); return; }
     if (body.act === 'ping')  { res.status(200).json({ ok: true }); return; }
-    res.status(400).json({ error: 'act 는 push / state / tasks / taskAdd / taskDone / ping 중 하나' });
+    if (body.act === 'cfgGet') { res.status(200).json({ ok: true, cfg: await cfgGet(uid) }); return; }
+    if (body.act === 'cfgPut') { res.status(200).json({ ok: true, ...(await cfgPut(uid, body.cfg)) }); return; }
+    res.status(400).json({ error: '알 수 없는 act' });
   } catch (e) {
     console.error('[hub]', e);
     res.status(500).json({ error: e.message });
@@ -262,4 +353,4 @@ module.exports = async (req, res) => {
 };
 
 // 테스트용
-module.exports._t = { parseCode, clean, slotKey, sameSecret };
+module.exports._t = { parseCode, clean, slotKey, sameSecret, cleanCfg };
