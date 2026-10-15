@@ -16,6 +16,11 @@
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
+		C14318C41F07CACF7F10B615 /* BashyViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7D92B823CB48A107479AC1B /* BashyViewController.swift */; };
+		68352EF773C80DAE09E16A80 /* BashyNativePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1AC8D7E79C77F9C76C2F536 /* BashyNativePlugin.swift */; };
+		5D8BDC77E6431ECD01432C21 /* BashyIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DD31D4B02D7C274604EF2C /* BashyIntents.swift */; };
+		7625BA565FA6257DC3FC476A /* BashyLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = D384FF964BA9C55C47EB3B9E /* BashyLock.swift */; };
+		B69926B2989B5B3DD9C14AE0 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 85CCDB3732489B8EDB267EF7 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +35,12 @@
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		C7D92B823CB48A107479AC1B /* BashyViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BashyViewController.swift; sourceTree = "<group>"; };
+		F1AC8D7E79C77F9C76C2F536 /* BashyNativePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BashyNativePlugin.swift; sourceTree = "<group>"; };
+		C1DD31D4B02D7C274604EF2C /* BashyIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BashyIntents.swift; sourceTree = "<group>"; };
+		D384FF964BA9C55C47EB3B9E /* BashyLock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BashyLock.swift; sourceTree = "<group>"; };
+		C5ECB9C96059C305DE12559E /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		85CCDB3732489B8EDB267EF7 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -67,6 +78,12 @@
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				85CCDB3732489B8EDB267EF7 /* PrivacyInfo.xcprivacy */,
+				C7D92B823CB48A107479AC1B /* BashyViewController.swift */,
+				F1AC8D7E79C77F9C76C2F536 /* BashyNativePlugin.swift */,
+				C1DD31D4B02D7C274604EF2C /* BashyIntents.swift */,
+				D384FF964BA9C55C47EB3B9E /* BashyLock.swift */,
+				C5ECB9C96059C305DE12559E /* App.entitlements */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -142,6 +159,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B69926B2989B5B3DD9C14AE0 /* PrivacyInfo.xcprivacy in Resources */,
 				504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */,
 				50B271D11FEDC1A000F3C39B /* public in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
@@ -159,6 +177,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				C14318C41F07CACF7F10B615 /* BashyViewController.swift in Sources */,
+				68352EF773C80DAE09E16A80 /* BashyNativePlugin.swift in Sources */,
+				5D8BDC77E6431ECD01432C21 /* BashyIntents.swift in Sources */,
+				7625BA565FA6257DC3FC476A /* BashyLock.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -301,6 +323,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -323,6 +346,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (

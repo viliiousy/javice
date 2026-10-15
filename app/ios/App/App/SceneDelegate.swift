@@ -8,7 +8,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         window = UIWindow(windowScene: windowScene)
-        window?.rootViewController = CAPBridgeViewController()
+        window?.rootViewController = BashyViewController()
+        BashyLock.coverIfNeeded(windowScene)
         window?.makeKeyAndVisible()
 
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
@@ -20,5 +21,14 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
         SceneDelegateProxy.shared.scene(scene, continue: userActivity)
+    }
+
+    // Face ID 잠금 — 뒤로 갈 때 가리고, 앞으로 올 때 확인한다.
+    func sceneWillResignActive(_ scene: UIScene) {
+        if let ws = scene as? UIWindowScene { BashyLock.coverIfNeeded(ws) }
+    }
+
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        BashyLock.unlockIfNeeded()
     }
 }
