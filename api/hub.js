@@ -13,8 +13,10 @@
 //   _usage/latest/<서비스>   마지막으로 본 값 (서비스별로 따로 덮어쓴다)
 //   _usage/hist/<10분칸>     그래프용 압축 이력 { c5, c7, g5, g7, hf }
 //
-//   tasks : 허브 왼쪽의 구글 할일. 서버에 있는 리프레시 토큰(/google_refresh/<구글 sub>)으로
-//           읽기만 한다. 구글 sub 는 사용자 데이터 키의 접두사(u_<sub>_)에서 얻는다.
+//   tasks : 허브 왼쪽의 구글 할일. 서버에 있는 리프레시 토큰(/google_refresh/<구글 sub>)으로 읽는다.
+//           구글 sub 는 사용자 데이터 키의 접두사(u_<sub>_)에서 얻는다. 사이트의 숨김·별표·색 설정은
+//           u_<sub>_gl_* 키를 읽기만 한다(쓰지 않는다).
+//   taskDone : 허브에서 체크한 할일을 구글 할일에서 완료(또는 되돌림) 처리한다.
 
 const crypto = require('crypto');
 const { fbFetch, fbGet } = require('../lib/fb-admin');
@@ -161,23 +163,61 @@ async function gget(tok, url) {
   return j;
 }
 
-async function tasks(uid) {
+// bashy.app 이 할일 화면에 쓰는 설정을 같이 읽는다 — 허브가 사이트와 똑같이 보이도록.
+//   숨김(gl_hidden_<id>) · 별표(gl_star_<id>, 또는 notes 앞 마커) · 지난 할일 보기(gl_task_show_overdue) · 목록 색(gl_cat_colors)
+// 사이트는 이 값들을 /users/<uid> 아래 u_<sub>_* 키로 올려 둔다(FirebaseSync).
+const STAR_MARK = '__⭐__';
+async function sitePrefs(uid, sub) {
+  const range = p => fbGet(`/users/${uid}.json?orderBy=%22$key%22&startAt=%22${encodeURIComponent(p)}%22&endAt=%22${encodeURIComponent(p + '\uf8ff')}%22`).catch(() => null);
+  const pre = `u_${sub}_`;
+  const [hid, star, ov, col] = await Promise.all([
+    range(pre + 'gl_hidden_'), range(pre + 'gl_star_'),
+    fbGet(`/users/${uid}/${encodeURIComponent(pre + 'gl_task_show_overdue')}.json`).catch(() => null),
+    fbGet(`/users/${uid}/gl_cat_colors.json`).catch(() => null),
+  ]);
+  const ids = (o, p) => new Set(Object.entries(o || {}).filter(([, v]) => String(v) === '1').map(([k]) => k.slice(p.length)));
+  let colors = {};
+  try { colors = typeof col === 'string' ? JSON.parse(col) : (col || {}); } catch {}
+  return { hidden: ids(hid, pre + 'gl_hidden_'), star: ids(star, pre + 'gl_star_'), showOverdue: String(ov) !== '0', colors };
+}
+
+async function googleTok(uid) {
   const sub = await googleSub(uid);
   if (!sub) return { needConsent: true, reason: '구글 계정을 찾지 못했습니다' };
   const t = await accessTokenFor(sub);
   if (t.needConsent || !t.access_token) return { needConsent: true, reason: t.reason || 'bashy.app 에서 구글 접근을 한 번 더 허용해 주세요' };
-  const tok = t.access_token;
+  return { sub, tok: t.access_token };
+}
+
+async function tasks(uid) {
+  const g = await googleTok(uid);
+  if (g.needConsent) return g;
+  const { sub, tok } = g;
   const base = 'https://tasks.googleapis.com/tasks/v1';
-  const ls = await gget(tok, `${base}/users/@me/lists?maxResults=100`);
-  const lists = (ls.items || []).map(l => ({ id: l.id, title: l.title }));
+  const [ls, prefs] = await Promise.all([gget(tok, `${base}/users/@me/lists?maxResults=100`), sitePrefs(uid, sub)]);
+  const lists = (ls.items || []).map(l => ({ id: l.id, title: l.title, color: prefs.colors[l.id] || null }));
   const per = await Promise.all(lists.map(l =>
     gget(tok, `${base}/lists/${encodeURIComponent(l.id)}/tasks?showCompleted=false&showHidden=false&maxResults=100`)
-      .then(j => (j.items || []).filter(x => x.title && x.status !== 'completed').map(x => ({
+      .then(j => (j.items || []).filter(x => x.title && x.status !== 'completed' && !prefs.hidden.has(x.id)).map(x => ({
         id: x.id, list: l.id, title: String(x.title).slice(0, 200),
         due: x.due ? x.due.slice(0, 10) : null, pos: x.position || '', sub: !!x.parent,
+        star: prefs.star.has(x.id) || (typeof x.notes === 'string' && x.notes.startsWith(STAR_MARK)),
       })))
       .catch(() => [])));
-  return { lists, tasks: per.flat() };
+  return { lists, tasks: per.flat(), showOverdue: prefs.showOverdue };
+}
+
+// 허브에서 체크하면 구글 할일에서 완료 처리 — bashy.app 도 같은 구글 할일을 보므로 그대로 따라온다.
+async function taskDone(uid, list, id, undo) {
+  if (!list || !id || !/^[\w-]{4,}$/.test(list) || !/^[\w-]{4,}$/.test(id)) throw new Error('할일 지정이 잘못되었습니다');
+  const g = await googleTok(uid);
+  if (g.needConsent) return g;
+  const url = `https://tasks.googleapis.com/tasks/v1/lists/${encodeURIComponent(list)}/tasks/${encodeURIComponent(id)}`;
+  const body = undo ? { status: 'needsAction', completed: null } : { status: 'completed' };
+  const r = await fetch(url, { method: 'PATCH', headers: { Authorization: `Bearer ${g.tok}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`Tasks API ${r.status}: ${(j.error && j.error.message) || ''}`);
+  return { status: j.status };
 }
 
 module.exports = async (req, res) => {
@@ -196,8 +236,9 @@ module.exports = async (req, res) => {
     if (body.act === 'push')  { res.status(200).json({ ok: true, ...(await push(uid, body.usage)) }); return; }
     if (body.act === 'state') { res.status(200).json({ ok: true, ...(await state(uid, body.days)) }); return; }
     if (body.act === 'tasks') { res.status(200).json({ ok: true, ...(await tasks(uid)) }); return; }
+    if (body.act === 'taskDone') { res.status(200).json({ ok: true, ...(await taskDone(uid, body.list, body.id, !!body.undo)) }); return; }
     if (body.act === 'ping')  { res.status(200).json({ ok: true }); return; }
-    res.status(400).json({ error: 'act 는 push / state / tasks / ping 중 하나' });
+    res.status(400).json({ error: 'act 는 push / state / tasks / taskDone / ping 중 하나' });
   } catch (e) {
     console.error('[hub]', e);
     res.status(500).json({ error: e.message });

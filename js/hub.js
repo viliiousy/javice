@@ -240,12 +240,16 @@ const Usage = {
 // 서버(bashy)가 갖고 있는 구글 권한으로 읽기만 한다. 목록(카테고리)별로 고를 수 있고,
 // 앱을 열 때마다 '전체' 로 시작한다.
 const Tasks = {
-  data: null, sel: 'all',
+  data: null, sel: 'all', done: new Set(),
   init() {
-    this.load(); setInterval(() => { if (!document.hidden) this.load(); }, 5 * 60000);
+    // bashy.app 과 같은 구글 할일을 1분마다 다시 받는다(사이트에서 고친 것이 곧 보이게).
+    this.load(); setInterval(() => { if (!document.hidden) this.load(); }, 60000);
     $('taskTabs').addEventListener('click', e => {
       const b = e.target.closest('[data-list]'); if (!b) return;
       this.sel = b.dataset.list; this.render();
+    });
+    $('taskList').addEventListener('click', e => {
+      const c = e.target.closest('[data-done]'); if (c) this.check(c.dataset.done, c.dataset.l);
     });
   },
   async load() {
@@ -253,16 +257,30 @@ const Tasks = {
     try {
       const j = await hubCall({ act: 'tasks' });
       if (j.needConsent) { this.note(j.reason || '구글 할일 권한이 필요합니다'); return; }
-      this.data = j; this.render();
+      this.data = j; this.done.clear(); this.render();
     } catch (e) { if (!this.data) this.note('불러오기 실패: ' + e.message); }
   },
   note(t) { $('taskTabs').innerHTML = ''; $('taskList').innerHTML = `<li class="tk-empty">${esc(t)}</li>`; $('taskCount').textContent = ''; },
 
+  // 동그라미를 누르면 완료. 2.5초 안에 한 번 더 누르면 되돌린다.
+  async check(id, list) {
+    const undo = this.done.has(id);
+    undo ? this.done.delete(id) : this.done.add(id);
+    this.render();
+    try {
+      const j = await hubCall({ act: 'taskDone', id, list, undo });
+      if (j.needConsent) throw new Error(j.reason || '구글 권한이 필요합니다');
+      if (!undo) {
+        toast('완료했습니다 — 다시 누르면 되돌립니다');
+        clearTimeout(this._gone); this._gone = setTimeout(() => this.load(), 2500);
+      }
+    } catch (e) { undo ? this.done.add(id) : this.done.delete(id); this.render(); toast('실패: ' + e.message); }
+  },
+
+  _day(d) { const t = new Date(); t.setHours(0, 0, 0, 0); return Math.round((new Date(d + 'T00:00:00') - t) / 86400000); },
   _due(d) {
     if (!d) return null;
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const dt = new Date(d + 'T00:00:00');
-    const n = Math.round((dt - today) / 86400000);
+    const n = this._day(d), dt = new Date(d + 'T00:00:00');
     if (n < 0) return { t: `${-n}일 지남`, cls: 'late' };
     if (n === 0) return { t: '오늘', cls: 'today' };
     if (n === 1) return { t: '내일', cls: '' };
@@ -270,22 +288,30 @@ const Tasks = {
     return { t: `${dt.getMonth() + 1}/${dt.getDate()}`, cls: '' };
   },
 
+  // bashy.app 할일 화면과 같은 규칙: 숨긴 할일은 빼고(서버가 이미 뺌), '지난 할일 보기'를 꺼 두었으면
+  // 기한 지난 것도 접고, 날짜순으로. 별표와 목록 색도 사이트에서 정한 그대로.
   render() {
-    const { lists = [], tasks = [] } = this.data || {};
+    const { lists = [], tasks = [], showOverdue = true } = this.data || {};
     if (this.sel !== 'all' && !lists.some(l => l.id === this.sel)) this.sel = 'all';
-    const used = lists.filter(l => tasks.some(t => t.list === l.id));
+    const late = t => t.due && this._day(t.due) < 0 && !this.done.has(t.id);
+    const shown = tasks.filter(t => showOverdue || !late(t));
+    const folded = tasks.length - shown.length;
+    const used = lists.filter(l => shown.some(t => t.list === l.id));
     $('taskTabs').innerHTML = [`<button class="chip${this.sel === 'all' ? ' sel' : ''}" data-list="all">전체</button>`]
-      .concat(used.map(l => `<button class="chip${this.sel === l.id ? ' sel' : ''}" data-list="${esc(l.id)}">${esc(l.title)}</button>`)).join('');
-    const name = Object.fromEntries(lists.map(l => [l.id, l.title]));
-    const rows = tasks.filter(t => this.sel === 'all' || t.list === this.sel)
+      .concat(used.map(l => `<button class="chip${this.sel === l.id ? ' sel' : ''}" data-list="${esc(l.id)}"${l.color ? ` style="--lc:${esc(l.color)}"` : ''}>${esc(l.title)}</button>`)).join('');
+    const L = Object.fromEntries(lists.map(l => [l.id, l]));
+    const rows = shown.filter(t => this.sel === 'all' || t.list === this.sel)
       .sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || String(a.pos).localeCompare(String(b.pos)));
     $('taskCount').textContent = rows.length ? `${rows.length}개` : '';
-    $('taskList').innerHTML = rows.length ? rows.map(t => {
-      const d = this._due(t.due);
-      return `<li class="tk${t.sub ? ' tk-sub' : ''}"><span class="tk-dot"></span>
-        <span class="tk-title">${esc(t.title)}${this.sel === 'all' && used.length > 1 ? `<small>${esc(name[t.list] || '')}</small>` : ''}</span>
+    const col = c => /^#[0-9a-f]{3,8}$|^rgb|^hsl/i.test(c || '') ? c : '';
+    $('taskList').innerHTML = (rows.length ? rows.map(t => {
+      const d = this._due(t.due), l = L[t.list] || {}, c = col(l.color), ok = this.done.has(t.id);
+      return `<li class="tk${t.sub ? ' tk-sub' : ''}${ok ? ' tk-done' : ''}"${c ? ` style="--lc:${c}"` : ''}>
+        <button class="tk-dot" data-done="${esc(t.id)}" data-l="${esc(t.list)}" aria-label="${ok ? '되돌리기' : '완료'}"></button>
+        <span class="tk-title">${t.star ? '<i class="tk-star">★</i>' : ''}${esc(t.title)}${this.sel === 'all' && used.length > 1 ? `<small>${esc(l.title || '')}</small>` : ''}</span>
         ${d ? `<span class="tk-due ${d.cls}">${d.t}</span>` : ''}</li>`;
-    }).join('') : '<li class="tk-empty">남은 할일이 없습니다</li>';
+    }).join('') : '<li class="tk-empty">남은 할일이 없습니다</li>')
+      + (folded ? `<li class="tk-empty tk-fold">지난 할일 ${folded}개는 bashy.app 설정대로 접어 두었습니다</li>` : '');
   },
 };
 
