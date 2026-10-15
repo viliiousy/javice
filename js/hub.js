@@ -846,6 +846,79 @@ const DevSettings = {
   },
 };
 
+// ── 말로 기기 다루기 ──────────────────────────────
+// 허브 타일 이름(내가 바꾼 이름 포함)을 기준으로 찾는다. 가장 길게 겹치는 이름이 이긴다.
+const Cmd = {
+  n: s => String(s || '').toLowerCase().replace(/[\s.,!?~'"]/g, ''),
+  CTRL: ['light', 'switch', 'fan', 'climate', 'cover', 'input_boolean', 'humidifier', 'media_player', 'vacuum'],
+
+  verb(t) {
+    const pct = t.match(/(\d{1,3})\s*(%|퍼센트|프로)/) || (/밝기/.test(t) && t.match(/(\d{1,3})/));
+    if (pct) return { act: 'bri', v: Math.min(100, Number(pct[1])) };
+    if (/(더\s*)?밝게|밝혀/.test(t)) return { act: 'step', v: 25 };
+    if (/(더\s*)?어둡게|어두워|줄여/.test(t)) return { act: 'step', v: -25 };
+    if (/(꺼|끄|끔|off|오프|멈춰|정지)/i.test(t)) return { act: 'off' };
+    if (/(켜|틀어|켬|\bon\b|시작|돌려)/i.test(t)) return { act: 'on' };
+    return null;
+  },
+
+  find(t) {
+    if (!HA.ready) return [];
+    const nt = this.n(t);
+    const list = HA.candidates().filter(s => this.CTRL.includes(s.entity_id.split('.')[0]));
+    // "불·조명" 이라고 했으면 조명·스위치 안에서만 이름을 찾는다 ("거실 불" 이 '거실' 스피커로 가지 않게)
+    const lightWord = /(불|조명|등|라이트)/.test(t);
+    const pool = lightWord ? list.filter(s => /^(light|switch)\./.test(s.entity_id)) : list;
+    let best = null, bestLen = 0;
+    for (const s of pool) {
+      for (const nm of [HA.name(s), HA.baseName(s)]) {
+        const k = this.n(nm);
+        if (k.length >= 2 && nt.includes(k) && k.length > bestLen) { best = s; bestLen = k.length; }
+      }
+    }
+    if (best) return [best];
+    // "거실 불", "안방 조명" → 그 공간의 조명 전부
+    if (lightWord) {
+      for (const [id, nm] of Object.entries(HA.areas)) {
+        if (nt.includes(this.n(nm))) return list.filter(s => s.entity_id.startsWith('light.') && HA.entArea[s.entity_id] === id && !HA.hiddenNow(s));
+      }
+    }
+    return [];
+  },
+
+  // 받침에 맞춰 을/를, 은/는, 이/가
+  j(w, a, b) { const c = String(w).charCodeAt(String(w).length - 1); return w + ((c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28) ? a : b); },
+
+  async run(text) {
+    const v = this.verb(text);
+    if (!v) return null;
+    const hits = this.find(text);
+    if (!hits.length) return null;
+    const names = hits.map(s => HA.name(s)).join(', ');
+    for (const s of hits) {
+      const [dom] = s.entity_id.split('.');
+      const id = s.entity_id;
+      if (s.state === 'unavailable') throw new Error(`${this.j(HA.name(s), '이', '가')} 지금 연결되어 있지 않습니다`);
+      if (v.act === 'bri' || v.act === 'step') {
+        if (dom !== 'light' || !HA.dimmable(s)) return `${this.j(names, '은', '는')} 밝기를 바꿀 수 없는 기기입니다.`;
+        const cur = s.state === 'on' ? Math.round((s.attributes.brightness || 0) / 2.55) : 0;
+        const to = v.act === 'bri' ? v.v : Math.max(0, Math.min(100, cur + v.v));
+        await HA.setBrightness(id, to);
+        continue;
+      }
+      let domain = dom, service = v.act === 'on' ? 'turn_on' : 'turn_off';
+      if (dom === 'vacuum') service = v.act === 'on' ? 'start' : 'return_to_base';
+      if (dom === 'cover') service = v.act === 'on' ? 'open_cover' : 'close_cover';
+      if (dom === 'media_player' && v.act === 'off') service = 'media_pause';
+      await HA.send({ type: 'call_service', domain, service, service_data: { entity_id: id } });
+    }
+    if (v.act === 'bri') return `${names} 밝기를 ${v.v}%로 맞췄습니다.`;
+    if (v.act === 'step') return `${this.j(names, '을', '를')} ${v.v > 0 ? '밝게' : '어둡게'} 했습니다.`;
+    if (hits.every(s => s.entity_id.startsWith('vacuum.'))) return v.act === 'on' ? `${this.j(names, '이', '가')} 청소를 시작합니다.` : `${this.j(names, '을', '를')} 충전대로 돌려보냅니다.`;
+    return `${this.j(names, '을', '를')} ${v.act === 'on' ? '켰습니다' : '껐습니다'}.`;
+  },
+};
+
 // ── 음성 ─────────────────────────────────────────
 // 두 가지 길이 있다.
 //   1) 항상 듣기: "자비스" 하고 부르면 띠링 → 이어지는 말을 명령으로 받는다.
@@ -911,13 +984,28 @@ const Voice = {
         if (want) { await J.start({ wakeWords: this.wakeWords(), lang: 'ko-KR' }); this.wakeOn = true; }
         else { await J.stop(); this.wakeOn = false; }
       } catch (e) { this.wakeOn = false; toast(e.message || '마이크 권한이 필요합니다'); }
-      this.set(''); return;
+      this.set(''); this.guard(); return;
     }
     // 브라우저: 연속 인식으로 흉내 (크롬 데스크톱 등)
     this.webStop();
     if (want && (window.SpeechRecognition || window.webkitSpeechRecognition)) { this.wakeOn = true; this.webStart(); }
     else this.wakeOn = false;
     this.set('');
+  },
+
+  // 화면 쪽 감시: 1분마다 귀가 살아 있는지 묻고, 멈춰 있으면 다시 켠다.
+  // (앱 안쪽에도 감시자가 있지만, 그것까지 멈췄을 때를 대비한 두 번째 안전장치)
+  guard() {
+    clearInterval(this._guard);
+    const J = Native.plugin('JarvisListener');
+    if (!J || !this.wakeOn) return;
+    this._guard = setInterval(async () => {
+      if (!this.wakeOn || this.busy || document.hidden) return;
+      let st = null;
+      try { st = await Promise.race([J.status(), new Promise((_, rej) => setTimeout(() => rej(new Error('t')), 5000))]); } catch (e) {}
+      const stuck = !st || !st.enabled || (st.running && st.sinceStart > 40000) || (st.paused && !this.busy);
+      if (stuck) { try { await J.stop(); } catch (e) {} try { await J.start({ wakeWords: this.wakeWords(), lang: 'ko-KR' }); } catch (e) {} }
+    }, 60000);
   },
 
   onWake() {
@@ -1035,8 +1123,8 @@ const Voice = {
     const TTS = Native.plugin('TextToSpeech');
     if (TTS) {
       if (J && this.wakeOn) await J.pause().catch(() => {});
-      try { await TTS.speak({ text: clean, lang: 'ko-KR', rate: 1.0 }); } catch (e) {}
-      if (J && this.wakeOn) await J.resume().catch(() => {});
+      try { await Promise.race([TTS.speak({ text: clean, lang: 'ko-KR', rate: 1.0 }), new Promise(r => setTimeout(r, 30000))]); } catch (e) {}
+      finally { if (J && this.wakeOn) await J.resume().catch(() => {}); }
       return;
     }
     if ('speechSynthesis' in window) {
@@ -1056,6 +1144,24 @@ const Voice = {
     const t = text.replace(/\s+/g, '');
     if (/(챗지피티|chatgpt|지피티)/i.test(t) && /(열어|켜|실행)/.test(t)) { this.openApp('chatgpt'); return 'ChatGPT 를 엽니다.'; }
     if (/(클로드|claude)/i.test(t) && /(열어|켜|실행)/.test(t)) { this.openApp('claude'); return 'Claude 를 엽니다.'; }
+
+    // "할 일에 관리비 내기 추가해 줘" / "관리비 내기 할 일 추가" → 구글 할일(첫 번째 목록)에 넣는다. bashy.app 에도 그대로 보인다.
+    const add = [text.match(/할\s*일\s*(?:에|로|목록에)\s*(.+?)\s*(?:을|를)?\s*(?:추가|넣어|등록|적어)/), text.match(/^(.+?)\s*(?:을|를)?\s*할\s*일\s*(?:에|로)?\s*(?:추가|넣어|등록|적어)/)]
+      .map(m => m && m[1].trim()).find(x => x && x.length >= 2 && !/^할\s*일/.test(x));
+    if (add) {
+      const title = add;
+      const j = await hubCall({ act: 'taskAdd', title });
+      if (j.needConsent) return j.reason || '구글 할일 권한이 필요합니다';
+      Tasks.load();
+      return `할 일에 '${title}'${Cmd.j(title, '을', '를').slice(title.length)} 추가했습니다.`;
+    }
+
+    // 허브 화면에 보이는 기기 이름으로 먼저 직접 처리한다 ("모니터 조명 꺼 줘", "거실 불 켜", "모니터 조명 밝기 30").
+    // Home Assistant 의 말 알아듣기는 샤오미처럼 이름 뒤에 영어가 붙은 기기를 못 찾는 일이 많다.
+    try {
+      const r = await Cmd.run(text);
+      if (r) return r;
+    } catch (e) { return '실패했습니다: ' + e.message; }
 
     try {
       const r = await HA.converse(text);

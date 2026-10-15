@@ -17,6 +17,7 @@
 //           구글 sub 는 사용자 데이터 키의 접두사(u_<sub>_)에서 얻는다. 사이트의 숨김·별표·색 설정은
 //           u_<sub>_gl_* 키를 읽기만 한다(쓰지 않는다).
 //   taskDone : 허브에서 체크한 할일을 구글 할일에서 완료(또는 되돌림) 처리한다.
+//   taskAdd  : 허브에 말로 한 할일을 구글 기본 목록에 넣는다.
 
 const crypto = require('crypto');
 const { fbFetch, fbGet } = require('../lib/fb-admin');
@@ -207,6 +208,20 @@ async function tasks(uid) {
   return { lists, tasks: per.flat(), showOverdue: prefs.showOverdue };
 }
 
+// 허브에 말로 "할 일에 ○○ 추가" — 첫 번째 목록(구글 기본 목록)에 넣는다.
+async function taskAdd(uid, title) {
+  title = String(title || '').trim().slice(0, 200);
+  if (title.length < 2) throw new Error('할일 내용이 비었습니다');
+  const g = await googleTok(uid);
+  if (g.needConsent) return g;
+  const r = await fetch('https://tasks.googleapis.com/tasks/v1/lists/%40default/tasks', {
+    method: 'POST', headers: { Authorization: `Bearer ${g.tok}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ title }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`Tasks API ${r.status}: ${(j.error && j.error.message) || ''}`);
+  return { id: j.id };
+}
+
 // 허브에서 체크하면 구글 할일에서 완료 처리 — bashy.app 도 같은 구글 할일을 보므로 그대로 따라온다.
 async function taskDone(uid, list, id, undo) {
   if (!list || !id || !/^[\w-]{4,}$/.test(list) || !/^[\w-]{4,}$/.test(id)) throw new Error('할일 지정이 잘못되었습니다');
@@ -236,9 +251,10 @@ module.exports = async (req, res) => {
     if (body.act === 'push')  { res.status(200).json({ ok: true, ...(await push(uid, body.usage)) }); return; }
     if (body.act === 'state') { res.status(200).json({ ok: true, ...(await state(uid, body.days)) }); return; }
     if (body.act === 'tasks') { res.status(200).json({ ok: true, ...(await tasks(uid)) }); return; }
+    if (body.act === 'taskAdd') { res.status(200).json({ ok: true, ...(await taskAdd(uid, body.title)) }); return; }
     if (body.act === 'taskDone') { res.status(200).json({ ok: true, ...(await taskDone(uid, body.list, body.id, !!body.undo)) }); return; }
     if (body.act === 'ping')  { res.status(200).json({ ok: true }); return; }
-    res.status(400).json({ error: 'act 는 push / state / tasks / taskDone / ping 중 하나' });
+    res.status(400).json({ error: 'act 는 push / state / tasks / taskAdd / taskDone / ping 중 하나' });
   } catch (e) {
     console.error('[hub]', e);
     res.status(500).json({ error: e.message });

@@ -11,6 +11,13 @@ package app.bashy.hub;
 // 가능하면 기기 안(온디바이스) 인식기를 써서 인터넷과 배터리를 덜 쓴다.
 //
 // JS 쪽 이벤트: wake, command {text}, state {mode}, error {code, message}
+//
+// 오래 켜 두면 안드로이드 인식기가 결과도 오류도 없이 멈춰 버리는 일이 있다(몇 분 뒤 '아무리 불러도 안 됨').
+// 그래서 4초마다 살펴보는 감시자를 둔다.
+//   - 한 번 듣기가 25초 넘게 끝나지 않으면 인식기를 버리고 새로 만든다.
+//   - 듣고 있지도, 다시 들을 예정도 없는 채로 5초가 지나면 다시 듣기 시작한다.
+//   - 말하는 동안 멈춘(pause) 상태가 60초 넘게 이어지면 풀어 준다(되살리기 신호를 놓친 경우).
+//   - 10분마다 인식기를 새로 만든다(오래 쓴 인식기가 굳는 것을 미리 막는다).
 
 import android.Manifest;
 import android.content.Context;
@@ -54,6 +61,9 @@ public class JarvisListener extends Plugin {
     private boolean wokeThisSession = false;
     private String lang = "ko-KR";
     private final List<String> wakeWords = new ArrayList<>();
+    private long startedAt = 0, idleSince = 0, pausedAt = 0, recBornAt = 0;
+    private int errorsInRow = 0;
+    private final Runnable watch = this::watchdog;
 
     // ── JS 에서 부르는 것 ─────────────────────────
     @PluginMethod
@@ -82,6 +92,7 @@ public class JarvisListener extends Plugin {
     private void begin(PluginCall call) {
         enabled = true; paused = false; mode = WAKE;
         main.post(listenTask);
+        main.removeCallbacks(watch); main.postDelayed(watch, 4000);
         JSObject r = new JSObject();
         r.put("available", SpeechRecognizer.isRecognitionAvailable(getContext()));
         call.resolve(r);
@@ -90,6 +101,7 @@ public class JarvisListener extends Plugin {
     @PluginMethod
     public void stop(PluginCall call) {
         enabled = false;
+        main.removeCallbacks(watch);
         main.post(this::halt);
         call.resolve();
     }
@@ -97,7 +109,7 @@ public class JarvisListener extends Plugin {
     // 말하는 동안(TTS) 자기 목소리를 듣지 않도록 잠깐 멈춘다
     @PluginMethod
     public void pause(PluginCall call) {
-        paused = true;
+        paused = true; pausedAt = System.currentTimeMillis();
         main.post(this::halt);
         call.resolve();
     }
@@ -123,6 +135,39 @@ public class JarvisListener extends Plugin {
     @Override
     protected void handleOnResume() { appVisible = true; if (enabled && !paused) { mode = WAKE; main.postDelayed(listenTask, 400); } }
 
+    // JS 가 상태를 확인할 때 (화면 쪽 감시용)
+    @PluginMethod
+    public void status(PluginCall call) {
+        JSObject o = new JSObject();
+        o.put("enabled", enabled); o.put("paused", paused); o.put("running", running);
+        o.put("mode", mode == WAKE ? "wake" : "command");
+        o.put("sinceStart", startedAt == 0 ? -1 : System.currentTimeMillis() - startedAt);
+        call.resolve(o);
+    }
+
+    // ── 감시자 ───────────────────────────────────
+    private void watchdog() {
+        if (!enabled) return;
+        long now = System.currentTimeMillis();
+        try {
+            if (paused && pausedAt > 0 && now - pausedAt > 60000) { paused = false; mode = WAKE; again(100); }
+            if (!paused && appVisible) {
+                if (running && now - startedAt > 25000) { recycle(); again(300); }
+                else if (!running && idleSince > 0 && now - idleSince > 5000) { idleSince = now; again(50); }
+                else if (!running && recBornAt > 0 && now - recBornAt > 10 * 60000) { recycle(); }
+            }
+        } catch (Exception ignored) {}
+        main.postDelayed(watch, 4000);
+    }
+
+    // 인식기를 버리고 다음 듣기 때 새로 만든다
+    private void recycle() {
+        main.removeCallbacks(listenTask);
+        running = false;
+        if (rec != null) { try { rec.cancel(); } catch (Exception ignored) {} try { rec.destroy(); } catch (Exception ignored) {} rec = null; }
+        quiet(false);
+    }
+
     @Override
     protected void handleOnDestroy() { main.post(() -> { halt(); if (rec != null) { rec.destroy(); rec = null; } }); }
 
@@ -136,6 +181,7 @@ public class JarvisListener extends Plugin {
         }
         if (rec == null) { rec = SpeechRecognizer.createSpeechRecognizer(ctx); onDevice = false; }
         rec.setRecognitionListener(new Ear());
+        recBornAt = System.currentTimeMillis();
     }
 
     private void listen() {
@@ -155,11 +201,12 @@ public class JarvisListener extends Plugin {
             }
             wokeThisSession = false;
             quiet(true);
-            running = true;
+            running = true; startedAt = System.currentTimeMillis(); idleSince = 0;
             rec.startListening(i);
             state();
         } catch (Exception e) {
             running = false; quiet(false);
+            recycle();
             again(1500);
         }
     }
@@ -172,6 +219,7 @@ public class JarvisListener extends Plugin {
     }
 
     private void again(long ms) {
+        idleSince = System.currentTimeMillis();
         main.removeCallbacks(listenTask);
         if (enabled && !paused && appVisible) main.postDelayed(listenTask, ms);
     }
@@ -255,7 +303,7 @@ public class JarvisListener extends Plugin {
 
         @Override
         public void onResults(Bundle b) {
-            running = false; quiet(false);
+            running = false; quiet(false); errorsInRow = 0;
             ArrayList<String> list = b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
             if (mode == COMMAND) {
                 mode = WAKE;
@@ -288,9 +336,12 @@ public class JarvisListener extends Plugin {
                 mode = WAKE; emitCommand(""); again(300); return;
             }
             long wait = 150;
-            if (code == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) { wait = 800; if (rec != null) { rec.destroy(); rec = null; } }
+            errorsInRow++;
+            // 같은 오류가 거듭되면 인식기가 굳은 것이다 — 새로 만든다. 온디바이스가 계속 말썽이면 일반 인식기로.
+            if (errorsInRow >= 6) { if (onDevice) triedOnDevice = true; recycle(); errorsInRow = 0; again(1000); return; }
+            if (code == SpeechRecognizer.ERROR_RECOGNIZER_BUSY || code == 10 || code == 11) { wait = 800; recycle(); }   // BUSY / TOO_MANY_REQUESTS / SERVER_DISCONNECTED
             else if (code == SpeechRecognizer.ERROR_NETWORK || code == SpeechRecognizer.ERROR_NETWORK_TIMEOUT || code == SpeechRecognizer.ERROR_SERVER) wait = 3000;
-            else if (code == SpeechRecognizer.ERROR_CLIENT) wait = 500;
+            else if (code == SpeechRecognizer.ERROR_CLIENT) { wait = 500; recycle(); }
             again(wait);
         }
     }
