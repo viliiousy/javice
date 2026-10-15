@@ -3,6 +3,7 @@
 #   사용법:  TEAM=XXXXXXXXXX bash app/scripts/ios-release.sh
 #   TEAM 은 developer.apple.com → Membership(멤버십) 의 Team ID(10자리).
 # 필요: Xcode 설치 + Xcode → Settings → Accounts 에 개발자 Apple ID 로그인.
+# 처음 한 번은 아이폰을 케이블로 맥미니에 연결해 둬야 한다(개발용 프로필에 기기 1대 필요).
 set -euo pipefail
 cd "$(dirname "$0")/.."                      # app/
 : "${TEAM:?TEAM=팀ID 를 앞에 붙여 실행해 주세요}"
@@ -31,7 +32,7 @@ PLIST
 xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$OUT/Bashy.xcarchive" \
   DEVELOPMENT_TEAM="$TEAM" CURRENT_PROJECT_VERSION="$BUILD" \
-  -allowProvisioningUpdates archive | tail -30
+  -allowProvisioningUpdates -allowProvisioningDeviceRegistration archive | tail -30
 
 xcodebuild -exportArchive -archivePath "$OUT/Bashy.xcarchive" \
   -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" \
