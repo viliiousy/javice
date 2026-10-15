@@ -279,6 +279,15 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
 <script>
 window.addEventListener('load', function() {
+  // 아이폰 앱: 서비스 워커·웹 푸시가 없다. 네이티브 FCM(@capacitor-firebase/messaging)에서 토큰을 받는다.
+  var FM = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.Capacitor.Plugins.FirebaseMessaging;
+  if (FM) {
+    window._fcmGetToken = async function() {
+      try { var r = await FM.getToken(); return (r && r.token) || null; }
+      catch(e) { console.error('[FCM] 앱 토큰 오류:', e.message); return null; }
+    };
+    return;
+  }
   try {
     if(!firebase.apps.length) firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
     const _msg = firebase.messaging();

@@ -100,7 +100,10 @@ async function sendFCM(fcmToken, title, body, slot) {
   const accessToken = await getAccessToken();
   const payload = JSON.stringify({ message:{ token:fcmToken,
     data:{ title:String(title), body:String(body), slot:String(slot||'') },
-    webpush:{ fcm_options:{ link:'/' } } } });
+    webpush:{ fcm_options:{ link:'/' } },
+    // 아이폰 앱: data 만 있는 메시지는 화면에 뜨지 않는다. APNs 알림 내용을 같이 싣는다(웹 푸시에는 영향 없음).
+    apns:{ headers:{ 'apns-collapse-id':String(slot||'bashy').slice(0,64) },
+      payload:{ aps:{ alert:{ title:String(title), body:String(body) }, sound:'default' } } } } });
   return new Promise((resolve)=>{
     const opts={hostname:'fcm.googleapis.com',path:`/v1/projects/${sa.project_id}/messages:send`,method:'POST',
       headers:{'Content-Type':'application/json','Authorization':`Bearer ${accessToken}`,'Content-Length':Buffer.byteLength(payload)}};

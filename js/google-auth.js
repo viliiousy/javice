@@ -26,6 +26,9 @@ const Auth = {
   _loginPrompt:  '',      // 이번 로그인 시도의 prompt 값
 
   init() {
+    // 아이폰 앱에서는 웹 로그인(GIS)을 쓰지 않는다 — nativeLogin() 참고. 세션 복원만 한다.
+    const native = typeof Platform !== 'undefined' && Platform.native;
+    if (!native) {
     if (typeof google === 'undefined' || !google.accounts) return;
     if (CONFIG.GOOGLE_CLIENT_ID.startsWith('YOUR_GOOGLE')) return;
 
@@ -78,6 +81,8 @@ const Auth = {
         }
       },
     });
+
+    }   // ← 웹(GIS) 전용 끝
 
     // GIS 로딩 전에 로그인을 눌렀다면 이제 이어서 진행 (다시 누를 필요 없음)
     if (this._pendingLogin) {
@@ -264,7 +269,13 @@ const Auth = {
     this._refreshing = true;
     this.serverRefresh().then(ok => {
       this._refreshing = false;
-      if (ok || !this.tokenClient) return;
+      if (ok) return;
+      if (typeof Platform !== 'undefined' && Platform.native) {   // 앱: 서버 갱신이 안 되면 다시 로그인
+        App.showToast('구글 로그인이 만료되었습니다. 다시 로그인해 주세요.', 'error');
+        this._promptRelogin && this._promptRelogin();
+        return;
+      }
+      if (!this.tokenClient) return;
       console.log('[Auth] 서버 갱신 불가 — GIS 갱신으로 대체');
       this._refreshing = true;
       try {
@@ -278,6 +289,7 @@ const Auth = {
   },
 
   login(forceConsent = false) {
+    if (typeof Platform !== 'undefined' && Platform.native) return this.nativeLogin();
     if (!this.tokenClient) {
       // 아직 GIS 로딩 중 — 요청을 기억해뒀다가 준비되면 자동으로 이어간다
       this._pendingLogin = true;
@@ -296,6 +308,41 @@ const Auth = {
     // 조용한 시도가 실패하면 콜백에서 consent로 한 번 재시도한다.
     this._loginPrompt = forceConsent ? 'consent' : '';
     this.tokenClient.requestAccessToken({ prompt: this._loginPrompt });
+  },
+
+  // ── 아이폰 앱 로그인 ──
+  // 앱(WKWebView) 안에서는 구글이 웹 로그인 창(GIS 팝업)을 막는다(disallowed_useragent).
+  // 그래서 구글 공식 iOS 로그인으로 '서버 인증 코드'를 받아 서버(/api/gauth exchange)에서 토큰으로 바꾼다.
+  // 서버는 이때 리프레시 토큰을 보관하므로, 이후 갱신은 웹과 똑같이 serverRefresh() 로 팝업 없이 된다.
+  async nativeLogin() {
+    const SL = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SocialLogin;
+    if (!SL || !CONFIG.GOOGLE_IOS_CLIENT_ID) { App.showToast('앱 로그인이 아직 준비되지 않았습니다', 'error'); return; }
+    try {
+      if (!this._slReady) {
+        await SL.initialize({ google: { iOSClientId: CONFIG.GOOGLE_IOS_CLIENT_ID, iOSServerClientId: CONFIG.GOOGLE_CLIENT_ID, mode: 'offline' } });
+        this._slReady = true;
+      }
+      const r = await SL.login({ provider: 'google', options: {
+        scopes: ['openid', 'email', 'profile', ...REQUIRED_SCOPES], forceRefreshToken: true,
+      } });
+      const code = r && r.result && r.result.serverAuthCode;
+      if (!code) throw new Error('구글에서 인증 코드를 받지 못했습니다');
+      const res = await fetch(Platform.api('/api/gauth'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'exchange', code, native: true }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.access_token) throw new Error(d.error || '로그인 처리에 실패했습니다');
+      this._applyToken(d);
+      localStorage.setItem('gl_offline', '1');
+      const missing = this.missingScopes();
+      if (missing.length) App.showToast('캘린더·할일 권한이 허용되지 않았습니다. 다시 로그인해 모든 항목에 체크해주세요.', 'error');
+      await this._fetchUserInfo();
+    } catch (e) {
+      if (/cancel/i.test(String(e && (e.message || e.code)))) return;   // 사용자가 닫음
+      console.warn('[Auth] 앱 로그인 실패', e);
+      App.showToast('로그인 실패: ' + (e.message || e), 'error');
+    }
   },
 
   logout() {
@@ -387,7 +434,7 @@ const Auth = {
         if (adopted) { FirebaseSync.scheduleSave(); App.showToast(`이전 기록 ${adopted}건을 계정으로 옮겼습니다`, 'success'); }
         else if (loaded) App.showToast('동기화 완료 ✓', 'success');
         // 서버에 리프레시 토큰이 없으면 최초 1회 동의를 제안한다 (모달, 스누즈 가능)
-        setTimeout(() => this._maybeOfferOffline(), 2500);
+        if (!(typeof Platform !== 'undefined' && Platform.native)) setTimeout(() => this._maybeOfferOffline(), 2500);   // 앱은 로그인 때 이미 오프라인 동의를 받는다
       }
 
       App.onAuthSuccess(this.userInfo);

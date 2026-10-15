@@ -2,7 +2,7 @@
   "name": "bashy-app",
   "version": "1.0.0",
   "private": true,
-  "description": "Bashy iOS 래퍼 (Capacitor)",
+  "description": "Bashy iOS 앱 (Capacitor) — 화면은 번들(www), 서버는 bashy.app",
   "scripts": {
     "www": "node scripts/build-www.mjs",
     "sync": "npm run www && npx cap sync ios",
@@ -13,10 +13,12 @@
     "@capacitor/browser": "^8.0.0",
     "@capacitor/core": "^8.0.0",
     "@capacitor/ios": "^8.0.0",
-    "@capacitor/push-notifications": "^8.0.0",
-    "@capacitor/status-bar": "^8.0.0"
+    "@capacitor/status-bar": "^8.0.0",
+    "@capacitor-firebase/messaging": "^8.5.2",
+    "@capgo/capacitor-social-login": "^8.5.17"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.0.0"
+    "@capacitor/cli": "^8.0.0",
+    "firebase": "^12.6.0"
   }
 }

@@ -19,7 +19,7 @@ const App = {
     this._setupListeners();
     if (typeof Tabs !== 'undefined') Tabs.init();
     setTimeout(()=>{ if(typeof JARVIS!=='undefined') JARVIS.init(); },500);
-    const waitGIS=setInterval(()=>{ if(typeof google!=='undefined'&&google.accounts){ clearInterval(waitGIS); Auth.init(); } },150); setTimeout(()=>clearInterval(waitGIS),8000);
+    if(typeof Platform!=='undefined'&&Platform.native){ Auth.init(); } else { const waitGIS=setInterval(()=>{ if(typeof google!=='undefined'&&google.accounts){ clearInterval(waitGIS); Auth.init(); } },150); setTimeout(()=>clearInterval(waitGIS),8000); }   // 앱은 GIS 를 기다리지 않는다
   },
 
   _setupListeners() {

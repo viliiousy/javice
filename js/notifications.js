@@ -100,8 +100,20 @@ const Notifications = {
 
   syncedAt(){ return Number(localStorage.getItem(this.STAMP_KEY) || 0) || null; },
 
+  // 아이폰 앱에는 브라우저의 Notification 이 없다. 네이티브 FCM 플러그인으로 같은 일을 한다.
+  _fm() { return (typeof Platform !== 'undefined' && Platform.native && window.Capacitor.Plugins.FirebaseMessaging) || null; },
+  async _permission(ask) {
+    const fm = this._fm();
+    if (fm) {
+      try { const r = ask ? await fm.requestPermissions() : await fm.checkPermissions(); return r.receive === 'granted' ? 'granted' : 'denied'; }
+      catch { return 'denied'; }
+    }
+    if (typeof Notification === 'undefined') return 'denied';
+    return ask ? Notification.requestPermission() : Notification.permission;
+  },
+
   async refresh() {
-    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    if ((await this._permission(false)) !== 'granted') return;
     if (!this.localToken()) return;            // 이 기기는 애초에 등록한 적이 없다
     const get = await this._waitForFcm();
     if (!get) return;
@@ -140,7 +152,7 @@ const Notifications = {
   async subscribe() {
     try {
       // 권한 요청
-      const permission = await Notification.requestPermission();
+      const permission = await this._permission(true);
       if (permission !== 'granted') {
         App.showToast('알림 권한이 거부됐습니다', 'error');
         return false;
@@ -152,8 +164,8 @@ const Notifications = {
         token = await window._fcmGetToken();
       }
 
-      // Firebase SDK 실패 시 Web Push 직접 방식으로 폴백
-      if (!token) {
+      // Firebase SDK 실패 시 Web Push 직접 방식으로 폴백 (앱에는 웹 푸시가 없다)
+      if (!token && !this._fm()) {
         console.warn('[Notif] Firebase SDK 토큰 발급 실패, Web Push 폴백 시도...');
         try {
           const sub = await this._swReg.pushManager.subscribe({

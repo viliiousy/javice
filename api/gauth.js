@@ -20,7 +20,7 @@ module.exports = async (req, res) => {
 
     if (action === 'exchange') {
       if (!body.code) { res.status(400).json({ error: 'code 없음' }); return; }
-      const r = await exchangeCode(body.code);
+      const r = await exchangeCode(body.code, { native: !!body.native });   // native: 아이폰 앱의 서버 인증 코드
       if (r.error) { res.status(400).json({ error: r.error }); return; }
       res.status(200).json({
         ok: true, access_token: r.access_token, expires_in: r.expires_in,
