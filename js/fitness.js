@@ -119,7 +119,9 @@ const Fitness = {
     // 제목도 '오늘의 운동' 그대로여서, 지금 보고 있는 게 언제인지 알 수가 없었다.
     const tabs=DOW.map((d,i)=>`<button class="fit-tab${i===dow?' active':''}" onclick="Fitness.render(Fitness._dowDate(${i}, new Date('${Fitness._dateStr(date)}T00:00:00')))">${d}</button>`).join('')
       + `<button class="fit-tab fit-plan-btn" onclick="Fitness.showDayPlan()" title="요일별 루틴 배정">${
-          typeof Icons!=='undefined'?Icons.svg('gear','tf-ic'):'⚙'}</button>`;
+          typeof Icons!=='undefined'?Icons.svg('gear','tf-ic'):'⚙'}</button>`
+      + `<button class="fit-tab fit-home-btn" onclick="HomePlan.open()" title="홈트레이닝 플랜">${
+          typeof Icons!=='undefined'?Icons.svg('home','tf-ic'):'🏠'}</button>`;
 
     const container = document.getElementById('fitnessWrap');
     const ds = Fitness._dateStr(date);
