@@ -31,8 +31,50 @@ const DevicePair = {
           <button class="btn-sm" onclick="App.closeModal()">취소</button>
           <button class="btn-sm accent" id="dpGo" onclick="DevicePair.approve()">승인</button>
         </div>
+        <div style="height:1px;background:var(--border);margin:6px 0"></div>
+        <div style="font-size:13px;font-weight:700;color:var(--text)">허브 기본 설정 (클라우드에 저장)</div>
+        <div style="font-size:12px;color:var(--text3);line-height:1.6">여기 한 번 저장해 두면, 새 태블릿이나 앱을 다시 깐 태블릿은 위의 '연결' 만 하면 이 설정을 그대로 받아 갑니다.</div>
+        <label style="font-size:12px;color:var(--text2)">Home Assistant 주소 (집)
+          <input id="dpHaUrl" class="inp inp-sm" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://172.30.1.14"></label>
+        <label style="font-size:12px;color:var(--text2)">외부 주소
+          <input id="dpHaExt" class="inp inp-sm" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://bashy-bot.duckdns.org"></label>
+        <label style="font-size:12px;color:var(--text2)">장기 액세스 토큰
+          <input id="dpHaTok" class="inp inp-sm" type="password" autocomplete="off" spellcheck="false" placeholder="HA 프로필 → 보안 → 장기 액세스 토큰"></label>
+        <div id="dpCfgMsg" style="font-size:12px;color:var(--text3);min-height:1.2em"></div>
+        <div class="modal-btns"><button class="btn-sm accent" onclick="DevicePair.saveCfg()">설정 저장</button></div>
       </div>`);
     setTimeout(() => { const i = document.getElementById('dpPin'); if (i && !pin) i.focus(); }, 50);
+    this.loadCfg();
+  },
+
+  // 허브 설정은 /users/<uid>/_link/hubCfg 에 둔다 (본인만 읽고 쓰는 자리). 토큰은 화면에 다시 보여 주지 않는다.
+  async loadCfg() {
+    const msg = t => { const m = document.getElementById('dpCfgMsg'); if (m) m.textContent = t; };
+    if (typeof FirebaseSync === 'undefined' || !FirebaseSync.ready()) { msg('로그인하면 저장할 수 있습니다.'); return; }
+    const link = await FirebaseSync.getLink().catch(() => null);
+    const c = (link && link.hubCfg) || {};
+    this._cfg = c;
+    const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+    set('dpHaUrl', c.haUrl); set('dpHaExt', c.haUrlExt);
+    const tok = document.getElementById('dpHaTok');
+    if (tok && c.haToken) tok.placeholder = '저장되어 있음 — 바꿀 때만 입력';
+    msg(c.at ? `마지막 저장: ${new Date(c.at).toLocaleString('ko-KR')}` : '아직 저장된 허브 설정이 없습니다.');
+  },
+
+  async saveCfg() {
+    const msg = t => { const m = document.getElementById('dpCfgMsg'); if (m) m.textContent = t; };
+    const v = id => (document.getElementById(id)?.value || '').trim();
+    const haUrl = v('dpHaUrl'), haUrlExt = v('dpHaExt'), tok = v('dpHaTok');
+    for (const u of [haUrl, haUrlExt]) if (u && !/^https?:\/\//.test(u)) { msg('주소는 http:// 또는 https:// 로 시작해야 합니다'); return; }
+    const next = { ...(this._cfg || {}), haUrl, haUrlExt, at: new Date().toISOString() };
+    if (tok) next.haToken = tok;
+    if (!next.haToken) { msg('토큰을 입력해 주세요'); return; }
+    const ok = await FirebaseSync.setLink({ hubCfg: next });
+    if (!ok) { msg('저장 실패 — 잠시 뒤 다시 시도해 주세요'); return; }
+    this._cfg = next;
+    const t = document.getElementById('dpHaTok'); if (t) { t.value = ''; t.placeholder = '저장되어 있음 — 바꿀 때만 입력'; }
+    msg('저장했습니다. 연결된 허브는 다음에 켤 때 이 설정으로 바뀝니다.');
+    App.showToast('허브 설정을 클라우드에 저장했습니다', 'success');
   },
 
   async approve() {
