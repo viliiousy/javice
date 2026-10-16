@@ -335,19 +335,41 @@ const HA = {
     return base.replace(/^http/, 'ws') + '/api/websocket';
   },
 
+  // 시도할 주소 목록: 집 주소 → (예전 :8123 이면 포트 뺀 주소) → 외부 주소.
+  // 집 Wi-Fi 밖이거나 HA 포트가 바뀌어도 다음 주소로 넘어가서 붙는다.
+  urls(c) {
+    const out = [];
+    const add = u => { const w = this.wsUrl(u); if (w && !out.includes(w)) out.push(w); };
+    add(c.haUrl);
+    if (/:8123\/?$/.test(String(c.haUrl || '').trim())) add(String(c.haUrl).trim().replace(/:8123\/?$/, ''));
+    add(c.haUrlExt);
+    return out;
+  },
+  _ui: 0,
+
   connect() {
     const c = Cfg.get();
     this.close();
-    if (!c.haUrl || !c.haToken) { this.renderEmpty(); return; }
+    if (!(c.haUrl || c.haUrlExt) || !c.haToken) { this.renderEmpty(); return; }
     if (!this.ready && !Object.keys(this.states).length) this.loadSnap();
-    const url = this.wsUrl(c.haUrl);
-    if (!url) { this.note('주소 형식을 확인해 주세요 (http://… 로 시작)', true); return; }
-    this.note('연결 중…');
+    const list = this.urls(c);
+    if (!list.length) { this.note('주소 형식을 확인해 주세요 (http://… 로 시작)', true); return; }
+    const url = list[this._ui % list.length];
+    this.note(list.length > 1 ? `연결 중… (${url.replace(/^wss?:\/\//, '').replace(/\/api\/websocket$/, '')})` : '연결 중…');
     let ws;
     try { ws = new WebSocket(url); } catch (e) { this.note('연결 실패: ' + e.message, true); this.retry(); return; }
     this.ws = ws;
     ws.onmessage = ev => this.onMsg(JSON.parse(ev.data));
-    ws.onclose = () => { this.ready = false; if (this.ws === ws) { this.note('연결 끊김 — 마지막 상태 표시 중', true); this.markStale(true); this.retry(); } };
+    let ok = false;
+    ws.addEventListener('message', () => { ok = true; });
+    setTimeout(() => { if (!ok && this.ws === ws) { try { ws.close(); } catch {} } }, 7000);   // 닿지 않는 주소는 7초 만에 포기
+    ws.onclose = () => {
+      this.ready = false;
+      if (this.ws !== ws) return;
+      this.note('연결 끊김 — 마지막 상태 표시 중', true); this.markStale(true);
+      if (!ok && list.length > 1) { this._ui++; clearTimeout(this._rt); this._rt = setTimeout(() => this.connect(), 800); return; }   // 다음 주소로 바로
+      this.retry();
+    };
     ws.onerror = () => {};
   },
   close() { if (this.ws) { const w = this.ws; this.ws = null; try { w.close(); } catch {} } this.ready = false; },
@@ -1210,7 +1232,7 @@ const Voice = {
 // ── 클라우드 설정 · bashy 계정 연결 ───────────────────
 // 연결 코드 하나만 있으면 나머지 설정(HA·OpenClaw·호출어)은 /api/hub 의 cfgGet/cfgPut 으로 오간다.
 // 새 기기는 '연결' 을 눌러 6자리 번호를 띄우고, 로그인된 bashy.app 에서 승인하면 코드와 설정을 함께 받는다.
-const CLOUD_KEYS = ['haUrl', 'haToken', 'aiUrl', 'aiToken', 'aiModel', 'wakeWord', 'wakeOn', 'night'];
+const CLOUD_KEYS = ['haUrl', 'haUrlExt', 'haToken', 'aiUrl', 'aiToken', 'aiModel', 'wakeWord', 'wakeOn', 'night'];
 const Cloud = {
   pick(c) { const o = {}; for (const k of CLOUD_KEYS) if (c[k] !== undefined) o[k] = c[k]; return o; },
   // 받은 설정을 이 기기에 적용한다. 바뀐 것만 다시 연결한다.
@@ -1219,7 +1241,7 @@ const Cloud = {
     if (cfg) { for (const k of CLOUD_KEYS) if (cfg[k] !== undefined) next[k] = cfg[k]; next.cfgAt = cfg.at || new Date().toISOString(); }
     Cfg.set(next);
     if (next.code !== prev.code) { Usage.load(); Tasks.load(); }
-    if (next.haUrl !== prev.haUrl || next.haToken !== prev.haToken) { HA._retry = 0; HA.connect(); }
+    if (next.haUrl !== prev.haUrl || next.haUrlExt !== prev.haUrlExt || next.haToken !== prev.haToken) { HA._retry = 0; HA._ui = 0; HA.connect(); }
     if (next.wakeOn !== prev.wakeOn || next.wakeWord !== prev.wakeWord) Voice.applyWake();
     Clock.tick();
   },
@@ -1236,7 +1258,7 @@ const Cloud = {
     try {
       const { cfg } = await hubCall({ act: 'cfgGet' });
       if (cfg && cfg.at && (!c.cfgAt || cfg.at > c.cfgAt)) this.apply(cfg);
-      else if ((!cfg || !cfg.at || c.cfgAt > cfg.at) && (c.haUrl || c.aiUrl)) await this.push();
+      else if ((!cfg || !cfg.at || c.cfgAt > cfg.at) && (c.haUrl || c.haUrlExt || c.aiUrl)) await this.push();
     } catch (e) { console.warn('[hub] cfg sync', e); }
   },
 
@@ -1314,14 +1336,14 @@ const Settings = {
   },
   fill() {
     const c = Cfg.get(), f = $('setForm');
-    for (const k of ['code', 'haUrl', 'haToken', 'aiUrl', 'aiToken', 'aiModel']) f.elements[k].value = c[k] || '';
+    for (const k of ['code', 'haUrl', 'haUrlExt', 'haToken', 'aiUrl', 'aiToken', 'aiModel']) f.elements[k].value = c[k] || '';
     f.elements.night.checked = !!c.night;
     f.elements.wakeOn.checked = c.wakeOn !== false;
     f.elements.wakeWord.value = c.wakeWord || '';
   },
   read() {
     const f = $('setForm'), v = {};
-    for (const k of ['code', 'haUrl', 'haToken', 'aiUrl', 'aiToken', 'aiModel']) v[k] = f.elements[k].value.trim();
+    for (const k of ['code', 'haUrl', 'haUrlExt', 'haToken', 'aiUrl', 'aiToken', 'aiModel']) v[k] = f.elements[k].value.trim();
     v.night = f.elements.night.checked;
     v.wakeOn = f.elements.wakeOn.checked;
     v.wakeWord = f.elements.wakeWord.value.trim();
@@ -1332,7 +1354,7 @@ const Settings = {
     Cfg.set({ ...prev, ...v, cfgAt: new Date().toISOString() });
     Cloud.push();
     if (v.code !== prev.code) { Usage.load(); Tasks.load(); }
-    if (v.haUrl !== prev.haUrl || v.haToken !== prev.haToken) { HA._retry = 0; HA.connect(); }
+    if (v.haUrl !== prev.haUrl || v.haUrlExt !== prev.haUrlExt || v.haToken !== prev.haToken) { HA._retry = 0; HA._ui = 0; HA.connect(); }
     if (v.wakeOn !== (prev.wakeOn !== false) || v.wakeWord !== (prev.wakeWord || '')) Voice.applyWake();
     Clock.tick();
     toast('저장했습니다');
@@ -1348,6 +1370,7 @@ const Settings = {
       } catch (e) { out.push('✗ 연결 코드: ' + e.message); }
     }
     if (v.haUrl) out.push(await this.testHA(v));
+    if (v.haUrlExt) out.push((await this.testHA({ ...v, haUrl: v.haUrlExt })).replace('Home Assistant', 'Home Assistant(외부)'));
     if (v.aiUrl) {
       try {
         const r = await fetch(v.aiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(v.aiToken ? { Authorization: 'Bearer ' + v.aiToken } : {}) },
@@ -1397,9 +1420,9 @@ function boot() {
   Cloud.sync();
   window.addEventListener('resize', () => { if (Usage.data) Usage.sparks(Usage.data.hist || {}); });
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { Usage.load(); Tasks.load(); Cloud.sync(); if (!HA.ready && Cfg.get().haUrl) { HA._retry = 0; HA.connect(); } }
+    if (!document.hidden) { Usage.load(); Tasks.load(); Cloud.sync(); if (!HA.ready && (Cfg.get().haUrl || Cfg.get().haUrlExt)) { HA._retry = 0; HA.connect(); } }
   });
-  if (!Cfg.get().code && !Cfg.get().haUrl) setTimeout(() => Settings.open(), 600);
+  if (!Cfg.get().code && !Cfg.get().haUrl && !Cfg.get().haUrlExt) setTimeout(() => Settings.open(), 600);
 }
 
 window.Hub = { HA, Usage, Voice, Tasks, Cfg, Cloud };   // 디버깅용

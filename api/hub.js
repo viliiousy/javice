@@ -244,7 +244,7 @@ async function taskDone(uid, list, id, undo) {
 //   cfgGet / cfgPut : 연결 코드로 설정을 읽고 쓴다
 const FIREBASE_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyBWrrQLSK-krXQMwuueI_dw893bK5-hmPY';
 const PAIR_TTL = 10 * 60 * 1000;
-const CFG_FIELDS = { haUrl: 300, haToken: 600, aiUrl: 300, aiToken: 600, aiModel: 60, wakeWord: 30 };
+const CFG_FIELDS = { haUrl: 300, haUrlExt: 300, haToken: 600, aiUrl: 300, aiToken: 600, aiModel: 60, wakeWord: 30 };
 const CFG_FLAGS  = ['wakeOn', 'night'];
 
 async function uidFromIdToken(idToken) {
