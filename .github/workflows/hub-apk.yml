@@ -34,6 +34,9 @@ jobs:
       - run: npx cap add android
       - run: npx cap sync android
       - run: node scripts/patch-android.mjs
+      # 매번 새 서명 키로 빌드되면 태블릿이 '기존 패키지와 충돌' 이라며 업데이트를 거부한다.
+      # 같은 키로 서명하도록 저장소에 둔 고정 키를 디버그 키 자리에 놓는다.
+      - run: mkdir -p ~/.android && cp keystore/debug.keystore ~/.android/debug.keystore
       - run: ./gradlew assembleDebug --no-daemon
         working-directory: hub-app/android
       - run: cp android/app/build/outputs/apk/debug/app-debug.apk bashy-hub.apk
