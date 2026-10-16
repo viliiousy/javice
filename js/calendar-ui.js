@@ -96,14 +96,8 @@ const CalendarUI = {
       let tip = '';
       if (h && h.lv > 0) { cls += ` cal-hb hb-l${h.lv}`; tip = ` title="습관 ${h.done}/${h.total}"`; }
 
-      cells+=`<div class="${cls}"${tip}
-        onclick="App.selectCalDate(new Date(${yr},${mo},${d}))"
-        ontouchend="(function(e){e.preventDefault();App.selectCalDate(new Date(${yr},${mo},${d}));CalendarUI._endLP();})(event)"
-        ontouchstart="CalendarUI._startLP(${yr},${mo},${d},event)"
-        ontouchcancel="CalendarUI._endLP()"
-        onmousedown="CalendarUI._startLP(${yr},${mo},${d},event)"
-        onmouseup="CalendarUI._endLP()"
-        onmouseleave="CalendarUI._endLP()">${d}</div>`;
+      // 손 이벤트는 칸마다 달지 않고 아래 _bind 에서 달력 전체에 한 번 건다.
+      cells+=`<div class="${cls}"${tip} data-y="${yr}" data-m="${mo}" data-d="${d}">${d}</div>`;
     }
 
     container.innerHTML=`
@@ -119,12 +113,37 @@ const CalendarUI = {
         }).join('')}
         ${cells}
       </div>`;
+    this._bind(container);
   },
 
-  _startLP(yr,mo,day,e){
-    if(e.type==='touchstart') e.preventDefault();
-    clearTimeout(this._lpTimer);
-    this._lpTimer=setTimeout(()=>{ CalendarUI._endLP(); App.showLongPressMenu(new Date(yr,mo,day)); },600);
+  // 탭 = 브라우저의 click. 스크롤하다 손을 뗀 경우에는 click 이 오지 않으므로
+  //   '스크롤하려다 엉뚱한 날짜가 눌리는' 일이 없다. (예전엔 touchend 에서 바로 골라서 그랬다)
+  // 길게 누르기 = 600ms 동안 10px 이상 움직이지 않을 때. 움직이면 스크롤로 보고 취소한다.
+  //   touchstart 에서 preventDefault 를 하지 않는다 — 그게 달력 위에서 스크롤을 막고 있었다.
+  _bind(container){
+    if(container._calBound) return;
+    container._calBound = true;
+    let sx=0, sy=0, lpFired=false;
+    const dayOf = e => { const el = e.target.closest && e.target.closest('.cal-day[data-d]'); return el && container.contains(el) ? el : null; };
+    const dateOf = el => new Date(+el.dataset.y, +el.dataset.m, +el.dataset.d);
+    container.addEventListener('pointerdown', e => {
+      const el = dayOf(e); if(!el || (e.pointerType==='mouse' && e.button!==0)) return;
+      sx=e.clientX; sy=e.clientY; lpFired=false;
+      clearTimeout(this._lpTimer);
+      this._lpTimer = setTimeout(() => { lpFired = true; this._lpTimer=null; App.showLongPressMenu(dateOf(el)); }, 600);
+    });
+    container.addEventListener('pointermove', e => {
+      if(this._lpTimer && (Math.abs(e.clientX-sx)>10 || Math.abs(e.clientY-sy)>10)) this._endLP();
+    });
+    ['pointerup','pointercancel','pointerleave'].forEach(t => container.addEventListener(t, () => this._endLP()));
+    container.addEventListener('contextmenu', e => { if(dayOf(e)) e.preventDefault(); });
+    container.addEventListener('click', e => {
+      const el = dayOf(e); if(!el) return;
+      if(lpFired){ lpFired=false; e.preventDefault(); return; }   // 길게 눌러 메뉴를 띄운 손은 탭으로 치지 않는다
+      if(container._onDay){ container._onDay(dateOf(el), e); return; }
+      App.selectCalDate(dateOf(el));
+    });
   },
+
   _endLP(){ clearTimeout(this._lpTimer); this._lpTimer=null; },
 };

@@ -301,7 +301,6 @@ const App = {
         : d.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
       elDate.style.cursor = 'pointer';
       elDate.onclick = (e) => { e.stopPropagation(); App._toggleDateDropdown(d); };
-      elDate.ontouchend = (e) => { e.preventDefault(); e.stopPropagation(); App._toggleDateDropdown(d); };
     }
 
     // 요일 + 오늘 표시
@@ -341,6 +340,7 @@ const App = {
         }).length, 0);
       if(taskCount > 0) {
         const badge = document.createElement('span');
+        badge.className = 'h-tbadge';
         badge.textContent = '할일 ' + taskCount;
         badge.style.cssText = 'font-size:9px;background:var(--accent);color:var(--accent-fg);padding:1px 5px;border-radius:8px;font-weight:700;margin-left:4px;vertical-align:middle';
         elDay.appendChild(badge);
@@ -367,20 +367,8 @@ const App = {
       calContainer.innerHTML='';
       CalendarUI.render(calContainer, pickerDate, App.S.events, currentDate);
       // 달력 클릭 오버라이드 (touch + mouse 모두)
-      calContainer.querySelectorAll('.cal-day:not(.other-month)').forEach(dayEl=>{
-        const handler=(e)=>{
-          e.stopPropagation(); e.preventDefault();
-          const txt=dayEl.textContent.trim();
-          if(!txt||isNaN(parseInt(txt))) return;
-          const d=new Date(pickerDate.getFullYear(), pickerDate.getMonth(), parseInt(txt));
-          dropdown.remove();
-          App.selectCalDate(d);
-        };
-        dayEl.onclick=handler;
-        dayEl.ontouchend=handler;
-        // long press 방지
-        dayEl.onmousedown=null; dayEl.ontouchstart=(e)=>e.stopPropagation();
-      });
+      // 날짜 고르기: 달력의 탭 처리(_bind)를 그대로 쓰고, 고른 뒤 할 일만 바꾼다.
+      calContainer._onDay=(d,e)=>{ e.stopPropagation(); dropdown.remove(); App.selectCalDate(d); };
       // 월 이동 버튼 오버라이드
       calContainer.querySelector('.cal-nav-btn:first-child').onclick=(e)=>{
         e.stopPropagation();
@@ -856,7 +844,7 @@ const App = {
         onclick="App._setFilter('${t.id}')"
         oncontextmenu="event.preventDefault();App._showCatColorPicker('${t.id}','${esc(t.label)}')"
         ontouchstart="App._tabLongPress('${t.id}','${esc(t.label)}',event)"
-        ontouchend="App._tabLongPressEnd()"
+        ontouchend="App._tabLongPressEnd()" ontouchmove="App._tabLongPressEnd()"
         style="${borderStyle}">${esc(t.label)}</button>`;
     }).join('')
       // 할일을 더하는 자리는 할일 목록의 머리다. 달력 머리에 있던 '+ 할일' 은

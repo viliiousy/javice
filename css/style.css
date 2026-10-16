@@ -3135,3 +3135,27 @@ body, .empty, .card-title, .modal-lbl, .habit-name, .task-text,
   .header{ padding-top:6px; padding-bottom:6px; }
   .h-logo span{ line-height:1; }
 }
+
+/* ── 폰 최적화 (2026-10) ─────────────────────
+   1) 상단 고정 묶음이 아이폰 상태 표시줄 밑으로 들어가지 않게 안전 영역만큼 내린다.
+      (앱은 contentInset 을 끄고 CSS 로 처리한다 — 웹뷰가 넣던 여백 때문에 스크롤이 튀었다)
+   2) 머리의 '할일 N' 은 폰에서 숨긴다. 바로 아래 줄에 같은 숫자가 있고, 좁은 폭에서 AI 링과 겹쳤다.
+   3) 하단 탭을 줄인다. 아이콘·글자·높이 모두 iOS 기본 탭바 크기에 맞춘다.
+   4) 달력 칸은 두 번 탭 확대를 기다리지 않게 하고, 길게 누를 때 글자 선택·확대경이 뜨지 않게 한다. */
+.header-sticky-group{ padding-top:env(safe-area-inset-top, 0px); }
+.login-screen{ padding-top:max(env(safe-area-inset-top, 0px), 16px); }
+.cal-day{ touch-action:manipulation; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+@media (max-width:640px){
+  .h-tbadge{ display:none !important; }
+  .h-date{ min-width:0; flex-shrink:1; }
+  .h-ai{ flex-shrink:0; }
+}
+@media (max-width:900px){
+  :root{ --tabbar-h:46px; }
+  .tab-btn{ gap:2px; padding:5px 0 3px; }
+  .tab-ic{ width:19px !important; height:19px !important; }
+  .tab-lb{ font-size:10px; font-weight:600; }
+  .tabbar{ padding-bottom:max(calc(env(safe-area-inset-bottom, 0px) - 8px), 4px); }
+  .jarvis-panel{ bottom:calc(var(--tabbar-h) + max(calc(env(safe-area-inset-bottom, 0px) - 8px), 4px)); }
+  .dashboard{ padding-bottom:calc(var(--tabbar-h) + max(calc(env(safe-area-inset-bottom, 0px) - 8px), 4px) + 14px); }
+}
