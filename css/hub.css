@@ -275,3 +275,8 @@ body.night .hub{ filter:brightness(.45); }
 .pair-qr svg, .pair-qr img{ width:148px; height:148px; display:block; }
 .pair-pin{ font:700 34px/1 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.18em; color:var(--fg); }
 .pair-txt{ display:grid; gap:6px; font-size:13px; color:var(--fg2); line-height:1.5; }
+
+/* 기기 설정: 음성 별명 칸은 이름 아래 한 줄 */
+.dv-row{ flex-wrap:wrap; }
+.dv-alias{ flex:1 0 100%; margin:4px 0 2px 44px; padding:6px 10px; border-radius:8px; border:1px dashed var(--line);
+  background:transparent; color:var(--fg2); font-size:12px; }

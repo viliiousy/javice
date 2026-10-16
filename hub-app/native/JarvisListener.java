@@ -121,6 +121,13 @@ public class JarvisListener extends Plugin {
         call.resolve();
     }
 
+    // 화면이 중간 인식 결과로 이미 명령을 실행했을 때 — 지금 듣던 것을 버리고 호출어 대기로 돌아간다
+    @PluginMethod
+    public void finish(PluginCall call) {
+        main.post(() -> { halt(); mode = WAKE; again(500); });
+        call.resolve();
+    }
+
     // 화면에서 마이크 단추를 눌렀을 때 — 호출어 없이 바로 명령을 듣는다
     @PluginMethod
     public void listenNow(PluginCall call) {
@@ -195,10 +202,9 @@ public class JarvisListener extends Plugin {
             i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
             i.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getContext().getPackageName());
             if (!onDevice) i.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);
-            if (mode == COMMAND) {
-                i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1200L);
-                i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1000L);
-            }
+            // 말이 끝났다고 보는 침묵 길이. 기본값(2초 안팎)은 너무 길어서 명령이 늦게 실행됐다.
+            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, mode == COMMAND ? 900L : 800L);
+            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, mode == COMMAND ? 700L : 600L);
             wokeThisSession = false;
             quiet(true);
             running = true; startedAt = System.currentTimeMillis(); idleSince = 0;
@@ -296,9 +302,20 @@ public class JarvisListener extends Plugin {
 
         @Override
         public void onPartialResults(Bundle b) {
-            if (mode != WAKE) return;
             ArrayList<String> list = b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-            if (findWake(list) != null) emitWake();   // 띠링은 빨리 — 말이 끝나기 전에
+            String text;
+            if (mode == WAKE) {
+                text = findWake(list);
+                if (text == null) return;
+                emitWake();                            // 띠링은 빨리 — 말이 끝나기 전에
+            } else {
+                text = (list != null && !list.isEmpty()) ? list.get(0) : "";
+            }
+            // 중간 결과를 화면에 넘긴다. 이미 실행할 수 있는 기기 명령이면 화면이 바로 실행하고 finish() 를 부른다.
+            if (text != null && text.length() >= 2) {
+                JSObject o = new JSObject(); o.put("text", text);
+                notifyListeners("partial", o);
+            }
         }
 
         @Override

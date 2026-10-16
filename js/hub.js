@@ -753,13 +753,13 @@ const HA = {
   },
 
   // 말 한 줄을 HA 에 맡긴다. 못 알아들었으면 null.
-  async converse(text) {
+  async converse(text, noAI) {
     if (!this.ready) return null;
     const r = await this.send({ type: 'conversation/process', text, language: 'ko', conversation_id: this._conv || undefined });
     this._conv = r.conversation_id;
     const resp = r.response || {};
     const speech = resp.speech && resp.speech.plain && resp.speech.plain.speech;
-    if (resp.response_type === 'error' && ['no_intent_match', 'no_valid_targets'].includes(resp.data && resp.data.code)) return this.converseAI(text);
+    if (resp.response_type === 'error' && ['no_intent_match', 'no_valid_targets'].includes(resp.data && resp.data.code)) return noAI ? null : this.converseAI(text);
     return speech || '알겠습니다.';
   },
 
@@ -803,6 +803,8 @@ const DevSettings = {
     $('devSet').addEventListener('close', () => { if ($('devSet').returnValue === 'save') this.save(); });
     $('devList').addEventListener('click', e => this.onClick(e));
     $('devList').addEventListener('input', e => {
+      const al = e.target.closest('[data-alias]');
+      if (al) { this.row(al.dataset.alias).alias = al.value.trim(); return; }
       const inp = e.target.closest('[data-name]'); if (!inp) return;
       this.row(inp.dataset.name).name = inp.value.trim();
     });
@@ -832,6 +834,7 @@ const DevSettings = {
           <button type="button" class="dv-ic" data-pick="${id}" aria-label="아이콘 바꾸기">${HubIcons.svg(key)}</button>
           <input class="dv-name" data-name="${id}" value="${esc(p.name || '')}" placeholder="${esc(HA.baseName(s))}" autocomplete="off" spellcheck="false">
           <button type="button" class="dv-sw${off ? '' : ' on'}" data-vis="${id}" aria-label="화면에 보이기">${off ? '숨김' : '표시'}</button>
+          <input class="dv-alias" data-alias="${id}" value="${esc(p.alias || '')}" placeholder="음성 별명 (쉼표로 여러 개)" autocomplete="off" spellcheck="false">
         </div>
         ${this.openIcon === s.entity_id ? `<div class="dv-icons">
           <button type="button" class="dv-opt${!p.icon ? ' sel' : ''}" data-set="${id}" data-key="">${HubIcons.svg(HA.autoIcon(s))}<span>자동</span></button>
@@ -860,6 +863,7 @@ const DevSettings = {
       if (p.hide != null && st && !!p.hide !== HA.noise(st)) q.hide = !!p.hide;   // 기본과 다를 때만 적어 둔다
       if (p.icon) q.icon = p.icon;
       if (p.name) q.name = p.name;
+      if (p.alias) q.alias = p.alias;
       if (Object.keys(q).length) clean[id] = q;
     }
     Dev.save(clean);
@@ -869,75 +873,167 @@ const DevSettings = {
 };
 
 // ── 말로 기기 다루기 ──────────────────────────────
-// 허브 타일 이름(내가 바꾼 이름 포함)을 기준으로 찾는다. 가장 길게 겹치는 이름이 이긴다.
+// 한 문장을 [무엇을(동작)] + [어디·무엇에(대상)] 로 나눈다. 전부 이 태블릿 안에서 끝난다 —
+// 서버나 AI 를 거치지 않으니 빠르고, 같은 말이면 늘 같은 결과가 나온다.
+//
+//   동작: 켜/꺼/밝기 N%/밝게/어둡게/N도(난방)/상태 묻기
+//   대상: ① 기기 이름(허브 타일 이름·HA 이름·별명)  ② 공간(거실·침실1…)  ③ 종류(불·난방·컴퓨터·청정기·청소기·TV)
+//         ④ '다·전부·모두' 가 붙으면 그 범위 전체
+// 못 알아들은 말만 Home Assistant 대화 → AI 로 넘긴다. (그 길은 몇 초씩 걸린다)
 const Cmd = {
-  n: s => String(s || '').toLowerCase().replace(/[\s.,!?~'"]/g, ''),
+  n: s => String(s || '').toLowerCase().replace(/[\s.,!?~'"·]/g, ''),
   CTRL: ['light', 'switch', 'fan', 'climate', 'cover', 'input_boolean', 'humidifier', 'media_player', 'vacuum'],
 
+  // 종류 낱말 → 그 종류에 드는 기기인지
+  KINDS: [
+    { k: 'light',  re: /(불|조명|전등|라이트|램프|스탠드)/, is: s => s.entity_id.startsWith('light.') || /(조명|불|램프|라이트|스탠드)/.test(HA.name(s)) },
+    { k: 'heat',   re: /(난방|보일러)/,                    is: s => s.entity_id.startsWith('climate.') },
+    { k: 'pc',     re: /(컴퓨터|피씨|pc|데스크탑)/i,         is: s => /(컴퓨터|pc)/i.test(HA.name(s)) },
+    { k: 'air',    re: /(공기\s*청정기|청정기|청공)/,         is: s => /(청정기|청공)/.test(HA.name(s)) || s.entity_id.startsWith('fan.') },
+    { k: 'vacuum', re: /(청소기|로봇\s*청소기|로청|청소)/,     is: s => s.entity_id.startsWith('vacuum.') },
+    { k: 'tv',     re: /(티비|tv|텔레비전|테레비)/i,          is: s => s.entity_id.startsWith('media_player.') },
+  ],
+  ALL_RE: /(다\s*(꺼|켜|끄|켜)|전부|모두|모든|전체|싹\s*다|싹|집\s*안)/,
+
   verb(t) {
+    if (/(켜져|꺼져|켜졌|꺼졌)\s*(있|있어|있나|있니|있냐|있어요)?\s*\??$|상태\s*(어때|알려|봐)|(켜져|꺼져)\s*있/.test(t)) return { act: 'ask' };
+    const deg = t.match(/(\d{2})\s*도/);
+    if (deg && /(난방|보일러|온도)/.test(t)) return { act: 'temp', v: Number(deg[1]) };
     const pct = t.match(/(\d{1,3})\s*(%|퍼센트|프로)/) || (/밝기/.test(t) && t.match(/(\d{1,3})/));
     if (pct) return { act: 'bri', v: Math.min(100, Number(pct[1])) };
-    if (/(더\s*)?밝게|밝혀/.test(t)) return { act: 'step', v: 25 };
-    if (/(더\s*)?어둡게|어두워|줄여/.test(t)) return { act: 'step', v: -25 };
-    if (/(꺼|끄|끔|off|오프|멈춰|정지)/i.test(t)) return { act: 'off' };
-    if (/(켜|틀어|켬|\bon\b|시작|돌려)/i.test(t)) return { act: 'on' };
+    if (/(더\s*)?밝게|밝혀|환하게/.test(t)) return { act: 'step', v: 25 };
+    if (/(더\s*)?어둡게|어두워|어둡|줄여/.test(t)) return { act: 'step', v: -25 };
+    if (/(꺼|끄|끔|끈|off|오프|멈춰|정지|중지|그만|닫아)/i.test(t)) return { act: 'off' };
+    if (/(켜|틀어|켬|\bon\b|시작|돌려|작동|열어)/i.test(t)) return { act: 'on' };
     return null;
   },
 
-  find(t) {
-    if (!HA.ready) return [];
-    const nt = this.n(t);
-    const list = HA.candidates().filter(s => this.CTRL.includes(s.entity_id.split('.')[0]));
-    // "불·조명" 이라고 했으면 조명·스위치 안에서만 이름을 찾는다 ("거실 불" 이 '거실' 스피커로 가지 않게)
-    const lightWord = /(불|조명|등|라이트)/.test(t);
-    const pool = lightWord ? list.filter(s => /^(light|switch)\./.test(s.entity_id)) : list;
-    let best = null, bestLen = 0;
-    for (const s of pool) {
-      for (const nm of [HA.name(s), HA.baseName(s)]) {
-        const k = this.n(nm);
-        if (k.length >= 2 && nt.includes(k) && k.length > bestLen) { best = s; bestLen = k.length; }
-      }
+  // 기기 하나가 들을 수 있는 이름들. 'HA 이름 · 허브에서 바꾼 이름 · 별명' 에
+  // '침실1 침실1조명1' 같은 되풀이를 접은 것, 끝 숫자를 뗀 것까지 넣는다.
+  // 불·전등·라이트·조명은 같은 말로 본다 ("침실1 불" = "침실1 조명")
+  KW: s => s.replace(/(불|전등|라이트|램프)/g, '조명'),
+  PURE: /^(조명|난방|보일러|컴퓨터|스위치|콘센트|플러그|switch)\d*$/,
+
+  aliases(s) {
+    const out = new Set();
+    const add = x => {
+      const k = this.KW(this.n(x)); if (k.length < 2 || this.PURE.test(k)) return;
+      out.add(k);
+      const bare = k.replace(/(조명|난방)/g, '');            // '침실1조명' → '침실1' (종류는 따로 맞춘다)
+      if (bare.length >= 2 && bare !== k && !/^\d+$/.test(bare)) out.add(bare);
+    };
+    const base = [HA.name(s), HA.baseName(s), ...((Dev.get(s.entity_id).alias || '').split(/[,，]/))];
+    for (const nm of base) {
+      if (!nm) continue;
+      add(nm);
+      const w = String(nm).trim().split(/\s+/);
+      if (w.length > 1 && w[1].startsWith(w[0])) add(w.slice(1).join(' '));         // 침실1 침실1조명1 → 침실1조명1
+      add(String(nm).replace(/\s*\d+$/, ''));                                       // 거실 조명1 → 거실 조명
     }
-    if (best) return [best];
-    // "거실 불", "안방 조명" → 그 공간의 조명 전부
-    if (lightWord) {
-      for (const [id, nm] of Object.entries(HA.areas)) {
-        if (nt.includes(this.n(nm))) return list.filter(s => s.entity_id.startsWith('light.') && HA.entArea[s.entity_id] === id && !HA.hiddenNow(s));
-      }
-    }
-    return [];
+    return [...out];
   },
 
-  // 받침에 맞춰 을/를, 은/는, 이/가
+  areaOf(t) {
+    const nt = this.n(t);
+    let best = null, len = 0;
+    for (const [id, nm] of Object.entries(HA.areas)) { const k = this.n(nm); if (k.length >= 2 && nt.includes(k) && k.length > len) { best = id; len = k.length; } }
+    return best;
+  },
+
+  // 대상 찾기. { list, why } — why 는 못 찾았을 때 되물을 말
+  find(t, v) {
+    if (!HA.ready && !Object.keys(HA.states).length) return { list: [] };
+    const nt = this.KW(this.n(t));
+    const all = HA.candidates().filter(s => this.CTRL.includes(s.entity_id.split('.')[0]) && !HA.hiddenNow(s));
+    const kind = this.KINDS.find(k => k.re.test(t));
+    const pool = kind ? all.filter(kind.is) : all;
+    const many = this.ALL_RE.test(t);
+
+    // ① 이름: 가장 길게 겹치는 이름. 같은 길이로 여럿이면 전부 (거실 조명 → 거실 조명1·2)
+    let best = [], bestLen = 0;
+    for (const s of pool) {
+      let m = 0;
+      for (const a of this.aliases(s)) if (nt.includes(a) && a.length > m) m = a.length;
+      if (!m) continue;
+      if (m > bestLen) { best = [s]; bestLen = m; } else if (m === bestLen) best.push(s);
+    }
+    if (best.length) return { list: best };
+
+    // ② 공간 (+종류)
+    const area = this.areaOf(t);
+    if (area) {
+      const inArea = pool.filter(s => HA.entArea[s.entity_id] === area);
+      if (inArea.length) return { list: inArea };
+    }
+    // ③ 종류만: 하나뿐이면 그것, '다' 가 붙었으면 전부
+    if (kind) {
+      if (pool.length === 1 || many) return { list: pool };
+      if (pool.length > 1) {
+        // 켜는 말이면 꺼진 것, 끄는 말이면 켜진 것만 남겨 본다 — 하나로 좁혀지면 그것
+        const want = v && v.act === 'off' ? pool.filter(s => HA.isOn(s)) : v && v.act === 'on' ? pool.filter(s => !HA.isOn(s) && s.state !== 'unavailable') : [];
+        if (v && v.act === 'off') return { list: want.length ? want : pool };   // "불 꺼" = 켜진 것 전부 (없으면 '이미 꺼져 있습니다')
+        if (want.length === 1) return { list: want };
+        return { list: [], why: `어느 ${kind.k === 'light' ? '조명' : '기기'}인지 말씀해 주세요. ${pool.slice(0, 4).map(s => HA.name(s)).join(', ')}${pool.length > 4 ? ' …' : ''}` };
+      }
+    }
+    return { list: [] };
+  },
+
   j(w, a, b) { const c = String(w).charCodeAt(String(w).length - 1); return w + ((c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28) ? a : b); },
+
+  // 말 한 줄을 바로 실행할 수 있는지만 본다 (부분 인식 결과로 미리 실행할지 정할 때 씀)
+  ready(text) { const v = this.verb(text); if (!v) return false; const f = this.find(text, v); return f.list.length > 0; },
+
+  // 기다리지 않는다: 명령은 보내 놓고, 1.5초 안에 실패가 오면 그때만 알린다.
+  fire(domain, service, data) {
+    const p = HA.send({ type: 'call_service', domain, service, service_data: data });
+    return Promise.race([p.then(() => true), new Promise(r => setTimeout(() => r(true), 1500))]);
+  },
 
   async run(text) {
     const v = this.verb(text);
     if (!v) return null;
-    const hits = this.find(text);
-    if (!hits.length) return null;
-    const names = hits.map(s => HA.name(s)).join(', ');
-    for (const s of hits) {
-      const [dom] = s.entity_id.split('.');
-      const id = s.entity_id;
-      if (s.state === 'unavailable') throw new Error(`${this.j(HA.name(s), '이', '가')} 지금 연결되어 있지 않습니다`);
+    const { list: hits, why } = this.find(text, v);
+    if (!hits.length) return why || null;
+    const names = hits.length > 2 ? `${HA.name(hits[0])} 등 ${hits.length}개` : hits.map(s => HA.name(s)).join(', ');
+
+    if (v.act === 'ask') {
+      return hits.map(s => `${HA.name(s)} ${s.state === 'unavailable' ? '연결 안 됨' : HA.isOn(s) ? '켜져 있음' : '꺼져 있음'}`).join(', ') + '.';
+    }
+    const dead = hits.filter(s => s.state === 'unavailable');
+    const live = hits.filter(s => s.state !== 'unavailable');
+    if (!live.length) return `${this.j(HA.name(dead[0]), '이', '가')} 지금 연결되어 있지 않습니다.`;
+
+    const jobs = [];
+    for (const s of live) {
+      const [dom] = s.entity_id.split('.'), id = s.entity_id;
       if (v.act === 'bri' || v.act === 'step') {
-        if (dom !== 'light' || !HA.dimmable(s)) return `${this.j(names, '은', '는')} 밝기를 바꿀 수 없는 기기입니다.`;
+        if (dom !== 'light' || !HA.dimmable(s)) continue;
         const cur = s.state === 'on' ? Math.round((s.attributes.brightness || 0) / 2.55) : 0;
-        const to = v.act === 'bri' ? v.v : Math.max(0, Math.min(100, cur + v.v));
-        await HA.setBrightness(id, to);
+        jobs.push(HA.setBrightness(id, v.act === 'bri' ? v.v : Math.max(0, Math.min(100, cur + v.v))));
+        continue;
+      }
+      if (v.act === 'temp') {
+        if (dom === 'climate') jobs.push(this.fire('climate', 'set_temperature', { entity_id: id, temperature: v.v, hvac_mode: 'heat' }));
         continue;
       }
       let domain = dom, service = v.act === 'on' ? 'turn_on' : 'turn_off';
       if (dom === 'vacuum') service = v.act === 'on' ? 'start' : 'return_to_base';
       if (dom === 'cover') service = v.act === 'on' ? 'open_cover' : 'close_cover';
-      if (dom === 'media_player' && v.act === 'off') service = 'media_pause';
-      await HA.send({ type: 'call_service', domain, service, service_data: { entity_id: id } });
+      if (dom === 'media_player' && v.act === 'off') service = 'turn_off';
+      if (v.act === 'off' && !HA.isOn(s)) continue;      // 이미 꺼진 건 건너뛴다 (보내 봐야 느리기만 하다)
+      if (v.act === 'on' && HA.isOn(s) && dom !== 'vacuum') continue;
+      jobs.push(this.fire(domain, service, { entity_id: id }));
     }
-    if (v.act === 'bri') return `${names} 밝기를 ${v.v}%로 맞췄습니다.`;
-    if (v.act === 'step') return `${this.j(names, '을', '를')} ${v.v > 0 ? '밝게' : '어둡게'} 했습니다.`;
-    if (hits.every(s => s.entity_id.startsWith('vacuum.'))) return v.act === 'on' ? `${this.j(names, '이', '가')} 청소를 시작합니다.` : `${this.j(names, '을', '를')} 충전대로 돌려보냅니다.`;
-    return `${this.j(names, '을', '를')} ${v.act === 'on' ? '켰습니다' : '껐습니다'}.`;
+    await Promise.all(jobs).catch(e => { throw new Error('실패했습니다: ' + e.message); });
+
+    const tail = dead.length ? ` (${dead.map(s => HA.name(s)).join(', ')} 연결 안 됨)` : '';
+    if (!jobs.length && (v.act === 'on' || v.act === 'off')) return `이미 ${v.act === 'on' ? '켜져' : '꺼져'} 있습니다.${tail}`;
+    if (v.act === 'bri') return `밝기 ${v.v}%.${tail}`;
+    if (v.act === 'step') return `${v.v > 0 ? '밝게' : '어둡게'} 했습니다.${tail}`;
+    if (v.act === 'temp') return `난방 ${v.v}도로 맞췄습니다.${tail}`;
+    if (live.every(s => s.entity_id.startsWith('vacuum.'))) return v.act === 'on' ? '청소 시작합니다.' : '충전대로 보냅니다.';
+    return `${this.j(names, '을', '를')} ${v.act === 'on' ? '켰습니다' : '껐습니다'}.${tail}`;
   },
 };
 
@@ -991,6 +1087,36 @@ const Voice = {
     } catch (e) {}
   },
 
+  done() {
+    try {
+      const C = window.AudioContext || window.webkitAudioContext;
+      const ctx = this._ac || (this._ac = new C());
+      if (ctx.state === 'suspended') ctx.resume();
+      const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = 880;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+      o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.27);
+    } catch (e) {}
+  },
+
+  // 말이 끝나기를 기다리지 않는다: 중간 인식 결과가 이미 '실행할 수 있는 기기 명령' 이고
+  // 0.35초 동안 그대로면 그 자리에서 실행한다. ("자비스 모니터 조명 꺼" → '꺼' 를 듣자마자)
+  onPartial(text) {
+    text = String(text || '').trim();
+    if (this.busy || text.length < 3) return;
+    clearTimeout(this._pt);
+    // 문장이 동작 말로 끝났을 때만 (말하는 중간의 '모니터 조명 켜…져 있어?' 를 미리 실행하지 않게)
+    if (!/(꺼|켜|줘|주세요|해|돌려|틀어|멈춰|%|퍼센트|프로|도)$/.test(text.replace(/[\s.!?]+$/, '')) || /(켜져|꺼져)$/.test(text)) return;
+    if (!Cmd.ready(text) || Cmd.verb(text).act === 'ask') return;
+    this._pt = setTimeout(async () => {
+      if (this.busy) return;
+      const J = Native.plugin('JarvisListener');
+      this._early = { text, at: Date.now() };
+      if (J && J.finish) { try { await J.finish(); } catch (e) {} }
+      this.run(text);
+    }, 400);
+  },
+
   // ── 항상 듣기 켜고 끄기 ──
   async applyWake() {
     const want = this.enabled();
@@ -1000,6 +1126,7 @@ const Voice = {
         this._bound = true;
         J.addListener('wake', () => this.onWake());
         J.addListener('command', e => this.onCommand((e && e.text) || ''));
+        J.addListener('partial', e => this.onPartial((e && e.text) || ''));
         J.addListener('error', e => { this.wakeOn = false; this.set(''); toast((e && e.message) || '음성 대기 오류'); });
       }
       try {
@@ -1039,6 +1166,8 @@ const Voice = {
 
   async onCommand(text) {
     text = String(text || '').trim();
+    clearTimeout(this._pt);
+    if (this._early && Date.now() - this._early.at < 4000) { this._early = null; return; }   // 중간 결과로 이미 실행함
     if (!text) { this.set(''); $('vReply').textContent = '잘 못 들었습니다. 다시 불러 주세요.'; return; }
     await this.run(text);
   },
@@ -1049,8 +1178,13 @@ const Voice = {
     $('vHeard').textContent = text; $('vReply').textContent = '';
     this.set('busy');
     try {
+      this._devOk = false;
       const reply = await this.handle(text);
-      if (reply) { $('vReply').textContent = reply; await this.speak(reply); }
+      if (reply) {
+        $('vReply').textContent = reply;
+        // 기기를 켜고 끈 경우엔 말로 되읽지 않고 '딩' 한 번 — 다음 명령을 바로 받을 수 있게.
+        if (this._devOk) this.done(); else await this.speak(reply);
+      }
     } catch (e) {
       $('vReply').textContent = e.message || String(e);
     } finally {
@@ -1122,10 +1256,11 @@ const Voice = {
     r.onresult = e => {
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const t = e.results[i][0].transcript;
-        if (pendingCmd) { if (e.results[i].isFinal) { pendingCmd = false; this.onCommand(t); } continue; }
+        if (pendingCmd) { if (e.results[i].isFinal) { pendingCmd = false; this.onCommand(t); } else this.onPartial(t); continue; }
         const rest = this.afterWake(t);
         if (rest == null) continue;
         if (!this._webWoke) { this._webWoke = true; this.onWake(); }
+        if (!e.results[i].isFinal) this.onPartial(rest);
         if (e.results[i].isFinal) {
           this._webWoke = false;
           if (rest.length >= 2) this.onCommand(rest); else pendingCmd = true;
@@ -1182,13 +1317,16 @@ const Voice = {
     // Home Assistant 의 말 알아듣기는 샤오미처럼 이름 뒤에 영어가 붙은 기기를 못 찾는 일이 많다.
     try {
       const r = await Cmd.run(text);
-      if (r) return r;
+      if (r) { this._devOk = !/(못|없|않|실패|어느)/.test(r); return r; }
     } catch (e) { return '실패했습니다: ' + e.message; }
 
+    // 켜·꺼 같은 기기 말인데 대상을 못 찾았으면 AI 로 넘기지 않는다 — 느리고, 엉뚱한 대답('껐습니다')을 지어낸다.
+    const deviceish = !!Cmd.verb(text) || Cmd.KINDS.some(k => k.re.test(text));
     try {
-      const r = await HA.converse(text);
+      const r = await HA.converse(text, deviceish);
       if (r) return r;
     } catch (e) { console.warn('[hub] HA converse', e); }
+    if (deviceish) return '어떤 기기인지 찾지 못했습니다. 기기 이름이나 공간(거실·침실1)을 넣어 다시 말씀해 주세요.';
 
     const c = Cfg.get();
     if (c.aiUrl) return this.askAI(text, c);
@@ -1425,6 +1563,6 @@ function boot() {
   if (!Cfg.get().code && !Cfg.get().haUrl && !Cfg.get().haUrlExt) setTimeout(() => Settings.open(), 600);
 }
 
-window.Hub = { HA, Usage, Voice, Tasks, Cfg, Cloud };   // 디버깅용
+window.Hub = { HA, Usage, Voice, Tasks, Cfg, Cloud, Cmd };   // 디버깅용
 boot();
 })();
