@@ -3163,10 +3163,10 @@ body, .empty, .card-title, .modal-lbl, .habit-name, .task-text,
 /* ═══════════════════════════════════════
    홈트레이닝 플랜 모달
    ═══════════════════════════════════════ */
-.fit-home-btn{
-  background:var(--green)!important; color:#fff!important;
-  font-weight:600; border-radius:var(--r-xs)!important;
-}
+.fit-guide-btn{ margin-left:auto; font-weight:600; }
+.ex-info{ flex:none; width:20px; height:20px; border-radius:50%; border:1px solid var(--border);
+  background:transparent; color:var(--text3); font:italic 700 11px/18px Georgia,serif; cursor:pointer; padding:0; }
+.ex-info:hover{ color:var(--accent); border-color:var(--accent); }
 .hp-tabs{
   display:flex; gap:6px; overflow-x:auto; padding-bottom:8px;
   -webkit-overflow-scrolling:touch; scrollbar-width:none;
@@ -3300,3 +3300,9 @@ html.dark .hp-tag-rest{background:#334155;color:#94a3b8}
   padding:10px 12px; font-size:12px; color:var(--text2);
   margin-top:12px; line-height:1.5;
 }
+
+/* 상단 요약 칩: 항상 한 줄. 줄이 넘치면 옆으로 밀어서 본다 (접혀서 두 줄이 되지 않게). */
+.stats-row{ flex-wrap:nowrap !important; overflow-x:auto; scrollbar-width:none; gap:4px !important; }
+.stats-row::-webkit-scrollbar{ display:none; }
+.stats-row .stat-chip:not(.stat-ts){ font-size:11px; padding:2px 8px; gap:3px; flex:none; }
+.stats-row .stat-chip .chip-ic{ width:12px; height:12px; }

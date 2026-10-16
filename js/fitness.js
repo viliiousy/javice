@@ -1,33 +1,6 @@
 // js/fitness.js — 운동 트래커 (날짜별 기록 + 인라인 추가)
 
 const Fitness = {
-  PLAN: {
-    0:{ name:'휴식',        emoji:'😴', exercises:[] },
-    1:{ name:'가슴 + 삼두', emoji:'💪', exercises:[
-      {name:'벤치프레스',sets:'4×10'},{name:'인클라인 덤벨 프레스',sets:'3×12'},
-      {name:'케이블 플라이',sets:'3×15'},{name:'딥스',sets:'3×12'},
-      {name:'케이블 푸시다운',sets:'3×15'},{name:'오버헤드 익스텐션',sets:'3×12'}]},
-    2:{ name:'등 + 이두',   emoji:'🔙', exercises:[
-      {name:'데드리프트',sets:'4×8'},{name:'랫풀다운',sets:'4×12'},
-      {name:'시티드 로우',sets:'3×12'},{name:'원암 덤벨 로우',sets:'3×12'},
-      {name:'바벨 컬',sets:'3×12'},{name:'해머 컬',sets:'3×12'}]},
-    3:{ name:'어깨 + 팔',   emoji:'🦾', exercises:[
-      {name:'오버헤드 프레스',sets:'4×10'},{name:'레터럴 레이즈',sets:'4×15'},
-      {name:'페이스 풀',sets:'3×15'},{name:'업라이트 로우',sets:'3×12'},
-      {name:'케이블 컬',sets:'3×15'},{name:'스컬크러셔',sets:'3×12'}]},
-    4:{ name:'하체',        emoji:'🦵', exercises:[
-      {name:'스쿼트',sets:'5×8'},{name:'레그 프레스',sets:'4×12'},
-      {name:'레그 컬',sets:'3×15'},{name:'레그 익스텐션',sets:'3×15'},
-      {name:'카프 레이즈',sets:'4×20'},{name:'힙 쓰러스트',sets:'3×12'}]},
-    5:{ name:'크로스핏+복근', emoji:'🔥', exercises:[
-      {name:'크로스핏 WOD',sets:'1세션'},{name:'시티드 니업',sets:'50개'},
-      {name:'크런치',sets:'50개'},{name:'레그레이즈',sets:'50개'},
-      {name:'오블리크 크런치',sets:'50개'},{name:'바이시클 킥',sets:'100개'},
-      {name:'플랭크',sets:'1분30초'}]},
-    6:{ name:'유산소+주짓수', emoji:'🥋', exercises:[
-      {name:'Zone 2 유산소',sets:'30-45분'},{name:'주짓수',sets:'1세션'}]},
-  },
-
   // 날짜별 커스텀 운동 추가 저장
   _dateStr(date) {
     const d=new Date(date);
@@ -46,18 +19,14 @@ const Fitness = {
   _checked(date=new Date()){ return JSON.parse(UserStore.get(this._checkKey(date))||'[]'); },
   _save(v,date=new Date()){ UserStore.set(this._checkKey(date),JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
 
-  // ── Hevy 루틴 ─────────────────────────
-  // PLAN 은 코드에 박아 둔 기본 계획이다. 정작 사람은 Hevy 에서 루틴을 짜는데
-  // 두 곳을 손으로 맞춰 두면 언젠가 반드시 어긋난다. 루틴이 있으면 그쪽이 이긴다.
-  ROUTINE_KEY: 'gl_hevy_routines_v1',
-  DAYPLAN_KEY: 'gl_fitness_dayplan',     // { 0:'루틴id', 1:'rest', 2:'' … }  0=일
+  // ── 요일별 계획 ─────────────────────────
+  // 기본은 홈트레이닝 3일 분할(js/home-plan.js): 월=DAY A 푸시, 수=DAY B 풀, 금=DAY C 하체+코어,
+  // 화·목·토는 가벼운 유산소, 일요일은 휴식. 요일마다 ⚙ 에서 바꿀 수 있다.
+  // (예전엔 Hevy 루틴을 받아 썼는데, Hevy 를 더 쓰지 않아 걷어냈다.)
+  DAYPLAN_KEY: 'gl_fitness_dayplan',     // { 0:'rest', 1:'A', 2:'cardio' … }  0=일
+  DEFAULT_DAY: { 0:'rest', 1:'A', 2:'cardio', 3:'B', 4:'cardio', 5:'C', 6:'cardio' },
+  CARDIO: { name:'유산소', exercises:[{ name:'걷기 또는 Zone2 자전거', sets:'30-40분', note:'심박 120~130, 회복 위주' }] },
 
-  routines() {
-    try {
-      const v = JSON.parse(UserStore.get(this.ROUTINE_KEY) || '[]');
-      return Array.isArray(v) ? v : [];
-    } catch (e) { return []; }
-  },
   dayPlan() {
     try {
       const v = JSON.parse(UserStore.get(this.DAYPLAN_KEY) || '{}');
@@ -66,16 +35,25 @@ const Fitness = {
   },
   saveDayPlan(v) { UserStore.set(this.DAYPLAN_KEY, JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
 
-  // 그 요일에 무엇을 할지. 정해 둔 게 없으면 코드의 기본 계획으로 떨어진다 —
-  // 루틴을 안 쓰거나 아직 안 받아왔을 때도 카드는 그대로 돌아야 한다.
+  // 홈트 플랜의 한 날(A/B/C)을 카드가 쓰는 모양으로. 세트는 태그 중 's'(4×10-12 같은 것)를 쓴다.
+  homeDay(key) {
+    const i = { A:0, B:1, C:2 }[key];
+    if (i == null || typeof HomePlan === 'undefined') return null;
+    const lb = HomePlan.DAY_LABELS[i];
+    return {
+      name: `${lb.name} ${lb.sub}`, src:'home', day:i,
+      exercises: HomePlan.EX[i].map((x, j) => ({
+        name: x.n, sets: ((x.tg || []).find(t => t.c === 's') || {}).t || '', hp: j,
+      })),
+    };
+  },
+
   planFor(dow) {
-    const pick = this.dayPlan()[dow];
-    if (pick === 'rest') return { name:'휴식', exercises:[], src:'day' };
-    if (pick) {
-      const r = this.routines().find(x => x.id === pick);
-      if (r) return { name:r.title, exercises:r.items, src:'hevy' };
-    }
-    return { ...this.PLAN[dow], src:'default' };
+    let pick = this.dayPlan()[dow];
+    if (!['A','B','C','cardio','rest'].includes(pick)) pick = this.DEFAULT_DAY[dow];   // 예전 Hevy 루틴 id 는 무시
+    if (pick === 'rest')   return { name:'휴식', exercises:[], src:'day' };
+    if (pick === 'cardio') return { ...this.CARDIO, src:'day' };
+    return this.homeDay(pick) || { name:'휴식', exercises:[], src:'day' };
   },
 
   render(date=new Date(), planIdx=null) {
@@ -103,9 +81,10 @@ const Fitness = {
     const badge = document.getElementById('fitBadge');
     if (badge) {
       // 배지에 있던 이모지는 뺐다. 바로 옆 머리글이 이미 선 아이콘이라 둘이 부딪혔다.
-      // 어디서 온 계획인지 한 글자로 남긴다. 같은 이름이라도 Hevy 루틴인지
-      // 코드의 기본 계획인지 모르면 '왜 안 바뀌지' 를 한참 헤매게 된다.
-      badge.textContent=plan.name + (plan.src==='hevy' ? ' · Hevy' : '');
+      badge.textContent=plan.name;
+      // 배지를 누르면 그날 플랜의 자세·중량 가이드가 열린다.
+      badge.style.cursor='pointer'; badge.title='자세·추천 중량 가이드';
+      badge.onclick=()=>HomePlan.open(plan.src==='home'?plan.day:0);
       badge.className=allEx.length?'badge badge-accent':'badge';
     }
 
@@ -119,9 +98,7 @@ const Fitness = {
     // 제목도 '오늘의 운동' 그대로여서, 지금 보고 있는 게 언제인지 알 수가 없었다.
     const tabs=DOW.map((d,i)=>`<button class="fit-tab${i===dow?' active':''}" onclick="Fitness.render(Fitness._dowDate(${i}, new Date('${Fitness._dateStr(date)}T00:00:00')))">${d}</button>`).join('')
       + `<button class="fit-tab fit-plan-btn" onclick="Fitness.showDayPlan()" title="요일별 루틴 배정">${
-          typeof Icons!=='undefined'?Icons.svg('gear','tf-ic'):'⚙'}</button>`
-      + `<button class="fit-tab fit-home-btn" onclick="HomePlan.open()" title="홈트레이닝 플랜">${
-          typeof Icons!=='undefined'?Icons.svg('home','tf-ic'):'🏠'}</button>`;
+          typeof Icons!=='undefined'?Icons.svg('gear','tf-ic'):'⚙'}</button>`;
 
     const container = document.getElementById('fitnessWrap');
     const ds = Fitness._dateStr(date);
@@ -129,24 +106,17 @@ const Fitness = {
     if (!allEx.length) {
       // 계획이 휴식일이어도 그날 실제로 운동했으면 기록과 피드백은 보여야 한다.
       // 예전엔 여기서 그냥 빠져나가서, 계획에 없던 날의 운동은 어디서도 볼 수 없었다.
-      const didWork = typeof Hevy!=='undefined' && (Hevy.byDate(ds)||[]).length;
       container.innerHTML=`
       <div class="fit-tabs">${tabs}</div>
       <div style="text-align:center;padding:20px 16px;color:var(--text2)">
         ${Icons.big('moon')}
-        <p>${plan.name} — 휴식일입니다.${didWork?'<br><span style="color:var(--text3);font-size:12px">계획엔 없었지만 기록이 있어요</span>':'<br><span style="color:var(--text3);font-size:12px">다른 요일을 눌러 계획을 볼 수 있어요</span>'}</p>
+        <p>휴식일입니다.<br><span style="color:var(--text3);font-size:12px">다른 요일을 눌러 계획을 볼 수 있어요</span></p>
       </div>
-      ${didWork && typeof Hevy!=='undefined'?Hevy.html(ds):''}
-      ${didWork && typeof Coach!=='undefined'?Coach.html(ds):''}
       ${isToday?'<div class="habit-add-btn" onclick="Fitness.showInlineAdd()">+ 운동 추가</div>':''}`;
       return;
     }
 
-    // Hevy 에 같은 이름의 기록이 있으면 손으로 안 눌러도 체크된 것으로 본다.
-    // 운동하고 와서 앱에 또 체크하는 일이 없어지는 게 연동의 실질적 이득이다.
-    // 다만 저장소는 건드리지 않는다 — 자동 판정은 화면에서만 하고, 손으로 누른 것과 구분해 표시한다.
-    const auto = i => !chk.includes(i) && typeof Hevy !== 'undefined' && Hevy.isDone(allEx[i].name, ds);
-    const on  = i => chk.includes(i) || auto(i);
+    const on  = i => chk.includes(i);
 
     const done=allEx.filter((_,i)=>on(i)).length;
     const pct=Math.round(done/allEx.length*100);
@@ -154,18 +124,16 @@ const Fitness = {
     container.innerHTML=`
       <div class="fit-tabs">${tabs}</div>
       ${allEx.map((ex,i)=>`
-        <div class="ex-item${on(i)?' done':''}${auto(i)?' ex-auto':''}" onclick="Fitness.toggle(${i},'${Fitness._dateStr(date)}')">
-          <div class="ex-chk"${auto(i)?' title="Hevy 기록에서 자동 체크"':''}>${on(i)?'✓':''}</div>
+        <div class="ex-item${on(i)?' done':''}" onclick="Fitness.toggle(${i},'${Fitness._dateStr(date)}')">
+          <div class="ex-chk">${on(i)?'✓':''}</div>
           <span class="ex-name">${esc(ex.name)}</span>
+          ${ex.hp!=null&&plan.src==='home'?`<button class="ex-info" onclick="event.stopPropagation();HomePlan.open(${plan.day},${ex.hp})" title="자세·중량 가이드">i</button>`:''}
           <a class="ex-yt" href="${Fitness.ytUrl(ex.name)}" target="_blank" rel="noopener"
              onclick="event.stopPropagation()" title="자세 영상 검색">▶</a>
           <span class="ex-sets">${ex.sets}</span>
           ${i>=plan.exercises.length&&isToday?`<button class="task-del" onclick="event.stopPropagation();Fitness._delCustom(${i-plan.exercises.length},'${Fitness._dateStr(date)}')">✕</button>`:''}
         </div>`).join('')}
       ${isToday?'<div class="habit-add-btn" onclick="Fitness.showInlineAdd()">+ 운동 추가</div>':''}
-      ${typeof Hevy!=='undefined'?Hevy.html(ds):''}
-      ${typeof Hevy!=='undefined'?Hevy.weeklyHtml(8):''}
-      ${typeof Coach!=='undefined'?Coach.html(ds):''}
       <div class="fit-progress">
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
         <span class="progress-txt">${done}/${allEx.length} (${pct}%)</span>
@@ -181,115 +149,31 @@ const Fitness = {
 
   // ── 요일별 루틴 배정 ───────────────────
   showDayPlan() {
-    const rs = this.routines(), dp = this.dayPlan();
+    const dp = this.dayPlan();
     const DOW = ['일','월','화','수','목','금','토'];
+    const OPTS = [['A','DAY A 푸시'],['B','DAY B 풀'],['C','DAY C 하체+코어'],['cardio','유산소'],['rest','휴식']];
     const rows = DOW.map((d,i) => {
-      const cur = dp[i] || '';
-      const opts = [`<option value=""${cur===''?' selected':''}>기본 계획 (${esc(this.PLAN[i].name)})</option>`,
-                    `<option value="rest"${cur==='rest'?' selected':''}>휴식</option>`]
-        .concat(rs.map(r => `<option value="${esc(r.id)}"${cur===r.id?' selected':''}>${esc(r.title)} (${r.items.length}종목)</option>`));
+      const cur = dp[i] || this.DEFAULT_DAY[i];
+      const opts = OPTS.map(([v,l]) => `<option value="${v}"${cur===v?' selected':''}>${l}${this.DEFAULT_DAY[i]===v?' (기본)':''}</option>`);
       return `<div class="dp-row">
         <span class="dp-d${i===0?' dp-sun':''}${i===6?' dp-sat':''}">${d}</span>
         <select class="inp inp-sm dp-sel" data-dow="${i}">${opts.join('')}</select>
       </div>`;
     }).join('');
-
-    const note = rs.length
-      ? `Hevy 에서 짠 루틴 ${rs.length}개를 불러왔습니다. 루틴을 고치면 한 시간 안에 여기에도 반영됩니다.`
-      : `아직 받아온 루틴이 없습니다. Hevy 에 루틴을 만들어 두면 한 시간 안에 여기 목록에 나타납니다.`;
-
-    // 루틴마다 Hevy 가 준 마지막 수정 시각을 드러낸다.
-    // 이게 없으면 '앱이 낡은 걸 보여 준다' 고 느꼈을 때 원인이 둘 중 어느 쪽인지 알 수가 없다 —
-    // 아직 안 받아왔는지(시각이 옛날), 받아왔는데 화면이 안 고쳐졌는지(시각은 최신).
-    const rtList = rs.length ? `<div class="dp-rt-list">${rs.map(r => `
-      <div class="dp-rt"><span class="dp-rt-nm">${esc(r.title)}</span>
-        <i class="dp-rt-at">${esc(this._agoLabel(r.updated))}</i></div>`).join('')}
-      <button class="btn-sm dp-rt-btn" onclick="Fitness.reloadRoutines()">클라우드에서 다시 읽기</button>
-    </div>` : '';
-
     App.openModal('@dumbbell 요일별 운동', `
-      <div class="dp-note">${note}</div>
-      ${rtList}
+      <div class="dp-note">홈트레이닝 3일 분할 플랜을 요일에 배정합니다. 종목별 자세·추천 중량은 운동 카드의 '가이드' 에서 볼 수 있어요.</div>
       <div class="dp-list">${rows}</div>
-      <div style="height:1px;background:var(--border);margin:14px 0"></div>
-      <div class="dp-note" id="hevyLinkNote">Hevy 연동 상태 확인 중…</div>
-      <div class="dp-row" style="gap:6px">
-        <input id="hevyKeyInp" class="inp inp-sm" type="password" autocomplete="off"
-               placeholder="Hevy API 키" style="flex:1">
-        <button onclick="Fitness._saveHevyKey()" class="btn-sm">연동</button>
-      </div>
       <div class="modal-btns">
         <button onclick="Fitness._saveDayPlan()" class="btn-sm accent">저장</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
       </div>`);
-    this._loadHevyLink();
-  },
-
-  // ── Hevy 연동 ─────────────────────────
-  // 키는 사람마다 제 것을 쓴다. Firebase 의 /users/<uid>/_link/hevyKey 에 들어가고,
-  // 크론이 그걸 읽어 그 사람 몫만 받아 온다. localStorage 로는 내려오지 않는다 —
-  // Hevy API 에는 기록을 지우는 엔드포인트도 있어서 브라우저에 두면 안 된다.
-  async _loadHevyLink() {
-    const el = document.getElementById('hevyLinkNote');
-    if (!el) return;
-    if (typeof FirebaseSync === 'undefined' || !FirebaseSync.ready()) {
-      el.textContent = '로그인하면 Hevy 를 연동할 수 있습니다.';
-      return;
-    }
-    const link = await FirebaseSync.getLink();
-    el.textContent = (link && link.hevyKey)
-      ? 'Hevy 연동됨 ✓ — 한 시간마다 기록과 루틴을 받아옵니다. 키를 바꾸려면 새로 입력하세요.'
-      : 'Hevy 앱 → Settings → Developer 에서 API 키를 발급받아 붙여넣으면 운동 기록과 루틴이 자동으로 들어옵니다.';
-  },
-
-  async _saveHevyKey() {
-    const inp = document.getElementById('hevyKeyInp');
-    const key = String((inp && inp.value) || '').trim();
-    if (!key) { App.showToast('API 키를 입력해주세요', 'error'); return; }
-    if (typeof FirebaseSync === 'undefined' || !FirebaseSync.ready()) {
-      App.showToast('로그인이 필요합니다', 'error'); return;
-    }
-    const ok = await FirebaseSync.setLink({ hevyKey: key });
-    if (!ok) { App.showToast('저장 실패 — 잠시 뒤 다시 시도해주세요', 'error'); return; }
-    inp.value = '';
-    App.showToast('Hevy 연동 저장됨 ✓ — 다음 정시에 기록을 받아옵니다', 'success');
-    this._loadHevyLink();
-  },
-
-  // '3시간 전' 처럼 읽는다. 절대 시각은 길고, 우리가 알고 싶은 건 '얼마나 낡았나' 다.
-  _agoLabel(iso) {
-    const t = new Date(iso || '').getTime();
-    if (!isFinite(t)) return '수정 시각 없음';
-    const m = Math.floor((Date.now() - t) / 60000);
-    if (m < 1)    return '방금';
-    if (m < 60)   return m + '분 전';
-    if (m < 1440) return Math.floor(m / 60) + '시간 전';
-    return Math.floor(m / 1440) + '일 전';
-  },
-
-  // 크론은 매시 17분에 Hevy 를 읽어 클라우드에 넣는다. 그런데 앱이 그걸 다시 읽지 않으면
-  // 화면은 그대로다 — 기다릴 필요 없이 지금 다시 읽는 길을 둔다.
-  async reloadRoutines() {
-    if (typeof FirebaseSync === 'undefined' || !FirebaseSync.ready()) {
-      App.showToast('로그인이 필요합니다', 'error'); return;
-    }
-    App.showToast('클라우드에서 다시 읽는 중…', '');
-    const before = JSON.stringify(this.routines());
-    await FirebaseSync.load();
-    const after = JSON.stringify(this.routines());
-    this.render(App && App.S && App.S.selDate ? App.S.selDate : new Date());
-    App.closeModal();
-    setTimeout(() => this.showDayPlan(), 60);
-    App.showToast(before === after
-      ? '클라우드에도 같은 루틴입니다 — 아직 Hevy 에서 안 받아왔어요'
-      : '루틴을 새로 받았습니다 ✓', before === after ? '' : 'success');
   },
 
   _saveDayPlan() {
     const dp = {};
     document.querySelectorAll('.dp-sel').forEach(sel => {
       const v = sel.value;
-      if (v) dp[sel.dataset.dow] = v;      // 빈 값(기본 계획)은 저장하지 않는다
+      if (v && v !== this.DEFAULT_DAY[sel.dataset.dow]) dp[sel.dataset.dow] = v;   // 기본과 같으면 저장하지 않는다
     });
     this.saveDayPlan(dp);
     App.closeModal();

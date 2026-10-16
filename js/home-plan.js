@@ -287,9 +287,10 @@ const HomePlan = {
     el.innerHTML = `<div class="hp-tabs">${tabs}</div>${content}`;
   },
 
-  open() {
-    this._tab = 0;
+  open(day = 0, ex = null) {
+    this._tab = Number(day) || 0;
     this._open = {};
+    if (ex != null) this._open[this._tab + '-' + ex] = true;
     App.openModal('@dumbbell 홈트레이닝 플랜', '<div id="homePlanBody"></div>');
     setTimeout(() => this._render(), 30);
   }

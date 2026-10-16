@@ -187,26 +187,20 @@ const App = {
     // 하루를 여는 화면이 "아직 아무것도 안 했다"만 네 번 반복해서 알려준다.
     // 그래서 '한 것' 이 아니라 '남은 것' 을 적는다. 아침에도 할 말이 생기고,
     // 어차피 행동을 정하는 숫자는 먹은 양이 아니라 더 먹어도 되는 양이다.
-    const hLeft = hList.length - hDone;
-    const habitTxt = !hList.length ? '습관 없음'
-                   : hLeft === 0   ? '습관 완료'
-                                   : `습관 ${hLeft}개 남음`;
-
+    // 한 줄에 다 들어가게 짧게 쓴다: 습관 2/4 · 2,800kcal · 할일 5 · 체크 3/7 (한 것/전체)
     const calGoal = Number(ds.calorieGoal) || 0;
     const calLeft = calGoal - dt.cal;
     const won = v => Math.round(v).toLocaleString('ko-KR');
-    // 색은 세 단계면 충분하다. 초과(빨강) / 거의 다 채움(초록) / 그 외(무색).
-    // 예전엔 50~80% 구간에 노랑을 줬는데, '1,150kcal 남음' 이 경고색으로 뜨면
-    // 뭐가 잘못된 줄 안다. 아직 더 먹어도 된다는 뜻인데.
     const calTxt = !calGoal      ? `${won(dt.cal)}kcal`
-                 : calLeft >= 0  ? `${won(calLeft)}kcal 남음`
-                                 : `${won(-calLeft)}kcal 초과`;
+                 : calLeft >= 0  ? `${won(calLeft)}kcal`
+                                 : `+${won(-calLeft)}kcal`;
+    const clAll = Checklist.getItems().length, clDone = clAll - clItems.length;
 
     const chipsHTML=`
-      <div class="stat-chip ${hLeft===0&&hList.length>0?'stat-green':''}" data-s="habits">${ic('check')}${habitTxt}</div>
-      <div class="stat-chip ${calGoal&&calLeft<0?'stat-red':calPct>=80?'stat-green':''}" data-s="diet">${ic('diet')}${calTxt}</div>
-      ${pending>0?`<div class="stat-chip" data-s="tasks">${ic('tasks')}할일 ${pending}개</div>`:''}
-      ${clItems.length>0?`<div class="stat-chip" data-s="checklist">${ic('pen')}체크리스트 ${clItems.length}개</div>`:''}`;
+      ${hList.length?`<div class="stat-chip ${hDone===hList.length?'stat-green':''}" data-s="habits" title="오늘 습관">${ic('check')}습관 ${hDone}/${hList.length}</div>`:''}
+      <div class="stat-chip ${calGoal&&calLeft<0?'stat-red':calPct>=80?'stat-green':''}" data-s="diet" title="${calGoal?(calLeft>=0?'남은 칼로리':'초과한 칼로리'):'먹은 칼로리'}">${ic('diet')}${calTxt}</div>
+      ${pending>0?`<div class="stat-chip" data-s="tasks" title="남은 할일">${ic('tasks')}할일 ${pending}</div>`:''}
+      ${clAll>0?`<div class="stat-chip ${clDone===clAll?'stat-green':''}" data-s="checklist" title="체크리스트">${ic('pen')}체크 ${clDone}/${clAll}</div>`:''}`;
     // 인바디·자산은 이 줄에서 빠졌다. 헤더 오른쪽 두 줄(TopStrip)로 옮겼다 —
     // 같은 줄에 여섯 칸이 붙으면 모바일에서 두 줄로 접히면서 정작 오늘 할 일이 밀렸다.
     try { TopStrip.render(); } catch(e){}
@@ -542,7 +536,7 @@ const App = {
     } catch(e){ console.warn('요약 할일', e); }
 
     try {
-      const dow=new Date(date).getDay(), plan=Fitness.PLAN[dow];
+      const dow=new Date(date).getDay(), plan=Fitness.planFor(dow);
       const n=(plan.exercises||[]).length + Fitness.getCustomExercises(date).length;
       const done=Fitness._checked(date).length;
       if(plan.name==='휴식') out.push(row('운동','휴식일',true,'fitness'));

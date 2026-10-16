@@ -377,7 +377,7 @@ const JARVIS = {
 
   _buildCtx() {
     const now=new Date(),dow=now.getDay();
-    const plan=Fitness.PLAN[dow],fitChk=Fitness._checked();
+    const plan=Fitness.planFor(dow),fitChk=Fitness._checked();
     const hList=Habits.getList(),hChk=Habits.getChecked();
     const dd=Diet.getData(),dt=Diet.totals(dd),ds=Diet.getSettings();
     const evToday=(App.S.events||[]).filter(e=>{ try{ return new Date(e.start?.dateTime||e.start?.date).toDateString()===now.toDateString(); }catch{return false;} });
