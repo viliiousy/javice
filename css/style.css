@@ -3456,7 +3456,7 @@ body.ob-open{ overflow:hidden; }
 .exm-media.has .exm-none{ display:none; }
 @keyframes exmFlip{ 0%{ background-position:0 0 } 50%{ background-position:100% 0 } }
 .exm-none{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:#8a9099; font-size:13px; }
-html.dark .exm-media{ background:#1d2026; }
+html.dark .exm-media{ background:#eeeff1; }
 .exm-sub{ font-size:12px; color:var(--text3); text-align:center; margin-bottom:8px; }
 .exm-cues{ margin:0 0 12px; padding-left:20px; font-size:14px; line-height:1.7; }
 
