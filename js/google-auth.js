@@ -107,7 +107,38 @@ const Auth = {
       if (this.missingScopes().length) {
         setTimeout(() => App.showToast('캘린더·할일 권한이 없습니다. 로그아웃 후 다시 로그인해 모든 항목에 체크해주세요.', 'error'), 1500);
       }
+    } else if (t || localStorage.getItem('gl_offline') === '1') {
+      // 구글 토큰(1시간짜리)은 만료됐지만 예전에 로그인한 적이 있다 → 서버의 리프레시 토큰으로 조용히 되살린다.
+      // 예전엔 여기서 그냥 로그인 화면을 보여서, 앱을 한 시간 뒤에 열 때마다 다시 로그인해야 했다.
+      this._restoreViaServer();
     }
+    this._watchResume();
+  },
+
+  async _restoreViaServer() {
+    try {
+      if (typeof firebase === 'undefined' || !firebase.auth) return;
+      if (!firebase.apps.length) firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
+      document.body.classList.add('auth-restoring');
+      // Firebase 로그인(저장돼 있음)이 되살아나기를 잠깐 기다린다
+      const user = await new Promise(res => {
+        let done = false;
+        const off = firebase.auth().onAuthStateChanged(u => { if (!done) { done = true; off(); res(u); } });
+        setTimeout(() => { if (!done) { done = true; res(firebase.auth().currentUser); } }, 6000);
+      });
+      if (user && await this.serverRefresh()) { await this._fetchUserInfo(true); return; }
+    } catch (e) { console.warn('[Auth] 세션 되살리기 실패', e); }
+    finally { document.body.classList.remove('auth-restoring'); }
+  },
+
+  // 앱이 백그라운드에 오래 있으면 예약해 둔 갱신이 멈춘다. 다시 보일 때 만료됐으면 바로 갱신한다.
+  _watchResume() {
+    if (this._resumeBound) return;
+    this._resumeBound = true;
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden || !this.userInfo) return;
+      if (!this.tokenExpiry || Date.now() > this.tokenExpiry - 120000) this._silentRefresh();
+    });
   },
 
   // 팝업·서버 어느 쪽에서 받았든 토큰을 같은 방식으로 반영한다
@@ -142,6 +173,7 @@ const Auth = {
       if (d.needConsent) { localStorage.setItem('gl_offline', '0'); return false; }
       if (!r.ok || !d.access_token) return false;
       this._applyToken(d);
+      this._nativeFails = 0;
       localStorage.setItem('gl_offline', '1');
       console.log('[Auth] 서버 갱신 완료, 다음 만료:', new Date(this.tokenExpiry).toLocaleTimeString());
       return true;
@@ -270,7 +302,11 @@ const Auth = {
     this.serverRefresh().then(ok => {
       this._refreshing = false;
       if (ok) return;
-      if (typeof Platform !== 'undefined' && Platform.native) {   // 앱: 서버 갱신이 안 되면 다시 로그인
+      if (typeof Platform !== 'undefined' && Platform.native) {
+        // 앱: 네트워크가 잠깐 끊긴 것일 수 있다 — 바로 로그아웃하지 않고 몇 번 더 해 본다.
+        this._nativeFails = (this._nativeFails || 0) + 1;
+        if (this._nativeFails < 4 && localStorage.getItem('gl_offline') === '1') { setTimeout(() => this._silentRefresh(), 30000 * this._nativeFails); return; }
+        this._nativeFails = 0;
         App.showToast('구글 로그인이 만료되었습니다. 다시 로그인해 주세요.', 'error');
         this._promptRelogin && this._promptRelogin();
         return;

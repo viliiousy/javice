@@ -871,13 +871,16 @@ html.dark .btn-danger:hover{ background:rgba(220,38,38,0.24); }
 /* ── 토스트 ──────────────────────────── */
 .toast{
   position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
-  background:var(--text); color:white;
+  /* 배경은 글자색, 글자는 카드색 — 다크 모드에서도 서로 반대라 항상 읽힌다 (예전엔 다크에서 흰 바탕에 흰 글씨) */
+  background:var(--text); color:var(--card);
   padding:9px 20px; border-radius:8px; font-size:13px;
   z-index:9999; animation:slideUp 0.25s ease; white-space:nowrap; font-weight:500;
   box-shadow:var(--shadow);
 }
-.toast.success{ background:var(--green); }
-.toast.error{ background:var(--red); }
+.toast.success{ background:var(--green); color:#fff; }
+.toast.error{ background:var(--red); color:#fff; }
+/* 폰에서는 하단 탭 위로 띄운다 */
+@media (max-width:900px){ .toast{ bottom:calc(var(--tabbar-h, 46px) + env(safe-area-inset-bottom, 0px) + 12px); max-width:calc(100vw - 32px); white-space:normal; text-align:center; } }
 @keyframes slideUp{ from{transform:translateX(-50%) translateY(8px);opacity:0} to{transform:translateX(-50%) translateY(0);opacity:1} }
 
 /* ── JARVIS ──────────────────────────── */
@@ -3306,3 +3309,7 @@ html.dark .hp-tag-rest{background:#334155;color:#94a3b8}
 .stats-row::-webkit-scrollbar{ display:none; }
 .stats-row .stat-chip:not(.stat-ts){ font-size:11px; padding:2px 8px; gap:3px; flex:none; }
 .stats-row .stat-chip .chip-ic{ width:12px; height:12px; }
+
+/* 세션을 되살리는 동안에는 로그인 화면 대신 '불러오는 중' 만 보인다 (깜빡이며 로그인 단추가 보이지 않게) */
+body.auth-restoring .login-card > *:not(.login-emoji):not(.login-title){ visibility:hidden; }
+body.auth-restoring .login-title::after{ content:'불러오는 중…'; display:block; font-size:14px; font-weight:500; color:var(--text3); margin-top:10px; }
