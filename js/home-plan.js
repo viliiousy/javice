@@ -1,28 +1,29 @@
 // js/home-plan.js — 홈트레이닝 3일 분할 플랜 (모달 뷰)
 
 const HomePlan = {
-  // 이미지 경로 (img/home-workout/)
+  // 이미지 경로 (img/ex/ — 전체 종목 그림과 같은 그림체)
+  // 운동 자세 그림 — 전체 종목 그림(img/ex)과 같은 그림체. 왼쪽 시작·오른쪽 끝 자세를 번갈아 보여 준다.
   IMG: [
-    'img/home-workout/ex00_incline_db_press.png',
-    'img/home-workout/ex01_flat_db_press.png',
-    'img/home-workout/ex02_incline_db_fly.png',
-    'img/home-workout/ex03_shoulder_press.png',
-    'img/home-workout/ex04_lateral_raise.png',
-    'img/home-workout/ex05_cable_pushdown.png',
-    'img/home-workout/ex06_decline_pushup.png',
-    'img/home-workout/ex07_band_pullup.png',
-    'img/home-workout/ex08_onearm_row.png',
-    'img/home-workout/ex09_lat_pulldown.png',
-    'img/home-workout/ex10_face_pull.png',
-    'img/home-workout/ex11_incline_curl.png',
-    'img/home-workout/ex12_hammer_curl.png',
-    'img/home-workout/ex13_goblet_squat.png',
-    'img/home-workout/ex14_romanian_dl.png',
-    'img/home-workout/ex15_bulgarian_split.png',
-    'img/home-workout/ex16_calf_raise.png',
-    'img/home-workout/ex17_hanging_knee.png',
-    'img/home-workout/ex18_russian_twist.png',
-    'img/home-workout/ex19_plank.png'
+    'img/ex/incline_db_press.webp',
+    'img/ex/db_bench_press.webp',
+    'img/ex/incline_db_fly.webp',
+    'img/ex/db_shoulder_press.webp',
+    'img/ex/lateral_raise.webp',
+    'img/ex/cable_pushdown_diy.webp',
+    'img/ex/decline_pushup.webp',
+    'img/ex/band_assist_pullup.webp',
+    'img/ex/one_arm_db_row.webp',
+    'img/ex/lat_pulldown.webp',
+    'img/ex/face_pull.webp',
+    'img/ex/incline_db_curl.webp',
+    'img/ex/hammer_curl.webp',
+    'img/ex/goblet_squat.webp',
+    'img/ex/db_romanian_deadlift.webp',
+    'img/ex/bulgarian_split.webp',
+    'img/ex/calf_raise.webp',
+    'img/ex/hanging_knee_raise.webp',
+    'img/ex/russian_twist.webp',
+    'img/ex/plank.webp'
   ],
 
   // ═══ 운동 데이터 ═══
@@ -189,7 +190,7 @@ const HomePlan = {
       </div>
       <div class="hp-tags">${x.tg.map(t => `<span class="${this._tagClass(t.c)}">${esc(t.t)}</span>`).join('')}</div>
       ${isOpen ? `<div class="hp-ex-detail">
-        ${imgSrc ? `<div class="hp-img-wrap"><img src="${imgSrc}" alt="${esc(x.n)}" loading="lazy"></div>` : ''}
+        ${imgSrc ? `<div class="hp-img-wrap exm-media has"><div class="exm-anim" style="background-image:url('${imgSrc}')" role="img" aria-label="${esc(x.n)} 시작·끝 자세"></div></div>` : ''}
         <div class="hp-yt-section">
           <a class="hp-yt-btn" href="${this.ytUrl(x.yt.ko)}" target="_blank" rel="noopener">
             <span class="hp-yt-icon">▶</span>
