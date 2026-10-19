@@ -49,7 +49,7 @@ const Onboard = {
 
   close(done) {
     UserStore.set(this.KEY, done ? 'done' : 'skipped');
-    FirebaseSync?.scheduleSave();
+    window.FirebaseSync?.scheduleSave?.();
     const el = document.getElementById('obWrap'); if (el) el.hidden = true;
     document.body.classList.remove('ob-open');
     try { App._updateStatsBanner?.(); TopStrip?.render?.(); } catch {}
@@ -131,12 +131,12 @@ const Onboard = {
         </div>
       </div>
       <div class="ob-grid">
-        <label>나이<input id="obAge" class="inp" type="number" inputmode="numeric" placeholder="30" value="${this.d.age || ''}" oninput="Onboard._calc()"></label>
-        <label>키 (cm)<input id="obHt" class="inp" type="number" inputmode="decimal" placeholder="175" value="${this.d.ht || ''}" oninput="Onboard._calc()"></label>
-        <label>몸무게 (kg)<input id="obWt" class="inp" type="number" inputmode="decimal" placeholder="70" value="${v('wt')}" oninput="Onboard._calc()"></label>
-        <label>체지방률 (%) <i>선택</i><input id="obBf" class="inp" type="number" inputmode="decimal" placeholder="—" value="${v('bf')}" oninput="Onboard._calc()"></label>
-        <label>골격근량 (kg) <i>선택</i><input id="obMs" class="inp" type="number" inputmode="decimal" placeholder="—" value="${v('ms')}"></label>
-        <label>활동량<select id="obAct" class="inp" onchange="Onboard._calc()">
+        <label><span>나이</span><input id="obAge" class="inp" type="number" inputmode="numeric" placeholder="30" value="${this.d.age || ''}" oninput="Onboard._calc()"></label>
+        <label><span>키 (cm)</span><input id="obHt" class="inp" type="number" inputmode="decimal" placeholder="175" value="${this.d.ht || ''}" oninput="Onboard._calc()"></label>
+        <label><span>몸무게 (kg)</span><input id="obWt" class="inp" type="number" inputmode="decimal" placeholder="70" value="${v('wt')}" oninput="Onboard._calc()"></label>
+        <label><span>체지방률 (%) <i>선택</i></span><input id="obBf" class="inp" type="number" inputmode="decimal" placeholder="—" value="${v('bf')}" oninput="Onboard._calc()"></label>
+        <label><span>골격근량 (kg) <i>선택</i></span><input id="obMs" class="inp" type="number" inputmode="decimal" placeholder="—" value="${v('ms')}"></label>
+        <label><span>활동량</span><select id="obAct" class="inp" onchange="Onboard._calc()">
           <option value="1.2">거의 앉아서 지냄</option>
           <option value="1.375" selected>주 1~3회 운동</option>
           <option value="1.55">주 3~5회 운동</option>
@@ -198,7 +198,7 @@ const Onboard = {
       InBody.saveRecords(recs.filter(x => x.dt !== dt).concat(rec));
       try { InBody.render(); } catch {}
     }
-    FirebaseSync?.scheduleSave();
+    window.FirebaseSync?.scheduleSave?.();
     try { Diet.render(App?.S?.selDate || new Date()); } catch {}
     return true;
   },

@@ -3459,3 +3459,11 @@ body.ob-open{ overflow:hidden; }
 html.dark .exm-media{ background:#1d2026; }
 .exm-sub{ font-size:12px; color:var(--text3); text-align:center; margin-bottom:8px; }
 .exm-cues{ margin:0 0 12px; padding-left:20px; font-size:14px; line-height:1.7; }
+
+/* AI 창 머리: 카드와 같은 바탕 — 밝은/어두운 모드 모두 글씨가 분명하게 */
+.jarvis-head{ background:var(--card) !important; border-bottom:1px solid var(--border); }
+.j-logo{ color:var(--text) !important; font-size:15px !important; }
+.j-status{ color:var(--text3) !important; opacity:1 !important; background:var(--card2) !important; }
+.j-icon-btn{ background:var(--card2) !important; color:var(--text2) !important; }
+/* 선택된 요일은 확실히 채워 보이게 */
+.day-pick-btn:has(input:checked){ background:var(--accent) !important; border-color:var(--accent) !important; color:var(--accent-fg) !important; font-weight:700; }
