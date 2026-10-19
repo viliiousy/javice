@@ -32,6 +32,8 @@
         var dark = p==='dark' || (p==='system' && matchMedia('(prefers-color-scheme: dark)').matches);
         if(dark) document.documentElement.classList.add('dark');
       }catch(e){}
+      // 허브 모드: 태블릿·거치용으로 켜 두면 앱을 열자마자 허브 화면으로 간다 (설정 › 기기 · 허브)
+      try{ if(localStorage.getItem('gl_hub_mode')==='1' && !/[?&]nohub/.test(location.search)) location.replace('hub.html?from=app'); }catch(e){}
       // 디자인 판: v2(새 디자인) 기본, v1 은 예전 모습. 프로필 메뉴 → 디자인 에서 바꾼다.
       try{ document.documentElement.dataset.ui = localStorage.getItem('gl_ui') || 'v2'; }catch(e){ document.documentElement.dataset.ui='v2'; }
     })();

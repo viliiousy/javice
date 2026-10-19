@@ -1,0 +1,110 @@
+/* css/hub-v2.css — 허브를 앱(2차 디자인)과 같은 옷으로
+   방향: "현관 벽에 걸린 출발 안내판" — 먹색 판 위에 큰 시각 숫자 하나, 나머지는 가는 선으로 나뉜 줄.
+   서체 둘: 글은 IBM Plex Sans KR, 숫자는 Space Grotesk. 색: 먹색 + 주황 한 가지(켜진 기기·지금 할 것).
+   간격 단위 8px. 상자를 겹겹이 두르지 않고 구역은 선 하나로 나눈다.
+   예전 모습은 css/hub.css 그대로이고, 이 파일은 그 위에 덮는다. */
+
+:root{
+  --bg:#101113; --panel:#101113; --panel2:#17181B; --line:#26282D;
+  --fg:#ECEDEE; --fg2:#B4B7BD; --fg3:#8B8F97;
+  --on:#FF6A2B; --on-bg:#2A1A12; --ok:#ECEDEE; --warn:#FF9A6B; --bad:#FF6B6B;
+  --claude:#ECEDEE; --gpt:#ECEDEE; --higgs:#ECEDEE;
+  --radius:14px;
+  --num:'Space Grotesk','IBM Plex Sans KR',system-ui,sans-serif;
+}
+body{ font-family:'IBM Plex Sans KR','Pretendard Variable',Pretendard,system-ui,sans-serif; }
+
+.hub{ gap:0; padding:max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
+  max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); grid-template-columns:minmax(320px, 34%) 1fr; }
+.h-left{ gap:0; padding-right:24px; border-right:1px solid var(--line); }
+.h-right{ gap:0; padding-left:24px; grid-template-rows:auto 1fr; }
+
+/* 시각: 화면에서 가장 먼저 보이는 것 하나 */
+.clock{ padding:0 0 24px; border-bottom:1px solid var(--line); }
+.time{ font-family:var(--num); font-weight:600; font-size:clamp(80px, 11vw, 152px); letter-spacing:-.035em; line-height:.9; }
+.date{ margin-top:16px; font-size:clamp(16px,1.6vw,20px); color:var(--fg2); font-weight:500; }
+.wx-row{ margin-top:8px; gap:16px; }
+.weather b, .indoor b{ font-family:var(--num); font-weight:500; }
+.w-sun{ color:var(--on); } .w-moon,.w-rain,.w-storm,.w-snow{ color:var(--fg2); }
+
+/* 구역: 상자 대신 위쪽 가는 선 */
+.tasks, .panel, .voice{ background:none; border:0; border-radius:0; }
+.tasks{ padding:24px 0 8px; border-bottom:1px solid var(--line); }
+.panel{ padding:0 0 24px; }
+.usage{ border-bottom:1px solid var(--line); }
+.home{ padding-top:24px; }
+.p-head{ margin-bottom:16px; gap:16px; }
+.p-head h2{ font-size:17px; font-weight:600; color:var(--fg); letter-spacing:0; }
+.p-note{ font-size:13px; }
+
+/* 할 일 */
+.tk{ padding:12px 0; font-size:16px; border-top-color:#1E2024; }
+.tk-dot{ width:22px; height:22px; border-radius:7px; border-color:var(--fg3); }
+.tk-done .tk-dot{ background:var(--on); border-color:var(--on); }
+.tk-due{ font-family:var(--num); font-size:13px; }
+.tk-due.today{ color:var(--on); }
+.tk-star{ color:var(--on); }
+
+/* 음성: 맨 아래 한 줄. 마이크만 주황 */
+.voice{ padding:16px 0 0; min-height:0; }
+.mic{ width:56px; height:56px; border:0; background:var(--on); color:#101113; }
+.mic.armed::after{ background:#ECEDEE; }
+.mic.listening{ background:#ECEDEE; color:#101113; animation:none; }
+.v-hint{ font-size:15px; }
+.v-reply{ font-size:16px; }
+
+/* AI 사용량: 카드 셋 대신 세로선으로 나눈 세 칸, 숫자 크게 */
+.u-cards{ gap:0; }
+.u-card{ background:none; border-radius:0; padding:0 16px; border-left:1px solid var(--line); }
+.u-card:first-child{ border-left:0; padding-left:0; }
+.u-ring{ width:72px; height:72px; }
+.u-ring .trk{ stroke:#26282D; }
+.u-ring .val[stroke^="#"]{ stroke:var(--fg); }   /* 넉넉하면 흰색, 30% 아래는 주황(var(--warn)/--bad 그대로) */
+.u-ring .num{ font-family:var(--num); font-weight:600; }
+.u-name{ font-size:16px; font-weight:600; }
+.u-meta b, .u-week-top b{ font-family:var(--num); }
+.u-week-fill[style*="#"]{ background:var(--fg) !important; }
+.u-week-trk{ height:6px; background:#26282D; }
+
+/* 집: 기기 칸 — 꺼진 건 조용히, 켜진 것만 주황 */
+.tiles{ gap:8px; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); }
+.tile{ background:var(--panel2); border-color:transparent; border-radius:14px; padding:16px; min-height:128px; gap:8px; }
+.tile .t-ic{ width:32px; height:32px; color:var(--fg3); }
+.tile .t-name{ font-size:15px; font-weight:500; }
+.tile .t-state{ font-family:var(--num); font-size:13px; }
+.tile.on{ background:var(--on-bg); border-color:transparent; }
+.tile.on .t-ic, .tile.on .t-state{ color:var(--on); }
+.tile.ro .t-state{ font-size:24px; font-weight:600; }
+.tile .t-ctl button{ background:none; border-color:var(--line); border-radius:10px; font-family:var(--num); }
+.tile.dimming{ border-color:var(--on); }
+
+/* 칩·단추 */
+.chip{ background:none; border-color:var(--line); font-weight:500; height:40px; padding:0 16px; display:inline-flex; align-items:center; }
+.chip-acc, .chip.sel{ background:var(--fg); color:#101113; border-color:var(--fg); font-weight:600; }
+.areas .chip{ height:36px; padding:0 14px; }
+
+/* 설정 창: 앱의 시트와 같은 결 */
+.settings{ background:#17181B; border-color:var(--line); border-radius:24px; }
+.settings form{ padding:24px; gap:16px; }
+.settings h2{ font-size:20px; font-weight:600; }
+.settings fieldset{ border:0; border-top:1px solid var(--line); border-radius:0; padding:16px 0 0; }
+.settings legend{ padding:0 8px 0 0; font-size:13px; color:var(--fg3); font-weight:600; }
+.settings input:not([type=checkbox]){ height:48px; border-radius:12px; background:#101113; padding:0 14px; }
+.settings input:focus{ outline:1px solid var(--fg3); }
+.s-check input{ accent-color:var(--on); }
+.dv-ic, .dv-sw{ border-radius:12px; }
+.dv-sw.on{ background:var(--on-bg); color:var(--on); border-color:transparent; }
+
+/* 앱으로 돌아가기 (허브 모드에서만) */
+.back-app{ position:fixed; right:calc(max(10px, env(safe-area-inset-right)) + 48px); bottom:max(10px, env(safe-area-inset-bottom));
+  height:40px; padding:0 14px; border-radius:20px; border:1px solid var(--line); background:#101113; color:var(--fg2);
+  font:inherit; font-size:13px; display:none; align-items:center; gap:6px; cursor:pointer; z-index:5; }
+body.hub-mode .back-app{ display:inline-flex; }
+.gear{ color:var(--fg3); }
+
+@media (max-width:820px), (orientation:portrait){
+  .h-left{ padding-right:0; border-right:0; }
+  .h-right{ padding-left:0; }
+  .u-card{ border-left:0; padding:16px 0; border-top:1px solid var(--line); }
+  .u-card:first-child{ border-top:0; }
+}
