@@ -117,7 +117,18 @@ const ExMedia = {
     for (const [id, ko, en, part, cues] of this.RAW) this._map.set(ko, { id, ko, en, part, cues: cues.split('|') });
     return this._map;
   },
-  find(name) { return this._all().get(String(name || '').trim()) || null; },
+  find(name) {
+    const n = String(name || '').trim();
+    const e = this._all().get(n);
+    if (e) return e;
+    // 요령은 아직 없지만 그림은 있는 나머지 종목 (js/ex-auto.js)
+    if (typeof EX_AUTO !== 'undefined' && EX_AUTO[n]) {
+      let part = '';
+      if (typeof EX_DB !== 'undefined') for (const [p, ns] of Object.entries(EX_DB)) if (ns.includes(n)) { part = p; break; }
+      return { id: EX_AUTO[n], ko: n, en: '', part, cues: [] };
+    }
+    return null;
+  },
   img(e) { return this.DIR + e.id + '.webp'; },
 
   open(name) {
@@ -128,8 +139,8 @@ const ExMedia = {
         <div class="exm-anim" style="background-image:url('${this.img(e)}')" role="img" aria-label="${esc(e.ko)} 시작·끝 자세"></div>
         <div class="exm-none">${Icons.big('dumbbell')}<span>자세 그림 준비 중</span></div>
       </div>
-      <div class="exm-sub">${esc(e.en)} · ${esc(e.part)}</div>
-      <ol class="exm-cues">${e.cues.map(c => `<li>${esc(c)}</li>`).join('')}</ol>
+      <div class="exm-sub">${[e.en, e.part].filter(Boolean).map(esc).join(' · ')}</div>
+      ${e.cues.length ? `<ol class="exm-cues">${e.cues.map(c => `<li>${esc(c)}</li>`).join('')}</ol>` : ''}
       <div class="modal-btns">
         <a class="btn-sm" href="${yt}" target="_blank" rel="noopener">▶ 자세 영상 찾기</a>
         <button class="btn-sm accent" onclick="App.closeModal()">닫기</button>
