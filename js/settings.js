@@ -8,8 +8,8 @@
 const Settings = {
   CATS: [
     { id:'design', ic:'palette', name:'디자인',      sub:() => `${Settings._uiName()} · ${Settings._themeName()}` },
-    { id:'voice',  ic:'volume',  name:'음성 · 소리', sub:() => `답 읽기 ${Settings._on(JARVIS?._ttsEnabled)} · 효과음 ${Settings._on(Sounds?.enabled)}` },
-    { id:'notify', ic:'bell',    name:'알림',        sub:() => '할일·습관·일정 알림' },
+    { id:'voice',  ic:'volume',  name:'음성 · 소리 · 진동', sub:() => `답 읽기 ${Settings._on(JARVIS?._ttsEnabled)} · 효과음 ${Settings._on(Sounds?.enabled)} · 진동 ${Settings._on(Haptic.on)}` },
+    { id:'notify', ic:'bell',    name:'알림',        sub:() => { try { return Notifications.getSettings().enabled ? '켜짐 · 습관·식단·할일·일정' : '꺼짐'; } catch(e){ return ''; } } },
     { id:'ai',     ic:'sparkle', name:'AI',          sub:() => { try { const P = JARVIS.PROVIDERS[JARVIS._active()]; return `기본 ${P ? (P.short || P.name) : '미설정'} · 사용량 추적`; } catch(e){ return 'AI 비서 · 사용량 추적'; } } },
     { id:'secure', ic:'key',     name:'보안 · 계정', sub:() => '기기 연결 · 저장된 키 · 로그아웃' },
     { id:'help',   ic:'book',    name:'도움말',      sub:() => '사용 도우미 · 버전' },
@@ -73,9 +73,11 @@ const Settings = {
       h = `<div class="set-h">AI 비서</div>
         ${this._item('답을 소리로 읽기', this._sw(JARVIS?._ttsEnabled, 'Settings.toggleTTS()'), 'AI 답을 음성으로 들려 줍니다')}
         <div class="set-h">앱</div>
-        ${this._item('효과음', this._sw(Sounds?.enabled, 'Settings.toggleSound()'), '체크·완료할 때 짧은 소리')}`;
+        ${this._item('효과음', this._sw(Sounds?.enabled, 'Settings.toggleSound()'), '체크·완료할 때 짧은 소리')}
+        ${this._item('진동(햅틱)', this._sw(Haptic.on, 'Settings.toggleHaptic()'), '체크·순서 바꾸기·탭 전환 때 손끝 진동')}`;
     } else if (cat === 'notify') {
-      h = `${this._link('알림 설정 열기', 'Notifications.showSettings()', '할일 마감·습관·일정 알림 시간을 정합니다')}`;
+      h = `<div id="setNotify" class="set-loading">불러오는 중…</div>`;
+      setTimeout(async () => { const el = document.getElementById('setNotify'); if (el) { el.className=''; el.innerHTML = await Notifications.pageHtml(); } }, 0);
     } else if (cat === 'ai') {
       h = `<div class="set-h">AI 비서</div>
         ${this._link('기본 AI · 키 설정', 'JARVIS.showKeySetup()', '어느 AI 를 쓸지, 각 서비스의 키를 넣습니다')}
@@ -105,6 +107,7 @@ const Settings = {
   setTheme(v) { App._theme = v; App._applyTheme(); this._re('design'); },
   setIcons(v) { Icons.mode = v; Icons.applyMode(); Icons.updateModeLabel?.(); this._re('design'); },
   toggleTTS() { JARVIS.toggleTTS(); this._re('voice'); },
+  toggleHaptic() { Haptic.on = !Haptic.on; if (Haptic.on) Haptic.light(); this._re('voice'); },
   toggleSound() { Sounds.enabled = !Sounds.enabled; if (Sounds.enabled) Sounds.click?.(); App._updateSoundLabel?.(); this._re('voice'); },
   clearKeys() {
     if (!confirm('이 기기에 저장된 AI 키를 모두 지울까요?')) return;

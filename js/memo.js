@@ -164,6 +164,7 @@ const Memo = {
         this.saveItems(out);
       },
     }); } catch(e){ console.warn('RowUI', e); }
+    try { Fold.apply(wrap, 'memo'); } catch(e) {}
 
     wrap.querySelectorAll('.memo-item').forEach(row => {
       if (row.dataset.mmOn) return;

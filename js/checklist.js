@@ -3,7 +3,7 @@
 const Checklist = {
   _key() { return 'gl_checklist_v2'; },
   getItems() { return JSON.parse(UserStore.get(this._key())||'[]'); },
-  saveItems(v) { UserStore.set(this._key(), JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
+  saveItems(v) { UserStore.set(this._key(), JSON.stringify(v)); FirebaseSync?.scheduleSave(); try{ LocalNotify?.reschedule(); }catch(e){} },
 
   getItemsForDate(date) {
     const d=new Date(date); d.setHours(0,0,0,0);
@@ -46,6 +46,7 @@ const Checklist = {
       del:  id => this.remove(id),
       reorder: order => this._applyOrder(order),
     }); } catch(e) { console.warn('RowUI', e); }
+    try { Fold.apply(wrap, 'checklist'); } catch(e) {}
   },
 
   // ── 터치 제스처 ───────────────────────
@@ -104,6 +105,7 @@ const Checklist = {
   },
 
   toggle(id) {
+    try { Haptic.light(); } catch(e){}
     const items=this.getItems();
     const it=items.find(i=>i.id===id);
     if(it){

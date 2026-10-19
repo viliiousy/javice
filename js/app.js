@@ -64,6 +64,7 @@ const App = {
     this._updateHeaderDate(new Date());
     try { Habits.init(new Date()); } catch(e){ console.warn('Habits init',e); }
     try { Notifications.init(); } catch(e){ console.warn('Notifications init',e); }
+    try { LocalNotify.init(); } catch(e){ console.warn('LocalNotify init',e); }
     try { Diet.render(new Date()); } catch(e){ console.warn('Diet render',e); }
     try { Fitness.render(new Date()); } catch(e){ console.warn('Fitness render',e); }
     try { Checklist.render(); }     catch(e){ console.warn('Checklist render',e); }
@@ -196,8 +197,8 @@ const App = {
     const calLeft = calGoal - dt.cal;
     const won = v => Math.round(v).toLocaleString('ko-KR');
     const calTxt = !calGoal      ? `<b>${won(dt.cal)}</b>kcal`
-                 : calLeft >= 0  ? `남은 <b>${won(calLeft)}</b>kcal`
-                                 : `초과 <b>${won(-calLeft)}</b>kcal`;
+                 : calLeft >= 0  ? `<span class="kc-pre">남은 </span><b>${won(calLeft)}</b>kcal`
+                                 : `<span class="kc-pre">초과 </span><b>+${won(-calLeft)}</b>kcal`;
     // 새 디자인의 폰 화면은 헤더 오른쪽 두 줄(인바디·자산)을 접는다 — 몸무게만 이 줄 끝으로 옮긴다.
     let kgTxt = '';
     try { const r = (typeof InBody!=='undefined' && InBody.getRecords()) || []; const la = r[r.length-1]; if (la && la.wt) kgTxt = `<div class="stat-chip stat-kg" data-s="inbody" title="최근 체중"><b>${la.wt}</b>kg</div>`; } catch(e){}
@@ -941,6 +942,7 @@ const App = {
       edit: v => { const [id,lid]=v.split('|'); this._showTaskDetail(id,lid); },
       del:  v => { const [id,lid]=v.split('|'); this._delTask(id,lid); },
     }); } catch(e) { console.warn('RowUI', e); }
+    try { Fold.apply(document.getElementById('tasksContainer'), 'tasks'); } catch(e) {}
   },
 
   _taskHTML(t) {
@@ -1044,6 +1046,7 @@ const App = {
 
   async _toggle(taskId,listId,done){
     try{
+      try { Haptic.light(); } catch(e){}
       await GoogleTasks.toggleTask(listId,taskId,!done);
       const t=this.S.tasks[listId]?.find(x=>x.id===taskId);
       if(t){ t.status=!done?'completed':'needsAction'; t.completed=!done?new Date().toISOString():null; }

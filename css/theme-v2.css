@@ -359,3 +359,41 @@ html[data-ui="v2"] .stats-upcoming{ border-top:0; margin-top:0; }
   html[data-ui="v2"] .habits-wrap{ gap:0; }
 }
 html[data-ui="v2"] .chip-flash{ animation:none; }
+
+/* 폰: 카드 안 모든 내용 좌우 16px (경제 목록이 화면 끝에 붙어 잘리던 것) */
+@media (max-width:900px){
+  html[data-ui="v2"] .card > :not(.card-head){ padding-left:16px !important; padding-right:16px !important; }
+  html[data-ui="v2"] #econHold:empty{ display:none; }
+  html[data-ui="v2"] .card-head{ gap:8px; }
+  html[data-ui="v2"] .card-title{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  html[data-ui="v2"] .card-acts{ flex:none; }
+  html[data-ui="v2"] .ec-row-l{ min-width:0; }
+  html[data-ui="v2"] .ec-nm{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+}
+
+/* 상단 요약: 좁은 화면에서 오른쪽 몸무게가 잘리지 않게 — 글자·간격을 화면 너비에 맞춰 줄인다 */
+html[data-ui="v2"] .stats-row{ gap:8px; }
+html[data-ui="v2"] .sg-l{ gap:10px; padding:0 10px; min-width:0; }
+html[data-ui="v2"] .sg-r{ gap:8px; min-width:0; }
+html[data-ui="v2"] .stat-chip{ font-size:12px; white-space:nowrap; }
+html[data-ui="v2"] .stat-chip b{ font-size:14px; }
+@media (max-width:400px){
+  html[data-ui="v2"] .stats-banner{ padding-left:12px !important; padding-right:12px !important; }
+  html[data-ui="v2"] .sg-l{ gap:8px; padding:0 9px; }
+  html[data-ui="v2"] .stat-chip{ font-size:11px; gap:2px; }
+  html[data-ui="v2"] .stat-chip b{ font-size:13px; }
+  html[data-ui="v2"] .sg-r .stat-chip .kc-pre{ display:none; }   /* '남은' 글자는 숨기고 숫자만 */
+}
+@media (max-width:360px){ html[data-ui="v2"] .stat-chip b{ font-size:12px; } html[data-ui="v2"] .sg-l{ gap:6px; padding:0 8px; } }
+@media (max-width:380px){
+  html[data-ui="v2"] .card-head .btn-sm.btn-ic{ width:32px; height:32px; }
+  html[data-ui="v2"] .card-head .btn-sm:not(.btn-ic){ height:32px; padding:0 10px; }
+  html[data-ui="v2"] .card-acts{ gap:4px; }
+}
+/* 알림 설정 시간 칸 */
+.set-times{ display:flex; flex-wrap:wrap; gap:8px; padding:0 0 12px; border-bottom:1px solid var(--border); }
+.set-times label{ display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text3); }
+.set-time{ height:40px; border-radius:10px; border:1px solid var(--border); background:var(--card2); color:var(--text); font:inherit; font-size:15px; padding:0 10px; font-family:var(--v2-num, inherit); }
+html.dark .set-time{ background:var(--card); color-scheme:dark; }
+.set-note{ font-size:12.5px; color:var(--text3); margin:10px 0 0; line-height:1.5; }
+.set-loading{ padding:24px 0; color:var(--text3); font-size:13px; }

@@ -95,7 +95,7 @@ const Habits = {
   },
   _dateKey(date) { return `gl_habits_${this._dateStr(date)}`; },
   getChecked(date=new Date()) { return JSON.parse(UserStore.get(this._dateKey(date))||'[]'); },
-  setChecked(v,date=new Date()) { UserStore.set(this._dateKey(date), JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
+  setChecked(v,date=new Date()) { UserStore.set(this._dateKey(date), JSON.stringify(v)); FirebaseSync?.scheduleSave(); try{ LocalNotify?.reschedule(); }catch(e){} },
 
   // cat 을 넘기지 않으면 전체 카테고리를 반환한다 (스탯 배너 등 기존 호출 호환)
   getHabitsForDate(date=new Date(), cat=null) {
@@ -212,6 +212,7 @@ const Habits = {
       del:  id => this._delFrom(id, this._dateStr(date)),
       reorder: order => this._applyOrder(order),
     }); } catch(e) { console.warn('RowUI', e); }
+    try { Fold.apply(wrap, 'habits'); } catch(e) {}
 
     // 지난 다섯 주 격자는 여기 있었는데 달력 칸 바탕으로 옮겼다(monthLevels).
     // 한 화면에 달력이 둘이면 어느 쪽이 무엇인지 매번 다시 읽어야 한다.
@@ -273,7 +274,7 @@ const Habits = {
       // 퍼펙트 달성 체크
       const newChk=this.getChecked(date);
       const todayList=this.getHabitsForDate(date);
-      if(todayList.length>0&&todayList.every(h=>newChk.includes(h.id))) setTimeout(()=>Sounds?.achieve(),200);
+      if(todayList.length>0&&todayList.every(h=>newChk.includes(h.id))) { setTimeout(()=>Sounds?.achieve(),200); setTimeout(()=>{ try{ Haptic.success(); }catch(e){} },120); }
     } else { Sounds?.uncheck(); }
   },
 
@@ -281,6 +282,7 @@ const Habits = {
     const chk=this.getChecked(date);
     const i=chk.indexOf(id);
     if(i===-1) chk.push(id); else chk.splice(i,1);
+    try { Haptic.light(); } catch(e){}
     const isDoneNow=!chk.includes(id);
     this.setChecked(chk,date);
     this.render(date);

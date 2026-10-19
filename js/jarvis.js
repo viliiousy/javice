@@ -482,6 +482,7 @@ const JARVIS = {
   },
   // 오른쪽 단추: 듣는 중 → 멈추고 보내기 / 글자 있음 → 보내기 / 비어 있음 → 듣기
   _act() {
+    try { Haptic.medium(); } catch(e){}
     if(this.listening) return this._stopListen();
     const v=document.getElementById('jInput')?.value.trim();
     if(v) return this.send();

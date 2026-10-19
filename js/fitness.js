@@ -288,6 +288,7 @@ const Fitness = {
   },
 
   toggle(idx, dateStr=null) {
+    try { Haptic.light(); } catch(e){}
     const d = dateStr ? new Date(dateStr+'T00:00:00') : new Date();
     if (this._dateStr(d)!==this._dateStr(new Date())) return;
     const chk=this._checked(d);

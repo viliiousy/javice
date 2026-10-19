@@ -76,7 +76,7 @@ const RowUI = {
         lp = setTimeout(() => {
           if (moved) return;
           fired = true;
-          if (navigator.vibrate) { try { navigator.vibrate(12); } catch {} }
+          try { Haptic.medium(); } catch {}
           this.closeOpen();
           // 순서를 바꿀 수 있는 목록(습관)은 길게 누르면 끌기가 시작된다.
           if (h.reorder) { dragging = true; this._dragStart(wrap, root, sy); }
@@ -111,7 +111,7 @@ const RowUI = {
         const x2 = base + dx;
         row.style.transform = '';
         row.classList.remove('rw-drag');
-        if (x2 < -this.SNAP / 2) { row.classList.add('rw-on'); this._open = row; }
+        if (x2 < -this.SNAP / 2) { row.classList.add('rw-on'); this._open = row; try { Haptic.light(); } catch {} }
         else { row.classList.remove('rw-on'); if (startedOpen()) this._open = null; }
       };
       // 길게 누를 때 iOS 가 글씨를 선택(파란 칠)하거나 메뉴를 띄우지 못하게 한다
@@ -126,7 +126,7 @@ const RowUI = {
           if (e.button !== 0 || e.target.closest('button, input, .habit-chk')) return;
           const y0 = e.clientY, x0 = e.clientX;
           let t = setTimeout(() => {
-            t = null; fired = true; this._dragStart(wrap, root, y0);
+            t = null; fired = true; try { Haptic.medium(); } catch {} this._dragStart(wrap, root, y0);
             const mv = (ev) => { ev.preventDefault(); this._dragMove(ev.clientY); };
             const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up);
               this._dragEnd(h.reorder); setTimeout(() => { fired = false; }, 0); };
@@ -187,7 +187,7 @@ const RowUI = {
     for (let i = d.idx - 1; i >= 0; i--)            if (c < d.tops[i] + d.hs[i] / 2) to = i;
     if (to !== d.to) {
       d.to = to;
-      if (navigator.vibrate) { try { navigator.vibrate(6); } catch {} }
+      try { Haptic.select(); } catch {}
       d.items.forEach((el, i) => {
         if (i === d.idx) return;
         const sh = (d.idx < i && i <= to) ? -d.H : (to <= i && i < d.idx) ? d.H : 0;
@@ -214,6 +214,7 @@ const RowUI = {
     cancelAnimationFrame(d.raf);
     document.body.classList.remove('rw-dragging');
     const moved = d.to !== d.idx;
+    try { Haptic.light(); } catch {}
     // 제자리로 내려앉는 짧은 움직임: 들린 줄을 목표 칸 위치까지 옮겨 둔 뒤 DOM 을 바꾼다
     const finish = () => {
       d.root.classList.add('rw-noanim');
@@ -242,3 +243,29 @@ document.addEventListener('click', (e) => {
   if (RowUI._open && !e.target.closest('.rw')) RowUI.closeOpen();
 });
 document.addEventListener('scroll', () => RowUI.closeOpen(), true);
+
+// ── 긴 목록 접기 ───────────────────────────
+// 목록이 길면 처음 몇 줄만 보이고 'n개 더 보기' 로 펼친다. 추가 단추(+ 습관 추가 등)는
+// 목록의 일부가 아니므로 접혀 있어도 늘 맨 아래에 보인다. 펼친 상태는 화면을 새로 그려도 유지한다.
+const Fold = {
+  MAX: 5,
+  _open: {},
+  apply(root, key, max = this.MAX) {
+    if (!root) return;
+    root.querySelectorAll(':scope .fold-btn').forEach(b => b.remove());
+    const items = [...root.querySelectorAll('.rw')].filter(el => !el.closest('.fold-skip'));
+    items.forEach(el => el.classList.remove('fold-hide'));
+    if (items.length <= max + 1) return;            // 한 줄 더 접느라 단추를 다는 건 손해다
+    const open = !!this._open[key];
+    if (!open) items.slice(max).forEach(el => el.classList.add('fold-hide'));
+    // 묶음(할일 그룹)이 통째로 숨으면 그 이름표도 숨긴다
+    root.querySelectorAll('.task-group').forEach(g => g.classList.toggle('fold-hide', !open && ![...g.querySelectorAll('.rw')].some(r => !r.classList.contains('fold-hide'))));
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'fold-btn' + (open ? ' open' : '');
+    btn.innerHTML = open ? '접기' : `${items.length - max}개 더 보기`;
+    btn.onclick = (e) => { e.stopPropagation(); this._open[key] = !open; try { Haptic.select(); } catch {} this.apply(root, key, max); };
+    const last = items[items.length - 1];
+    const anchor = open ? last : items[max - 1];
+    (anchor.closest('.task-group') || anchor).after(btn);
+  },
+};

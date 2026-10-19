@@ -232,128 +232,78 @@ const Notifications = {
     }
   },
 
-  // 테스트 알림 (로컬 Notification API)
+  // ── 테스트 알림 ─────────────────────────────
+  // 앱: 기기 안에 3초 뒤 알림을 예약한다. 웹: 브라우저 알림을 바로 띄우고,
+  // 이 기기가 서버에 등록돼 있으면 서버 푸시도 한 번 보내 본다(실제 경로 확인).
   async sendTest() {
-    if(Notification.permission !== 'granted') {
-      await Notification.requestPermission();
+    if (typeof LocalNotify !== 'undefined' && LocalNotify.ok) {
+      const ok = await LocalNotify.test();
+      App.showToast(ok ? '3초 뒤 테스트 알림이 울립니다 (앱을 잠시 나가 보세요)' : '알림 권한이 꺼져 있습니다 — 아이폰 설정 › Bashy › 알림', ok ? 'success' : 'error');
+      return;
     }
-    if(Notification.permission === 'granted') {
-      new Notification('⚡ Bashy 알림 테스트', {
-        body: '알림이 정상 작동합니다! 🎉',
-        icon: '/icons/icon-192.png',
-      });
-      App.showToast('✅ 테스트 알림 전송됨', 'success');
-    } else {
-      App.showToast('알림 권한이 없습니다', 'error');
-    }
+    if (typeof Notification === 'undefined') { App.showToast('이 브라우저는 알림을 지원하지 않습니다', 'error'); return; }
+    if (Notification.permission !== 'granted') await Notification.requestPermission();
+    if (Notification.permission !== 'granted') { App.showToast('알림 권한이 없습니다', 'error'); return; }
+    try {
+      const reg = this._swReg || await navigator.serviceWorker?.ready;
+      if (reg?.showNotification) reg.showNotification('Bashy 알림 테스트', { body:'알림이 정상적으로 울립니다.', icon:'/icons/icon-192.png' });
+      else new Notification('Bashy 알림 테스트', { body:'알림이 정상적으로 울립니다.', icon:'/icons/icon-192.png' });
+    } catch (e) { try { new Notification('Bashy 알림 테스트', { body:'알림이 정상적으로 울립니다.' }); } catch {} }
+    const token = this.localToken();
+    if (token) fetch(Platform.api('/api/test-push'), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ token }) }).catch(()=>{});
+    App.showToast('테스트 알림을 보냈습니다', 'success');
   },
 
-  // 알림 설정 모달
-  showSettings() {
-    const s   = this.getSettings();
-    const sub = this.localToken();   // 이 기기 기준 (다른 기기 등록과 무관)
-    // '등록됨' 만으로는 부족하다. 죽은 토큰도 등록은 돼 있다 —
-    // 언제 등록된 것인지가 보여야 '오래됐으니 한 번 다시 해 보자' 는 판단이 선다.
-    const at  = this.syncedAt();
-    const day = at ? Math.floor((Date.now() - at) / 86400000) : null;
-    const when = day === null ? '' : day === 0 ? ' · 오늘 갱신' : ` · ${day}일 전 갱신`;
-    const state = this._needsReauth ? '⚠️ 등록이 풀렸습니다 — 다시 등록하세요'
-                : sub ? `✅ 이 기기에 등록됨${when}` : '미등록';
-    App.openModal('🔔 알림 설정', `
-      <div style="margin-bottom:14px">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--card2);border-radius:10px;margin-bottom:8px">
-          <div>
-            <div style="font-weight:600;font-size:14px">알림 활성화</div>
-            <div style="font-size:11px;color:var(--text3)">${state}</div>
-          </div>
-          <button onclick="Notifications._toggleEnable()" class="btn-sm ${s.enabled?'accent':''}" id="notifToggle">
-            ${s.enabled?'켜짐':'끄기'}
-          </button>
-        </div>
-        <!-- 등록된 뒤에도 이 단추를 숨기지 않는다. 알림이 안 올 때 사용자가 스스로
-             할 수 있는 일이 이것 하나인데, 예전엔 '등록됨' 이 되는 순간 사라졌다. -->
-        <button onclick="Notifications.subscribe()" class="btn-sm ${sub&&!this._needsReauth?'':'accent'}"
-          style="width:100%;padding:10px;margin-bottom:10px">
-          ${sub ? '🔄 이 기기 다시 등록 <span style="opacity:.7;font-size:11px">(알림이 안 올 때)</span>'
-                : '🔔 이 기기에서 알림 활성화'}
-        </button>
-      </div>
+  // 알림 설정 — 설정 화면(Settings) 안의 '알림' 갈래로 연다
+  showSettings() { if (typeof Settings !== 'undefined') Settings.open('notify'); },
 
-      <div class="notif-section">
-        <div class="notif-row">
-          <label class="notif-label">✅ 습관 리마인더</label>
-          <input type="checkbox" id="n_habits" ${s.habits?.enabled?'checked':''}
-            onchange="Notifications._toggle('habits',this.checked)">
-        </div>
-        <div class="notif-time-row" id="nr_habits" ${!s.habits?.enabled?'style="display:none"':''}>
-          <span class="notif-time-lbl">알림 시간</span>
-          <input type="time" value="${s.habits?.time||'21:00'}" class="inp notif-time-inp"
-            onchange="Notifications._setTime('habits','time',this.value)">
-        </div>
-      </div>
-
-      <div class="notif-section">
-        <div class="notif-row">
-          <label class="notif-label">🥗 식단 기록 알림</label>
-          <input type="checkbox" id="n_diet" ${s.diet?.enabled?'checked':''}
-            onchange="Notifications._toggle('diet',this.checked)">
-        </div>
-        <div id="nr_diet" ${!s.diet?.enabled?'style="display:none"':''}>
-          ${['아침','점심','저녁'].map(m=>`
-            <div class="notif-time-row">
-              <span style="font-size:12px;color:var(--text2)">${m}</span>
-              <input type="time" value="${s.diet?.[m]||{아침:'09:00',점심:'13:00',저녁:'19:00'}[m]}" class="inp inp-sm"
-                onchange="Notifications._setTime('diet','${m}',this.value)">
-            </div>`).join('')}
-        </div>
-      </div>
-
-      <div class="notif-section">
-        <div class="notif-row">
-          <label class="notif-label">📋 오늘 마감 할일</label>
-          <input type="checkbox" id="n_tasks" ${s.tasks?.enabled?'checked':''}
-            onchange="Notifications._toggle('tasks',this.checked)">
-        </div>
-        <div class="notif-time-row" id="nr_tasks" ${!s.tasks?.enabled?'style="display:none"':''}>
-          <span class="notif-time-lbl">알림 시간</span>
-          <input type="time" value="${s.tasks?.time||'09:00'}" class="inp inp-sm"
-            onchange="Notifications._setTime('tasks','time',this.value)">
-        </div>
-      </div>
-
-      <div class="notif-section">
-        <div class="notif-row">
-          <label class="notif-label">📅 캘린더 일정</label>
-          <input type="checkbox" id="n_cal" ${s.calendar?.enabled?'checked':''}
-            onchange="Notifications._toggle('calendar',this.checked)">
-        </div>
-        <div class="notif-time-row" id="nr_calendar" ${!s.calendar?.enabled?'style="display:none"':''}>
-          <span class="notif-time-lbl">오늘 일정 요약</span>
-          <select class="inp inp-sm" onchange="Notifications._setTime('calendar','time',this.value)">
-            ${Array.from({length:24},(_,h)=>{
-              const v = String(h).padStart(2,'0')+':00';
-              return `<option value="${v}" ${(s.calendar?.time||'08:00')===v?'selected':''}>${v}</option>`;
-            }).join('')}
-          </select>
-        </div>
-      </div>
-
-      <p class="notif-hint">⏱ 알림 크론은 <b>매시 정각</b>에만 돌아갑니다. 분은 무시되니 시(時)만 맞춰 주세요.</p>
-
-      <div class="modal-btns" style="margin-top:16px">
-        <button onclick="Notifications.sendTest()" class="btn-sm">🔔 테스트 알림</button>
-        <button onclick="Notifications._saveAll();App.closeModal();" class="btn-sm accent">저장</button>
-      </div>`);
+  // 설정 화면에 그릴 내용 (새 디자인)
+  async pageHtml() {
+    const s = this.getSettings(), local = typeof LocalNotify !== 'undefined' && LocalNotify.ok;
+    const perm = local ? await LocalNotify.permission(false) : (typeof Notification !== 'undefined' ? Notification.permission : 'denied');
+    const sub = this.localToken();
+    const stateTxt = !s.enabled ? '꺼져 있습니다'
+      : perm !== 'granted' ? (local ? '아이폰 알림 권한이 꺼져 있습니다 — 설정 › Bashy › 알림' : '브라우저 알림 권한이 필요합니다')
+      : local ? '이 기기에서 울립니다 (기기 안 예약 · 인터넷 없어도 울림)'
+      : sub ? '이 기기에 등록됨 · 서버 알림' : '이 기기는 아직 등록되지 않았습니다';
+    const sw = (on, fn) => Settings._sw(on, fn);
+    const t = (sec, key, v) => `<input type="time" class="set-time" value="${v}" onchange="Notifications._setTime('${sec}','${key}',this.value)">`;
+    const block = (sec, label, sub2, times) => `
+      <div class="set-item"><span class="set-tx"><b>${label}</b><small>${sub2}</small></span>${sw(s[sec]?.enabled, `Notifications._toggle('${sec}',${!s[sec]?.enabled})`)}</div>
+      ${s[sec]?.enabled ? `<div class="set-times">${times}</div>` : ''}`;
+    return `
+      <div class="set-item"><span class="set-tx"><b>알림 받기</b><small>${stateTxt}</small></span>${sw(s.enabled, 'Notifications._toggleEnable()')}</div>
+      ${s.enabled ? `
+      <div class="set-h">무엇을 알려 드릴까요</div>
+      ${block('habits', '습관', '남은 습관이 있을 때 · 시간 정한 습관은 그 시각에', t('habits','time', s.habits?.time||'21:00'))}
+      ${block('diet', '식단 기록', '끼니마다 기록 알림', ['아침','점심','저녁'].map(m => `<label>${m}${t('diet', m, s.diet?.[m]||{아침:'09:00',점심:'13:00',저녁:'19:00'}[m])}</label>`).join(''))}
+      ${block('tasks', '오늘 마감 할일', '마감인 할일이 있는 날만', t('tasks','time', s.tasks?.time||'09:00'))}
+      ${block('checklist', '체크리스트', '그날 날짜를 정해 둔 항목', t('checklist','time', s.checklist?.time||'09:00'))}
+      ${block('calendar', '오늘 일정 요약', '일정이 있는 날 아침에', t('calendar','time', s.calendar?.time||'08:00'))}
+      ${local ? '' : '<p class="set-note">웹에서는 서버가 10분마다 확인해 보냅니다. 시각이 최대 10분 늦을 수 있습니다.</p>'}` : ''}
+      <div class="set-h"></div>
+      ${Settings._link('테스트 알림 보내기', 'Notifications.sendTest()', local ? '3초 뒤 이 기기에서 울립니다' : '이 기기로 바로 보냅니다')}
+      ${!local && s.enabled ? Settings._link('이 기기 다시 등록', 'Notifications.subscribe()', '알림이 안 올 때') : ''}`;
   },
 
-  _toggleEnable() {
-    const s    = this.getSettings();
-    s.enabled  = !s.enabled;
+  _after() {
+    try { FirebaseSync?.scheduleSave(); } catch {}
+    if (typeof LocalNotify !== 'undefined' && LocalNotify.ok) LocalNotify.reschedule(300);
+    else { const token = this.localToken(); if (token) this._registerToken(token); }
+    if (typeof Settings !== 'undefined') Settings._re('notify');
+  },
+
+  async _toggleEnable() {
+    const s = this.getSettings();
+    s.enabled = !s.enabled;
     this.saveSettings(s);
-    const btn  = document.getElementById('notifToggle');
-    if (btn) { btn.textContent=s.enabled?'켜짐':'끄기'; btn.className=`btn-sm ${s.enabled?'accent':''}`; }
-    if (s.enabled && !this.localToken()) this.subscribe();
-    FirebaseSync?.scheduleSave();
+    if (s.enabled) {
+      if (typeof LocalNotify !== 'undefined' && LocalNotify.ok) {
+        const p = await LocalNotify.permission(true);
+        if (p !== 'granted') App.showToast('아이폰 설정 › Bashy › 알림 에서 허용해 주세요', 'error');
+      } else if (!this.localToken()) await this.subscribe();
+    }
+    this._after();
   },
 
   _toggle(section, val) {
@@ -361,8 +311,7 @@ const Notifications = {
     if (!s[section]) s[section] = {};
     s[section].enabled = val;
     this.saveSettings(s);
-    const row = document.getElementById(`nr_${section}`);
-    if (row) row.style.display = val ? '' : 'none';
+    this._after();
   },
 
   _setTime(section, key, val) {
@@ -370,16 +319,9 @@ const Notifications = {
     if (!s[section]) s[section] = {};
     s[section][key] = val;
     this.saveSettings(s);
-  },
-
-  _saveAll() {
-    App.showToast('알림 설정 저장됨 ✓', 'success');
-    // 서버에 설정 업데이트 (이 기기 토큰 기준)
-    const token = this.localToken();
-    if (token) this._registerToken(token).then(r => {
-      if (!r.ok) App.showToast('설정 서버 반영 실패: ' + r.error, 'error');
-    });
-    FirebaseSync?.scheduleSave();
+    clearTimeout(this._st); this._st = setTimeout(() => { try { FirebaseSync?.scheduleSave(); } catch {}
+      if (typeof LocalNotify !== 'undefined' && LocalNotify.ok) LocalNotify.reschedule(300);
+      else { const tk = this.localToken(); if (tk) this._registerToken(tk); } }, 600);
   },
 
   _urlBase64ToUint8Array(base64String) {

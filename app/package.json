@@ -9,15 +9,17 @@
     "open": "npx cap open ios"
   },
   "dependencies": {
+    "@capacitor-community/text-to-speech": "^8.0.2",
+    "@capacitor-firebase/messaging": "^8.5.2",
     "@capacitor/app": "^8.0.0",
     "@capacitor/browser": "^8.0.0",
     "@capacitor/core": "^8.0.0",
+    "@capacitor/haptics": "^8.0.2",
     "@capacitor/ios": "^8.0.0",
+    "@capacitor/local-notifications": "^8.3.1",
     "@capacitor/status-bar": "^8.0.0",
-    "@capacitor-firebase/messaging": "^8.5.2",
     "@capgo/capacitor-social-login": "^8.5.17",
-    "@capgo/capacitor-speech-recognition": "^8.4.4",
-    "@capacitor-community/text-to-speech": "^8.0.2"
+    "@capgo/capacitor-speech-recognition": "^8.4.4"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
