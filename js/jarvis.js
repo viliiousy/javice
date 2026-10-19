@@ -73,7 +73,11 @@ const JARVIS = {
       // 읽지 않은 알림 초기화
       this._unread=0;
       this._updateBadge();
-      setTimeout(()=>document.getElementById('jInput')?.focus(),100);
+      // 폰에서는 입력칸에 자동 포커스하지 않는다. 키보드가 올라오면서 화면이 맨 아래로 밀려
+      // 창 머리와 첫 메시지가 가려졌다. 대화는 맨 위부터 보여 준다.
+      const msgs=document.getElementById('jMsgs')||document.querySelector('.j-msgs');
+      if(matchMedia('(pointer:coarse)').matches){ if(msgs) msgs.scrollTop=0; }
+      else setTimeout(()=>document.getElementById('jInput')?.focus(),100);
     }
   },
 
