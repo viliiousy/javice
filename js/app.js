@@ -66,6 +66,9 @@ const App = {
     try { Notifications.init(); } catch(e){ console.warn('Notifications init',e); }
     try { LocalNotify.init(); } catch(e){ console.warn('LocalNotify init',e); }
     try { if(typeof Widgets!=='undefined') Widgets.init(); } catch(e){}
+    // 허브에서 '연결 코드가 없다' 며 돌아왔으면 이 계정으로 연결해 주고 다시 허브로
+    if(/[?&]linkhub=1/.test(location.search)) Settings.hubLink(120000).then(c=>{ if(c) location.replace('hub.html?from=app'); else App.showToast('로그인한 뒤 설정 › 기기·허브에서 허브를 열어 주세요','error'); });
+    else if(localStorage.getItem('gl_hub_mode')==='1') Settings.hubLink().catch(()=>{});
     try { Diet.render(new Date()); } catch(e){ console.warn('Diet render',e); }
     try { Fitness.render(new Date()); } catch(e){ console.warn('Fitness render',e); }
     try { Checklist.render(); }     catch(e){ console.warn('Checklist render',e); }

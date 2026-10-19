@@ -155,7 +155,33 @@ const Settings = {
     if (on) { App.showToast('허브 모드를 켰습니다 — 허브로 이동합니다', 'success'); setTimeout(() => this.openHub(), 600); }
     else this._re('device');
   },
-  openHub() { location.href = 'hub.html?from=app'; },
+
+  // 허브는 따로 로그인하지 않는다. 이 앱에 로그인한 구글 계정의 연결 코드를 허브 설정에 넣어 주면
+  // 허브가 그 코드로 할 일·AI 사용량과, 계정에 저장해 둔 허브 설정(Home Assistant 주소 등)을 받아 온다.
+  // 코드가 이미 있으면 그대로 쓴다(새로 만들면 다른 태블릿의 연결이 끊긴다).
+  async hubLink(waitMs = 15000) {
+    const end = Date.now() + waitMs;
+    const authed = () => typeof FirebaseSync !== 'undefined' && FirebaseSync.ready() && FirebaseSync._authed;
+    while (!authed() && Date.now() < end) await new Promise(r => setTimeout(r, 300));
+    if (!authed()) return null;
+    let link = await FirebaseSync.getLink();
+    let key = link && link.hubKey;
+    if (!key) {
+      const b = new Uint8Array(24); crypto.getRandomValues(b);
+      key = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      if (!(await FirebaseSync.setLink({ hubKey: key }))) return null;
+    }
+    const code = `${FirebaseSync._uid}.${key}`;
+    let cfg = {}; try { cfg = JSON.parse(localStorage.getItem('hub_cfg_v1')) || {}; } catch {}
+    if (cfg.code !== code) { cfg.code = code; delete cfg.cfgAt; localStorage.setItem('hub_cfg_v1', JSON.stringify(cfg)); }
+    return code;
+  },
+
+  async openHub() {
+    App.showToast('허브를 여는 중…');
+    await this.hubLink();
+    location.href = 'hub.html?from=app';
+  },
   clearKeys() {
     if (!confirm('이 기기에 저장된 AI 키를 모두 지울까요?')) return;
     Object.values(JARVIS.PROVIDERS).forEach(p => localStorage.removeItem(p.key));

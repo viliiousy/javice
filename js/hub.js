@@ -1551,6 +1551,9 @@ function nativeSetup() {
 }
 
 function boot() {
+  // 앱(설정 › 허브 모드)에서 왔는데 연결 코드가 없으면, 로그인한 계정으로 연결하러 앱에 잠깐 다녀온다
+  const fromApp = /[?&]from=app/.test(location.search) || document.body.classList.contains('hub-mode');
+  if (fromApp && !Cfg.get().code && !/[?&]linked=0/.test(location.search)) { location.replace('index.html?nohub=1&linkhub=1'); return; }
   Clock.init(); Weather.init(); Usage.init(); Tasks.init();
   HA.bind(); HA.connect();
   Voice.init(); Settings.init(); DevSettings.init();
@@ -1560,7 +1563,7 @@ function boot() {
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) { Usage.load(); Tasks.load(); Cloud.sync(); if (!HA.ready && (Cfg.get().haUrl || Cfg.get().haUrlExt)) { HA._retry = 0; HA.connect(); } }
   });
-  if (!Cfg.get().code && !Cfg.get().haUrl && !Cfg.get().haUrlExt) setTimeout(() => Settings.open(), 600);
+  if (!fromApp && !Cfg.get().code && !Cfg.get().haUrl && !Cfg.get().haUrlExt) setTimeout(() => Settings.open(), 600);
 }
 
 window.Hub = { HA, Usage, Voice, Tasks, Cfg, Cloud, Cmd };   // 디버깅용
