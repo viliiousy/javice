@@ -158,63 +158,55 @@ const Diet = {
     // 아래 요약에 같은 말을 또 쓰면 카드가 한 줄을 공짜로 잃는다.
     document.getElementById('dietBadge').textContent=`${t.cal.toLocaleString()} / ${s.calorieGoal.toLocaleString()} kcal · ${pct}%`;
 
+    // ── 시안 05: 남은 열량을 크게, 단·탄·지는 세 칸 막대, 끼니는 한 줄씩 ──
+    const won=v=>Math.round(v).toLocaleString('ko-KR');
+    const left=s.calorieGoal-t.cal, over=left<0;
+    const mpct=(v,g)=>g?Math.min(100,Math.round(v/g*100)):0;
+    const hour=new Date().getHours();
+    const nowMeal=hour<10?'아침':hour<15?'점심':hour<21?'저녁':'간식';
     const mealsHTML=this.MEALS.map(meal=>{
       const items=data[meal]||[];
       const mealCal=items.reduce((s,i)=>s+(i.cal||0),0);
-      const mt=this.sumMacros(items);
       const open=!!this._open[meal];
-      // 접힌 줄 하나로 그 끼니를 다 말한다 — 뭘 먹었고, 몇 kcal 이고, 단탄지가 얼마인지.
       const names=items.map(i=>i.name);
-      const sum=items.length
-        ? `<b>${esc(names.slice(0,2).join(', '))}${names.length>2?` 외 ${names.length-2}`:''}</b>`
-          + ` · ${mealCal}kcal · 단 ${this.macroTxt(mt.protein,mt,'')} · 탄 ${this.macroTxt(mt.carb,mt,'')} · 지 ${this.macroTxt(mt.fat,mt,'')}`
-        : '기록 없음';
-      return `<div class="meal-sec${open?' open':''}">
-        <div class="meal-hd" onclick="Diet.toggleMeal('${meal}','${ds}')">
-          <span class="meal-cv">▶</span>
-          <span class="meal-nm">${this.EMOJIS[meal]} ${meal}</span>
-          <span class="meal-sum">${sum}</span>
-          <button type="button" class="meal-add" title="${meal} 추가"
-            onclick="event.stopPropagation();Diet.showAdd('${meal}','${ds}')">+</button>
+      return `<div class="dm${open?' open':''}">
+        <div class="dm-hd" onclick="${items.length?`Diet.toggleMeal('${meal}','${ds}')`:`Diet.showAdd('${meal}','${ds}')`}">
+          <div class="dm-tx"><div class="dm-nm">${meal}</div>${items.length?`<div class="dm-sub">${esc(names.slice(0,3).join(' · '))}${names.length>3?` 외 ${names.length-3}`:''}</div>`:''}</div>
+          ${items.length?`<span class="dm-cal num">${won(mealCal)}</span>`:`<span class="dm-add">+ 기록</span>`}
         </div>
-        <div class="meal-items">
+        ${items.length?`<div class="dm-items">
           ${items.map((item,idx)=>`
-            <div class="meal-food">
+            <div class="dm-food">
               <button class="diet-fav-btn${this.isFav(item.base||item.name)?' is-fav':''}"
-                onclick="Diet._clickFav('${(item.base||item.name).replace(/'/g,'&#39;')}','${meal}','${ds}')" title="즐겨찾기">★</button>
-              <span>${esc(item.name)}</span>
-              <span class="meal-food-cal">${item.cal}kcal
-                <button class="btn-del-food" onclick="Diet.remove('${meal}',${idx},'${ds}')">✕</button>
-              </span>
+                onclick="Diet._clickFav('${(item.base||item.name).replace(/'/g,'&#39;')}','${meal}','${ds}')" title="즐겨찾기" aria-label="즐겨찾기">★</button>
+              <span class="dm-fn">${esc(item.name)}</span>
+              <span class="dm-fc num">${item.cal}</span>
+              <button class="dm-del" onclick="Diet.remove('${meal}',${idx},'${ds}')" aria-label="${esc(item.name)} 삭제">✕</button>
             </div>`).join('')}
-        </div>
+          <button type="button" class="dm-more" onclick="Diet.showAdd('${meal}','${ds}')">+ ${meal}에 더하기</button>
+        </div>`:''}
       </div>`;
     }).join('');
 
     document.getElementById('dietWrap').innerHTML=`
-      <div class="diet-summary">
-        <svg class="diet-ring" viewBox="0 0 48 48">
-          <circle cx="24" cy="24" r="22" fill="none" stroke="var(--card)" stroke-width="4"/>
-          <circle cx="24" cy="24" r="22" fill="none" stroke="${col}" stroke-width="4"
-            stroke-dasharray="${(pct/100)*C} ${C}" stroke-linecap="round"
-            transform="rotate(-90 24 24)" style="transition:stroke-dasharray 0.5s"/>
-        </svg>
-        <div class="diet-info">
-          <div class="diet-cal-num">${t.cal.toLocaleString()}<span class="diet-cal-unit">kcal</span></div>
-          ${isToday?'':`<div class="diet-cal-sub">${ds}</div>`}
+      <div class="dk">
+        <div class="dk-sub">${isToday?'오늘 ':ds+' '}${over?'초과한 열량':'남은 열량'} · 목표 ${won(s.calorieGoal)}</div>
+        <div class="dk-big"><span class="num${over?' over':''}">${won(Math.abs(left))}</span><span class="dk-u">kcal</span>
+          <span class="dk-eat">먹음 <b class="num">${won(t.cal)}</b></span></div>
+        <div class="dk-bar"><i style="width:${Math.min(100,pct)}%"${over?' class="over"':''}></i></div>
+        <div class="dk-mac">
+          <div><span>단백질</span><b class="num">${this.macroTxt(t.protein,t,'')}<small> / ${s.proteinGoal}g</small></b><em><i class="acc" style="width:${mpct(t.protein,s.proteinGoal)}%"></i></em></div>
+          <div><span>탄수화물</span><b class="num">${this.macroTxt(t.carb,t,'')}<small> / ${s.carbGoal}g</small></b><em><i style="width:${mpct(t.carb,s.carbGoal)}%"></i></em></div>
+          <div><span>지방</span><b class="num">${this.macroTxt(t.fat,t,'')}<small> / ${s.fatGoal}g</small></b><em><i style="width:${mpct(t.fat,s.fatGoal)}%"></i></em></div>
         </div>
-        <div class="diet-sum-btns">
-          <button class="diet-photo-btn" onclick="Diet.showPhotoAnalysis('${ds}')" title="사진으로 식단 분석">📷</button>
-          <button class="diet-set-btn" onclick="Diet.showSettings()" title="목표 설정">⚙️</button>
-        </div>
+        ${t.unknown?`<div class="diet-macro-note">${t.unknown}개 음식은 영양정보가 없어 빠져 있어요 — 눌러서 채울 수 있어요</div>`:''}
       </div>
-      <div class="diet-macros">
-        <div class="macro"><span class="macro-lbl">단백질</span><span class="macro-val" style="color:var(--cyan)">${this.macroTxt(t.protein,t)}</span><span class="macro-goal">/${s.proteinGoal}</span></div>
-        <div class="macro"><span class="macro-lbl">탄수</span><span class="macro-val" style="color:var(--yellow)">${this.macroTxt(t.carb,t)}</span><span class="macro-goal">/${s.carbGoal}</span></div>
-        <div class="macro"><span class="macro-lbl">지방</span><span class="macro-val" style="color:var(--accent-l)">${this.macroTxt(t.fat,t)}</span><span class="macro-goal">/${s.fatGoal}</span></div>
+      <div class="dk-acts">
+        <button type="button" class="dk-act on" onclick="Diet.showPhotoAnalysis('${ds}')">${typeof Icons!=='undefined'?Icons.svg('camera'):''}사진</button>
+        <button type="button" class="dk-act" onclick="Diet.showAdd('${nowMeal}','${ds}')">검색</button>
+        <button type="button" class="dk-act" onclick="Diet.showSettings()">목표</button>
       </div>
-      ${t.unknown?`<div class="diet-macro-note">${t.unknown}개 음식은 영양정보가 없어 빠져 있어요 — 눌러서 채울 수 있어요</div>`:''}
-      ${mealsHTML}`;
+      <div class="dm-list">${mealsHTML}</div>`;
 
     if(typeof App!=='undefined') App._updateStatsBanner();
   },

@@ -133,6 +133,9 @@ const ExMedia = {
   // 정렬해 둔 두 프레임(시작·끝 자세, 정사각형 두 칸) — img/exf/. 바닥·기구가 같은 자리에 오도록 맞춰 둔 그림이다.
   FDIR: 'img/exf/',
   frames(e) { return this.FDIR + e.id + '.webp'; },
+  // 그림이 실제로 있는 운동인지 (없으면 자리 자체를 만들지 않는다)
+  has(e) { return !!e && (typeof EX_HAVE === 'undefined' || EX_HAVE.has(e.id)); },
+  thumbFor(name) { const e = this.find(name); return this.has(e) ? this.frames(e) : ''; },
   // 두 프레임을 겹쳐 두고 위의 것만 천천히 나타났다 사라지게 한다 — 안 움직이는 부분은 그대로 서 있다.
   poseHtml(src, label) {
     return `<span class="pose" role="img" aria-label="${label||''}"><i style="background-image:url('${src}')"></i><i class="pb" style="background-image:url('${src}')"></i></span>`;

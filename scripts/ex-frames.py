@@ -55,3 +55,9 @@ for f in sorted(glob.glob(SRC + '/*.webp')):
     sp = Image.new('RGB', (S*2, S)); sp.paste(crop(La), (0,0)); sp.paste(crop(Ra), (S,0))
     sp.save(os.path.join(DST, os.path.basename(f)), 'WEBP', quality=80)
     print(os.path.basename(f), resp, s_, dx)
+
+# 프레임이 있는 id 목록을 앱이 읽는 파일로 남긴다 (js/ex-have.js)
+import json as _j
+_ids = sorted(f[:-5] for f in os.listdir(DST) if f.endswith('.webp'))
+_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+open(os.path.join(_root, 'js', 'ex-have.js'), 'w').write('// 자동 생성: scripts/ex-frames.py 를 돌린 뒤 갱신 — 정렬 프레임(img/exf)이 있는 운동 id\nconst EX_HAVE = new Set(' + _j.dumps(_ids) + ');\n')

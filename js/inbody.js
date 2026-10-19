@@ -14,6 +14,12 @@ const InBody = {
 
   // 제지방량은 뺐다. 체지방량과 함께 체중·체지방률에서 바로 나오는 파생값이라
   // 탭과 타일만 늘리고 새로 알려주는 게 없었다. 지표 4개면 탭이 한 줄에 들어간다.
+  // 새 디자인: 체중은 글자색(주인공), 근육량은 주황, 나머지는 조용한 색
+  _c(k) {
+    if (document.documentElement.dataset.ui !== 'v2') return (this.METRICS[k]||{}).color;
+    const t = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#ECEDEE';
+    return { wt:t, ms:'#FF6A2B', bf:'#8B8F97', bmi:'#5B9BFF' }[k] || t;
+  },
   METRICS: {
     wt: { label:'체중',     unit:'kg', color:'#3b82f6', good:'down' },
     ms: { label:'근육량',   unit:'kg', color:'#059669', good:'up'   },
@@ -253,8 +259,8 @@ const InBody = {
     return `<div class="ib-tabs">` + Object.entries(this.METRICS).map(([k,m]) => {
       const on = views.includes(k);
       return `<button class="ib-tab${on?' active':''}" aria-pressed="${on}"
-        onclick="InBody.toggleView('${k}')" style="--ib-c:${m.color}"
-        ><i class="ib-dot" style="border-color:${m.color};background:${on?m.color:'transparent'}"></i>${m.label}</button>`;
+        onclick="InBody.toggleView('${k}')" style="--ib-c:${InBody._c(m.k||k)}"
+        ><i class="ib-dot" style="border-color:${InBody._c(m.k||k)};background:${on?InBody._c(k):'transparent'}"></i>${m.label}</button>`;
     }).join('') + `</div>`;
   },
 
@@ -312,8 +318,8 @@ const InBody = {
       if (single) {
         const gid = `ibg_${s.k}`;
         defs  = `<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stop-color="${s.m.color}" stop-opacity="0.22"/>
-            <stop offset="100%" stop-color="${s.m.color}" stop-opacity="0"/>
+            <stop offset="0%"   stop-color="${InBody._c(s.k)}" stop-opacity="0.22"/>
+            <stop offset="100%" stop-color="${InBody._c(s.k)}" stop-opacity="0"/>
           </linearGradient>`;
         fills = `<path d="${line} L${xOf(last).toFixed(1)},${H-PY} L${xOf(first).toFixed(1)},${H-PY} Z" fill="url(#${gid})"/>`;
         const f = v => (Math.round(v*10)/10).toFixed(1);
@@ -321,7 +327,7 @@ const InBody = {
                  <text x="${PX-8}" y="${H-PY+4}" class="ib-axis" text-anchor="end">${f(min)}</text>`;
       }
 
-      lines += `<path d="${line}" fill="none" stroke="${s.m.color}" stroke-width="2"
+      lines += `<path d="${line}" fill="none" stroke="${InBody._c(s.k)}" stroke-width="2"
                  stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;
 
       // 골격근량은 추정 지점을 속 빈 점으로 따로 찍는다 — 추정을 실측처럼 보이게 하지 않는다
@@ -331,14 +337,14 @@ const InBody = {
           if (!recs[i].msEst) return;
           est++;
           dots += `<circle cx="${xOf(i).toFixed(1)}" cy="${s.at[i].y.toFixed(1)}" r="3.5"
-                    fill="var(--card)" stroke="${s.m.color}" stroke-width="1.5"/>`;
+                    fill="var(--card)" stroke="${InBody._c(s.k)}" stroke-width="1.5"/>`;
         });
       }
       dots += `<circle cx="${xOf(last).toFixed(1)}" cy="${s.at[last].y.toFixed(1)}" r="5"
-                fill="${s.k === 'ms' && recs[last].msEst ? 'var(--card)' : s.m.color}"
-                stroke="${s.m.color}" stroke-width="3"/>`;
+                fill="${s.k === 'ms' && recs[last].msEst ? 'var(--card)' : InBody._c(s.k)}"
+                stroke="${InBody._c(s.k)}" stroke-width="3"/>`;
 
-      meta.push({ k:s.k, label:s.m.label, unit:s.m.unit, color:s.m.color, at:s.at, est });
+      meta.push({ k:s.k, label:s.m.label, unit:s.m.unit, color:InBody._c(s.k), at:s.at, est });
     }
 
     // 툴팁이 쓸 좌표를 남겨 둔다. 화면을 다시 그릴 때마다 갈아 끼운다.
@@ -346,7 +352,7 @@ const InBody = {
                      dts: recs.map(r => r.dt.slice(2).replace(/-/g, '.')) };
     this._hoverI = -1;
 
-    const foot = meta.map(m => `<b style="color:${m.color}">${m.label}</b>${m.unit?`(${m.unit})`:''}`).join(' · ');
+    const foot = meta.map(m => `<b style="color:${InBody._c(m.k)}">${m.label}</b>${m.unit?`(${m.unit})`:''}`).join(' · ');
     const estN = meta.reduce((a, m) => a + m.est, 0);
 
     return `<div class="ib-chart">

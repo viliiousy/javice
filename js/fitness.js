@@ -113,7 +113,7 @@ const Fitness = {
     // 제목도 '오늘의 운동' 그대로여서, 지금 보고 있는 게 언제인지 알 수가 없었다.
     // 요일 줄: 요일 아래에 그날 루틴 이름을 작게 적는다 (시안 06)
     const shortNm = p => p.src==='none' ? '—' : String(p.name||'').replace(/^DAY\s*[ABC]\s*/,'').replace(/^내 루틴 · /,'').slice(0,4) || '—';
-    const tabs = DOW.map((dn,i)=>`<button class="fit-day${i===dow?' on':''}${i===0?' sun':''}" onclick="Fitness.render(Fitness._dowDate(${i}, new Date('${Fitness._dateStr(date)}T00:00:00')))"><b>${dn}</b><span>${esc(shortNm(this.planFor(i)))}</span></button>`).join('');
+    const tabs = DOW.map((dn,i)=>`<button class="fit-day${i===dow?' on':''}${i===0?' sun':''}" onclick="Fitness.pickDay(${i}, '${Fitness._dateStr(date)}')"><b>${dn}</b><span>${esc(shortNm(this.planFor(i)))}</span></button>`).join('');
     const container = document.getElementById('fitnessWrap');
     const ds = Fitness._dateStr(date);
 
@@ -168,6 +168,15 @@ const Fitness = {
       <div class="habit-add-btn" onclick="Fitness.showInlineAdd(new Date('${dsx}T00:00:00'))">+ 운동 추가</div>`;
   },
 
+  // 요일을 누르면 앱 전체의 날짜가 그날로 바뀐다 — 상단 날짜·요약·식단·습관이 함께 따라온다
+  pickDay(i, base) {
+    const d = this._dowDate(i, new Date(base+'T00:00:00'));
+    if (typeof App!=='undefined' && App.selectCalDate) {
+      if (App.S) App.S.calDate = new Date(d.getFullYear(), d.getMonth(), 1);
+      App.selectCalDate(d);
+    } else this.render(d);
+  },
+
   // 운동 줄 썸네일: 홈트 플랜 그림 → 전체 종목 그림 순으로 찾는다
   _thumb(ex, plan) {
     try {
@@ -175,7 +184,7 @@ const Fitness = {
         const x = HomePlan.EX?.[plan.day]?.[ex.hp];
         if (x && HomePlan.IMG[x.img]) return HomePlan.IMG[x.img].replace('img/ex/','img/exf/');
       }
-      if (typeof ExMedia!=='undefined') { const e = ExMedia.find(ex.name); if (e) return ExMedia.frames(e); }
+      if (typeof ExMedia!=='undefined') return ExMedia.thumbFor(ex.name);
     } catch(e){}
     return '';
   },
@@ -373,7 +382,9 @@ const Fitness = {
     const favs=this.getFavs();
     return own + hits.map(([p,n],i)=>{
       const fv=favs.includes(n);
-      return `<div class="ex-row">
+      const th=typeof ExMedia!=='undefined'?ExMedia.thumbFor(n):'';
+      return `<div class="ex-row${th?' has-th':''}">
+        ${th?`<span class="ex-th" onclick="Fitness.pick(${i})">${ExMedia.poseHtml(th)}</span>`:''}
         <button class="ex-fav${fv?' on':''}" title="즐겨찾기"
           onclick="event.stopPropagation();Fitness.toggleFav('${n.replace(/'/g,'&#39;')}')">${fv?'★':'☆'}</button>
         <span class="ex-row-main" onclick="Fitness.pick(${i})">

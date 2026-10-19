@@ -3586,3 +3586,71 @@ html.dark .exm-media{ background:#eeeff1; }
 .fx-th{ background:#f2f3f5; }
 .exm-media{ aspect-ratio:1/1 !important; max-height:52vh; }
 .exm-anim{ animation:none !important; background:none !important; }
+
+/* ── 식단 카드 (시안 05) ─────────────────── */
+.dk{ padding:4px 0 0; }
+.dk-sub{ font-size:13px; color:var(--text3); }
+.dk-big{ display:flex; align-items:baseline; gap:8px; margin-top:8px; }
+.dk-big > .num{ font-size:48px; font-weight:600; letter-spacing:-.03em; line-height:1; color:var(--text); font-variant-numeric:tabular-nums; }
+.dk-big > .num.over{ color:var(--accent); }
+.dk-u{ font-size:15px; color:var(--text3); }
+.dk-eat{ margin-left:auto; font-size:13px; color:var(--text3); }
+.dk-eat b{ color:var(--text2); font-weight:600; }
+.dk-bar{ height:8px; border-radius:4px; background:var(--border); margin-top:16px; overflow:hidden; }
+.dk-bar i{ display:block; height:100%; border-radius:4px; background:var(--text); transition:width .3s; }
+.dk-bar i.over{ background:var(--accent); }
+.dk-mac{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:24px; }
+.dk-mac span{ display:block; font-size:12.5px; color:var(--text3); }
+.dk-mac b{ display:block; font-size:17px; font-weight:600; margin-top:4px; color:var(--text); }
+.dk-mac b small{ font-size:12px; color:var(--text3); font-weight:400; }
+.dk-mac b i{ font-style:normal; }
+.dk-mac em{ display:block; height:4px; border-radius:2px; background:var(--border); margin-top:8px; overflow:hidden; }
+.dk-mac em i{ display:block; height:100%; border-radius:2px; background:var(--text2); }
+.dk-mac em i.acc{ background:var(--accent); }
+.dk-acts{ display:flex; gap:8px; margin:20px 0 8px; }
+.dk-act{ flex:1; height:44px; border-radius:22px; border:1px solid var(--border); background:none; color:var(--text); font:inherit; font-size:14px;
+  display:inline-flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; }
+.dk-act .ic{ width:18px; height:18px; }
+.dk-act.on{ background:var(--text); color:var(--card); border-color:var(--text); font-weight:600; }
+.dm-list{ border-top:1px solid var(--border); margin-top:8px; }
+.dm{ border-bottom:1px solid var(--border); }
+.dm:last-child{ border-bottom:0; }
+.dm-hd{ display:flex; align-items:center; gap:12px; min-height:64px; padding:10px 0; cursor:pointer; }
+.dm-tx{ flex:1; min-width:0; }
+.dm-nm{ font-size:16px; font-weight:600; color:var(--text); }
+.dm-sub{ font-size:13px; color:var(--text3); margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dm-cal{ font-size:16px; color:var(--text); font-variant-numeric:tabular-nums; }
+.dm-add{ font-size:13px; color:var(--text3); }
+.dm-items{ display:none; padding:0 0 12px; }
+.dm.open .dm-items{ display:block; }
+.dm-food{ display:flex; align-items:center; gap:8px; padding:8px 0; font-size:14px; }
+.dm-fn{ flex:1; min-width:0; color:var(--text2); }
+.dm-fc{ color:var(--text3); font-variant-numeric:tabular-nums; }
+.dm-del{ border:0; background:none; color:var(--text3); width:28px; height:28px; cursor:pointer; }
+.dm-food .diet-fav-btn{ border:0; background:none; color:var(--text4); font-size:14px; cursor:pointer; padding:0; width:24px; }
+.dm-food .diet-fav-btn.is-fav{ color:var(--accent); }
+.dm-more{ border:0; background:none; color:var(--accent); font:inherit; font-size:13px; padding:6px 0; cursor:pointer; }
+html[data-ui="v2"] #dietBadge{ display:none; }
+html[data-ui="v2"] .dm, html[data-ui="v2"] .dm-list{ border-color:var(--v2-line); }
+
+/* 운동 고르기 목록: 그림이 있는 운동만 왼쪽에 시작 자세 썸네일 */
+.ex-row.has-th{ padding-top:6px; padding-bottom:6px; }
+.ex-th{ position:relative; flex:none; width:48px; height:48px; border-radius:10px; overflow:hidden; background:#f2f3f5; cursor:pointer; }
+.ex-th .pose i.pb{ display:none; }
+
+/* 습관: 지난 7일 띠 (시안 04) */
+.habits-footer{ text-align:left; }
+.hw-row{ display:flex; gap:4px; }
+.hw{ flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; }
+.hw span{ font-size:11.5px; color:var(--text3); }
+.hw.cur span{ color:var(--text); font-weight:600; }
+.hw i{ width:32px; height:32px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-style:normal;
+  font-size:13px; font-weight:600; background:var(--border); color:var(--text3); font-variant-numeric:tabular-nums; }
+.hw i.lv1{ background:#ffe3d5; color:#b8461a; } .hw i.lv2{ background:#ffc3a6; color:#8a2e0b; }
+.hw i.lv3{ background:#ff9a6b; color:#3a1406; } .hw i.lv4{ background:var(--accent); color:#101113; }
+html.dark .hw i.lv1{ background:#3A1F14; color:#FF9A6B; } html.dark .hw i.lv2{ background:#5c2a15; color:#FFD9C7; }
+html.dark .hw i.lv3{ background:#8A3A1A; color:#FFD9C7; } html.dark .hw i.lv4{ background:#FF6A2B; color:#101113; }
+.hw.cur i{ box-shadow:inset 0 0 0 1.5px var(--text); }
+.hw-sum{ margin-top:10px; font-size:12.5px; color:var(--text3); text-align:right; }
+.hw-sum b{ color:var(--text); font-size:15px; }
+html[data-ui="v2"] .habits-footer{ background:transparent; border-top:1px solid var(--v2-line); padding:14px 0 4px; }

@@ -106,17 +106,10 @@
         <img id="hAvatar" src="" alt="" class="h-avatar">
       </div>
       <div id="profileMenu" class="profile-menu hidden">
-        <div class="profile-menu-item" style="font-size:11px;color:var(--text3);cursor:default;padding:6px 16px;border-bottom:1px solid var(--border)">v26.05.25.0116 업데이트</div>
-        <div class="profile-menu-item" data-ic="bell" onclick="Notifications.showSettings()">알림 설정</div>
-        <div class="profile-menu-item" data-ic="grid" onclick="App.showCardSettings()">메인 카드</div>
+        <div class="pm-who"><b id="pmName"></b><small id="pmMail"></small></div>
+        <div class="profile-menu-item" data-ic="gear" onclick="Settings.open()">설정</div>
         <div class="profile-menu-item" data-ic="sparkle" onclick="AIUsage.open()">AI 사용량 · 허브</div>
-        <div class="profile-menu-item" data-ic="grid" onclick="DevicePair.open()">기기 연결</div>
-        <div class="profile-menu-item" data-ic="sparkle" onclick="Onboard.open(true)">사용 도우미</div>
-        <div class="profile-menu-item" onclick="App.toggleUI()"><span>디자인</span><span id="uiLabel" class="ui-cur"></span></div>
-        <div class="profile-menu-item" onclick="App.toggleDarkMode()"><span id="darkModeLabel">테마</span></div>
-        <div class="profile-menu-item" onclick="Icons.toggleMode()"><span id="iconModeLabel">아이콘</span></div>
-        <div class="profile-menu-item" onclick="App.toggleSound()"><span id="soundLabel">사운드</span></div>
-        <div class="profile-menu-item" data-ic="logout" onclick="Auth.logout()">로그아웃</div>
+        <div class="profile-menu-item pm-out" data-ic="logout" onclick="Auth.logout()">로그아웃</div>
       </div>
     </div>
   </header>
@@ -277,7 +270,9 @@
 <script src="js/memo.js"></script>
 <script src="js/inbody.js"></script>
   <script src="js/onboard.js"></script>
+  <script src="js/settings.js"></script>
   <script src="js/ex-auto.js"></script>
+  <script src="js/ex-have.js"></script>
   <script src="js/ex-media.js"></script>
   <script src="js/econ-ko.js"></script>
   <script src="js/econ.js"></script>

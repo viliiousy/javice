@@ -215,10 +215,24 @@ const Habits = {
 
     // 지난 다섯 주 격자는 여기 있었는데 달력 칸 바탕으로 옮겼다(monthLevels).
     // 한 화면에 달력이 둘이면 어느 쪽이 무엇인지 매번 다시 읽어야 한다.
+    // 지난 7일(보는 날 포함) 완료 개수 띠 — 많이 지킨 날일수록 진한 주황 (시안 04)
     const foot=document.getElementById('habitsFooter');
-    if(foot) foot.innerHTML = list.length
-      ? `${isToday?'오늘':'해당 날짜'} <strong>${done}/${list.length}</strong> 완료 ${done===list.length?'🏆 퍼펙트!':''}`
-      : '';
+    if(foot){
+      if(!list.length){ foot.innerHTML=''; }
+      else {
+        const all=this.getList(), base=new Date(date); base.setHours(0,0,0,0);
+        const cells=[];
+        for(let i=6;i>=0;i--){
+          const d=new Date(base); d.setDate(base.getDate()-i);
+          const hs=this._forDate(all,d,null), ck=this.getChecked(d);
+          const dn=hs.filter(h=>ck.includes(h.id)).length, tot=hs.length;
+          const r=tot?dn/tot:0, lv=!tot?0:r===0?0:r<.34?1:r<.67?2:r<1?3:4;
+          const lbl=i===0?(isToday?'오늘':this.DAYS_KO[d.getDay()]):this.DAYS_KO[d.getDay()];
+          cells.push(`<div class="hw${i===0?' cur':''}"><span>${lbl}</span><i class="lv${lv}">${tot?dn:''}</i></div>`);
+        }
+        foot.innerHTML=`<div class="hw-row">${cells.join('')}</div><div class="hw-sum"><b class="num">${done}</b> / ${list.length} 완료</div>`;
+      }
+    }
   },
 
   // ── 탭/클릭 ──────────────────────────
