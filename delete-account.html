@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>계정 삭제 · Bashy</title>
+<link rel="icon" href="icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{ --bg:#101113; --fg:#ECEDEE; --sub:#8B8F97; --line:#26282D; --acc:#FF6A2B; }
+*{ box-sizing:border-box; }
+body{ margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 'IBM Plex Sans KR',system-ui,sans-serif; }
+main{ max-width:640px; margin:0 auto; padding:48px 16px 64px; }
+h1{ font-size:28px; font-weight:600; margin:0 0 8px; letter-spacing:-.01em; }
+.lead{ color:var(--sub); margin:0 0 32px; }
+h2{ font-size:17px; font-weight:600; margin:32px 0 8px; padding-top:24px; border-top:1px solid var(--line); }
+ol,ul{ padding-left:20px; margin:0; } li{ margin:4px 0; }
+b{ font-weight:600; }
+.go{ display:inline-flex; align-items:center; height:48px; padding:0 20px; margin-top:16px; border-radius:12px;
+  background:var(--acc); color:#101113; font-weight:600; text-decoration:none; }
+.muted{ color:var(--sub); font-size:14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Bashy 계정 삭제</h1>
+  <p class="lead">앱이나 웹에서 언제든 직접 계정과 모든 기록을 지울 수 있습니다.</p>
+
+  <h2>지우는 방법</h2>
+  <ol>
+    <li>Bashy 앱 또는 <b>bashy.app</b> 에 로그인합니다.</li>
+    <li>오른쪽 위 프로필 → <b>설정</b> → <b>보안·계정</b> → <b>계정 삭제</b> 를 누릅니다.</li>
+    <li>확인 칸에 <b>삭제</b> 라고 입력하고 <b>계정 영구 삭제</b> 를 누릅니다.</li>
+  </ol>
+  <a class="go" href="index.html">bashy.app 열기</a>
+  <p class="muted">앱을 지운 뒤라도 웹(bashy.app)에서 같은 구글 계정으로 로그인해 지울 수 있습니다.</p>
+
+  <h2>지워지는 것</h2>
+  <ul>
+    <li>Bashy 에 저장한 모든 기록 — 습관·식단·체크리스트·메모·인바디·운동·설정</li>
+    <li>직접 넣은 AI 키</li>
+    <li>알림 기기 등록, 서버에 보관한 구글 연결(구글에도 연결 해제를 요청합니다)</li>
+    <li>Bashy 로그인 계정</li>
+  </ul>
+  <p class="muted">삭제는 바로 처리되며 되돌릴 수 없습니다. 따로 보관하는 백업은 없습니다.</p>
+
+  <h2>지워지지 않는 것</h2>
+  <ul>
+    <li>구글 캘린더 일정과 구글 할 일 — 사용자 본인의 구글 계정에 있는 데이터라 그대로 남습니다.</li>
+  </ul>
+  <p class="muted"><a href="privacy.html" style="color:var(--sub)">개인정보처리방침</a></p>
+</main>
+</body>
+</html>

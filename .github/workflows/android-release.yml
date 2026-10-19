@@ -67,6 +67,9 @@ jobs:
           BASHY_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: node scripts/patch-android.mjs
 
+      # 서명 키가 없을 때 쓰는 디버그 키도 매번 같게 — 허브 앱과 같은 고정 키(SHA-1 이 바뀌지 않아 구글 로그인 테스트 가능)
+      - run: mkdir -p ~/.android && cp hub-app/keystore/debug.keystore ~/.android/debug.keystore
+
       - name: 빌드
         working-directory: app/android
         env:
