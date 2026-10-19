@@ -21,7 +21,7 @@ on:
     paths: [ 'app/native-android/**', 'app/scripts/patch-android.mjs', '.github/workflows/android-release.yml' ]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-app
@@ -98,6 +98,20 @@ jobs:
           name: bashy-android-${{ github.run_number }}
           path: out/*
           retention-days: 30
+
+      # 휴대폰 크롬에서 바로 받아 설치할 수 있게 고정 주소(릴리스 android-latest)에도 올린다
+      - name: 설치용 APK 를 릴리스에 올리기
+        run: cp out/*.apk out/bashy.apk 2>/dev/null || true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-latest
+          name: Bashy 안드로이드 (테스트 설치용)
+          body: |
+            휴대폰 크롬에서 이 페이지를 열고 아래 bashy.apk 를 눌러 받은 뒤, 다운로드 알림을 눌러 설치합니다.
+            (처음 한 번 '출처를 알 수 없는 앱 설치 허용'을 켜야 합니다)
+          files: out/bashy.apk
+          prerelease: true
+          make_latest: false
 
       - name: 플레이 콘솔에 올리기
         if: env.HAS_PLAY == 'true' && env.HAS_KEY == 'true' && github.event_name == 'workflow_dispatch' && inputs.track != 'none'
