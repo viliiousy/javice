@@ -157,7 +157,7 @@ const Fitness = {
         const custom = i>=plan.exercises.length;
         return `<div class="fx${on(i)?' done':''}" onclick="Fitness.toggle(${i},'${dsx}')">
           <button type="button" class="fx-th${src?'':' none'}" ${info?`onclick="event.stopPropagation();${info}"`:'tabindex="-1"'} aria-label="${esc(ex.name)} 자세 보기">
-            ${typeof Icons!=='undefined'?Icons.svg('dumbbell','fx-ic'):''}${src?`<span class="fx-img" style="background-image:url('${src}')"></span>`:''}
+            ${typeof Icons!=='undefined'?Icons.svg('dumbbell','fx-ic'):''}${src?`<span class="fx-img">${ExMedia.poseHtml(src)}</span>`:''}
           </button>
           <div class="fx-tx"><div class="fx-nm">${esc(ex.name)}</div><div class="fx-sets num">${esc(ex.sets||'')}</div></div>
           ${i===nextI&&isToday?'<span class="fx-next">다음</span>':''}
@@ -173,9 +173,9 @@ const Fitness = {
     try {
       if (ex.hp!=null && plan.src==='home' && typeof HomePlan!=='undefined') {
         const x = HomePlan.EX?.[plan.day]?.[ex.hp];
-        if (x && HomePlan.IMG[x.img]) return HomePlan.IMG[x.img];
+        if (x && HomePlan.IMG[x.img]) return HomePlan.IMG[x.img].replace('img/ex/','img/exf/');
       }
-      if (typeof ExMedia!=='undefined') { const e = ExMedia.find(ex.name); if (e) return ExMedia.img(e); }
+      if (typeof ExMedia!=='undefined') { const e = ExMedia.find(ex.name); if (e) return ExMedia.frames(e); }
     } catch(e){}
     return '';
   },

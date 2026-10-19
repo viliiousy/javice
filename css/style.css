@@ -3575,3 +3575,14 @@ html.dark .exm-media{ background:#eeeff1; }
 .hp-more{ border:1px solid var(--border); background:none; color:var(--text2); border-radius:16px; height:30px; padding:0 12px;
   font:inherit; font-size:12px; cursor:pointer; margin:0 0 4px; }
 .hp-ex{ padding:12px !important; }
+
+/* ── 자세 그림: 정렬된 두 프레임을 겹쳐 서서히 바꾼다 (img/exf) ── */
+.pose{ position:absolute; inset:0; display:block; }
+.pose i{ position:absolute; inset:0; background-size:200% 100%; background-repeat:no-repeat; background-position:0 0; }
+.pose i.pb{ background-position:100% 0; opacity:0; animation:poseFade 2.6s ease-in-out infinite; }
+@keyframes poseFade{ 0%,30%{ opacity:0 } 45%,80%{ opacity:1 } 95%,100%{ opacity:0 } }
+@media (prefers-reduced-motion:reduce){ .pose i.pb{ animation:none; } }
+.fx-img{ position:absolute; inset:0; animation:none !important; background:none !important; }
+.fx-th{ background:#f2f3f5; }
+.exm-media{ aspect-ratio:1/1 !important; max-height:52vh; }
+.exm-anim{ animation:none !important; background:none !important; }

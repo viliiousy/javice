@@ -130,13 +130,20 @@ const ExMedia = {
     return null;
   },
   img(e) { return this.DIR + e.id + '.webp'; },
+  // 정렬해 둔 두 프레임(시작·끝 자세, 정사각형 두 칸) — img/exf/. 바닥·기구가 같은 자리에 오도록 맞춰 둔 그림이다.
+  FDIR: 'img/exf/',
+  frames(e) { return this.FDIR + e.id + '.webp'; },
+  // 두 프레임을 겹쳐 두고 위의 것만 천천히 나타났다 사라지게 한다 — 안 움직이는 부분은 그대로 서 있다.
+  poseHtml(src, label) {
+    return `<span class="pose" role="img" aria-label="${label||''}"><i style="background-image:url('${src}')"></i><i class="pb" style="background-image:url('${src}')"></i></span>`;
+  },
 
   open(name) {
     const e = this.find(name); if (!e) return;
     const yt = typeof Fitness !== 'undefined' ? Fitness.ytUrl(e.ko) : '#';
     App.openModal('@dumbbell ' + e.ko, `
       <div class="exm-media" id="exmMedia">
-        <div class="exm-anim" style="background-image:url('${this.img(e)}')" role="img" aria-label="${esc(e.ko)} 시작·끝 자세"></div>
+        <div class="exm-anim">${this.poseHtml(this.frames(e), esc(e.ko)+' 시작·끝 자세')}</div>
         <div class="exm-none">${Icons.big('dumbbell')}<span>자세 그림 준비 중</span></div>
       </div>
       <div class="exm-sub">${[e.en, e.part].filter(Boolean).map(esc).join(' · ')}</div>
@@ -148,6 +155,6 @@ const ExMedia = {
     // 그림이 있으면 움직이는 칸을, 없으면 '준비 중' 을 보인다.
     const im = new Image();
     im.onload = () => document.getElementById('exmMedia')?.classList.add('has');
-    im.src = this.img(e);
+    im.src = this.frames(e);
   },
 };
