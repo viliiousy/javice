@@ -352,10 +352,14 @@ const Auth = {
   // 서버는 이때 리프레시 토큰을 보관하므로, 이후 갱신은 웹과 똑같이 serverRefresh() 로 팝업 없이 된다.
   async nativeLogin() {
     const SL = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SocialLogin;
-    if (!SL || !CONFIG.GOOGLE_IOS_CLIENT_ID) { App.showToast('앱 로그인이 아직 준비되지 않았습니다', 'error'); return; }
+    const android = window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'android';
+    if (!SL || (!android && !CONFIG.GOOGLE_IOS_CLIENT_ID)) { App.showToast('앱 로그인이 아직 준비되지 않았습니다', 'error'); return; }
     try {
       if (!this._slReady) {
-        await SL.initialize({ google: { iOSClientId: CONFIG.GOOGLE_IOS_CLIENT_ID, iOSServerClientId: CONFIG.GOOGLE_CLIENT_ID, mode: 'offline' } });
+        // 안드로이드는 웹 클라이언트 ID 하나로 된다(구글 클라우드에 패키지 이름 + 서명 SHA-1 로 안드로이드 클라이언트만 등록해 두면 됨)
+        await SL.initialize({ google: android
+          ? { webClientId: CONFIG.GOOGLE_CLIENT_ID, mode: 'offline' }
+          : { iOSClientId: CONFIG.GOOGLE_IOS_CLIENT_ID, iOSServerClientId: CONFIG.GOOGLE_CLIENT_ID, mode: 'offline' } });
         this._slReady = true;
       }
       const r = await SL.login({ provider: 'google', options: {

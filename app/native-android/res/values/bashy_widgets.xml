@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_today_name">Bashy 오늘</string>
+    <string name="widget_today_desc">습관·할 일·다음 일정을 한눈에</string>
+    <string name="widget_habit_name">Bashy 습관</string>
+    <string name="widget_habit_desc">오늘 습관 진행</string>
+</resources>

@@ -1,0 +1,107 @@
+name: Android app
+
+# Bashy 안드로이드 앱(app.bashy)을 빌드한다. 안내: docs/android-release.md
+#
+#  · 서명 키 비밀값(ANDROID_KEYSTORE_B64 등)이 있으면  → 플레이 스토어용 AAB + 같은 키로 서명한 APK
+#  · 없으면                                           → 휴대폰에 바로 깔아 보는 디버그 APK 만
+#  · PLAY_SERVICE_ACCOUNT_JSON 까지 있으면 플레이 콘솔 '내부 테스트' 트랙에 자동으로 올린다(선택)
+#
+# 결과물은 실행 화면의 Artifacts 에서 받는다(비공개 저장소가 아니어도 로그인한 사람만 받을 수 있다).
+# 서명 키·비밀번호는 저장소에 넣지 않는다 — 전부 Settings › Secrets and variables › Actions 에 둔다.
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: '플레이 콘솔에 올릴 트랙 (서비스 계정이 있을 때만)'
+        type: choice
+        options: [ none, internal, alpha ]
+        default: internal
+  push:
+    branches: [ main ]
+    paths: [ 'app/native-android/**', 'app/scripts/patch-android.mjs', '.github/workflows/android-release.yml' ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-app
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEY: ${{ secrets.ANDROID_KEYSTORE_B64 != '' }}
+      HAS_PLAY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" > /dev/null
+
+      - name: 웹 화면 묶기 + 안드로이드 프로젝트 만들기
+        working-directory: app
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+          [ -n "$GOOGLE_SERVICES_JSON" ] && printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json || true
+          npm run www
+          npx cap add android
+          npx cap sync android
+
+      - name: 서명 키 풀기
+        if: env.HAS_KEY == 'true'
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: printf '%s' "$KS" | base64 -d > "$RUNNER_TEMP/upload.jks"
+
+      - name: Bashy 에 맞게 고치기 (위젯·플러그인·아이콘·버전·서명)
+        working-directory: app
+        env:
+          BASHY_KEYSTORE: ${{ env.HAS_KEY == 'true' && format('{0}/upload.jks', runner.temp) || '' }}
+          BASHY_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          BASHY_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          BASHY_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: node scripts/patch-android.mjs
+
+      - name: 빌드
+        working-directory: app/android
+        env:
+          BASHY_KEYSTORE: ${{ runner.temp }}/upload.jks
+          BASHY_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          BASHY_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          BASHY_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ "$HAS_KEY" = "true" ]; then
+            ./gradlew bundleRelease assembleRelease --no-daemon
+          else
+            ./gradlew assembleDebug --no-daemon
+          fi
+          mkdir -p ../../out
+          cp app/build/outputs/bundle/release/*.aab ../../out/bashy.aab 2>/dev/null || true
+          cp app/build/outputs/apk/release/*.apk ../../out/bashy.apk 2>/dev/null || cp app/build/outputs/apk/debug/*.apk ../../out/bashy-debug.apk
+          ls -la ../../out
+
+      - name: 서명 SHA-1 (구글 로그인용 안드로이드 OAuth 클라이언트에 넣을 값)
+        run: |
+          f=$(ls out/*.apk | head -1)
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$f" | grep -i 'SHA-1\|SHA-256' | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bashy-android-${{ github.run_number }}
+          path: out/*
+          retention-days: 30
+
+      - name: 플레이 콘솔에 올리기
+        if: env.HAS_PLAY == 'true' && env.HAS_KEY == 'true' && github.event_name == 'workflow_dispatch' && inputs.track != 'none'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: app.bashy
+          releaseFiles: out/bashy.aab
+          track: ${{ inputs.track }}
+          status: draft

@@ -65,6 +65,7 @@ const App = {
     try { Habits.init(new Date()); } catch(e){ console.warn('Habits init',e); }
     try { Notifications.init(); } catch(e){ console.warn('Notifications init',e); }
     try { LocalNotify.init(); } catch(e){ console.warn('LocalNotify init',e); }
+    try { if(typeof Widgets!=='undefined') Widgets.init(); } catch(e){}
     try { Diet.render(new Date()); } catch(e){ console.warn('Diet render',e); }
     try { Fitness.render(new Date()); } catch(e){ console.warn('Fitness render',e); }
     try { Checklist.render(); }     catch(e){ console.warn('Checklist render',e); }
@@ -122,6 +123,7 @@ const App = {
   // ── 스탯 배너 (즉각 반영 + 반짝임 + 긴급 할일) ──
   _statsPrev: '{}',
   _updateStatsBanner() {
+    try { if(typeof Widgets!=='undefined') Widgets.push(); } catch(e){}
     const el=document.getElementById('statsBanner'); if(!el) return;
     const now=new Date();
     const selDate=this.S.selDate||now;
