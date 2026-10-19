@@ -46,6 +46,7 @@ const Icons = {
     mic:      '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>',
     send:     '<path d="M12 19V5"/><path d="m6 11 6-6 6 6"/>',
     close:    '<path d="M6 6l12 12M18 6 6 18"/>',
+    trash:    '<path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 12.5h9l1-12.5M10 11v5M14 11v5"/>',
     stop:     '<rect x="7" y="7" width="10" height="10" rx="2"/>',
     eye:      '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/>',
     eyeclosed:'<path d="M3 10c2.4 3 5.4 4.5 9 4.5s6.6-1.5 9-4.5"/><path d="m5.6 13-1.7 2.1M9.4 14.3l-.6 2.6M14.6 14.3l.6 2.6M18.4 13l1.7 2.1"/>',

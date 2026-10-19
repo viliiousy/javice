@@ -111,10 +111,9 @@ const Fitness = {
     // 예전에는 날짜는 그대로 두고 계획만 바꿨다. 그래서 화요일에 '월' 을 누르면
     // 월요일 계획이 뜨는데 아래 실제 운동 기록과 체크는 화요일 것이었다 —
     // 제목도 '오늘의 운동' 그대로여서, 지금 보고 있는 게 언제인지 알 수가 없었다.
-    const tabs=DOW.map((d,i)=>`<button class="fit-tab${i===dow?' active':''}" onclick="Fitness.render(Fitness._dowDate(${i}, new Date('${Fitness._dateStr(date)}T00:00:00')))">${d}</button>`).join('')
-      + `<button class="fit-tab fit-plan-btn" onclick="Fitness.showDayPlan()" title="요일별 루틴 배정">${
-          typeof Icons!=='undefined'?Icons.svg('gear','tf-ic'):'⚙'}</button>`;
-
+    // 요일 줄: 요일 아래에 그날 루틴 이름을 작게 적는다 (시안 06)
+    const shortNm = p => p.src==='none' ? '—' : String(p.name||'').replace(/^DAY\s*[ABC]\s*/,'').replace(/^내 루틴 · /,'').slice(0,4) || '—';
+    const tabs = DOW.map((dn,i)=>`<button class="fit-day${i===dow?' on':''}${i===0?' sun':''}" onclick="Fitness.render(Fitness._dowDate(${i}, new Date('${Fitness._dateStr(date)}T00:00:00')))"><b>${dn}</b><span>${esc(shortNm(this.planFor(i)))}</span></button>`).join('');
     const container = document.getElementById('fitnessWrap');
     const ds = Fitness._dateStr(date);
 
@@ -123,7 +122,7 @@ const Fitness = {
       // 예전엔 여기서 그냥 빠져나가서, 계획에 없던 날의 운동은 어디서도 볼 수 없었다.
       const none = plan.src==='none';
       container.innerHTML=`
-      <div class="fit-tabs">${tabs}</div>
+      <div class="fit-days">${tabs}</div>
       ${none ? `<div class="fit-empty">
         ${Icons.big('dumbbell')}
         <p><b>아직 이 요일의 운동 계획이 없어요</b><br><span>내 루틴을 만들어 요일에 붙이거나, 그날 한 운동만 바로 기록해도 됩니다.</span></p>
@@ -144,24 +143,41 @@ const Fitness = {
     const done=allEx.filter((_,i)=>on(i)).length;
     const pct=Math.round(done/allEx.length*100);
 
+    const dsx = Fitness._dateStr(date);
+    // 다음에 할 운동 = 아직 안 한 것 중 첫 번째
+    const nextI = allEx.findIndex((_,i)=>!on(i));
     container.innerHTML=`
-      <div class="fit-tabs">${tabs}</div>
-      ${allEx.map((ex,i)=>`
-        <div class="ex-item${on(i)?' done':''}" onclick="Fitness.toggle(${i},'${Fitness._dateStr(date)}')">
-          <div class="ex-chk">${on(i)?'✓':''}</div>
-          <span class="ex-name">${esc(ex.name)}</span>
-          ${ex.hp!=null&&plan.src==='home'?`<button class="ex-info" onclick="event.stopPropagation();HomePlan.open(${plan.day},${ex.hp})" title="자세·중량 가이드">i</button>`
-            :(typeof ExMedia!=='undefined'&&ExMedia.find(ex.name))?`<button class="ex-info" onclick="event.stopPropagation();ExMedia.open('${esc(ex.name).replace(/'/g,'&#39;')}')" title="자세 보기">i</button>`:''}
-          <a class="ex-yt" href="${Fitness.ytUrl(ex.name)}" target="_blank" rel="noopener"
-             onclick="event.stopPropagation()" title="자세 영상 검색">▶</a>
-          <span class="ex-sets">${ex.sets}</span>
-          ${i>=plan.exercises.length?`<button class="task-del" onclick="event.stopPropagation();Fitness._delCustom(${i-plan.exercises.length},'${Fitness._dateStr(date)}')">✕</button>`:''}
-        </div>`).join('')}
-      <div class="habit-add-btn" onclick="Fitness.showInlineAdd(new Date('${Fitness._dateStr(date)}T00:00:00'))">+ 운동 추가</div>
-      <div class="fit-progress">
-        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-        <span class="progress-txt">${done}/${allEx.length} (${pct}%)</span>
-      </div>`;
+      <div class="fit-days">${tabs}</div>
+      <div class="fit-prog"><div class="fit-prog-bar"><i style="width:${pct}%"></i></div><span class="num">${done} / ${allEx.length}</span></div>
+      <div class="fit-list">
+      ${allEx.map((ex,i)=>{
+        const src = this._thumb(ex, plan);
+        const info = ex.hp!=null&&plan.src==='home' ? `HomePlan.open(${plan.day},${ex.hp})`
+                   : (typeof ExMedia!=='undefined'&&ExMedia.find(ex.name)) ? `ExMedia.open('${esc(ex.name).replace(/'/g,'&#39;')}')` : '';
+        const custom = i>=plan.exercises.length;
+        return `<div class="fx${on(i)?' done':''}" onclick="Fitness.toggle(${i},'${dsx}')">
+          <button type="button" class="fx-th${src?'':' none'}" ${info?`onclick="event.stopPropagation();${info}"`:'tabindex="-1"'} aria-label="${esc(ex.name)} 자세 보기">
+            ${typeof Icons!=='undefined'?Icons.svg('dumbbell','fx-ic'):''}${src?`<span class="fx-img" style="background-image:url('${src}')"></span>`:''}
+          </button>
+          <div class="fx-tx"><div class="fx-nm">${esc(ex.name)}</div><div class="fx-sets num">${esc(ex.sets||'')}</div></div>
+          ${i===nextI&&isToday?'<span class="fx-next">다음</span>':''}
+          ${custom?`<button type="button" class="fx-del" onclick="event.stopPropagation();Fitness._delCustom(${i-plan.exercises.length},'${dsx}')" aria-label="삭제">✕</button>`:''}
+          <span class="fx-chk" aria-hidden="true"></span>
+        </div>`;}).join('')}
+      </div>
+      <div class="habit-add-btn" onclick="Fitness.showInlineAdd(new Date('${dsx}T00:00:00'))">+ 운동 추가</div>`;
+  },
+
+  // 운동 줄 썸네일: 홈트 플랜 그림 → 전체 종목 그림 순으로 찾는다
+  _thumb(ex, plan) {
+    try {
+      if (ex.hp!=null && plan.src==='home' && typeof HomePlan!=='undefined') {
+        const x = HomePlan.EX?.[plan.day]?.[ex.hp];
+        if (x && HomePlan.IMG[x.img]) return HomePlan.IMG[x.img];
+      }
+      if (typeof ExMedia!=='undefined') { const e = ExMedia.find(ex.name); if (e) return ExMedia.img(e); }
+    } catch(e){}
+    return '';
   },
 
   // 같은 주(일요일 시작)의 i 요일 날짜. DOW[0] 이 '일' 이므로 getDay() 와 자리가 같다.

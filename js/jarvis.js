@@ -28,9 +28,11 @@ const JARVIS = {
         <span class="jarvis-btn-glyph">⚡</span>
         <span id="jarvisBadge" class="jarvis-badge hidden">0</span>
       </button>
+      <div id="jarvisScrim" class="j-scrim hidden" onclick="JARVIS.close()"></div>
       <div id="jarvisPanel" class="jarvis-panel hidden">
+        <div class="j-grab" aria-hidden="true"></div>
         <div class="jarvis-head">
-          <div class="j-head-l"><span class="j-logo">AI 비서</span><span id="jStatus" class="j-status">대기 중</span></div>
+          <div class="j-head-l"><span class="j-logo">AI 비서</span><span class="j-sub"><span id="jProv" class="j-prov"></span><span id="jStatus" class="j-status">대기 중</span></span></div>
           <div class="j-head-r">
             <button class="j-icon-btn" id="jTtsBtn" onclick="JARVIS.toggleTTS()" title="답을 소리로 듣기" aria-label="답을 소리로 듣기">${Icons.svg(this._ttsEnabled?'volume':'mute')}</button>
             <button class="j-icon-btn" onclick="JARVIS.showKeySetup()" title="AI 키 설정" aria-label="AI 키 설정">${Icons.svg('key')}</button>
@@ -43,6 +45,12 @@ const JARVIS = {
               <span style="font-size:11px;color:var(--accent-l)">할일·일정·체크리스트·습관·식단·메모 관리 가능<br>📷 사진으로 식단 자동 분석</span>
             </div>
           </div>
+        </div>
+        <div class="j-chips">
+          <button type="button" class="j-chip" onclick="JARVIS.quick('오늘 할일 알려줘')">오늘 할일</button>
+          <button type="button" class="j-chip" onclick="JARVIS.quick('물 한 잔 마셨어')">물 마셨어</button>
+          <button type="button" class="j-chip" onclick="JARVIS.quick('오늘 먹은 거 정리해줘')">오늘 식단</button>
+          <button type="button" class="j-chip" onclick="JARVIS.fill('메모해 줘: ')">메모해 줘</button>
         </div>
         <input id="jPhotoInput" type="file" accept="image/*" style="display:none" onchange="JARVIS._onPhotoSelected(this)">
         <div class="j-input-wrap">
@@ -66,10 +74,19 @@ const JARVIS = {
   },
 
   // ── 열기/닫기 ─────────────────────────
+  // 다른 탭(일정·건강·경제)을 누르거나 바깥을 누르면 창이 내려간다
+  close() { if (this.isOpen) this.toggle(); },
+  quick(t) { const i=document.getElementById('jInput'); if(!i) return; i.value=t; this._syncSend?.(); this.send(); },
+  fill(t)  { const i=document.getElementById('jInput'); if(!i) return; i.value=t; this._syncSend?.(); i.focus(); },
+
   toggle() {
     this.isOpen=!this.isOpen;
     document.getElementById('jarvisPanel').classList.toggle('hidden',!this.isOpen);
+    document.getElementById('jarvisScrim')?.classList.toggle('hidden',!this.isOpen);
+    document.querySelector('#tabbar .tab-jarvis')?.classList.toggle('on', this.isOpen);
     if(this.isOpen) {
+      try { const hg=document.querySelector('.header-sticky-group'); if(hg) document.documentElement.style.setProperty('--v2-head', Math.round(hg.getBoundingClientRect().bottom)+'px'); } catch(e){}
+      try { const P=this.PROVIDERS?.[this._active?.()]; const el=document.getElementById('jProv'); if(el) el.textContent=P?(P.short||P.name)+' · ':''; } catch(e){}
       // 읽지 않은 알림 초기화
       this._unread=0;
       this._updateBadge();

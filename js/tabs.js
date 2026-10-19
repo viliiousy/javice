@@ -75,6 +75,7 @@ const Tabs = {
     if (!this.DEF.some(t => t.id === id)) id = 'today';
     this._cur = id;
     document.body.dataset.tab = id;
+    try { if (typeof JARVIS !== 'undefined' && JARVIS.isOpen) JARVIS.close(); } catch(e){}
     document.querySelectorAll('#tabbar .tab-btn').forEach(b =>
       b.classList.toggle('on', b.dataset.t === id));
     if (!silent) window.scrollTo({ top:0, behavior:'smooth' });

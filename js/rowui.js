@@ -15,7 +15,7 @@
 // 그린 뒤 RowUI.paint(칸, {edit, del}) 를 부르면 된다.
 
 const RowUI = {
-  LP:   550,   // 길게 누르기로 치는 시간(ms)
+  LP:   380,   // 길게 누르기로 치는 시간(ms)
   MOVE: 10,    // 이만큼 움직이면 누른 게 아니라 미는 것
   SNAP: 56,    // 이만큼 밀면 삭제 버튼이 열린 채로 멈춘다
   _open: null, // 지금 열려 있는 줄 (한 번에 하나만)
@@ -114,6 +114,9 @@ const RowUI = {
         if (x2 < -this.SNAP / 2) { row.classList.add('rw-on'); this._open = row; }
         else { row.classList.remove('rw-on'); if (startedOpen()) this._open = null; }
       };
+      // 길게 누를 때 iOS 가 글씨를 선택(파란 칠)하거나 메뉴를 띄우지 못하게 한다
+      row.addEventListener('contextmenu', (e) => { if (h.reorder || fired) e.preventDefault(); });
+      row.addEventListener('selectstart', (e) => { if (h.reorder) e.preventDefault(); });
       row.addEventListener('touchend', end);
       row.addEventListener('touchcancel', end);
 
@@ -149,38 +152,88 @@ const RowUI = {
   },
 
   // ── 끌어서 순서 바꾸기 ─────────────────────
-  // 줄 껍데기(.rw)를 화면에 띄우고, 빈자리(placeholder)를 손가락 위치로 옮긴다.
+  // iOS 미리알림·Todoist 와 같은 구조로 간다.
+  //   1) 길게 누르면 그 줄이 '들린다' — 살짝 커지고 그림자가 생긴다. 줄은 제자리(흐름 안)에 둔다.
+  //   2) 손가락을 따라 들린 줄만 translateY 로 움직인다. DOM 은 건드리지 않는다.
+  //   3) 지나친 줄들은 들린 줄의 높이만큼 위/아래로 부드럽게 비켜선다(transform + transition).
+  //   4) 화면 위·아래 끝에 닿으면 저절로 스크롤된다.
+  //   5) 놓는 순간에만 DOM 순서를 한 번 바꾸고 transform 을 지운다.
+  // 예전 방식(줄을 position:fixed 로 떼고 점선 빈칸을 끼우기)은 줄이 튀고 글씨가 선택되어 파랗게 칠해졌다.
   _drag: null,
   _dragStart(wrap, root, y) {
-    const r = wrap.getBoundingClientRect();
-    const ph = document.createElement('div');
-    ph.className = 'rw-ph';
-    ph.style.height = r.height + 'px';
-    wrap.after(ph);
+    const items = [...root.querySelectorAll(':scope > .rw')];
+    const idx = items.indexOf(wrap); if (idx < 0) return;
+    const sy = window.scrollY;
+    const rs = items.map(el => el.getBoundingClientRect());
+    const tops = rs.map(r => r.top + sy), hs = rs.map(r => r.height);
+    // 들린 줄이 비키게 만드는 거리 = 제 높이 + 줄 사이 간격
+    const gap = idx < items.length - 1 ? Math.max(0, tops[idx+1] - (tops[idx] + hs[idx]))
+              : idx > 0 ? Math.max(0, tops[idx] - (tops[idx-1] + hs[idx-1])) : 0;
+    try { window.getSelection()?.removeAllRanges(); } catch {}
+    root.classList.add('rw-sorting');
+    document.body.classList.add('rw-dragging');
     wrap.classList.add('rw-lift');
-    Object.assign(wrap.style, { position:'fixed', left:r.left+'px', top:r.top+'px', width:r.width+'px', zIndex:9999, pointerEvents:'none' });
-    this._drag = { wrap, root, ph, top:r.top, y };
+    this._drag = { wrap, root, items, idx, to: idx, tops, hs, H: hs[idx] + gap, y0: y + sy, cy: y, raf: 0 };
+    this._autoScroll();
   },
   _dragMove(y) {
     const d = this._drag; if (!d) return;
-    d.top += y - d.y; d.y = y;
-    d.wrap.style.top = d.top + 'px';
-    const sibs = [...d.root.querySelectorAll(':scope > .rw')].filter(el => el !== d.wrap);
-    for (const s of sibs) {
-      const r = s.getBoundingClientRect();
-      if (y < r.top + r.height / 2) { s.before(d.ph); return; }
+    d.cy = y;
+    const dy = y + window.scrollY - d.y0;
+    d.wrap.style.transform = `translateY(${dy}px) scale(1.02)`;
+    const c = d.tops[d.idx] + d.hs[d.idx] / 2 + dy;   // 들린 줄의 가운데(페이지 좌표)
+    let to = d.idx;
+    for (let i = d.idx + 1; i < d.items.length; i++) if (c > d.tops[i] + d.hs[i] / 2) to = i;
+    for (let i = d.idx - 1; i >= 0; i--)            if (c < d.tops[i] + d.hs[i] / 2) to = i;
+    if (to !== d.to) {
+      d.to = to;
+      if (navigator.vibrate) { try { navigator.vibrate(6); } catch {} }
+      d.items.forEach((el, i) => {
+        if (i === d.idx) return;
+        const sh = (d.idx < i && i <= to) ? -d.H : (to <= i && i < d.idx) ? d.H : 0;
+        el.style.transform = sh ? `translateY(${sh}px)` : '';
+      });
     }
-    const last = sibs[sibs.length - 1];
-    if (last) last.after(d.ph);
+  },
+  // 손가락이 화면 위·아래 끝 근처면 그쪽으로 천천히 → 빠르게 스크롤한다.
+  _autoScroll() {
+    const d = this._drag; if (!d) return;
+    const head = document.querySelector('.header-sticky-group');
+    const topZ = (head ? head.getBoundingClientRect().bottom : 0) + 56;
+    const tab = document.querySelector('.tabbar');
+    const botZ = (tab && tab.offsetHeight ? tab.getBoundingClientRect().top : window.innerHeight) - 56;
+    let v = 0;
+    if (d.cy < topZ) v = -Math.min(18, (topZ - d.cy) / 3);
+    else if (d.cy > botZ) v = Math.min(18, (d.cy - botZ) / 3);
+    if (v) { window.scrollBy(0, v); this._dragMove(d.cy); }
+    d.raf = requestAnimationFrame(() => this._autoScroll());
   },
   _dragEnd(cb) {
     const d = this._drag; if (!d) return;
     this._drag = null;
-    d.wrap.removeAttribute('style');
-    d.wrap.classList.remove('rw-lift');
-    d.ph.before(d.wrap); d.ph.remove();
-    const order = [...d.root.querySelectorAll(':scope > .rw [data-row]')].map(el => el.dataset.i);
-    try { cb && cb(order); } catch (e) { console.warn(e); }
+    cancelAnimationFrame(d.raf);
+    document.body.classList.remove('rw-dragging');
+    const moved = d.to !== d.idx;
+    // 제자리로 내려앉는 짧은 움직임: 들린 줄을 목표 칸 위치까지 옮겨 둔 뒤 DOM 을 바꾼다
+    const finish = () => {
+      d.root.classList.add('rw-noanim');
+      d.items.forEach(el => { el.style.transform = ''; });
+      d.wrap.classList.remove('rw-lift');
+      if (moved) {
+        const ref = d.items[d.to];
+        if (d.to > d.idx) ref.after(d.wrap); else ref.before(d.wrap);
+      }
+      void d.root.offsetHeight;
+      d.root.classList.remove('rw-noanim', 'rw-sorting');
+      if (!moved) return;
+      const order = [...d.root.querySelectorAll(':scope > .rw [data-row]')].map(el => el.dataset.i);
+      try { cb && cb(order); } catch (e) { console.warn(e); }
+    };
+    let off = 0;
+    if (moved) for (let i = Math.min(d.idx, d.to); i <= Math.max(d.idx, d.to); i++) if (i !== d.idx) off += (d.to > d.idx ? 1 : -1) * (d.hs[i] + (d.H - d.hs[d.idx]));
+    d.wrap.classList.add('rw-drop');
+    d.wrap.style.transform = `translateY(${off}px)`;
+    setTimeout(() => { d.wrap.classList.remove('rw-drop'); finish(); }, 170);
   },
 };
 

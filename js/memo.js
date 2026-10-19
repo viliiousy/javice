@@ -157,6 +157,12 @@ const Memo = {
     try { RowUI.paint(wrap, {
       edit: id => this.showEdit(id),
       del:  id => this.remove(id),
+      reorder: order => {
+        const items = this.getItems();
+        const out = order.map(id => items.find(m => m.id === id)).filter(Boolean);
+        items.forEach(m => { if (!out.includes(m)) out.push(m); });
+        this.saveItems(out);
+      },
     }); } catch(e){ console.warn('RowUI', e); }
 
     wrap.querySelectorAll('.memo-item').forEach(row => {
@@ -228,32 +234,35 @@ const Memo = {
     </div>`;
   },
 
+  // 편집 화면: 제목은 크게, 본문은 테두리 없는 넓은 칸, 서식 단추는 한 줄 — 메모 앱처럼 간결하게
   _form(m){
-    return `<div class="modal-row"><label class="modal-lbl">제목${m?'':' *'}</label>
-        <input id="mTitle" type="text" placeholder="제목" class="inp" value="${m?esc(m.title):''}"></div>
-      <div class="modal-row"><label class="modal-lbl">내용</label>
-        ${this._bar()}
-        <div id="mBody" class="mm-ed" contenteditable="true" spellcheck="false"></div>
-        <div class="mm-hint">문구를 끌어서 고른 뒤 <b>복사 링크</b> 를 누르면 밑줄이 그어집니다. 메모 카드에서 그 글씨를 누르면 복사됩니다. 링크 안에 커서를 두고 한 번 더 누르면 밑줄이 풀립니다.</div>
-      </div>`;
+    return `<div class="mm-form">
+      <input id="mTitle" type="text" placeholder="제목" class="mm-title" value="${m?esc(m.title):''}" aria-label="제목">
+      <div id="mBody" class="mm-ed" contenteditable="true" spellcheck="false" data-ph="내용을 입력하세요"></div>
+      ${this._bar()}
+      <div class="mm-hint">문구를 골라 <b>복사 링크</b>를 누르면, 카드에서 그 글씨를 눌러 바로 복사할 수 있습니다.</div>
+    </div>`;
+  },
+
+  _btns(saveFn, id){
+    return `<div class="mm-foot">
+      ${id?`<button type="button" class="mm-del" onclick="Memo.remove('${id}');App.closeModal();" aria-label="메모 삭제">${typeof Icons!=='undefined'?Icons.svg('trash'):''}삭제</button>`:'<span></span>'}
+      <div class="mm-foot-r">
+        <button type="button" onclick="App.closeModal()" class="btn-sm">취소</button>
+        <button type="button" onclick="${saveFn}" class="btn-sm accent">저장</button>
+      </div>
+    </div>`;
   },
 
   showAdd(){
-    App.openModal('@memo 메모 추가', this._form(null) + `
-      <div class="modal-btns">
-        <button onclick="Memo._saveNew()" class="btn-sm accent">저장</button>
-        <button onclick="App.closeModal()" class="btn-sm">취소</button>
-      </div>`, () => { this._wire(''); document.getElementById('mTitle')?.focus(); });
+    App.openModal('@memo 새 메모', this._form(null) + this._btns('Memo._saveNew()'),
+      () => { this._wire(''); document.getElementById('mTitle')?.focus(); });
   },
 
   showEdit(id){
     const m = this.getItems().find(x => x.id === id); if(!m) return;
-    App.openModal('@memo 메모 편집', this._form(m) + `
-      <div class="modal-btns">
-        <button onclick="Memo._saveEdit('${id}')" class="btn-sm accent">저장</button>
-        <button onclick="Memo.remove('${id}');App.closeModal();" class="btn-danger">삭제</button>
-        <button onclick="App.closeModal()" class="btn-sm">취소</button>
-      </div>`, () => { this._wire(this.htmlOf(m)); document.getElementById('mTitle')?.focus(); });
+    App.openModal('@memo 메모', this._form(m) + this._btns(`Memo._saveEdit('${id}')`, id),
+      () => { this._wire(this.htmlOf(m)); if(!matchMedia('(pointer:coarse)').matches) document.getElementById('mBody')?.focus(); });
   },
 
   _wire(html){

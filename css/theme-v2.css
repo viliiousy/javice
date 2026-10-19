@@ -155,10 +155,54 @@ html[data-ui="v2"] .inp{ border-radius:12px; }
   html[data-ui="v2"] .tab-jarvis .tab-ic{ color:inherit; }
 }
 
-/* ── AI 창: 아래에서 올라오는 시트 ───────────────────────────── */
-html[data-ui="v2"] .jarvis-panel{ background:var(--card2); border-color:var(--border); }
-html[data-ui="v2"] .j-msgs{ background:var(--card2); }
-html[data-ui="v2"] .j-input-wrap{ background:var(--card2); }
+/* ── AI 비서: 아래에서 올라오는 시트 (시안 09) ───────────────── */
+html[data-ui="v2"] .jarvis-panel{
+  background:var(--card2); border:1px solid var(--border); box-shadow:0 -12px 40px rgba(0,0,0,.25);
+}
+html[data-ui="v2"] .jarvis-head{
+  background:transparent !important; border-bottom:0 !important; padding:8px 16px 8px;
+}
+html[data-ui="v2"] .j-head-l{ flex-direction:column; align-items:flex-start; gap:0; }
+html[data-ui="v2"] .j-logo{ font-size:17px !important; font-weight:600; }
+html[data-ui="v2"] .j-sub{ font-size:13px; color:var(--text3); }
+html[data-ui="v2"] .j-prov{ color:var(--text3); white-space:pre; }
+html[data-ui="v2"] .j-status{ background:none !important; padding:0; font-size:13px; color:var(--text3) !important; border-radius:0; }
+html[data-ui="v2"] .j-head-r{ gap:8px; }
+html[data-ui="v2"] .j-icon-btn{ width:40px; height:40px; border-radius:20px; background:var(--border) !important; color:var(--text) !important; }
+html[data-ui="v2"] .j-icon-btn .ic{ width:18px; height:18px; }
+html[data-ui="v2"] .j-grab{ display:block; width:40px; height:4px; border-radius:2px; background:var(--border2); margin:8px auto 0; flex:none; }
+html[data-ui="v2"] .j-msgs{ background:transparent; padding:16px; gap:16px; }
+html[data-ui="v2"] .j-avatar{ display:none; }
+html[data-ui="v2"] .j-msg{ gap:0; }
+html[data-ui="v2"] .j-bubble{ font-size:15px; line-height:1.55; box-shadow:none; }
+html[data-ui="v2"] .j-ai .j-bubble{ background:none; border:0; padding:0; max-width:88%; border-radius:0; color:var(--text); }
+html[data-ui="v2"] .j-ai .j-bubble span{ color:var(--text3) !important; font-size:13px !important; }
+html[data-ui="v2"] .j-bubble-user{
+  background:var(--text); color:var(--card); border:0; padding:10px 14px; max-width:80%;
+  border-radius:18px 18px 4px 18px;
+}
+html[data-ui="v2"] .j-ai .j-bubble.j-reminder,
+html[data-ui="v2"] .j-ai .j-bubble.j-tip{ border-left:2px solid var(--accent); padding-left:12px; color:var(--text); background:none; }
+html[data-ui="v2"] .j-chips{ display:flex; gap:8px; padding:0 16px 8px; overflow-x:auto; scrollbar-width:none; flex:none; }
+html[data-ui="v2"] .j-chips::-webkit-scrollbar{ display:none; }
+html[data-ui="v2"] .j-chip{
+  flex:none; height:36px; padding:0 14px; border:1px solid var(--border); border-radius:18px;
+  background:none; color:var(--text); font:inherit; font-size:13px; white-space:nowrap; cursor:pointer;
+}
+html[data-ui="v2"] .j-input-wrap{ background:transparent; border-top:0; padding:8px 16px 12px; }
+html[data-ui="v2"] .j-input-row{ gap:8px; }
+html[data-ui="v2"] .j-in-btn{ width:44px; height:44px; border-radius:22px; background:var(--border); color:var(--text); }
+html[data-ui="v2"] .j-in-btn .ic{ width:20px; height:20px; }
+html[data-ui="v2"] .j-inp{ height:44px; border-radius:22px !important; background:var(--card) !important; border:1px solid var(--border) !important; padding:0 16px !important; }
+html[data-ui="v2"] .j-act{ background:var(--accent); color:#101113; }
+html[data-ui="v2"] .j-act[data-mode="stop"]{ background:var(--red); color:#fff; }
+@media (max-width:900px){
+  html[data-ui="v2"] .jarvis-panel{
+    left:0; right:0; width:100%; border-radius:24px 24px 0 0; border-bottom:0;
+    top:calc(var(--v2-head, 104px) + 8px); height:auto;
+  }
+  html[data-ui="v2"] .j-scrim{ background:rgba(0,0,0,.35); }
+}
 
 /* ── 모달 ────────────────────────────────────────────────────── */
 html[data-ui="v2"] .modal-box{ border-radius:20px; box-shadow:none; border:1px solid var(--border); }
@@ -167,3 +211,5 @@ html[data-ui="v2"].dark .modal-head{ background:var(--card2); }
 
 /* ── 프로필 메뉴의 현재 디자인 표시 ─────────────────────────── */
 .ui-cur{ margin-left:auto; font-size:11px; color:var(--text3); }
+html[data-ui="v2"] .fx{ border-bottom-color:var(--v2-line); }
+html[data-ui="v2"] .modal-close{ border-radius:50%; width:40px; height:40px; border:0; background:var(--border); color:var(--text); }

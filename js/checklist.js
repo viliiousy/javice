@@ -19,12 +19,8 @@ const Checklist = {
     const items=this.getItems();
     const today=new Date(); today.setHours(0,0,0,0);
 
-    const sorted=[...items].sort((a,b)=>{
-      if(a.done!==b.done) return a.done?1:-1;
-      const da=a.dueDate?new Date(a.dueDate+'T00:00:00'):new Date('9999');
-      const db=b.dueDate?new Date(b.dueDate+'T00:00:00'):new Date('9999');
-      return da-db;
-    });
+    // 순서는 사용자가 꾹 눌러 끌어 정한 그대로 둔다. 끝낸 항목만 아래로 내린다.
+    const sorted=[...items.filter(i=>!i.done), ...items.filter(i=>i.done)];
 
     wrap.innerHTML=sorted.map(item=>{
       const due=item.dueDate?new Date(item.dueDate+'T00:00:00'):null;
@@ -48,6 +44,7 @@ const Checklist = {
     try { RowUI.paint(wrap, {
       edit: id => this.showEdit(id),
       del:  id => this.remove(id),
+      reorder: order => this._applyOrder(order),
     }); } catch(e) { console.warn('RowUI', e); }
   },
 
@@ -73,6 +70,15 @@ const Checklist = {
   _bodyTap(id) { this.showEdit(id); },
 
   _reorderMode: false,
+
+  // 꾹 눌러 끌어 놓은 순서를 저장한다 (js/rowui.js)
+  _applyOrder(order) {
+    const items = this.getItems();
+    const out = order.map(id => items.find(i => i.id === id)).filter(Boolean);
+    items.forEach(i => { if (!out.includes(i)) out.push(i); });
+    this.saveItems(out);
+    try { Sounds?.click(); } catch(e){}
+  },
 
   toggleReorderMode() {
     this._reorderMode = !this._reorderMode;

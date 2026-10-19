@@ -179,18 +179,17 @@ const HomePlan = {
     const isOpen = this._open[dayIdx + '-' + exIdx];
     const imgSrc = this.IMG[x.img] || '';
 
+    // 그림은 늘 보인다(시작·끝 자세 두 칸 그대로). 이름은 한 줄로 작게, 자세 팁·영상만 접어 둔다.
     return `<div class="hp-ex ${isOpen ? 'hp-ex-open' : ''}">
-      <div class="hp-ex-head" onclick="HomePlan.toggle(${dayIdx},${exIdx})">
-        <div class="hp-ex-num">${exIdx + 1}</div>
-        <div class="hp-ex-info">
-          <div class="hp-ex-name">${esc(x.n)}</div>
-          <div class="hp-ex-en">${esc(x.e)}</div>
-        </div>
-        <svg class="hp-chev" viewBox="0 0 20 20" fill="currentColor"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+      ${imgSrc ? `<div class="hp-pic"><img src="${imgSrc}" alt="${esc(x.n)} 시작·끝 자세" loading="lazy"></div>` : ''}
+      <div class="hp-ex-line">
+        <span class="hp-ex-num">${exIdx + 1}</span>
+        <span class="hp-ex-name">${esc(x.n)}</span>
+        <span class="hp-ex-en">${esc(x.e)}</span>
       </div>
       <div class="hp-tags">${x.tg.map(t => `<span class="${this._tagClass(t.c)}">${esc(t.t)}</span>`).join('')}</div>
+      <button type="button" class="hp-more" onclick="HomePlan.toggle(${dayIdx},${exIdx})">${isOpen ? '접기' : '자세 팁 · 영상'}</button>
       ${isOpen ? `<div class="hp-ex-detail">
-        ${imgSrc ? `<div class="hp-img-wrap exm-media has"><div class="exm-anim" style="background-image:url('${imgSrc}')" role="img" aria-label="${esc(x.n)} 시작·끝 자세"></div></div>` : ''}
         <div class="hp-yt-section">
           <a class="hp-yt-btn" href="${this.ytUrl(x.yt.ko)}" target="_blank" rel="noopener">
             <span class="hp-yt-icon">▶</span>
