@@ -287,7 +287,7 @@ const Econ = {
     return this.TICKERS;
   },
   async search(v, where) {
-    const box = document.getElementById({ F:'ecFRes', L:'ecLRes', H:'ecHRes' }[where]);
+    const box = document.getElementById({ F:'ecFRes', L:'ecLRes', H:'ecHRes', O:'obERes' }[where]);
     if (!box) return;
     v = v.trim();
     if (!v) { box.innerHTML = ''; return; }
@@ -309,18 +309,27 @@ const Econ = {
     }
     out.sort((a,b) => a[0]-b[0] || a[1]-b[1]);
     const code = /^[0-9A-Za-z]{6}$/.test(v) ? v.toUpperCase() : '';
-    box.innerHTML =
+    box.innerHTML = (where === 'O' ? '' :
       `<div class="ec-res ec-manual" onclick="Econ.manual('${where}','${code}')">
-        <div><div class="ec-nm ec-gold">＋ 코드로 직접 추가</div><div class="ec-meta">검색에 없는 ETF 등 (예: 0173Y0)</div></div></div>` +
+        <div><div class="ec-nm ec-gold">＋ 코드로 직접 추가</div><div class="ec-meta">검색에 없는 ETF 등 (예: 0173Y0)</div></div></div>`) +
       out.slice(0,8).map(x => {
         const e = x[2];
         const it = { name:e.ko || e.n, code:e.c, type:e.t, tv:e.tv, unit:this.unitFor(e.t), floor:null };
         return `<div class="ec-res"><div><div class="ec-nm">${esc(e.ko || e.n)}</div>
           <div class="ec-meta">${e.ko ? esc(e.n)+' · ' : ''}${esc(e.c)} · ${this.TYPE[e.t]||''}</div></div>
-          <button class="btn-sm accent" onclick='Econ.add("${where}",${this.attr(it)})'>${where==='F'?'★ 추가':where==='H'?'＋ 보유':'＋ 담기'}</button></div>`;
+          <button class="btn-sm accent" onclick='Econ.add("${where}",${this.attr(it)})'>${where==='F'||where==='O'?'★ 담기':where==='H'?'＋ 보유':'＋ 담기'}</button></div>`;
       }).join('');
   },
   add(where, it) {
+    // 설정 도우미(O)에서 담은 종목은 즐겨찾기로 들어간다.
+    if (where === 'O') {
+      const c = this.cfg(), k = this.keyOf(it);
+      if (c.favorites.some(x => this.keyOf(x) === k)) { App.showToast('이미 담았어요'); return; }
+      c.favorites.push(Object.assign({ alert:true }, it));
+      this.queueSave(); App.showToast(`★ ${it.name} 담음`, 'success');
+      try { this._drawMain(); this.render(); } catch {}
+      return;
+    }
     const c = this.cfg(), k = this.keyOf(it);
     if (where === 'H') {
       if (it.type === 'exchange') { App.showToast('환율은 보유로 담을 수 없어요','error'); return; }

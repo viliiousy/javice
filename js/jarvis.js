@@ -39,7 +39,7 @@ const JARVIS = {
         </div>
         <div id="jMsgs" class="j-msgs">
           <div class="j-msg j-ai"><div class="j-avatar">⚡</div>
-            <div class="j-bubble">Bashy입니다.<br>
+            <div class="j-bubble">AI 비서입니다. 말하거나 입력하면 기록해 드려요.<br>
               <span style="font-size:11px;color:var(--accent-l)">할일·일정·체크리스트·습관·식단·메모 관리 가능<br>📷 사진으로 식단 자동 분석</span>
             </div>
           </div>

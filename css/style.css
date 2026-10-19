@@ -3358,3 +3358,104 @@ body.auth-restoring .login-title::after{ content:'불러오는 중…'; display:
 .j-act[data-mode="stop"]{ background:var(--red); color:#fff; }
 .j-voice-bar{ background:color-mix(in srgb, var(--red) 12%, transparent) !important; border-color:color-mix(in srgb, var(--red) 35%, transparent) !important; }
 #jVoiceTxt{ color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* ═══════════════════════════════════════
+   처음 사용 도우미 (js/onboard.js)
+   ═══════════════════════════════════════ */
+body.ob-open{ overflow:hidden; }
+.ob-wrap{ position:fixed; inset:0; z-index:2000; background:color-mix(in srgb, var(--bg) 70%, transparent);
+  -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+  display:flex; align-items:center; justify-content:center; padding:16px; }
+.ob-wrap[hidden]{ display:none; }
+.ob-card{ width:100%; max-width:440px; max-height:calc(100dvh - 32px); display:flex; flex-direction:column;
+  background:var(--card); border:1px solid var(--border); border-radius:22px; box-shadow:var(--shadow-lg); overflow:hidden; }
+@media (max-width:640px){
+  .ob-wrap{ padding:0; align-items:stretch; background:var(--card); }
+  .ob-card{ max-width:none; max-height:none; border-radius:0; border:0;
+    padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+}
+.ob-top{ display:flex; align-items:center; gap:12px; padding:12px 16px 0; }
+.ob-x{ width:32px; height:32px; border-radius:50%; border:0; background:var(--card2); color:var(--text2); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+.ob-x .ic{ width:16px; height:16px; }
+.ob-dots{ flex:1; display:flex; gap:5px; }
+.ob-dots span{ flex:1; height:4px; border-radius:2px; background:var(--border); transition:background .2s; }
+.ob-dots span.done{ background:color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.ob-dots span.on{ background:var(--accent); }
+.ob-cnt{ font-size:12px; color:var(--text3); font-variant-numeric:tabular-nums; }
+.ob-hd{ display:flex; align-items:center; gap:12px; padding:18px 20px 4px; }
+.ob-hd h2{ font-size:20px; font-weight:800; margin:0; letter-spacing:-.02em; }
+.ob-hd p{ margin:2px 0 0; font-size:13px; color:var(--text3); }
+.ob-ic{ width:44px; height:44px; border-radius:14px; background:var(--accent-bg); color:var(--accent); display:flex; align-items:center; justify-content:center; flex:none; }
+.ob-ic .ic{ width:22px; height:22px; }
+.ob-body{ flex:1; overflow-y:auto; padding:14px 20px 8px; -webkit-overflow-scrolling:touch; }
+.ob-foot{ display:flex; gap:8px; padding:12px 20px 16px; border-top:1px solid var(--border); }
+.ob-btn{ flex:1; height:46px; border-radius:14px; border:1px solid var(--border); background:var(--card); color:var(--text2);
+  font:inherit; font-size:15px; font-weight:600; cursor:pointer; }
+.ob-btn.pri{ flex:1.4; background:var(--accent); border-color:var(--accent); color:var(--accent-fg); }
+.ob-hero{ text-align:center; padding:28px 4px 8px; }
+.ob-hero h2{ font-size:22px; font-weight:800; margin:14px 0 8px; letter-spacing:-.02em; }
+.ob-hero p{ font-size:14px; line-height:1.6; color:var(--text2); margin:0 0 10px; }
+.ob-hero .ic-empty{ width:48px; height:48px; color:var(--accent); }
+.ob-logo{ width:64px; height:64px; margin:0 auto; border-radius:20px; background:#5b4cf0; color:#fff; display:flex; align-items:center; justify-content:center; }
+.ob-logo .ic{ width:32px; height:32px; fill:#fff; stroke:none; }
+.ob-sub{ font-size:12px !important; color:var(--text3) !important; }
+.ob-list{ list-style:none; padding:0; margin:16px auto; max-width:300px; text-align:left; display:grid; gap:6px; }
+.ob-list li{ display:flex; align-items:center; gap:10px; padding:9px 12px; background:var(--card2); border-radius:12px; font-size:14px; }
+.ob-list .ic{ width:18px; height:18px; color:var(--accent); }
+.ob-p{ font-size:14px; line-height:1.55; color:var(--text2); margin:0 0 12px; }
+.ob-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:12px 0; }
+.ob-grid label{ display:flex; flex-direction:column; gap:5px; font-size:12px; font-weight:600; color:var(--text2); }
+.ob-grid label i{ font-style:normal; font-weight:400; color:var(--text3); }
+.ob-grid .inp{ height:42px; font-size:16px; }
+.ob-seg{ display:flex; background:var(--card2); border-radius:12px; padding:3px; gap:3px; }
+.ob-seg button{ flex:1; height:36px; border:0; border-radius:10px; background:transparent; color:var(--text2); font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+.ob-seg button.on{ background:var(--card); color:var(--text); box-shadow:var(--shadow-sm); }
+.ob-goal{ margin:4px 0 12px; }
+.ob-res{ background:var(--accent-bg); border-radius:16px; padding:14px 16px; margin-bottom:10px; }
+.ob-kcal{ display:flex; align-items:baseline; gap:6px; }
+.ob-kcal span{ font-size:13px; color:var(--text2); }
+.ob-kcal b{ font-size:30px; font-weight:800; color:var(--accent); letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.ob-macros{ display:flex; gap:14px; margin-top:4px; font-size:13px; color:var(--text2); }
+.ob-macros b{ color:var(--text); }
+.ob-hint{ font-size:12px; color:var(--text3); line-height:1.5; margin:8px 0 0; }
+.ob-link{ display:inline-flex; align-items:center; gap:6px; border:0; background:none; color:var(--accent); font:inherit; font-size:13px; font-weight:600; padding:6px 0; cursor:pointer; }
+.ob-link .ic{ width:16px; height:16px; }
+.ob-tips{ display:grid; gap:10px; margin-top:6px; }
+.ob-tip{ display:flex; gap:12px; padding:12px; background:var(--card2); border-radius:14px; }
+.ob-tip b{ font-size:14px; }
+.ob-tip p{ margin:3px 0 0; font-size:13px; line-height:1.5; color:var(--text2); }
+.ob-tic{ width:34px; height:34px; border-radius:10px; background:var(--card); color:var(--accent); display:flex; align-items:center; justify-content:center; flex:none; }
+.ob-tic .ic{ width:18px; height:18px; }
+.ob-chips{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+.ob-chip{ height:38px; padding:0 14px; border-radius:19px; border:1px solid var(--border); background:var(--card); color:var(--text2); font:inherit; font-size:14px; cursor:pointer; }
+.ob-chip.on{ background:var(--accent); border-color:var(--accent); color:var(--accent-fg); font-weight:600; }
+.ob-opts{ display:grid; gap:8px; margin-bottom:14px; }
+.ob-opt{ text-align:left; padding:14px; border-radius:14px; border:1.5px solid var(--border); background:var(--card); font:inherit; cursor:pointer; display:flex; flex-direction:column; gap:3px; color:var(--text); }
+.ob-opt b{ font-size:15px; }
+.ob-opt span{ font-size:12px; color:var(--text3); }
+.ob-opt.on{ border-color:var(--accent); background:var(--accent-bg); }
+.ob-eres{ margin:8px 0 14px; }
+
+/* 운동: 계획 없음 · 내 루틴 */
+.fit-empty{ text-align:center; padding:18px 16px 10px; color:var(--text2); }
+.fit-empty p{ margin:8px 0 12px; font-size:13px; line-height:1.55; }
+.fit-empty p span{ color:var(--text3); font-size:12px; }
+.fit-empty-btns{ display:flex; gap:8px; justify-content:center; }
+.rt-box{ margin-top:14px; border-top:1px solid var(--border); padding-top:12px; }
+.rt-hd{ font-size:13px; font-weight:700; margin-bottom:8px; }
+.rt-row{ display:flex; align-items:center; gap:8px; padding:8px 10px; background:var(--card2); border-radius:10px; margin-bottom:6px; }
+.rt-nm{ flex:1; font-size:14px; font-weight:600; }
+.rt-n{ font-size:12px; color:var(--text3); }
+.rt-empty{ font-size:12px; color:var(--text3); padding:4px 0 8px; }
+
+/* 운동 자세 보기 — 두 칸 그림을 번갈아 보여 준다 */
+.exm-media{ position:relative; aspect-ratio:3/4; max-height:46vh; margin:0 auto 10px; border-radius:16px; background:#f2f3f5; overflow:hidden; }
+.exm-anim{ position:absolute; inset:0; background-size:200% 100%; background-repeat:no-repeat; background-position:0 0;
+  animation:exmFlip 1.8s steps(1) infinite; display:none; }
+.exm-media.has .exm-anim{ display:block; }
+.exm-media.has .exm-none{ display:none; }
+@keyframes exmFlip{ 0%{ background-position:0 0 } 50%{ background-position:100% 0 } }
+.exm-none{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:#8a9099; font-size:13px; }
+html.dark .exm-media{ background:#1d2026; }
+.exm-sub{ font-size:12px; color:var(--text3); text-align:center; margin-bottom:8px; }
+.exm-cues{ margin:0 0 12px; padding-left:20px; font-size:14px; line-height:1.7; }

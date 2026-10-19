@@ -48,9 +48,23 @@ const Fitness = {
     };
   },
 
+  // ── 내 루틴 ────────────────────────────
+  // 처음 가입한 사람에게는 아무것도 미리 정해 두지 않는다. 직접 루틴을 만들어 요일에 붙인다.
+  ROUTINE_KEY: 'gl_fitness_routines',     // { r_xxx: { name, exercises:[{name,sets}] } }
+  routines() {
+    try { const v = JSON.parse(UserStore.get(this.ROUTINE_KEY) || '{}'); return (v && typeof v === 'object') ? v : {}; }
+    catch { return {}; }
+  },
+  saveRoutines(v) { UserStore.set(this.ROUTINE_KEY, JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
+  // 새 사용자(도우미가 표시)는 기본 배정이 '계획 없음' 이다.
+  _defaultFor(dow) { return UserStore.get('gl_fit_blank') === '1' ? 'none' : this.DEFAULT_DAY[dow]; },
+
   planFor(dow) {
     let pick = this.dayPlan()[dow];
-    if (!['A','B','C','cardio','rest'].includes(pick)) pick = this.DEFAULT_DAY[dow];   // 예전 Hevy 루틴 id 는 무시
+    const R = this.routines();
+    if (!['A','B','C','cardio','rest','none'].includes(pick) && !R[pick]) pick = this._defaultFor(dow);   // 예전 Hevy 루틴 id 는 무시
+    if (R[pick]) return { name:R[pick].name, exercises:(R[pick].exercises||[]).map(x=>({ name:x.name, sets:x.sets||'' })), src:'routine', rid:pick };
+    if (pick === 'none')   return { name:'계획 없음', exercises:[], src:'none' };
     if (pick === 'rest')   return { name:'휴식', exercises:[], src:'day' };
     if (pick === 'cardio') return { ...this.CARDIO, src:'day' };
     return this.homeDay(pick) || { name:'휴식', exercises:[], src:'day' };
@@ -84,7 +98,8 @@ const Fitness = {
       badge.textContent=plan.name;
       // 배지를 누르면 그날 플랜의 자세·중량 가이드가 열린다.
       badge.style.cursor='pointer'; badge.title='자세·추천 중량 가이드';
-      badge.onclick=()=>HomePlan.open(plan.src==='home'?plan.day:0);
+      badge.onclick=()=> plan.src==='home' ? HomePlan.open(plan.day) : plan.src==='routine' ? Fitness.showRoutineEdit(plan.rid) : Fitness.showDayPlan();
+      if(plan.src!=='home') badge.title='루틴 보기·바꾸기';
       badge.className=allEx.length?'badge badge-accent':'badge';
     }
 
@@ -106,12 +121,20 @@ const Fitness = {
     if (!allEx.length) {
       // 계획이 휴식일이어도 그날 실제로 운동했으면 기록과 피드백은 보여야 한다.
       // 예전엔 여기서 그냥 빠져나가서, 계획에 없던 날의 운동은 어디서도 볼 수 없었다.
+      const none = plan.src==='none';
       container.innerHTML=`
       <div class="fit-tabs">${tabs}</div>
-      <div style="text-align:center;padding:20px 16px;color:var(--text2)">
+      ${none ? `<div class="fit-empty">
+        ${Icons.big('dumbbell')}
+        <p><b>아직 이 요일의 운동 계획이 없어요</b><br><span>내 루틴을 만들어 요일에 붙이거나, 그날 한 운동만 바로 기록해도 됩니다.</span></p>
+        <div class="fit-empty-btns">
+          <button class="btn-sm accent" onclick="Fitness.showRoutineEdit()">루틴 만들기</button>
+          <button class="btn-sm" onclick="Fitness.showDayPlan()">요일에 배정</button>
+        </div>
+      </div>` : `<div style="text-align:center;padding:20px 16px;color:var(--text2)">
         ${Icons.big('moon')}
         <p>휴식일입니다.<br><span style="color:var(--text3);font-size:12px">다른 요일을 눌러 계획을 볼 수 있어요</span></p>
-      </div>
+      </div>`}
       ${isToday?'<div class="habit-add-btn" onclick="Fitness.showInlineAdd()">+ 운동 추가</div>':''}`;
       return;
     }
@@ -127,7 +150,8 @@ const Fitness = {
         <div class="ex-item${on(i)?' done':''}" onclick="Fitness.toggle(${i},'${Fitness._dateStr(date)}')">
           <div class="ex-chk">${on(i)?'✓':''}</div>
           <span class="ex-name">${esc(ex.name)}</span>
-          ${ex.hp!=null&&plan.src==='home'?`<button class="ex-info" onclick="event.stopPropagation();HomePlan.open(${plan.day},${ex.hp})" title="자세·중량 가이드">i</button>`:''}
+          ${ex.hp!=null&&plan.src==='home'?`<button class="ex-info" onclick="event.stopPropagation();HomePlan.open(${plan.day},${ex.hp})" title="자세·중량 가이드">i</button>`
+            :(typeof ExMedia!=='undefined'&&ExMedia.find(ex.name))?`<button class="ex-info" onclick="event.stopPropagation();ExMedia.open('${esc(ex.name).replace(/'/g,'&#39;')}')" title="자세 보기">i</button>`:''}
           <a class="ex-yt" href="${Fitness.ytUrl(ex.name)}" target="_blank" rel="noopener"
              onclick="event.stopPropagation()" title="자세 영상 검색">▶</a>
           <span class="ex-sets">${ex.sets}</span>
@@ -150,19 +174,33 @@ const Fitness = {
   // ── 요일별 루틴 배정 ───────────────────
   showDayPlan() {
     const dp = this.dayPlan();
+    const R = this.routines();
     const DOW = ['일','월','화','수','목','금','토'];
-    const OPTS = [['A','DAY A 푸시'],['B','DAY B 풀'],['C','DAY C 하체+코어'],['cardio','유산소'],['rest','휴식']];
+    const OPTS = [
+      ...Object.entries(R).map(([id,r]) => [id, '내 루틴 · ' + r.name]),
+      ['none','계획 없음'], ['rest','휴식'], ['cardio','유산소'],
+      ['A','홈트 DAY A 푸시'],['B','홈트 DAY B 풀'],['C','홈트 DAY C 하체+코어'],
+    ];
     const rows = DOW.map((d,i) => {
-      const cur = dp[i] || this.DEFAULT_DAY[i];
-      const opts = OPTS.map(([v,l]) => `<option value="${v}"${cur===v?' selected':''}>${l}${this.DEFAULT_DAY[i]===v?' (기본)':''}</option>`);
+      let cur = dp[i]; if (!cur || (!R[cur] && !OPTS.some(o=>o[0]===cur))) cur = this._defaultFor(i);
+      const opts = OPTS.map(([v,l]) => `<option value="${v}"${cur===v?' selected':''}>${esc(l)}</option>`);
       return `<div class="dp-row">
         <span class="dp-d${i===0?' dp-sun':''}${i===6?' dp-sat':''}">${d}</span>
         <select class="inp inp-sm dp-sel" data-dow="${i}">${opts.join('')}</select>
       </div>`;
     }).join('');
+    const rlist = Object.entries(R).map(([id,r]) => `<div class="rt-row">
+        <span class="rt-nm">${esc(r.name)}</span><span class="rt-n">${(r.exercises||[]).length}종목</span>
+        <button class="btn-sm" onclick="Fitness.showRoutineEdit('${id}')">편집</button>
+      </div>`).join('');
     App.openModal('@dumbbell 요일별 운동', `
-      <div class="dp-note">홈트레이닝 3일 분할 플랜을 요일에 배정합니다. 종목별 자세·추천 중량은 운동 카드의 '가이드' 에서 볼 수 있어요.</div>
+      <div class="dp-note">요일마다 할 루틴을 고릅니다. 내 루틴은 아래에서 만들 수 있고, 홈트 3분할 플랜도 그대로 쓸 수 있어요.</div>
       <div class="dp-list">${rows}</div>
+      <div class="rt-box">
+        <div class="rt-hd">내 루틴</div>
+        ${rlist || '<div class="rt-empty">아직 만든 루틴이 없습니다</div>'}
+        <button class="habit-add-btn" onclick="Fitness.showRoutineEdit()">+ 새 루틴 만들기</button>
+      </div>
       <div class="modal-btns">
         <button onclick="Fitness._saveDayPlan()" class="btn-sm accent">저장</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
@@ -173,12 +211,55 @@ const Fitness = {
     const dp = {};
     document.querySelectorAll('.dp-sel').forEach(sel => {
       const v = sel.value;
-      if (v && v !== this.DEFAULT_DAY[sel.dataset.dow]) dp[sel.dataset.dow] = v;   // 기본과 같으면 저장하지 않는다
+      if (v && v !== this._defaultFor(sel.dataset.dow)) dp[sel.dataset.dow] = v;   // 기본과 같으면 저장하지 않는다
     });
     this.saveDayPlan(dp);
     App.closeModal();
     App.showToast('요일별 운동 저장됨 ✓','success');
     this.render(App?.S?.selDate || new Date());
+  },
+
+  // ── 루틴 만들기·고치기 ───────────────────
+  // 운동 추가 창(종목 고르기)을 그대로 쓰고, 위에 루틴 이름·요일 칸만 얹는다.
+  showRoutineEdit(id) {
+    const R = this.routines(), r = id && R[id];
+    this._rid = id || null;
+    this._cart = r ? (r.exercises||[]).map(x => ({ name:x.name, sets:x.sets||this.DEFAULT_SETS })) : [];
+    const dp = this.dayPlan();
+    const DOW = ['일','월','화','수','목','금','토'];
+    const days = DOW.map((d,i) => `<label class="day-pick-btn"><input type="checkbox" class="rt-day" value="${i}" ${id && dp[i]===id?'checked':''}><span>${d}</span></label>`).join('');
+    this._openPicker(r ? '루틴 편집' : '새 루틴', `
+      <div class="modal-row"><label class="modal-lbl">루틴 이름</label>
+        <input id="rtName" class="inp" placeholder="예: 상체 A, 하체 데이" value="${r?esc(r.name):''}"></div>
+      <div class="modal-row"><label class="modal-lbl">이 루틴을 하는 요일</label><div class="day-picker">${days}</div></div>`,
+      r ? `<button onclick="Fitness.delRoutine('${id}')" class="btn-danger">삭제</button>` : '');
+  },
+  delRoutine(id) {
+    if (!confirm('이 루틴을 삭제할까요? 배정된 요일은 계획 없음이 됩니다.')) return;
+    const R = this.routines(); delete R[id]; this.saveRoutines(R);
+    const dp = this.dayPlan(); Object.keys(dp).forEach(k => { if (dp[k] === id) dp[k] = 'none'; }); this.saveDayPlan(dp);
+    App.closeModal(); this.render(App?.S?.selDate || new Date());
+    App.showToast('루틴 삭제됨', 'success');
+  },
+  _commitRoutine() {
+    const name = document.getElementById('rtName')?.value.trim();
+    if (!name) { App.showToast('루틴 이름을 입력해 주세요', 'error'); return; }
+    const cart = this._cart || [];
+    if (!cart.length) { App.showToast('운동을 하나 이상 골라 주세요', 'error'); return; }
+    const R = this.routines();
+    const id = this._rid || ('r_' + Date.now().toString(36));
+    R[id] = { name, exercises: cart.map(x => ({ name:x.name, sets:x.sets||this.DEFAULT_SETS })) };
+    this.saveRoutines(R);
+    const dp = this.dayPlan();
+    const picked = [...document.querySelectorAll('.rt-day:checked')].map(c => c.value);
+    for (let i=0;i<7;i++) {
+      if (picked.includes(String(i))) dp[i] = id;
+      else if (dp[i] === id) dp[i] = 'none';
+    }
+    this.saveDayPlan(dp);
+    this._cart = []; this._rid = null;
+    App.closeModal(); this.render(App?.S?.selDate || new Date());
+    App.showToast(`'${name}' 루틴 저장됨 ✓`, 'success');
   },
 
   toggle(idx, dateStr=null) {
@@ -262,7 +343,7 @@ const Fitness = {
     if(btn){
       const n=(this._cart||[]).length;
       btn.disabled=!n;
-      btn.textContent = n ? `추가 (${n}개)` : '고른 운동 없음';
+      btn.textContent = n ? (this._rid !== undefined ? `루틴 저장 (${n}종목)` : `추가 (${n}개)`) : '고른 운동 없음';
     }
   },
   _pickHtml(){
@@ -308,10 +389,15 @@ const Fitness = {
   setQ(v){ this._q=v; this._paintPick(); },
 
   showInlineAdd() {
-    this._cart=[]; this._hits=null; this._part=null; this._q='';
+    this._cart=[]; this._rid=undefined;
+    this._openPicker('운동 추가', '', '');
+  },
+  _openPicker(title, head, extraBtn) {
+    this._hits=null; this._part=null; this._q='';
+    const routine = this._rid !== undefined;
     const parts=this._parts();
     const n=parts.reduce((a,p)=>a+EX_DB[p].length,0);
-    App.openModal('@dumbbell 운동 추가', `
+    App.openModal('@dumbbell '+title, `${head}
       <div class="ex-parts">
         ${parts.map(p=>`<button class="ex-part" data-part="${p}" onclick="Fitness.setPart('${p}')">${p}</button>`).join('')}
       </div>
@@ -321,10 +407,11 @@ const Fitness = {
       <div id="exResults" class="ex-results"></div>
       <p class="ex-hint">${n}개 종목 · ▶ 를 누르면 자세 영상을 찾아줍니다</p>
       <div class="modal-btns">
-        <button id="exCommit" onclick="Fitness.commitCart()" class="btn-sm accent" disabled>고른 운동 없음</button>
+        <button id="exCommit" onclick="${routine?'Fitness._commitRoutine()':'Fitness.commitCart()'}" class="btn-sm accent" disabled>고른 운동 없음</button>
+        ${extraBtn}
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
       </div>`);
-    setTimeout(()=>{ this._paintPick(); document.getElementById('exSearch')?.focus(); },50);
+    setTimeout(()=>{ this._paintPick(); if(!routine) document.getElementById('exSearch')?.focus(); },50);
   },
 
   commitCart() {

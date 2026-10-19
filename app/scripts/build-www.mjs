@@ -17,7 +17,7 @@ rmSync(www, { recursive: true, force: true });
 mkdirSync(www, { recursive: true });
 
 const FILES = ['index.html', 'privacy.html', 'terms.html', 'manifest.json'];
-const DIRS  = ['css', 'js', 'icons'];
+const DIRS  = ['css', 'js', 'icons', 'img'];
 const SKIP  = /(^|\/)(hub\.js|hub-icons\.js|hub\.css)$/;   // 태블릿 허브 전용
 
 for (const f of FILES) if (existsSync(join(root, f))) cpSync(join(root, f), join(www, f));

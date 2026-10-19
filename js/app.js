@@ -72,6 +72,8 @@ const App = {
     try { TopStrip.render(); }      catch(e){ console.warn('TopStrip',e); }
     try { CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,[],this.S.selDate); } catch(e){ console.warn('Cal render',e); }
     this._updateStatsBanner();
+    // 처음 쓰는 계정이면 설정 도우미 (클라우드 기록을 받은 뒤에 판단해야 기존 사용자를 새로 보지 않는다)
+    setTimeout(()=>{ try { Onboard.maybeStart(); } catch(e){ console.warn('Onboard',e); } }, 900);
     await this.sync();
   },
 
