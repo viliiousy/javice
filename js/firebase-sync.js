@@ -117,7 +117,7 @@ const FirebaseSync = {
 
   _collectData() {
     const data   = UserStore.getAllData();
-    const extras = ['gl_ai_key','gl_ai_prov','gl_ai_key_openai','gl_ai_key_anthropic','gl_ai_key_gemini','gl_ai_key_xai','gl_aiu_show','gl_tts','gl_dark','gl_cat_colors'];
+    const extras = ['gl_ai_key','gl_ai_prov','gl_ai_key_openai','gl_ai_key_anthropic','gl_ai_key_gemini','gl_ai_key_xai','gl_aiu_show','gl_ui','gl_tts','gl_dark','gl_cat_colors'];
     extras.forEach(k => { const v=localStorage.getItem(k); if(v!=null) data[k]=v; });
     data['_savedAt'] = String(Date.now());
     return data;

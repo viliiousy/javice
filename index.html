@@ -19,6 +19,10 @@
        체중·칼로리·시세처럼 한글 라벨 옆에 숫자가 계속 붙는 화면에서 정렬이 훨씬 안정적이다. -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+  <link rel="stylesheet" href="css/theme-v2.css">
   <script>
     // 테마는 첫 페인트 전에 정해야 한다. 스크립트가 늦게 돌면 흰 화면이 한 번 번쩍인다.
     (function(){
@@ -28,6 +32,8 @@
         var dark = p==='dark' || (p==='system' && matchMedia('(prefers-color-scheme: dark)').matches);
         if(dark) document.documentElement.classList.add('dark');
       }catch(e){}
+      // 디자인 판: v2(새 디자인) 기본, v1 은 예전 모습. 프로필 메뉴 → 디자인 에서 바꾼다.
+      try{ document.documentElement.dataset.ui = localStorage.getItem('gl_ui') || 'v2'; }catch(e){ document.documentElement.dataset.ui='v2'; }
     })();
   </script>
 </head>
@@ -106,6 +112,7 @@
         <div class="profile-menu-item" data-ic="sparkle" onclick="AIUsage.open()">AI 사용량 · 허브</div>
         <div class="profile-menu-item" data-ic="grid" onclick="DevicePair.open()">기기 연결</div>
         <div class="profile-menu-item" data-ic="sparkle" onclick="Onboard.open(true)">사용 도우미</div>
+        <div class="profile-menu-item" onclick="App.toggleUI()"><span>디자인</span><span id="uiLabel" class="ui-cur"></span></div>
         <div class="profile-menu-item" onclick="App.toggleDarkMode()"><span id="darkModeLabel">테마</span></div>
         <div class="profile-menu-item" onclick="Icons.toggleMode()"><span id="iconModeLabel">아이콘</span></div>
         <div class="profile-menu-item" onclick="App.toggleSound()"><span id="soundLabel">사운드</span></div>

@@ -193,16 +193,19 @@ const App = {
     const calGoal = Number(ds.calorieGoal) || 0;
     const calLeft = calGoal - dt.cal;
     const won = v => Math.round(v).toLocaleString('ko-KR');
-    const calTxt = !calGoal      ? `${won(dt.cal)}kcal`
-                 : calLeft >= 0  ? `${won(calLeft)}kcal`
-                                 : `+${won(-calLeft)}kcal`;
+    const calTxt = !calGoal      ? `<b>${won(dt.cal)}</b>kcal`
+                 : calLeft >= 0  ? `남은 <b>${won(calLeft)}</b>kcal`
+                                 : `초과 <b>${won(-calLeft)}</b>kcal`;
+    // 새 디자인의 폰 화면은 헤더 오른쪽 두 줄(인바디·자산)을 접는다 — 몸무게만 이 줄 끝으로 옮긴다.
+    let kgTxt = '';
+    try { const r = (typeof InBody!=='undefined' && InBody.getRecords()) || []; const la = r[r.length-1]; if (la && la.wt) kgTxt = `<div class="stat-chip stat-kg" data-s="inbody" title="최근 체중"><b>${la.wt}</b>kg</div>`; } catch(e){}
     const clAll = Checklist.getItems().length, clDone = clAll - clItems.length;
 
     const chipsHTML=`
-      ${hList.length?`<div class="stat-chip ${hDone===hList.length?'stat-green':''}" data-s="habits" title="오늘 습관">${ic('check')}습관 ${hDone}/${hList.length}</div>`:''}
+      ${hList.length?`<div class="stat-chip ${hDone===hList.length?'stat-green':''}" data-s="habits" title="오늘 습관">${ic('check')}습관 <b>${hDone}/${hList.length}</b></div>`:''}
       <div class="stat-chip ${calGoal&&calLeft<0?'stat-red':calPct>=80?'stat-green':''}" data-s="diet" title="${calGoal?(calLeft>=0?'남은 칼로리':'초과한 칼로리'):'먹은 칼로리'}">${ic('diet')}${calTxt}</div>
-      ${pending>0?`<div class="stat-chip" data-s="tasks" title="남은 할일">${ic('tasks')}할일 ${pending}</div>`:''}
-      ${clAll>0?`<div class="stat-chip ${clDone===clAll?'stat-green':''}" data-s="checklist" title="체크리스트">${ic('pen')}체크 ${clDone}/${clAll}</div>`:''}`;
+      ${pending>0?`<div class="stat-chip" data-s="tasks" title="남은 할일">${ic('tasks')}할일 <b>${pending}</b></div>`:''}
+      ${clAll>0?`<div class="stat-chip ${clDone===clAll?'stat-green':''}" data-s="checklist" title="체크리스트">${ic('pen')}체크 <b>${clDone}/${clAll}</b></div>`:''}${kgTxt}`;
     // 인바디·자산은 이 줄에서 빠졌다. 헤더 오른쪽 두 줄(TopStrip)로 옮겼다 —
     // 같은 줄에 여섯 칸이 붙으면 모바일에서 두 줄로 접히면서 정작 오늘 할 일이 밀렸다.
     try { TopStrip.render(); } catch(e){}
@@ -246,6 +249,7 @@ const App = {
       el.querySelectorAll('[data-s]').forEach(chip=>{
         chip.onclick=()=>{
           const sec=chip.dataset.s;
+          if(sec==='inbody'){ try{ TopStrip.go('card-inbody'); }catch(e){} return; }
           const map={habits:'.card-habits',diet:'.card-diet',tasks:'.card-calendar',checklist:'.card-checklist'};
           const target=document.querySelector(map[sec]);
           if(target){
@@ -292,6 +296,12 @@ const App = {
     const elDate = document.getElementById('hDate');
     if(elDate) {
       const isMobile = window.innerWidth <= 640;
+      if (document.documentElement.dataset.ui === 'v2') {
+        // 새 디자인: 큰 날짜 숫자 + 작은 두 줄(월 / 요일). 오늘이 아니면 요일 자리에 '오늘로' 표시.
+        const wd = d.toLocaleDateString('ko-KR',{weekday:'long'});
+        const yy = d.getFullYear() !== now.getFullYear() ? `${String(d.getFullYear()).slice(2)}년 ` : '';
+        elDate.innerHTML = `<b class="hd-n">${d.getDate()}</b><span class="hd-s">${yy}${d.getMonth()+1}월<br>${isToday ? wd : `<em>${wd}</em>`}</span>`;
+      } else
       elDate.textContent = isMobile
         ? `${String(d.getFullYear()).slice(2)}년 ${d.getMonth()+1}월 ${d.getDate()}일`
         : d.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
@@ -1127,7 +1137,24 @@ const App = {
       const onChange = () => { if (this._theme==='system') this._applyTheme(); };
       mq.addEventListener ? mq.addEventListener('change', onChange) : mq.addListener(onChange);
     }
-    setTimeout(()=>this._updateSoundLabel(),100);
+    setTimeout(()=>{ this._updateSoundLabel(); this._updateUILabel(); },100);
+  },
+
+  // 디자인 판 바꾸기: v2(새 디자인) ↔ v1(예전 모습). 예전 코드 전체는 ui-v1-backup 브랜치에도 남아 있다.
+  toggleUI() {
+    const cur = document.documentElement.dataset.ui === 'v1' ? 'v1' : 'v2';
+    const nx  = cur === 'v2' ? 'v1' : 'v2';
+    try { localStorage.setItem('gl_ui', nx); } catch(e){}
+    document.documentElement.dataset.ui = nx;
+    try { window.FirebaseSync?.scheduleSave?.(); } catch(e){}
+    document.getElementById('profileMenu')?.classList.add('hidden');
+    this._updateUILabel();
+    try { this._updateHeaderDate(this.S.selDate || new Date()); } catch(e){}
+    this.showToast(nx === 'v2' ? '새 디자인' : '예전 디자인', 'success');
+  },
+  _updateUILabel() {
+    const el = document.getElementById('uiLabel');
+    if (el) el.textContent = document.documentElement.dataset.ui === 'v1' ? '예전' : '새 디자인';
   },
 
   toggleDarkMode() {
