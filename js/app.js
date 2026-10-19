@@ -29,7 +29,7 @@ const App = {
     on('btnLogout',      ()=>Auth.logout());
     on('btnSync',        ()=>this.sync());
     on('btnShowCompleted',()=>{ this.S.showCompleted=!this.S.showCompleted; const b=document.getElementById('btnShowCompleted'); if(b)b.style.background=this.S.showCompleted?'var(--accent)':''; this._renderTasks(); });
-    on('btnShowHidden',  ()=>{ this.S.showHidden=!this.S.showHidden; const b=document.getElementById('btnShowHidden'); if(b)b.style.background=this.S.showHidden?'var(--accent)':''; this._renderTasks(); });
+    on('btnShowHidden',  ()=>{ this.S.showHidden=!this.S.showHidden; this._paintShowHidden(); this._renderTasks(); });
 
     // 이 카드의 머리는 달력이다. 할일은 아래 목록이 제 + 를 따로 가지고 있다.
     on('btnAddEvent',    ()=>this._showAddEventModalForDate(this.S.selDate));
@@ -852,7 +852,16 @@ const App = {
     this._tabLpTimer=setTimeout(()=>{ this._showCatColorPicker(id,label); },600);
   },
   _tabLongPressEnd(){ clearTimeout(this._tabLpTimer); },
-  _toggleHidden(){ this.S.showHidden=!this.S.showHidden; this._buildTaskFilters(); this._renderTasks(); },
+  _toggleHidden(){ this.S.showHidden=!this.S.showHidden; this._paintShowHidden(); this._buildTaskFilters(); this._renderTasks(); },
+  // 숨긴 할일 보기 단추. 감은 눈 = 숨긴 것은 안 보이는 중, 뜬 눈 = 숨긴 것도 보이는 중.
+  // 할일 줄의 단추와 같은 두 아이콘만 쓴다 — 원숭이·눈동자가 섞여 있던 것을 하나로 묶었다.
+  _paintShowHidden(){
+    const b=document.getElementById('btnShowHidden'); if(!b) return;
+    const on=!!this.S.showHidden;
+    b.innerHTML=Icons.svg(on?'eye':'eyeclosed');
+    b.classList.toggle('active',on);
+    b.title=b.ariaLabel=on?'숨긴 할일 가리기':'숨긴 할일 보기';
+  },
   _setFilter(id){ this.S.taskFilter=id; this._buildTaskFilters(); this._renderTasks(); },
 
   _renderTasks() {
@@ -932,12 +941,12 @@ const App = {
       <div class="task-check" onclick="event.stopPropagation();App._toggle('${t.id}','${t._lid}',${done})"></div>
       <div class="task-body" onclick="App._showTaskDetail('${t.id}','${t._lid}')">
         <div class="task-text-row">
-          <span class="task-title-txt">${hidden?'🙈 ':''}${esc(t.title)}</span>
+          <span class="task-title-txt">${hidden?Icons.svg('eyeclosed','task-hid-ic'):''}${esc(t.title)}</span>
           ${dueStr}
         </div>
         ${t.notes?`<div class="task-notes">${esc(t.notes.slice(0,60))}${t.notes.length>60?'…':''}</div>`:''}
       </div>
-      <button class="task-hide-btn" onclick="event.stopPropagation();App._toggleHideTask('${t.id}','${t._lid}')" title="${hidden?'숨김 해제':'숨김'}">${hidden?'👁':'🙈'}</button>
+      <button class="task-hide-btn" onclick="event.stopPropagation();App._toggleHideTask('${t.id}','${t._lid}')" title="${hidden?'다시 보이기':'숨기기'}" aria-label="${hidden?'다시 보이기':'숨기기'}">${Icons.svg(hidden?'eye':'eyeclosed','task-hide-ic')}</button>
       <button class="task-del" onclick="event.stopPropagation();App._delTask('${t.id}','${t._lid}')">✕</button>
     </div>`;
   },

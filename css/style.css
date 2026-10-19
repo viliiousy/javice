@@ -3154,10 +3154,10 @@ body, .empty, .card-title, .modal-lbl, .habit-name, .task-text,
   .h-ai{ flex-shrink:0; }
 }
 @media (max-width:900px){
-  :root{ --tabbar-h:38px; --tabbar-pb:max(calc(env(safe-area-inset-bottom, 0px) - 16px), 2px); }
-  .tab-btn{ gap:1px; padding:4px 0 2px; }
-  .tab-ic{ width:16px !important; height:16px !important; font-size:16px !important; }
-  .tab-lb{ font-size:9px; font-weight:600; }
+  :root{ --tabbar-h:44px; --tabbar-pb:max(calc(env(safe-area-inset-bottom, 0px) - 14px), 3px); }
+  .tab-btn{ gap:2px; padding:5px 0 3px; }
+  .tab-ic{ width:20px !important; height:20px !important; font-size:20px !important; }
+  .tab-lb{ font-size:10px; font-weight:600; }
   .tabbar{ padding-bottom:var(--tabbar-pb); }
   .jarvis-panel{ bottom:calc(var(--tabbar-h) + var(--tabbar-pb)); }
   .dashboard{ padding-bottom:calc(var(--tabbar-h) + var(--tabbar-pb) + 14px); }
@@ -3314,3 +3314,47 @@ html.dark .hp-tag-rest{background:#334155;color:#94a3b8}
 /* 세션을 되살리는 동안에는 로그인 화면 대신 '불러오는 중' 만 보인다 (깜빡이며 로그인 단추가 보이지 않게) */
 body.auth-restoring .login-card > *:not(.login-emoji):not(.login-title){ visibility:hidden; }
 body.auth-restoring .login-title::after{ content:'불러오는 중…'; display:block; font-size:14px; font-weight:500; color:var(--text3); margin-top:10px; }
+
+/* 숨김 아이콘 — 감은 눈/뜬 눈 한 쌍 */
+.task-hide-btn{ display:inline-flex; align-items:center; justify-content:center; color:var(--text3); }
+.task-hide-ic{ width:15px; height:15px; }
+.task-hid-ic{ width:13px; height:13px; vertical-align:-2px; margin-right:4px; color:var(--text3); }
+#btnShowHidden.active{ background:var(--accent); color:var(--accent-fg); }
+@media (hover:none){ .task-hide-btn{ opacity:.45; } }
+
+/* ── 오늘의 습관: 줄이 눌려 잘리지 않게, 위아래 여백·모서리를 고르게 ── */
+.habits-wrap > *{ flex-shrink:0; }
+.habits-wrap > .rw{ border-radius:10px; }
+.habit-item{ min-height:46px; padding-top:10px !important; padding-bottom:10px !important; }
+.habit-name{ display:flex; align-items:center; flex-wrap:wrap; gap:4px; line-height:1.35; }
+.rw-ph{ border:1.5px dashed var(--border2); border-radius:10px; background:transparent; }
+.rw-lift{ box-shadow:0 10px 28px rgba(0,0,0,.28); border-radius:10px; transform:scale(1.02); }
+
+/* ── 습관 편집: 요일 한 줄, 분류는 글자 단위로 꺾이지 않게 ── */
+.day-picker{ display:grid !important; grid-template-columns:repeat(7,1fr); gap:5px; flex-wrap:nowrap; }
+.day-pick-btn{ justify-content:center; padding:8px 0 !important; position:relative; }
+.day-pick-btn input, .cat-pick-btn input{ position:absolute; opacity:0; width:0; height:0; pointer-events:none; }
+.cat-box{ display:flex; align-items:flex-start; gap:6px; }
+.cat-picker{ flex-wrap:wrap; flex:1; }
+.cat-pick-btn{ flex:0 0 auto !important; white-space:nowrap; padding:7px 12px !important; position:relative; }
+.cat-add{ border:1px dashed var(--border2); background:transparent; color:var(--text3); border-radius:var(--r-xs);
+  padding:7px 12px; font:inherit; font-size:13px; cursor:pointer; white-space:nowrap; }
+.cat-edit-tg{ border:0; background:transparent; color:var(--text3); font:inherit; font-size:12px; padding:8px 2px; cursor:pointer; white-space:nowrap; }
+.cat-del{ display:none; position:absolute; top:-7px; right:-7px; width:18px; height:18px; border-radius:50%;
+  border:0; background:var(--red); color:#fff; font-size:10px; line-height:18px; padding:0; cursor:pointer; }
+.cat-box.editing .cat-del{ display:block; }
+.cat-box.editing .cat-pick-btn{ animation:catWiggle .25s ease-in-out infinite alternate; }
+@keyframes catWiggle{ from{ transform:rotate(-1deg) } to{ transform:rotate(1deg) } }
+
+/* ── AI 비서 창: 앱 채팅처럼 [사진][입력][마이크/보내기] ── */
+.j-icon-btn .ic{ width:16px; height:16px; }
+.j-input-wrap{ padding:8px 10px calc(8px + env(keyboard-inset-height, 0px)); }
+.j-input-row{ gap:6px; }
+.j-inp{ border-radius:20px !important; padding:9px 14px !important; font-size:15px !important; }
+.j-in-btn{ flex:none; width:38px; height:38px; border-radius:50%; border:0; display:flex; align-items:center; justify-content:center;
+  background:var(--card2); color:var(--text2); cursor:pointer; transition:background .15s, color .15s; }
+.j-in-btn .ic{ width:19px; height:19px; }
+.j-act.on{ background:var(--accent); color:var(--accent-fg); }
+.j-act[data-mode="stop"]{ background:var(--red); color:#fff; }
+.j-voice-bar{ background:color-mix(in srgb, var(--red) 12%, transparent) !important; border-color:color-mix(in srgb, var(--red) 35%, transparent) !important; }
+#jVoiceTxt{ color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

@@ -30,13 +30,11 @@ const JARVIS = {
       </button>
       <div id="jarvisPanel" class="jarvis-panel hidden">
         <div class="jarvis-head">
-          <div class="j-head-l"><span class="j-logo">⚡ Bashy</span><span id="jStatus" class="j-status">대기 중</span></div>
+          <div class="j-head-l"><span class="j-logo">AI 비서</span><span id="jStatus" class="j-status">대기 중</span></div>
           <div class="j-head-r">
-            <button class="j-icon-btn" id="jTtsBtn" onclick="JARVIS.toggleTTS()" title="음성 출력 켜기/끄기">${this._ttsEnabled?'🔊':'🔇'}</button>
-            <button class="j-icon-btn" onclick="JARVIS.showKeySetup()">🔑</button>
-            <button class="j-icon-btn" onclick="JARVIS.triggerPhoto()" title="사진 식단 분석">📷</button>
-            <button id="jMicBtn" class="j-icon-btn" onclick="JARVIS.toggleMic()">🎤</button>
-            <button class="j-icon-btn" onclick="JARVIS.toggle()">✕</button>
+            <button class="j-icon-btn" id="jTtsBtn" onclick="JARVIS.toggleTTS()" title="답을 소리로 듣기" aria-label="답을 소리로 듣기">${Icons.svg(this._ttsEnabled?'volume':'mute')}</button>
+            <button class="j-icon-btn" onclick="JARVIS.showKeySetup()" title="AI 키 설정" aria-label="AI 키 설정">${Icons.svg('key')}</button>
+            <button class="j-icon-btn" onclick="JARVIS.toggle()" title="닫기" aria-label="닫기">${Icons.svg('close')}</button>
           </div>
         </div>
         <div id="jMsgs" class="j-msgs">
@@ -48,10 +46,12 @@ const JARVIS = {
         </div>
         <input id="jPhotoInput" type="file" accept="image/*" style="display:none" onchange="JARVIS._onPhotoSelected(this)">
         <div class="j-input-wrap">
-          <div id="jVoiceBar" class="j-voice-bar hidden"><span class="j-pulse"></span> 듣고 있습니다...</div>
+          <div id="jVoiceBar" class="j-voice-bar hidden"><span class="j-pulse"></span><span id="jVoiceTxt">듣고 있습니다…</span></div>
           <div class="j-input-row">
-            <input id="jInput" type="text" class="inp" placeholder="메시지 입력 또는 🎤 📷" style="flex:1">
-            <button onclick="JARVIS.send()" class="btn-sm accent" style="flex-shrink:0">전송</button>
+            <button class="j-in-btn" onclick="JARVIS.triggerPhoto()" title="사진으로 식단 기록" aria-label="사진으로 식단 기록">${Icons.svg('camera')}</button>
+            <input id="jInput" type="text" class="inp j-inp" placeholder="무엇이든 말하거나 입력하세요" enterkeyhint="send" autocomplete="off"
+              oninput="JARVIS._syncSend()">
+            <button id="jMicBtn" class="j-in-btn j-act" onclick="JARVIS._act()" title="음성으로 말하기" aria-label="음성으로 말하기">${Icons.svg('mic')}</button>
           </div>
         </div>
       </div>`;
@@ -85,9 +85,9 @@ const JARVIS = {
   toggleTTS() {
     this._ttsEnabled=!this._ttsEnabled;
     const btn=document.getElementById('jTtsBtn');
-    if(btn) btn.textContent=this._ttsEnabled?'🔊':'🔇';
-    if(!this._ttsEnabled && this.synthesis) this.synthesis.cancel();
-    App.showToast(this._ttsEnabled?'🔊 음성 출력 켜짐':'🔇 음성 출력 꺼짐','');
+    if(btn) btn.innerHTML=Icons.svg(this._ttsEnabled?'volume':'mute');
+    if(!this._ttsEnabled) this._stopSpeak();
+    App.showToast(this._ttsEnabled?'답을 소리로 읽어 드립니다':'소리 읽기 꺼짐','');
   },
 
   // ── 읽지 않은 알림 배지 ───────────────
@@ -228,10 +228,11 @@ const JARVIS = {
     const inp=document.getElementById('jInput');
     const msg=(text||inp?.value||'').trim(); if(!msg) return;
     if(inp) inp.value='';
+    this._syncSend();
     this._addMsg('user',msg);
     this._setStatus('생각 중...');
     const key=this._getKey();
-    if(!key){ this._addMsg('ai','⚠️ 🔑 버튼 → Groq API 키 설정\nconsole.groq.com 에서 무료 발급'); this._setStatus('대기 중'); return; }
+    if(!key){ this._addMsg('ai','⚠️ 위쪽 열쇠 단추 → Groq API 키 설정\nconsole.groq.com 에서 무료 발급'); this._setStatus('대기 중'); return; }
     try{
       const raw=await this._callAPI(key,msg);
       this._handleReply(raw);
@@ -433,25 +434,89 @@ const JARVIS = {
   },
 
   // ── 음성 ──────────────────────────────
+  // 앱(iOS)에서는 기기 음성 인식·읽기(네이티브 플러그인)를 쓰고, 웹에서는 브라우저 기능을 쓴다.
+  // 입력칸 오른쪽 단추 하나가 상황에 따라 바뀐다: 비어 있으면 마이크, 글자가 있으면 보내기, 듣는 중이면 정지.
+  get _nSR(){ return window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.SpeechRecognition : null; },
+  get _nTTS(){ return window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.TextToSpeech : null; },
   _initSpeech() {
+    if(this._nSR){
+      this._nSR.addListener('partialResults', e=>{
+        const t=(e.accumulatedText||e.matches?.[0]||'').trim();
+        if(!t) return;
+        const inp=document.getElementById('jInput'); if(inp) inp.value=t;
+        const vt=document.getElementById('jVoiceTxt'); if(vt) vt.textContent=t;
+      }).catch(()=>{});
+      this._nSR.addListener('listeningState', e=>{
+        const st=e.state||e.status;
+        if(st==='stopped' && this.listening) this._voiceDone();
+      }).catch(()=>{});
+      return;
+    }
     if(/iPad|iPhone|iPod/.test(navigator.userAgent)) return;
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR) return;
-    this.recognition=new SR(); this.recognition.lang='ko-KR'; this.recognition.interimResults=false;
-    this.recognition.onresult=e=>{ this._setVoice(false); this.send(e.results[0][0].transcript); };
+    this.recognition=new SR(); this.recognition.lang='ko-KR'; this.recognition.interimResults=true;
+    this.recognition.onresult=e=>{
+      const t=[...e.results].map(r=>r[0].transcript).join('');
+      const inp=document.getElementById('jInput'); if(inp) inp.value=t;
+      const vt=document.getElementById('jVoiceTxt'); if(vt) vt.textContent=t;
+    };
     this.recognition.onerror=()=>{ this.listening=false; this._setVoice(false); };
-    this.recognition.onend=()=>{ this.listening=false; this._setVoice(false); };
+    this.recognition.onend=()=>{ if(this.listening) this._voiceDone(); };
   },
-  toggleMic() {
-    if(/iPad|iPhone|iPod/.test(navigator.userAgent)){ App.showToast('iOS: 키보드 🎤 버튼 사용',''); document.getElementById('jInput')?.focus(); return; }
-    if(!this.recognition){ App.showToast('Chrome에서만 지원','error'); return; }
-    if(this.listening) this.recognition.stop();
-    else{ try{ this.recognition.start(); this.listening=true; this._setVoice(true); }catch{ App.showToast('마이크 권한 필요','error'); } }
+  // 오른쪽 단추: 듣는 중 → 멈추고 보내기 / 글자 있음 → 보내기 / 비어 있음 → 듣기
+  _act() {
+    if(this.listening) return this._stopListen();
+    const v=document.getElementById('jInput')?.value.trim();
+    if(v) return this.send();
+    this.toggleMic();
+  },
+  _syncSend() {
+    const btn=document.getElementById('jMicBtn'); if(!btn) return;
+    const has=!!document.getElementById('jInput')?.value.trim();
+    const mode=this.listening?'stop':has?'send':'mic';
+    if(btn.dataset.mode===mode) return;
+    btn.dataset.mode=mode;
+    btn.innerHTML=Icons.svg(mode);
+    btn.classList.toggle('on', mode!=='mic');
+    btn.ariaLabel=btn.title=mode==='send'?'보내기':mode==='stop'?'말하기 끝내기':'음성으로 말하기';
+  },
+  async toggleMic() {
+    if(this.listening) return this._stopListen();
+    this._stopSpeak();
+    const inp=document.getElementById('jInput'); if(inp) inp.value='';
+    if(this._nSR){
+      try{
+        const p=await this._nSR.requestPermissions();
+        if(p.speechRecognition!=='granted'){ App.showToast('설정 → Bashy 에서 마이크·음성 인식을 허용해 주세요','error'); return; }
+        this.listening=true; this._setVoice(true);
+        await this._nSR.start({ language:'ko-KR', partialResults:true, popup:false, addPunctuation:false });
+      }catch(e){ this.listening=false; this._setVoice(false); App.showToast('음성 인식을 시작하지 못했습니다','error'); }
+      return;
+    }
+    if(!this.recognition){ App.showToast(/iPad|iPhone|iPod/.test(navigator.userAgent)?'키보드의 🎤 단추로 말해 주세요':'이 브라우저는 음성 인식을 지원하지 않습니다',''); inp?.focus(); return; }
+    try{ this.recognition.start(); this.listening=true; this._setVoice(true); }catch{ App.showToast('마이크 권한이 필요합니다','error'); }
+  },
+  _stopListen() {
+    if(this._nSR){ this._nSR.stop().catch(()=>{}); setTimeout(()=>{ if(this.listening) this._voiceDone(); },700); }
+    else this.recognition?.stop();
+  },
+  _voiceDone() {
+    this.listening=false; this._setVoice(false);
+    const v=document.getElementById('jInput')?.value.trim();
+    if(v) this.send(v);
+  },
+  _stopSpeak() {
+    if(this._nTTS) this._nTTS.stop().catch(()=>{});
+    else this.synthesis?.cancel();
   },
   _speak(text) {
-    if(!this._ttsEnabled||!this.synthesis) return;
+    if(!this._ttsEnabled) return;
+    const clean=text.replace(/[*`#\[\]{}]/g,'').replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu,'').trim().slice(0,300);
+    if(!clean) return;
+    if(this._nTTS){ this._nTTS.stop().catch(()=>{}).finally(()=>this._nTTS.speak({ text:clean, lang:'ko-KR', rate:1.0, pitch:1.0, category:'playback' }).catch(()=>{})); return; }
+    if(!this.synthesis) return;
     this.synthesis.cancel();
-    const clean=text.replace(/[*`#\[\]{}]/g,'').trim().slice(0,200);
-    const u=new SpeechSynthesisUtterance(clean); u.lang='ko-KR'; u.rate=1.05; u.pitch=0.9;
+    const u=new SpeechSynthesisUtterance(clean); u.lang='ko-KR'; u.rate=1.05; u.pitch=0.95;
     const ko=this.synthesis.getVoices().find(v=>v.lang==='ko-KR'||v.lang==='ko_KR');
     if(ko) u.voice=ko;
     this.synthesis.speak(u);
@@ -478,7 +543,12 @@ const JARVIS = {
     }
   },
   _setStatus(s){ const el=document.getElementById('jStatus'); if(el) el.textContent=s; },
-  _setVoice(on){ document.getElementById('jVoiceBar')?.classList.toggle('hidden',!on); const btn=document.getElementById('jMicBtn'); if(btn) btn.style.color=on?'var(--red)':''; },
+  _setVoice(on){
+    document.getElementById('jVoiceBar')?.classList.toggle('hidden',!on);
+    const vt=document.getElementById('jVoiceTxt'); if(vt&&on) vt.textContent='듣고 있습니다…';
+    this._setStatus(on?'듣는 중':'대기 중');
+    this._syncSend();
+  },
   _getKey(){ return localStorage.getItem('gl_ai_key')||''; },
 
   // ── 어떤 모델로 부를 것인가 ─────────────────────────

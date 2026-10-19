@@ -248,7 +248,7 @@ const Econ = {
     const c = this.cfg();
     const b = this._body(); if (!b) return;
     b.innerHTML =
-      `<input class="inp ec-search" id="ecFSearch" placeholder="즐겨찾기에 추가 — 검색 (금, 삼성, NVDA, KODEX)"
+      `<input class="inp ec-search" id="ecFSearch" placeholder="즐겨찾기에 추가 — 검색 (금, 삼성, 테슬라, KODEX)"
          oninput="Econ.search(this.value,'F')"><div id="ecFRes"></div>` +
       (c.favorites.length
         ? `<div class="ec-grid">${c.favorites.map(it => this._card(it,'F')).join('')}</div>`
@@ -293,8 +293,15 @@ const Econ = {
     if (!v) { box.innerHTML = ''; return; }
     const list = await this._tickers();
     const q = v.toLowerCase(), out = [];
+    // 한글로 친 해외 종목(테슬라·애플…)은 한글 이름표에서 티커를 찾아 맨 앞에 올린다.
+    const ko = new Map((typeof EconKo !== 'undefined' ? EconKo.match(v) : []).map(m => [m.tk, m]));
     for (const e of list) {
       const n = e.n.toLowerCase(), cd = e.c.toLowerCase();
+      if (ko.size && e.t === 'us') {
+        const sym = (e.tv || '').split(':')[1] || e.c.replace(/\.[A-Z]+$/, '');
+        const m = ko.get(sym);
+        if (m) { out.push([-10 + m.score, 0, Object.assign({}, e, { ko: m.label })]); ko.delete(sym); continue; }
+      }
       let s = -1;
       if (cd === q) s = 0; else if (n.startsWith(q)) s = 1; else if (cd.startsWith(q)) s = 2;
       else if (n.includes(q)) s = 3; else if (cd.includes(q)) s = 4;
@@ -307,9 +314,9 @@ const Econ = {
         <div><div class="ec-nm ec-gold">＋ 코드로 직접 추가</div><div class="ec-meta">검색에 없는 ETF 등 (예: 0173Y0)</div></div></div>` +
       out.slice(0,8).map(x => {
         const e = x[2];
-        const it = { name:e.n, code:e.c, type:e.t, tv:e.tv, unit:this.unitFor(e.t), floor:null };
-        return `<div class="ec-res"><div><div class="ec-nm">${esc(e.n)}</div>
-          <div class="ec-meta">${esc(e.c)} · ${this.TYPE[e.t]||''}</div></div>
+        const it = { name:e.ko || e.n, code:e.c, type:e.t, tv:e.tv, unit:this.unitFor(e.t), floor:null };
+        return `<div class="ec-res"><div><div class="ec-nm">${esc(e.ko || e.n)}</div>
+          <div class="ec-meta">${e.ko ? esc(e.n)+' · ' : ''}${esc(e.c)} · ${this.TYPE[e.t]||''}</div></div>
           <button class="btn-sm accent" onclick='Econ.add("${where}",${this.attr(it)})'>${where==='F'?'★ 추가':where==='H'?'＋ 보유':'＋ 담기'}</button></div>`;
       }).join('');
   },

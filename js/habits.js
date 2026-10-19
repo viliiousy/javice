@@ -15,12 +15,59 @@ const Habits = {
   // 예전엔 '일상' 과 '자기개발' 두 칸이었고 카드 위에 탭이 있었다. 탭 하나에 습관 두어 개씩이라
   // 매번 건너다니며 확인해야 했고, 안 보고 있는 쪽은 그냥 안 하게 됐다.
   // 지금은 한 목록에 다 있고, 분류는 줄에 붙는 이름표일 뿐이다.
-  CATS: {
-    ex:    { label:'운동', ic:'dumbbell' },
-    study: { label:'공부', ic:'book'     },
-    med:   { label:'약',   ic:'pill'     },
-    code:  { label:'개발', ic:'code'     },
-    etc:   { label:'기타', ic:'list'     },
+  // 기본 분류. 사용자가 추가·삭제할 수 있어서 실제 목록은 CATS(getter)가 저장값에서 만든다.
+  // '기타' 는 지울 수 없다 — 분류가 지워진 습관이 갈 곳이 있어야 한다.
+  BASE_CATS: [
+    { id:'ex',    label:'운동', ic:'dumbbell' },
+    { id:'study', label:'공부', ic:'book'     },
+    { id:'med',   label:'약',   ic:'pill'     },
+    { id:'code',  label:'개발', ic:'code'     },
+    { id:'etc',   label:'기타', ic:'list'     },
+  ],
+  _catList() {
+    let v = null;
+    try { v = JSON.parse(UserStore.get('gl_habit_cats') || 'null'); } catch {}
+    const list = Array.isArray(v) && v.length ? v : this.BASE_CATS.slice();
+    if (!list.some(c => c.id === 'etc')) list.push({ id:'etc', label:'기타', ic:'list' });
+    return list;
+  },
+  _saveCats(list) { UserStore.set('gl_habit_cats', JSON.stringify(list)); FirebaseSync?.scheduleSave(); },
+  get CATS() {
+    const o = {};
+    this._catList().forEach(c => { o[c.id] = { label:c.label, ic:c.ic || 'list' }; });
+    return o;
+  },
+  addCat(btn) {
+    const name = (prompt('새 분류 이름', '') || '').trim().slice(0, 8);
+    if (!name) return;
+    const list = this._catList();
+    if (list.some(c => c.label === name)) { App.showToast('이미 있는 분류입니다', 'error'); return; }
+    const id = 'c' + Date.now().toString(36);
+    list.splice(list.length - 1, 0, { id, label:name, ic:'list' });   // '기타' 앞에 넣는다
+    this._saveCats(list);
+    this._repaintPicker(btn, id);
+  },
+  delCat(id, btn) {
+    if (id === 'etc') return;
+    const C = this.CATS[id]; if (!C) return;
+    const n = this.getList().filter(h => !h.deletedFrom && this._catOf(h) === id).length;
+    if (!confirm(`'${C.label}' 분류를 삭제할까요?` + (n ? `\n이 분류의 습관 ${n}개는 '기타'로 옮겨집니다.` : ''))) return;
+    this._saveCats(this._catList().filter(c => c.id !== id));
+    this._repaintPicker(btn, 'etc');
+  },
+  _repaintPicker(btn, selected) {
+    const box = btn?.closest('.cat-box'); if (!box) return;
+    const name = box.dataset.name;
+    const cur = box.querySelector(`input[name="${name}"]:checked`)?.value;
+    const sel = selected || (this.CATS[cur] ? cur : 'etc');
+    const editing = box.classList.contains('editing');
+    box.outerHTML = this._catPickerHtml(sel, name, editing);
+    const med = document.querySelector('.med-row');
+    if (med) med.hidden = sel !== 'med';
+  },
+  toggleCatEdit(btn) {
+    const box = btn.closest('.cat-box'); box?.classList.toggle('editing');
+    btn.textContent = box?.classList.contains('editing') ? '완료' : '편집';
   },
   // 새 '개발' 을 'dev' 로 부르지 않는 이유: 예전 값 'dev' 가 '자기개발' 이었다.
   // 같은 글자가 두 가지 뜻이면 어느 쪽인지 영영 알 수 없는 데이터가 된다.
@@ -28,7 +75,9 @@ const Habits = {
   //   'dev'(자기개발) → 공부,  'life'·없음 → 기타
   _catOf(h) {
     const c = h && h.cat;
-    if (this.CATS[c]) return c;
+    const C = this.CATS;
+    if (C[c]) return c;
+    if (c === 'dev' && C.study) return 'study';
     return c === 'dev' ? 'study' : 'etc';
   },
 
@@ -119,7 +168,7 @@ const Habits = {
     const chk=this.getChecked(date);
     const isToday=this._dateStr(date)===this._dateStr(new Date());
     const done=list.filter(h=>chk.includes(h.id)).length;
-    const reorder=!!this._reorderMode;
+    const reorder=false;
 
     const titleEl=document.querySelector('.card-habits .card-title');
     if(titleEl){
@@ -157,9 +206,11 @@ const Habits = {
     + `<div class="habit-add-btn" onclick="Habits.showInlineAdd(App?.S?.selDate)">+ 습관 추가</div>`;
 
     // 밀기·길게누르기·✕ 를 붙인다 (js/rowui.js)
+    // 길게 누르면 끌어서 순서를 바꾼다. 수정은 이름을 누르면 열린다.
     try { RowUI.paint(wrap, {
       edit: id => this.showEditHabit(id),
       del:  id => this._delFrom(id, this._dateStr(date)),
+      reorder: order => this._applyOrder(order),
     }); } catch(e) { console.warn('RowUI', e); }
 
     // 지난 다섯 주 격자는 여기 있었는데 달력 칸 바탕으로 옮겼다(monthLevels).
@@ -229,32 +280,15 @@ const Habits = {
     } else { Sounds?.uncheck(); }
   },
 
-  // 목록이 하나가 되면서 편집 모드도 하나다.
-  _reorderMode: false,
-
-  toggleReorderMode() {
-    this._reorderMode = !this._reorderMode;
-    const btn = document.getElementById('btnHabitReorder');
-    if (btn) {
-      btn.style.background = this._reorderMode ? 'var(--accent)' : '';
-      btn.style.color      = this._reorderMode ? 'white' : '';
-    }
-    this.render(App?.S?.selDate || new Date());
-    if (!this._reorderMode) return;
-
-    setTimeout(() => {
-      const wrap = document.getElementById('habitsWrap');
-      if (!wrap || typeof Reorder === 'undefined') return;
-      Reorder.enable(wrap, (newOrder) => {
-        const list = this.getList();
-        // 새 순서대로 세우고, 그 안에 없던 것(그날 안 보이는 습관)은 뒤에 붙인다
-        const ordered = newOrder.map(id => list.find(h => h.id === id)).filter(Boolean);
-        list.forEach(h => { if (!ordered.includes(h)) ordered.push(h); });
-        this.saveList(ordered);
-        Sounds?.click();
-      });
-    }, 50);
+  // 화면에 보이는 순서대로 세우고, 그 안에 없던 것(그날 안 보이는 습관)은 원래 자리 순서대로 뒤에 붙인다.
+  _applyOrder(newOrder) {
+    const list = this.getList();
+    const ordered = newOrder.map(id => list.find(h => h.id === id)).filter(Boolean);
+    list.forEach(h => { if (!ordered.includes(h)) ordered.push(h); });
+    this.saveList(ordered);
+    Sounds?.click();
   },
+  toggleReorderMode() {},
 
   _del(id) {
     // _del은 _delFrom(소프트 삭제)으로 대체됨 — 직접 호출 시 오늘 날짜로 소프트 삭제
@@ -309,19 +343,22 @@ const Habits = {
   _pendingAddCat: 'etc',
 
   // 카테고리 선택 UI (추가/편집 모달 공용)
-  _catPickerHtml(selected, name) {
-    return `<div class="cat-picker">` + Object.entries(this.CATS).map(([c,C]) =>
+  _catPickerHtml(selected, name, editing=false) {
+    return `<div class="cat-box${editing?' editing':''}" data-name="${name}"><div class="cat-picker">` + Object.entries(this.CATS).map(([c,C]) =>
       `<label class="cat-pick-btn${c===selected?' on':''}">
          <input type="radio" name="${name}" value="${c}" ${c===selected?'checked':''}
-                onchange="Habits._syncCatPicker(this)"> ${Icons.svg(C.ic,'hb-cat-ic')}${C.label}
-       </label>`).join('') + `</div>`;
+                onchange="Habits._syncCatPicker(this)">${Icons.svg(C.ic,'hb-cat-ic')}<span>${esc(C.label)}</span>
+         ${c==='etc'?'':`<button type="button" class="cat-del" onclick="event.preventDefault();event.stopPropagation();Habits.delCat('${c}',this)" aria-label="${esc(C.label)} 분류 삭제">✕</button>`}
+       </label>`).join('')
+      + `<button type="button" class="cat-add" onclick="Habits.addCat(this)">+ 분류</button>`
+      + `</div><button type="button" class="cat-edit-tg" onclick="Habits.toggleCatEdit(this)">${editing?'완료':'편집'}</button></div>`;
   },
   _syncCatPicker(input) {
     const box = input.closest('.cat-picker');
     box?.querySelectorAll('.cat-pick-btn')
       .forEach(l => l.classList.toggle('on', l.querySelector('input')?.checked));
     // '약' 을 고를 때만 시각 칸이 나온다. 늘 띄워 두면 나머지 넷에서 뜻 없는 칸이 된다.
-    const med = box?.parentElement?.parentElement?.querySelector('.med-row');
+    const med = input.closest('.modal-box, .modal, body')?.querySelector('.med-row');
     if (med) med.hidden = input.value !== 'med';
   },
 
@@ -348,7 +385,7 @@ const Habits = {
       : '';
     const dayBtns = this.DAYS_KO.map((d,i) =>
       '<label class="day-pick-btn">' +
-      '<input type="checkbox" value="' + i + '" checked class="hday-chk"> ' + d +
+      '<input type="checkbox" value="' + i + '" checked class="hday-chk"><span>' + d + '</span>' +
       '</label>'
     ).join('');
     App.openModal('@check 습관 추가',
@@ -419,7 +456,7 @@ const Habits = {
       ${this._medRowHtml(this._catOf(h), h.time, h.notify)}
       <div class="modal-row"><label class="modal-lbl">반복 요일</label>
         <div class="day-picker">
-          ${this.DAYS_KO.map((d,i)=>`<label class="day-pick-btn"><input type="checkbox" value="${i}" ${(h.days||[]).includes(i)?'checked':''} class="day-edit-chk"> ${d}</label>`).join('')}
+          ${this.DAYS_KO.map((d,i)=>`<label class="day-pick-btn"><input type="checkbox" value="${i}" ${(h.days||[]).includes(i)?'checked':''} class="day-edit-chk"><span>${d}</span></label>`).join('')}
         </div>
       </div>
       <div class="modal-btns">

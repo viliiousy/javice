@@ -64,13 +64,13 @@ const RowUI = {
       }
 
       // ── 손가락 ──────────────────────────────
-      let sx = 0, sy = 0, moved = false, sliding = false, lp = null, fired = false;
+      let sx = 0, sy = 0, moved = false, sliding = false, lp = null, fired = false, dragging = false;
       const startedOpen = () => this._open === row;
 
       row.addEventListener('touchstart', (e) => {
         const t = e.touches[0];
         sx = t.clientX; sy = t.clientY;
-        moved = false; sliding = false; fired = false;
+        moved = false; sliding = false; fired = false; dragging = false;
         // 다른 줄이 열려 있으면 먼저 닫는다
         if (this._open && this._open !== row) this.closeOpen();
         lp = setTimeout(() => {
@@ -78,12 +78,15 @@ const RowUI = {
           fired = true;
           if (navigator.vibrate) { try { navigator.vibrate(12); } catch {} }
           this.closeOpen();
-          h.edit(id);
+          // 순서를 바꿀 수 있는 목록(습관)은 길게 누르면 끌기가 시작된다.
+          if (h.reorder) { dragging = true; this._dragStart(wrap, root, sy); }
+          else h.edit(id);
         }, this.LP);
       }, { passive: true });
 
       row.addEventListener('touchmove', (e) => {
         const t = e.touches[0];
+        if (dragging) { e.preventDefault(); this._dragMove(t.clientY); return; }
         const dx = t.clientX - sx, dy = t.clientY - sy;
         if (!moved && Math.abs(dx) < this.MOVE && Math.abs(dy) < this.MOVE) return;
         moved = true;
@@ -101,6 +104,7 @@ const RowUI = {
 
       const end = (e) => {
         clearTimeout(lp);
+        if (dragging) { dragging = false; this._dragEnd(h.reorder); return; }
         if (!sliding) return;
         const dx = (e.changedTouches ? e.changedTouches[0].clientX : sx) - sx;
         const base = startedOpen() ? -this.SNAP : 0;
@@ -113,6 +117,27 @@ const RowUI = {
       row.addEventListener('touchend', end);
       row.addEventListener('touchcancel', end);
 
+      // 마우스로도 길게 눌러 끌 수 있다 (순서를 바꿀 수 있는 목록만).
+      if (h.reorder) {
+        row.addEventListener('mousedown', (e) => {
+          if (e.button !== 0 || e.target.closest('button, input, .habit-chk')) return;
+          const y0 = e.clientY, x0 = e.clientX;
+          let t = setTimeout(() => {
+            t = null; fired = true; this._dragStart(wrap, root, y0);
+            const mv = (ev) => { ev.preventDefault(); this._dragMove(ev.clientY); };
+            const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up);
+              this._dragEnd(h.reorder); setTimeout(() => { fired = false; }, 0); };
+            document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+          }, 450);
+          const cancel = (ev) => {
+            if (ev.type === 'mousemove' && Math.abs(ev.clientX - x0) < 5 && Math.abs(ev.clientY - y0) < 5) return;
+            if (t) clearTimeout(t);
+            document.removeEventListener('mousemove', cancel); document.removeEventListener('mouseup', cancel);
+          };
+          document.addEventListener('mousemove', cancel); document.addEventListener('mouseup', cancel);
+        });
+      }
+
       // 열려 있을 때의 탭은 '닫기'다. 길게 눌러 수정을 띄운 뒤의 탭도 삼킨다.
       row.addEventListener('click', (e) => {
         if (fired || sliding || this._open === row) {
@@ -121,6 +146,41 @@ const RowUI = {
         }
       }, true);
     });
+  },
+
+  // ── 끌어서 순서 바꾸기 ─────────────────────
+  // 줄 껍데기(.rw)를 화면에 띄우고, 빈자리(placeholder)를 손가락 위치로 옮긴다.
+  _drag: null,
+  _dragStart(wrap, root, y) {
+    const r = wrap.getBoundingClientRect();
+    const ph = document.createElement('div');
+    ph.className = 'rw-ph';
+    ph.style.height = r.height + 'px';
+    wrap.after(ph);
+    wrap.classList.add('rw-lift');
+    Object.assign(wrap.style, { position:'fixed', left:r.left+'px', top:r.top+'px', width:r.width+'px', zIndex:9999, pointerEvents:'none' });
+    this._drag = { wrap, root, ph, top:r.top, y };
+  },
+  _dragMove(y) {
+    const d = this._drag; if (!d) return;
+    d.top += y - d.y; d.y = y;
+    d.wrap.style.top = d.top + 'px';
+    const sibs = [...d.root.querySelectorAll(':scope > .rw')].filter(el => el !== d.wrap);
+    for (const s of sibs) {
+      const r = s.getBoundingClientRect();
+      if (y < r.top + r.height / 2) { s.before(d.ph); return; }
+    }
+    const last = sibs[sibs.length - 1];
+    if (last) last.after(d.ph);
+  },
+  _dragEnd(cb) {
+    const d = this._drag; if (!d) return;
+    this._drag = null;
+    d.wrap.removeAttribute('style');
+    d.wrap.classList.remove('rw-lift');
+    d.ph.before(d.wrap); d.ph.remove();
+    const order = [...d.root.querySelectorAll(':scope > .rw [data-row]')].map(el => el.dataset.i);
+    try { cb && cb(order); } catch (e) { console.warn(e); }
   },
 };
 

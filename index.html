@@ -131,7 +131,7 @@
             <button class="btn-sm btn-ic" id="btnCalSettings" data-ic="gear" title="캘린더 설정" aria-label="캘린더 설정"></button>
             <button class="btn-sm btn-ic" id="btnSync" data-ic="refresh" title="동기화" aria-label="동기화"></button>
             <button class="btn-sm btn-ic" id="btnShowCompleted" data-ic="check" title="완료됨 보기" aria-label="완료됨 보기"></button>
-            <button class="btn-sm btn-ic" id="btnShowHidden" data-ic="eyeoff" title="숨김 보기" aria-label="숨김 보기"></button>
+            <button class="btn-sm btn-ic" id="btnShowHidden" data-ic="eyeclosed" title="숨긴 할일 보기" aria-label="숨긴 할일 보기"></button>
             <!-- 예전엔 '+ 일정' 과 '+ 할일' 이 나란히 있었다. 이 카드는 달력이고,
                  할일은 아래 목록이 제 머리를 따로 가지고 있다. 여기서는 일정만 더한다. -->
             <button class="btn-sm accent" id="btnAddEvent">+ 추가</button>
@@ -154,7 +154,6 @@
       <section class="card card-habits">
         <div class="card-head">
           <span class="card-title" data-ic="check">오늘의 습관</span>
-          <button class="btn-sm btn-ic" id="btnHabitReorder" onclick="Habits.toggleReorderMode()" data-ic="gear" title="편집 모드" aria-label="편집 모드"></button>
         </div>
         <div id="habitsWrap" class="habits-wrap"></div>
         <div id="habitsFooter" class="habits-footer"></div>
@@ -266,7 +265,8 @@
 <script src="js/checklist.js"></script>
 <script src="js/memo.js"></script>
 <script src="js/inbody.js"></script>
-<script src="js/econ.js"></script>
+  <script src="js/econ-ko.js"></script>
+  <script src="js/econ.js"></script>
 <script src="js/ai-usage.js"></script>
 <script src="js/device-pair.js"></script>
 <script src="js/topstrip.js"></script>
