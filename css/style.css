@@ -3662,3 +3662,37 @@ html[data-ui="v2"] .habits-footer{ background:transparent; border-top:1px solid 
 .fold-btn::after{ content:''; width:7px; height:7px; border:solid currentColor; border-width:0 1.5px 1.5px 0; transform:rotate(45deg) translateY(-2px); }
 .fold-btn.open::after{ transform:rotate(-135deg) translateY(-2px); }
 html.dark .fold-btn{ background:#1A1B1E; }
+
+/* ── 로그인 화면 (2026-10 다시 설계) ─────────────────────────────
+   방향: "먹색 수첩의 첫 장" — 표지에 한 문장, 그 아래 목차처럼 번호 매긴 줄.
+   서체: 제목·숫자 Space Grotesk / 글 IBM Plex Sans KR. 색: 먹색 + 주황(점 하나, 번호).
+   위계: ① "하루를 한 화면에." ② 구글로 계속하기. 나머지는 회색 작은 글.
+   간격 8px 단위, 왼쪽 정렬. 1차·2차 디자인, 밝은·어두운 테마와 상관없이 같은 모습. */
+.login-screen.ln{ position:fixed; inset:0; z-index:50; display:flex; justify-content:center; align-items:flex-start; overflow-y:auto;
+  background:#101113; color:#ECEDEE; font-family:'IBM Plex Sans KR','Pretendard Variable',Pretendard,system-ui,sans-serif;
+  padding:max(48px, env(safe-area-inset-top)) 24px max(32px, env(safe-area-inset-bottom)); }
+.ln-wrap{ width:100%; max-width:440px; display:flex; flex-direction:column; }
+.ln-brand{ display:flex; align-items:center; gap:12px; font:600 17px/1 'Space Grotesk','IBM Plex Sans KR',sans-serif; letter-spacing:-.01em; }
+.ln-brand img{ width:40px; height:40px; border-radius:10px; }
+.ln-h{ margin:56px 0 0; font:600 48px/1.08 'Space Grotesk','IBM Plex Sans KR',sans-serif; letter-spacing:-.035em; color:#ECEDEE; }
+.ln-h::after{ content:''; display:inline-block; width:10px; height:10px; border-radius:50%; background:#FF6A2B; margin-left:4px; vertical-align:baseline; }
+.ln-lead{ margin:16px 0 0; font-size:16px; line-height:1.6; color:#8B8F97; max-width:32ch; }
+.ln-google{ margin-top:40px; height:56px; width:100%; border:0; border-radius:14px; background:#ECEDEE; color:#101113;
+  display:flex; align-items:center; justify-content:center; gap:12px; font-family:inherit; font-size:16px; font-weight:600; cursor:pointer; }
+.ln-google:active{ transform:scale(.99); background:#fff; }
+.ln-google svg{ flex:none; }
+.ln-sync{ margin:12px 0 0; font-size:13px; line-height:1.5; color:#8B8F97; }
+.ln-list{ list-style:none; margin:48px 0 0; padding:0; border-top:1px solid #26282D; }
+.ln-list li{ display:grid; grid-template-columns:40px 72px 1fr; align-items:baseline; gap:0 8px; padding:16px 0; border-bottom:1px solid #1E2024; }
+.ln-list b{ font:500 13px/1 'Space Grotesk',sans-serif; color:#FF6A2B; letter-spacing:.02em; }
+.ln-list span{ font-size:15px; font-weight:600; }
+.ln-list em{ font-style:normal; font-size:14px; color:#8B8F97; }
+.ln-scopes{ margin-top:40px; }
+.ln-scopes h2{ margin:0 0 8px; font-size:13px; font-weight:600; color:#8B8F97; letter-spacing:.02em; }
+.ln-scopes dl{ margin:0; display:grid; grid-template-columns:104px 1fr; gap:8px 8px; font-size:13px; line-height:1.55; }
+.ln-scopes dt{ color:#B4B7BD; font-weight:500; }
+.ln-scopes dd{ margin:0; color:#8B8F97; }
+.ln-scopes p{ margin:16px 0 0; font-size:13px; line-height:1.55; color:#8B8F97; }
+.ln-scopes a, .ln-links a{ color:#B4B7BD; text-decoration:underline; text-underline-offset:3px; text-decoration-color:#33363C; }
+.ln-links{ margin-top:32px; display:flex; gap:16px; font-size:13px; }
+@media (max-width:360px){ .ln-h{ font-size:40px; } .ln-list li{ grid-template-columns:32px 64px 1fr; } }
