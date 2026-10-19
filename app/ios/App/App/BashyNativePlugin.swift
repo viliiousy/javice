@@ -1,6 +1,7 @@
 import Foundation
 import Capacitor
 import LocalAuthentication
+import WidgetKit
 
 // 화면(JS)과 아이폰 기능 사이의 다리.
 //   - 시리·단축어에서 들어온 요청(할 일 추가, 오늘 할 일 보기)을 화면에 넘긴다.
@@ -13,7 +14,16 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "consumePending", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAppLock", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getAppLock", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setWidget", returnType: CAPPluginReturnPromise),
     ]
+
+    // 홈 화면 위젯이 읽을 '오늘 요약'(JSON). 앱과 위젯이 같이 쓰는 App Group 저장소에 둔다.
+    @objc func setWidget(_ call: CAPPluginCall) {
+        let json = call.getString("json") ?? "{}"
+        UserDefaults(suiteName: "group.app.bashy")?.set(json, forKey: "today")
+        WidgetCenter.shared.reloadAllTimelines()
+        call.resolve()
+    }
 
     override public func load() {
         NotificationCenter.default.addObserver(self, selector: #selector(onIntent), name: BashyIntentStore.didChange, object: nil)
