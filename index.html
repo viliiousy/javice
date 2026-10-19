@@ -206,6 +206,10 @@
         <div class="card-head">
           <span class="card-title" data-ic="dumbbell">운동</span>
           <span id="fitBadge" class="badge"></span>
+          <div class="fit-head-btns">
+            <button class="btn-sm" onclick="Fitness.showDayPlan()" title="내 루틴 만들기·요일 배정">루틴 설정</button>
+            <button class="btn-sm accent" onclick="Fitness.showInlineAdd(App?.S?.selDate)" title="이 날 한 운동 추가">+ 운동</button>
+          </div>
         </div>
         <div id="fitnessWrap" class="fitness-wrap"></div>
       </section>

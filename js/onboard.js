@@ -9,6 +9,7 @@ const Onboard = {
   KEY: 'gl_onboard_v1',
   STEPS: [
     { id:'body',  ic:'user',     t:'기본 신체정보',          s:'목표 칼로리를 계산합니다' },
+    { id:'ai',    ic:'sparkle',  t:'AI 비서',                s:'어떤 AI 로 답할지·사용량 표시' },
     { id:'plan',  ic:'calendar', t:'일정과 할일',            s:'캘린더·할일 쓰는 법' },
     { id:'habit', ic:'check',    t:'습관·체크리스트·메모',   s:'매일 할 일 정하기' },
     { id:'diet',  ic:'diet',     t:'식단 기록',              s:'먹은 것을 남기는 법' },
@@ -115,6 +116,7 @@ const Onboard = {
       if (id === 'body' && !this._saveBody()) return;
       if (id === 'habit') this._saveHabits();
       if (id === 'fit') this._saveFit();
+      if (id === 'ai') { JARVIS.saveSetup(); AIUsage.saveTrack(); }
     } catch (e) { console.warn('onboard', e); }
     this.next();
   },
@@ -225,6 +227,15 @@ const Onboard = {
       } catch { App.showToast('결과지를 읽지 못했습니다. 숫자를 직접 넣어 주세요', 'error'); }
     };
     rd.readAsDataURL(f);
+  },
+
+  // ── AI 비서 ────────────────────────────
+  _ai() {
+    return `<p class="ob-p">말로 기록하기, 사진으로 식단·인바디 읽기는 AI 가 합니다. 기본으로 쓸 AI 를 고르고 키를 넣어 주세요. 키가 없으면 이 단계를 건너뛰고 나중에 AI 창의 열쇠 단추에서 넣어도 됩니다.</p>
+      ${JARVIS.setupHtml()}
+      <div class="ob-sub2">AI 사용량 표시</div>
+      <p class="ob-p">유료 구독 중인 AI 의 남은 사용량을 맨 위에 고리로 보여 줍니다(PC 크롬의 Bashy 사용량 확장이 필요합니다). 표시할 것을 고르세요.</p>
+      ${AIUsage.trackHtml()}`;
   },
 
   // ── 2. 일정과 할일 ──────────────────────

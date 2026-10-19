@@ -232,7 +232,7 @@ const JARVIS = {
     this._addMsg('user',msg);
     this._setStatus('생각 중...');
     const key=this._getKey();
-    if(!key){ this._addMsg('ai','⚠️ 위쪽 열쇠 단추 → Groq API 키 설정\nconsole.groq.com 에서 무료 발급'); this._setStatus('대기 중'); return; }
+    if(!key){ this._addMsg('ai','⚠️ 위쪽 열쇠 단추에서 AI 를 고르고 키를 넣어 주세요.\nGroq 은 console.groq.com 에서 무료로 받을 수 있습니다.'); this._setStatus('대기 중'); return; }
     try{
       const raw=await this._callAPI(key,msg);
       this._handleReply(raw);
@@ -549,7 +549,73 @@ const JARVIS = {
     this._setStatus(on?'듣는 중':'대기 중');
     this._syncSend();
   },
-  _getKey(){ return localStorage.getItem('gl_ai_key')||''; },
+  // ── AI 제공자 ─────────────────────────
+  // 기본은 Groq(무료 키). ChatGPT·Claude·Gemini·Grok 은 각 회사의 'API 키' 로 부른다.
+  // (ChatGPT Plus 같은 구독은 API 키가 아니다 — 개발자 콘솔에서 따로 발급하고 쓴 만큼 요금이 붙는다.)
+  // 모델 이름은 고정하지 않는다. 키로 지금 쓸 수 있는 목록을 받아 선호 순서대로 고른다.
+  PROVIDERS: {
+    groq:      { name:'Groq (무료)', short:'Groq',    url:'https://api.groq.com/openai/v1', key:'gl_ai_key',            keyUrl:'https://console.groq.com/keys', ph:'gsk_…', free:true },
+    openai:    { name:'ChatGPT',     short:'ChatGPT', url:'https://api.openai.com/v1',      key:'gl_ai_key_openai',     keyUrl:'https://platform.openai.com/api-keys', ph:'sk-…',
+                 pref:{ text:[/^gpt-5(\.\d+)?-mini$/,/^gpt-4\.1-mini$/,/^gpt-4o-mini$/,/mini/], vision:[/^gpt-5(\.\d+)?-mini$/,/^gpt-4\.1-mini$/,/^gpt-4o-mini$/,/mini/] } },
+    anthropic: { name:'Claude',      short:'Claude',  url:'https://api.anthropic.com/v1',   key:'gl_ai_key_anthropic',  keyUrl:'https://console.anthropic.com/settings/keys', ph:'sk-ant-…',
+                 pref:{ text:[/haiku/,/sonnet/], vision:[/haiku/,/sonnet/] } },
+    gemini:    { name:'Gemini',      short:'Gemini',  url:'https://generativelanguage.googleapis.com/v1beta/openai', key:'gl_ai_key_gemini', keyUrl:'https://aistudio.google.com/apikey', ph:'AIza…',
+                 pref:{ text:[/flash-lite/,/flash/], vision:[/flash/] } },
+    xai:       { name:'Grok',        short:'Grok',    url:'https://api.x.ai/v1',            key:'gl_ai_key_xai',        keyUrl:'https://console.x.ai', ph:'xai-…',
+                 pref:{ text:[/grok.*(mini|fast)/,/grok/], vision:[/grok.*vision/,/grok-4/,/grok/] } },
+  },
+  get prov(){ const p=localStorage.getItem('gl_ai_prov'); return this.PROVIDERS[p]?p:'groq'; },
+  _keyOf(p){ return localStorage.getItem(this.PROVIDERS[p].key)||''; },
+  // 고른 제공자의 키. 그 키가 비어 있으면 키가 있는 다른 제공자로 넘어간다 — 아무 키라도 있으면 비서는 동작한다.
+  _active(){
+    const order=[this.prov, ...Object.keys(this.PROVIDERS).filter(p=>p!==this.prov)];
+    return order.find(p=>this._keyOf(p)) || this.prov;
+  },
+  _getKey(){ return this._keyOf(this._active()); },
+
+  // OpenAI 호환(ChatGPT·Gemini·Grok)·Claude 의 모델 목록에서 선호 순서대로 하나 고른다. 하루 동안 기억한다.
+  async _pick(p, kind){
+    const P=this.PROVIDERS[p], ck='gl_ai_models_'+p, key=this._keyOf(p);
+    let ids=null;
+    try{ const c=JSON.parse(localStorage.getItem(ck)||'null'); if(c&&Date.now()-c.at<864e5) ids=c.ids; }catch{}
+    if(!ids){
+      try{
+        const h = p==='anthropic' ? { 'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' } : { Authorization:`Bearer ${key}` };
+        const r=await fetch(P.url+'/models',{ headers:h }); const d=await r.json();
+        ids=(d.data||d.models||[]).map(m=>String(m.id||m.name||'').replace(/^models\//,'')).filter(Boolean);
+        if(ids.length) localStorage.setItem(ck, JSON.stringify({ at:Date.now(), ids }));
+      }catch{ ids=[]; }
+    }
+    for(const re of (P.pref[kind]||P.pref.text)){ const hit=ids.filter(i=>re.test(i)).sort().reverse()[0]; if(hit) return hit; }
+    return ids[0] || ({ openai:'gpt-4o-mini', anthropic:'claude-haiku-4-5', gemini:'gemini-2.5-flash', xai:'grok-3-mini' })[p];
+  },
+
+  // Groq 이 아닌 제공자로 보내기. 결과는 OpenAI 모양({choices:[{message:{content}}]})으로 맞춰 돌려준다.
+  async _chatOther(p, body, kind){
+    const P=this.PROVIDERS[p], key=this._keyOf(p), model=await this._pick(p, kind);
+    const { reasoning_effort, response_format, ...b } = body;
+    if(p==='anthropic'){
+      const sys=(b.messages||[]).filter(m=>m.role==='system').map(m=>typeof m.content==='string'?m.content:'').join('\n');
+      const conv=c=> typeof c==='string' ? c : c.map(x=>{
+        if(x.type==='image_url'){ const m=/^data:([^;]+);base64,(.+)$/.exec(x.image_url.url||''); return m?{type:'image',source:{type:'base64',media_type:m[1],data:m[2]}}:{type:'text',text:''}; }
+        return { type:'text', text:x.text||'' };
+      });
+      const msgs=(b.messages||[]).filter(m=>m.role!=='system').map(m=>({ role:m.role==='assistant'?'assistant':'user', content:conv(m.content) }));
+      const res=await fetch(P.url+'/messages',{ method:'POST', headers:{ 'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
+        body:JSON.stringify({ model, max_tokens:b.max_tokens||1024, ...(sys?{system:sys}:{}), messages:msgs, ...(b.temperature!=null?{temperature:b.temperature}:{}) }) });
+      const d=await res.json().catch(()=>({}));
+      if(res.status===429) throw new Error('Claude 사용량이 잠깐 찼어요. 잠시 뒤 다시 눌러 주세요');
+      if(!res.ok) throw new Error(d.error?.message||`HTTP ${res.status}`);
+      return { choices:[{ message:{ content:(d.content||[]).map(x=>x.text||'').join('') } }] };
+    }
+    const nb={ ...b, model };
+    if(p==='openai' && nb.max_tokens){ nb.max_completion_tokens=nb.max_tokens; delete nb.max_tokens; delete nb.temperature; }
+    const res=await fetch(P.url+'/chat/completions',{ method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${key}` }, body:JSON.stringify(nb) });
+    const d=await res.json().catch(()=>({}));
+    if(res.status===429) throw new Error(`${P.short} 사용량이 잠깐 찼어요. 잠시 뒤 다시 눌러 주세요`);
+    if(!res.ok){ if(/model/i.test(d.error?.message||'')) localStorage.removeItem('gl_ai_models_'+p); throw new Error(d.error?.message||`HTTP ${res.status}`); }
+    return d;
+  },
 
   // ── 어떤 모델로 부를 것인가 ─────────────────────────
   // 모델 이름을 코드에 박아 두면 Groq 이 그걸 내리는 날 앱이 조용히 죽는다.
@@ -572,7 +638,7 @@ const JARVIS = {
         if(c && Date.now()-c.at < 864e5 && Array.isArray(c.ids) && c.ids.length) return c.ids;
       } catch {}
     }
-    const key=this._getKey(); if(!key) return [];
+    const key=this._keyOf('groq'); if(!key) return [];
     try {
       const res=await fetch('https://api.groq.com/openai/v1/models',{ headers:{ Authorization:`Bearer ${key}` } });
       if(!res.ok) return [];
@@ -592,8 +658,10 @@ const JARVIS = {
 
   // 모든 Groq 호출은 여기를 지난다. 모델이 없다고 하면 목록을 새로 받아 한 번만 다시 시도한다.
   async chat(body, kind='text') {
-    const key=this._getKey();
-    if(!key) throw new Error('API 키가 없습니다');
+    const p=this._active();
+    const key=this._keyOf(p);
+    if(!key) throw new Error('AI 키가 없습니다 — AI 창의 열쇠 단추에서 설정해 주세요');
+    if(p!=='groq') return this._chatOther(p, body, kind);
     // 지금 쓰는 모델(gpt-oss)은 답하기 전에 속으로 생각하고, 그 생각도 max_tokens 를 먹는다.
     // 조금 어려운 질문이면 생각만 하다 예산이 끝나 본문이 빈 채로 돌아온다
     // (finish_reason:'length', content:'') — 부르는 쪽에서는 '모델이 모른다' 로 보인다.
@@ -631,24 +699,49 @@ const JARVIS = {
   },
 
   showKeySetup() {
-    App.openModal('@key Bashy API 키',`
-      <p style="color:var(--text2);font-size:13px;margin-bottom:14px">
-        완전 무료 Groq API 키 필요<br>
-        <a href="https://console.groq.com" target="_blank" style="color:var(--accent-l)">console.groq.com</a> → API Keys → Create API Key
-      </p>
-      <div class="modal-row"><label class="modal-lbl">Groq API Key</label>
-        <input id="aiKeyInp" type="password" placeholder="gsk_..." class="inp" value="${this._getKey()}"></div>
+    App.openModal('@key AI 비서 설정', this.setupHtml() + `
       <div class="modal-btns">
-        <button onclick="JARVIS._saveKey()" class="btn-sm accent">저장 후 활성화</button>
+        <button onclick="JARVIS.saveSetup();App.closeModal()" class="btn-sm accent">저장</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
       </div>`);
-    setTimeout(()=>document.getElementById('aiKeyInp')?.focus(),100);
   },
-  _saveKey() {
-    const k=document.getElementById('aiKeyInp')?.value.trim();
-    if(!k){ App.showToast('API 키를 입력해주세요','error'); return; }
-    localStorage.setItem('gl_ai_key',k);
-    App.closeModal(); App.showToast('✓ Bashy 활성화됨','success');
-    setTimeout(()=>{ this.isOpen=true; document.getElementById('jarvisPanel').classList.remove('hidden'); this.send('안녕!'); },400);
+  // 설정 도우미와 같이 쓰는 화면 — 기본 AI 고르기 + 제공자별 키
+  setupHtml() {
+    const cur=this.prov;
+    return `<div class="ai-setup">
+      <p class="ai-note">AI 비서가 어떤 AI 로 답할지 고릅니다. <b>Groq</b> 은 무료 키로 바로 쓸 수 있고,
+        ChatGPT·Claude·Gemini·Grok 은 각 회사 개발자 사이트에서 <b>API 키</b>를 따로 받아야 합니다
+        (유료 구독과는 별개이며 쓴 만큼 요금이 붙습니다. Gemini 는 무료 사용량이 있습니다).</p>
+      <div class="ai-provs">${Object.entries(this.PROVIDERS).map(([id,P])=>`
+        <label class="ai-prov${id===cur?' on':''}">
+          <input type="radio" name="aiProv" value="${id}" ${id===cur?'checked':''} onchange="JARVIS._pickProv(this)">
+          <span class="ai-pn">${P.name}</span>
+          <span class="ai-ps">${this._keyOf(id)?'키 있음':'키 없음'}</span>
+        </label>`).join('')}</div>
+      ${Object.entries(this.PROVIDERS).map(([id,P])=>`
+        <div class="ai-keyrow" data-prov="${id}"${id===cur?'':' hidden'}>
+          <label class="modal-lbl">${P.name} API 키 <a href="${P.keyUrl}" target="_blank" rel="noopener">발급받기 ↗</a></label>
+          <input type="password" class="inp ai-key" data-prov="${id}" placeholder="${P.ph}" value="${esc(this._keyOf(id))}" autocomplete="off">
+        </div>`).join('')}
+      <p class="ai-note">키는 이 계정에만 저장되고, 이 기기에서 각 AI 회사로 바로 보냅니다.</p>
+    </div>`;
   },
+  _pickProv(input) {
+    const box=input.closest('.ai-setup');
+    box.querySelectorAll('.ai-prov').forEach(l=>l.classList.toggle('on', l.querySelector('input').checked));
+    box.querySelectorAll('.ai-keyrow').forEach(r=>r.hidden = r.dataset.prov!==input.value);
+  },
+  saveSetup() {
+    const box=document.querySelector('.ai-setup'); if(!box) return false;
+    const p=box.querySelector('input[name="aiProv"]:checked')?.value || 'groq';
+    box.querySelectorAll('.ai-key').forEach(i=>{
+      const k=i.value.trim(), lk=this.PROVIDERS[i.dataset.prov].key;
+      if(k) localStorage.setItem(lk,k); else localStorage.removeItem(lk);
+    });
+    localStorage.setItem('gl_ai_prov', p);
+    window.FirebaseSync?.scheduleSave?.();
+    App.showToast(this._keyOf(p) ? `기본 AI: ${this.PROVIDERS[p].short}` : `${this.PROVIDERS[p].short} 키가 없어 ${this._keyOf(this._active())?this.PROVIDERS[this._active()].short+' 로 답합니다':'AI 비서는 키를 넣은 뒤 동작합니다'}`, 'success');
+    return true;
+  },
+  _saveKey() { this.saveSetup(); },
 };

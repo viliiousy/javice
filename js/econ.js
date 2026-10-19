@@ -479,7 +479,7 @@ const Econ = {
   // 대신 사람이 이미 보고 있는 화면을 그대로 읽는다 — 식단 사진 분석과 같은 방식이다.
   // 캡처는 브라우저 밖으로 나가지 않고, AI 에게는 그림만 보낸다. 로그인 정보는 어디에도 안 남는다.
   showHoldScan() {
-    if (!localStorage.getItem('gl_ai_key')) {
+    if (!JARVIS._getKey()) {
       App.showToast('Bashy API 키를 먼저 설정해주세요 (⚡→🔑)','error'); return;
     }
     App.openModal('@camera 캡처로 보유 종목 채우기', `

@@ -291,7 +291,7 @@ const Diet = {
   async aiLookup(meal, ds){
     const q=(document.getElementById('dietSearch')?.value||'').trim();
     if(!q) return;
-    const key=localStorage.getItem('gl_ai_key');
+    const key=JARVIS._getKey();
     if(!key){ App.showToast('Bashy API 키를 먼저 설정해주세요 (⚡→🔑)','error'); return; }
     const btn=document.getElementById('dietAiBtn');
     const box=document.getElementById('dietAiRes');
@@ -593,7 +593,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
   async _readLabel(q, meal, ds){
     const box = document.getElementById('lblResult');
     if(!box) return;
-    if(!localStorage.getItem('gl_ai_key')){
+    if(!JARVIS._getKey()){
       box.innerHTML = `<div class="diet-empty-hint">Bashy API 키를 먼저 설정해주세요 (⚡→🔑)</div>`; return;
     }
     box.innerHTML = `<div class="diet-empty-hint">표를 읽는 중…</div>`;
@@ -855,7 +855,7 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
   // ── 사진 분석 ─────────────────────────
   showPhotoAnalysis(dateStr=null){
     const ds=dateStr||this._localDateStr();
-    const key=localStorage.getItem('gl_ai_key');
+    const key=JARVIS._getKey();
     if(!key){ App.showToast('Bashy API 키를 먼저 설정해주세요 (⚡→🔑)','error'); return; }
     App.openModal('@camera 음식 사진 AI 분석',`
       <p style="color:var(--text2);font-size:13px;margin-bottom:10px">사진을 업로드하면 AI가 자동 분석합니다.</p>
@@ -898,7 +898,7 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
     if(!this._photoBase64) return;
     const btn=document.getElementById('btnAnalyzePhoto');
     if(btn){ btn.disabled=true; btn.textContent='분석 중...'; }
-    const key=localStorage.getItem('gl_ai_key');
+    const key=JARVIS._getKey();
     const meal=document.getElementById('photoMeal')?.value||'저녁';
     try{
       const data=await JARVIS.chat({ max_tokens:1000,

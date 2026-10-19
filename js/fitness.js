@@ -135,7 +135,7 @@ const Fitness = {
         ${Icons.big('moon')}
         <p>휴식일입니다.<br><span style="color:var(--text3);font-size:12px">다른 요일을 눌러 계획을 볼 수 있어요</span></p>
       </div>`}
-      ${isToday?'<div class="habit-add-btn" onclick="Fitness.showInlineAdd()">+ 운동 추가</div>':''}`;
+      <div class="habit-add-btn" onclick="Fitness.showInlineAdd(new Date('${Fitness._dateStr(date)}T00:00:00'))">+ 운동 추가</div>`;
       return;
     }
 
@@ -155,9 +155,9 @@ const Fitness = {
           <a class="ex-yt" href="${Fitness.ytUrl(ex.name)}" target="_blank" rel="noopener"
              onclick="event.stopPropagation()" title="자세 영상 검색">▶</a>
           <span class="ex-sets">${ex.sets}</span>
-          ${i>=plan.exercises.length&&isToday?`<button class="task-del" onclick="event.stopPropagation();Fitness._delCustom(${i-plan.exercises.length},'${Fitness._dateStr(date)}')">✕</button>`:''}
+          ${i>=plan.exercises.length?`<button class="task-del" onclick="event.stopPropagation();Fitness._delCustom(${i-plan.exercises.length},'${Fitness._dateStr(date)}')">✕</button>`:''}
         </div>`).join('')}
-      ${isToday?'<div class="habit-add-btn" onclick="Fitness.showInlineAdd()">+ 운동 추가</div>':''}
+      <div class="habit-add-btn" onclick="Fitness.showInlineAdd(new Date('${Fitness._dateStr(date)}T00:00:00'))">+ 운동 추가</div>
       <div class="fit-progress">
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
         <span class="progress-txt">${done}/${allEx.length} (${pct}%)</span>
@@ -349,9 +349,13 @@ const Fitness = {
   _pickHtml(){
     const hits=this._search(this._part, this._q);
     this._hits=hits;
-    if(!hits.length) return '<div class="ex-empty">결과가 없습니다</div>';
+    const q=String(this._q||'').trim();
+    // 목록에 없는 운동도 이름만 쳐서 바로 넣을 수 있다.
+    const own = q && !hits.some(h=>h[1]===q)
+      ? `<div class="ex-row ex-own" onclick="Fitness.pickOwn()"><span class="ex-row-main"><span class="ex-row-nm">＋ '${esc(q)}' 직접 추가</span><span class="ex-row-part">목록에 없는 운동</span></span></div>` : '';
+    if(!hits.length) return own || '<div class="ex-empty">결과가 없습니다</div>';
     const favs=this.getFavs();
-    return hits.map(([p,n],i)=>{
+    return own + hits.map(([p,n],i)=>{
       const fv=favs.includes(n);
       return `<div class="ex-row">
         <button class="ex-fav${fv?' on':''}" title="즐겨찾기"
@@ -383,14 +387,23 @@ const Fitness = {
     this._cart.push({ name, sets:this.DEFAULT_SETS });
     this._paintPick();
   },
+  pickOwn(){
+    const name=String(this._q||'').trim().slice(0,40); if(!name) return;
+    if(!this._cart) this._cart=[];
+    if(this._cart.some(x=>x.name===name)){ App.showToast('이미 골랐어요'); return; }
+    this._cart.push({ name, sets:this.DEFAULT_SETS });
+    this._paintPick();
+  },
   cartSets(i,v){ const x=(this._cart||[])[i]; if(x) x.sets=String(v||'').trim(); },
   cartRemove(i){ if(this._cart){ this._cart.splice(i,1); this._paintPick(); } },
   setPart(p){ this._part = (this._part===p ? null : p); this._paintPick(); },
   setQ(v){ this._q=v; this._paintPick(); },
 
-  showInlineAdd() {
+  showInlineAdd(date) {
     this._cart=[]; this._rid=undefined;
-    this._openPicker('운동 추가', '', '');
+    this._addDate = date ? new Date(date) : new Date();
+    const same=this._dateStr(this._addDate)===this._dateStr(new Date());
+    this._openPicker(same?'오늘 한 운동 추가':`${this._addDate.getMonth()+1}/${this._addDate.getDate()} 운동 추가`, '', '');
   },
   _openPicker(title, head, extraBtn) {
     this._hits=null; this._part=null; this._q='';
@@ -417,17 +430,18 @@ const Fitness = {
   commitCart() {
     const cart=this._cart||[];
     if(!cart.length){ App.showToast('고른 운동이 없습니다','error'); return; }
-    const custom=this.getCustomExercises();
+    const d=this._addDate||new Date();
+    const custom=this.getCustomExercises(d);
     for(const x of cart) custom.push({ name:x.name, sets:x.sets||this.DEFAULT_SETS });
-    this.saveCustomExercises(custom);
+    this.saveCustomExercises(custom,d);
     this._cart=[];
-    this.render();
+    this.render(d);
     App.closeModal();
     App.showToast(`${cart.length}개 추가됨 ✓`,'success');
   },
 
   _delCustom(customIdx, dateStr=null) {
-    const d=dateStr?new Date(dateStr):new Date();
+    const d=dateStr?new Date(dateStr+'T00:00:00'):new Date();
     const custom=this.getCustomExercises(d);
     custom.splice(customIdx,1);
     this.saveCustomExercises(custom,d);

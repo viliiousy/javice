@@ -3467,3 +3467,23 @@ html.dark .exm-media{ background:#eeeff1; }
 .j-icon-btn{ background:var(--card2) !important; color:var(--text2) !important; }
 /* 선택된 요일은 확실히 채워 보이게 */
 .day-pick-btn:has(input:checked){ background:var(--accent) !important; border-color:var(--accent) !important; color:var(--accent-fg) !important; font-weight:700; }
+
+/* AI 비서 설정 (열쇠 단추 · 도우미 공용) */
+.ai-note{ font-size:12px; line-height:1.55; color:var(--text3); margin:0 0 10px; }
+.ai-provs{ display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:6px; margin-bottom:10px; }
+.ai-prov{ position:relative; display:flex; flex-direction:column; gap:2px; padding:10px 12px; border-radius:12px; border:1.5px solid var(--border); background:var(--card); cursor:pointer; }
+.ai-prov input{ position:absolute; opacity:0; pointer-events:none; }
+.ai-prov.on{ border-color:var(--accent); background:var(--accent-bg); }
+.ai-pn{ font-size:14px; font-weight:700; }
+.ai-ps{ font-size:11px; color:var(--text3); }
+.ai-keyrow{ margin-bottom:8px; }
+.ai-keyrow .modal-lbl a{ font-weight:500; margin-left:6px; color:var(--accent); }
+.ob-sub2{ font-size:14px; font-weight:700; margin:16px 0 6px; }
+.aiu-track-pick{ display:flex; flex-wrap:wrap; gap:6px; }
+.ob-chk{ display:inline-flex; align-items:center; gap:6px; height:36px; padding:0 12px; border-radius:18px; border:1px solid var(--border); font-size:13px; cursor:pointer; }
+.ob-chk:has(input:checked){ border-color:var(--accent); background:var(--accent-bg); }
+.ob-chk.off{ opacity:.55; cursor:default; }
+.ob-chk i{ font-style:normal; font-size:11px; color:var(--text3); }
+
+.fit-head-btns{ margin-left:auto; display:flex; gap:6px; }
+.fit-head-btns .btn-sm{ height:30px; padding:0 10px; font-size:12px; white-space:nowrap; }

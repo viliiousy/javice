@@ -16,6 +16,33 @@ const AIUsage = {
   NAMES: { claude: 'Claude', chatgpt: 'ChatGPT', higgsfield: 'Higgsfield' },
   HUB_URL: 'https://bashy.app/hub.html',
 
+  // ── 어떤 서비스를 추적할지 ─────────────────
+  // 사용량은 PC 크롬의 수집 확장이 각 사이트에서 읽어 온다. 지금 읽을 수 있는 곳은 Claude·ChatGPT·Higgsfield 이다.
+  // Gemini·Grok 은 사이트에 남은 사용량을 보여 주는 곳이 없어 아직 읽지 못한다 — 고를 수는 없게 '준비 중' 으로 둔다.
+  TRACK: [
+    { id:'claude',     name:'Claude',     ok:true },
+    { id:'chatgpt',    name:'ChatGPT',    ok:true },
+    { id:'higgsfield', name:'Higgsfield', ok:true },
+    { id:'gemini',     name:'Gemini',     ok:false },
+    { id:'grok',       name:'Grok',       ok:false },
+  ],
+  shown() {
+    try { const v = JSON.parse(localStorage.getItem('gl_aiu_show') || 'null'); if (Array.isArray(v)) return v; } catch {}
+    return ['claude', 'chatgpt', 'higgsfield'];
+  },
+  trackHtml() {
+    const on = this.shown();
+    return `<div class="aiu-track-pick">${this.TRACK.map(t => `
+      <label class="ob-chk${t.ok ? '' : ' off'}"><input type="checkbox" class="aiu-show" value="${t.id}" ${t.ok && on.includes(t.id) ? 'checked' : ''} ${t.ok ? '' : 'disabled'}>
+        <span>${t.name}</span>${t.ok ? '' : '<i>준비 중</i>'}</label>`).join('')}</div>`;
+  },
+  saveTrack() {
+    const v = [...document.querySelectorAll('.aiu-show:checked')].map(i => i.value);
+    localStorage.setItem('gl_aiu_show', JSON.stringify(v));
+    window.FirebaseSync?.scheduleSave?.();
+    if (typeof TopStrip !== 'undefined') TopStrip.render();
+  },
+
   init() {
     // 로그인(Firebase 인증)이 끝나야 읽을 수 있다. 끝날 때까지 가볍게 기다린다.
     const wait = setInterval(() => {
@@ -82,7 +109,8 @@ const AIUsage = {
   row() {
     const d = this.data;
     if (!d || !Object.keys(d).length) return '';
-    const items = ['claude', 'chatgpt', 'higgsfield'].filter(k => d[k]).map(k =>
+    const show = this.shown();
+    const items = ['claude', 'chatgpt', 'higgsfield'].filter(k => d[k] && show.includes(k)).map(k =>
       `<span class="aiu-it">${this.gauge(k, 28)}<span class="aiu-nm"><span class="nm-full">${k === 'higgsfield' ? 'Higgs' : this.NAMES[k]}</span><span class="nm-short">${this.SHORT_NAMES[k]}</span></span></span>`);
     if (!items.length) return '';
     return `<button class="ts-row ts-ai" id="tsAI" onclick="AIUsage.open()"
@@ -154,7 +182,9 @@ const AIUsage = {
   open() {
     App.openModal('@sparkle AI 사용량 · 허브', `
       <div class="aiu-wrap">
-        ${['claude', 'chatgpt', 'higgsfield'].map(k => this._svc(k)).join('')}
+        ${['claude', 'chatgpt', 'higgsfield'].filter(k => this.shown().includes(k)).map(k => this._svc(k)).join('')}
+        <div class="aiu-link"><div class="aiu-head"><b>위쪽에 표시할 AI</b></div>${this.trackHtml()}
+          <div class="modal-btns" style="justify-content:flex-start"><button class="btn-sm" onclick="AIUsage.saveTrack();App.showToast('저장했습니다','success')">표시 저장</button></div></div>
         <div class="aiu-link">
           <div class="aiu-head"><b>연결 코드</b><span class="aiu-sub">PC 수집 확장 · 태블릿 허브에 붙여 넣습니다</span></div>
           <div id="aiuCodeBox" class="aiu-code aiu-sub">확인 중…</div>
