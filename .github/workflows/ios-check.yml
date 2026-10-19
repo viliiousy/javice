@@ -1,0 +1,26 @@
+name: iOS build check
+
+# 서명 없이 iOS 앱이 컴파일되는지만 본다(위젯 확장 같은 네이티브 변경 확인용). 업로드는 맥미니의 ios-release.sh 가 한다.
+on:
+  workflow_dispatch: {}
+  push:
+    paths: [ 'app/ios/**', '.github/workflows/ios-check.yml' ]
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - working-directory: app
+        run: |
+          npm ci --no-audit --no-fund
+          npm run sync
+      - working-directory: app
+        run: |
+          xcodebuild -version
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build | tail -40
+          test ${PIPESTATUS[0]} -eq 0
+      - run: ls -la ~/Library/Developer/Xcode/DerivedData/*/Build/Products/Release-iphoneos/App.app/PlugIns || true
