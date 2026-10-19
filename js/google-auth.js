@@ -379,7 +379,9 @@ const Auth = {
       if (missing.length) App.showToast('캘린더·할일 권한이 허용되지 않았습니다. 다시 로그인해 모든 항목에 체크해주세요.', 'error');
       await this._fetchUserInfo();
     } catch (e) {
-      if (/cancel/i.test(String(e && (e.message || e.code)))) return;   // 사용자가 닫음
+      const msg = String(e && (e.message || e.code));
+      // 안드로이드는 앱 서명·OAuth 설정이 안 맞아도 '취소'로 돌아온다 — 조용히 넘기지 않고 알린다
+      if (/cancel/i.test(msg) && !(window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'android')) return;   // 사용자가 닫음
       console.warn('[Auth] 앱 로그인 실패', e);
       App.showToast('로그인 실패: ' + (e.message || e), 'error');
     }

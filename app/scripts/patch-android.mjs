@@ -83,7 +83,7 @@ let g = read(gradlePath);
 const vName = process.env.VERSION_NAME || pkg.version;
 const vCode = Number(process.env.VERSION_CODE) || (Math.floor(Date.now() / 60000) - 29000000);
 g = g.replace(/versionCode \d+/, `versionCode ${vCode}`).replace(/versionName "[^"]*"/, `versionName "${vName}"`);
-if (process.env.BASHY_KEYSTORE && !g.includes('signingConfigs')) {
+if (process.env.BASHY_KEYSTORE && !g.includes('signingConfigs.release')) {
   g = g.replace(/buildTypes \{\s*release \{/, `signingConfigs {
         release {
             storeFile file(System.getenv("BASHY_KEYSTORE"))
@@ -95,6 +95,21 @@ if (process.env.BASHY_KEYSTORE && !g.includes('signingConfigs')) {
     buildTypes {
         release {
             signingConfig signingConfigs.release`);
+}
+// 디버그(테스트) APK 도 늘 같은 키로 — 저장소의 고정 디버그 키(SHA-1 18:23:53:…:4C:64, 구글 클라우드에 등록됨)
+if (!g.includes('bashy-debug-key')) {
+  const dk = path.join(repo, 'hub-app/keystore/debug.keystore').replace(/\\/g, '/');
+  g = g.replace(/defaultConfig \{/, `signingConfigs {
+        debug {   // bashy-debug-key
+            storeFile file("${dk}")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+    defaultConfig {`);
+  g = g.replace(/buildTypes \{/, `buildTypes {
+        debug { signingConfig signingConfigs.debug }`);
 }
 fs.writeFileSync(gradlePath, g);
 
