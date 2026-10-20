@@ -604,3 +604,9 @@ html[data-ui="v2"] .uc-star{ color:var(--accent); font-weight:600; margin-right:
 html[data-ui="v2"] .stats-jarvis-icon{ font-family:var(--v2-num); font-size:10px; font-weight:600; color:var(--accent); letter-spacing:.06em; }
 html[data-ui="v2"] .habit-streak{ font-family:var(--v2-num); font-size:11px; color:var(--accent); }
 html[data-ui="v2"] .econ-login, html[data-ui="v2"] .ec-login-need{ color:var(--text3) !important; }
+
+/* 기기 연결: 스마트홈 방식 선택 */
+.dp-seg{ display:flex; gap:0; border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+.dp-seg button{ flex:1; height:40px; border:0; background:none; color:var(--text2); font:inherit; font-size:13.5px; cursor:pointer; }
+.dp-seg button + button{ border-left:1px solid var(--border); }
+.dp-seg button.on{ background:var(--text); color:var(--card); font-weight:600; }

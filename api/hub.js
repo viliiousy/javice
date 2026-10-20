@@ -244,7 +244,7 @@ async function taskDone(uid, list, id, undo) {
 //   cfgGet / cfgPut : 연결 코드로 설정을 읽고 쓴다
 const FIREBASE_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyBWrrQLSK-krXQMwuueI_dw893bK5-hmPY';
 const PAIR_TTL = 10 * 60 * 1000;
-const CFG_FIELDS = { haUrl: 300, haUrlExt: 300, haToken: 600, aiUrl: 300, aiToken: 600, aiModel: 60, wakeWord: 30 };
+const CFG_FIELDS = { provider: 8, haUrl: 300, haUrlExt: 300, haToken: 600, aiUrl: 300, aiToken: 600, aiModel: 60, wakeWord: 30 };
 const CFG_FLAGS  = ['wakeOn', 'night'];
 
 async function uidFromIdToken(idToken) {
@@ -317,6 +317,131 @@ async function pairPoll(pin, pairId) {
   await fbFetch(`/hub_pair/${pin}.json`, { method: 'DELETE' });
   const cfg = await cfgGet(safeUid(cur.uid)).catch(() => null);
   return { status: 200, ok: true, code: cur.code, cfg };
+}
+
+
+// ── SmartThings (집에 서버 없이 쓰는 스마트홈) ─────────────────────
+// Home Assistant 는 집에 서버(맥미니 등)를 둬야 해서 보통 사람에겐 어렵다. SmartThings 는 클라우드 API 가 있어
+// 이 서버가 사용자 대신 기기 목록·상태를 읽고 켜고 끈다. 사용자는 bashy.app 에서 삼성 계정으로 '허락' 만 한다.
+//   개인 액세스 토큰(PAT)은 2024년 말부터 24시간이면 만료라 쓰지 않고, OAuth(API_ONLY 앱)로 붙는다.
+//   토큰은 /users/<uid>/_link/st = { at, rt, exp } (본인 계정 칸, 기기로 내려가지 않음)
+//   stStart(idToken) → 삼성 로그인 주소 / GET /st/callback → 토큰 저장 → bashy.app 으로 돌아감
+//   stDevices(code) → 방·기기·상태·장면 / stCmd(code) → 기기 명령 · 장면 실행 / stStatus·stUnlink(idToken)
+const ST_API = 'https://api.smartthings.com/v1';
+const ST_AUTH = 'https://api.smartthings.com/oauth/authorize';
+const ST_TOKEN = 'https://auth-global.api.smartthings.com/oauth/token';
+const ST_SCOPE = 'r:devices:* x:devices:* r:locations:* r:scenes:* x:scenes:*';
+const ST_REDIRECT = process.env.ST_REDIRECT || 'https://bashy.app/st/callback';
+const stReady = () => !!(process.env.ST_CLIENT_ID && process.env.ST_CLIENT_SECRET);
+const stBasic = () => 'Basic ' + Buffer.from(`${process.env.ST_CLIENT_ID}:${process.env.ST_CLIENT_SECRET}`).toString('base64');
+
+async function stStart(idToken) {
+  if (!stReady()) return { status: 503, error: 'SmartThings 연동 준비 중입니다(서버 설정 필요)' };
+  const uid = await uidFromIdToken(idToken);
+  if (!uid) return { status: 401, error: '로그인이 필요합니다' };
+  const nonce = crypto.randomBytes(18).toString('base64url');
+  await fbFetch(`/st_state/${nonce}.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid, exp: Date.now() + 10 * 60 * 1000 }) });
+  const q = new URLSearchParams({ client_id: process.env.ST_CLIENT_ID, response_type: 'code', redirect_uri: ST_REDIRECT, scope: ST_SCOPE, state: nonce });
+  return { status: 200, ok: true, url: `${ST_AUTH}?${q}` };
+}
+
+async function stSaveTok(uid, j) {
+  const v = { at: j.access_token, rt: j.refresh_token, exp: Date.now() + (Number(j.expires_in) || 86400) * 1000 - 60000 };
+  await fbFetch(`/users/${uid}/_link/st.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(v) });
+  return v;
+}
+async function stTokReq(params) {
+  const r = await fetch(ST_TOKEN, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: stBasic() }, body: new URLSearchParams(params) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.access_token) throw new Error(j.error_description || j.error || `SmartThings 토큰 실패(HTTP ${r.status})`);
+  return j;
+}
+async function stCallback(req, res) {
+  const u = new URL(req.url, 'https://bashy.app');
+  const back = m => { res.statusCode = 302; res.setHeader('Location', `https://bashy.app/?st=${m}`); res.end(); };
+  const q = req.query || {};
+  const code = q.code || u.searchParams.get('code'), nonce = q.state || u.searchParams.get('state');
+  if (!code || !nonce || !/^[A-Za-z0-9_-]{10,64}$/.test(nonce)) return back('cancel');
+  const st = await fbGet(`/st_state/${nonce}.json`);
+  await fbFetch(`/st_state/${nonce}.json`, { method: 'DELETE' });
+  if (!st || !(st.exp > Date.now()) || !st.uid) return back('expired');
+  try { await stSaveTok(safeUid(st.uid), await stTokReq({ grant_type: 'authorization_code', code, redirect_uri: ST_REDIRECT, client_id: process.env.ST_CLIENT_ID })); }
+  catch (e) { console.error('[st cb]', e.message); return back('fail'); }
+  return back('ok');
+}
+async function stToken(uid) {
+  const t = await fbGet(`/users/${uid}/_link/st.json`);
+  if (!t || !t.rt) throw Object.assign(new Error('SmartThings 가 연결되어 있지 않습니다 — bashy.app › 기기 연결에서 연결해 주세요'), { code: 'NOLINK' });
+  if (t.at && t.exp > Date.now()) return t.at;
+  const j = await stTokReq({ grant_type: 'refresh_token', refresh_token: t.rt, client_id: process.env.ST_CLIENT_ID });
+  return (await stSaveTok(uid, j)).at;
+}
+async function stGet(tok, path) {
+  const r = await fetch(ST_API + path, { headers: { Authorization: 'Bearer ' + tok } });
+  if (!r.ok) throw new Error(`SmartThings ${path.split('?')[0]} HTTP ${r.status}`);
+  return r.json();
+}
+// 화면에 쓰는 값만 골라 보낸다 (기기 상태 원본은 크다)
+const ST_PICK = {
+  switch: ['switch'], switchLevel: ['level'], temperatureMeasurement: ['temperature'], relativeHumidityMeasurement: ['humidity'],
+  dustSensor: ['fineDustLevel', 'dustLevel'], fineDustSensor: ['fineDustLevel'], airConditionerMode: ['airConditionerMode'],
+  thermostatCoolingSetpoint: ['coolingSetpoint'], thermostatHeatingSetpoint: ['heatingSetpoint'], windowShade: ['windowShade'],
+  lock: ['lock'], robotCleanerMovement: ['robotCleanerMovement'], washerOperatingState: ['machineState', 'completionTime'],
+  dryerOperatingState: ['machineState', 'completionTime'], contactSensor: ['contact'], motionSensor: ['motion'],
+  mediaPlayback: ['playbackStatus'], carbonDioxideMeasurement: ['carbonDioxide'], fanSpeed: ['fanSpeed'],
+};
+async function stDevices(uid) {
+  const tok = await stToken(uid);
+  const [devs, locs, scenes] = await Promise.all([
+    stGet(tok, '/devices'), stGet(tok, '/locations'), stGet(tok, '/scenes').catch(() => ({ items: [] })),
+  ]);
+  const rooms = {};
+  await Promise.all((locs.items || []).map(async l => {
+    const r = await stGet(tok, `/locations/${l.locationId}/rooms`).catch(() => ({ items: [] }));
+    for (const x of r.items || []) rooms[x.roomId] = x.name;
+  }));
+  const items = (devs.items || []).slice(0, 80);
+  const out = await Promise.all(items.map(async d => {
+    const main = (d.components || []).find(c => c.id === 'main') || (d.components || [])[0] || {};
+    const caps = (main.capabilities || []).map(c => c.id);
+    const cat = ((main.categories || [])[0] || {}).name || '';
+    const st = {};
+    try {
+      const s = await stGet(tok, `/devices/${d.deviceId}/components/main/status`);
+      for (const [cap, keys] of Object.entries(ST_PICK)) if (s[cap]) for (const k of keys) if (s[cap][k] && s[cap][k].value != null) st[k] = s[cap][k].value;
+      if (s.healthCheck && s.healthCheck.DeviceWatch && s.healthCheck['DeviceWatch-DeviceStatus']) st.health = s.healthCheck['DeviceWatch-DeviceStatus'].value;
+    } catch (e) { st.err = 1; }
+    return { id: d.deviceId, name: d.label || d.name, room: d.roomId || null, cat, caps: caps.filter(c => ST_PICK[c] || c === 'switch'), st };
+  }));
+  return { rooms, devices: out, scenes: (scenes.items || []).slice(0, 30).map(x => ({ id: x.sceneId, name: x.sceneName })) };
+}
+const ST_CMD_OK = /^[a-zA-Z]{2,40}$/;
+async function stCmd(uid, b) {
+  const tok = await stToken(uid);
+  if (b.scene) {
+    if (!/^[0-9a-f-]{20,64}$/i.test(String(b.scene))) throw new Error('잘못된 장면');
+    const r = await fetch(`${ST_API}/scenes/${b.scene}/execute`, { method: 'POST', headers: { Authorization: 'Bearer ' + tok } });
+    if (!r.ok) throw new Error('장면 실행 실패 HTTP ' + r.status);
+    return { ok: true };
+  }
+  const id = String(b.device || '');
+  if (!/^[0-9a-f-]{20,64}$/i.test(id)) throw new Error('잘못된 기기');
+  const cmds = (Array.isArray(b.commands) ? b.commands : []).slice(0, 4)
+    .filter(c => c && ST_CMD_OK.test(c.capability) && ST_CMD_OK.test(c.command))
+    .map(c => ({ component: 'main', capability: c.capability, command: c.command, arguments: Array.isArray(c.arguments) ? c.arguments.slice(0, 3) : [] }));
+  if (!cmds.length) throw new Error('명령이 없습니다');
+  const r = await fetch(`${ST_API}/devices/${id}/commands`, { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify({ commands: cmds }) });
+  if (!r.ok) throw new Error('명령 실패 HTTP ' + r.status);
+  return { ok: true };
+}
+async function stStatus(idToken, unlink) {
+  const uid = await uidFromIdToken(idToken);
+  if (!uid) return { status: 401, error: '로그인이 필요합니다' };
+  if (unlink) { await fbFetch(`/users/${uid}/_link/st.json`, { method: 'DELETE' }); return { status: 200, ok: true, linked: false }; }
+  const t = await fbGet(`/users/${uid}/_link/st.json`);
+  if (!t || !t.rt) return { status: 200, ok: true, ready: stReady(), linked: false };
+  try { const d = await stDevices(uid); return { status: 200, ok: true, ready: true, linked: true, devices: d.devices.length, rooms: Object.keys(d.rooms).length }; }
+  catch (e) { return { status: 200, ok: true, ready: true, linked: false, error: e.message }; }
 }
 
 
@@ -502,6 +627,7 @@ const send = (res, r) => { const { status, ...rest } = r; res.status(status || 2
 module.exports = async (req, res) => {
   const mc = (req.query && req.query.mcp) || (String(req.url || '').match(/[?&]mcp=([^&]+)/) || [])[1];
   if (mc) { try { await mcpHandle(req, res, decodeURIComponent(mc)); } catch (e) { res.status(500).json({ error: e.message }); } return; }
+  if ((req.query && req.query.st === 'cb') || /[?&]st=cb\b|\/st\/callback/.test(String(req.url || ''))) { try { await stCallback(req, res); } catch (e) { res.statusCode = 302; res.setHeader('Location', 'https://bashy.app/?st=fail'); res.end(); } return; }
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -514,6 +640,8 @@ module.exports = async (req, res) => {
     if (body.act === 'pairStart')   { res.status(200).json({ ok: true, ...(await pairStart()) }); return; }
     if (body.act === 'pairApprove') { send(res, await pairApprove(body.idToken, body.pin)); return; }
     if (body.act === 'pairPoll')    { send(res, await pairPoll(body.pin, body.pairId)); return; }
+    if (body.act === 'stStart')     { send(res, await stStart(body.idToken)); return; }
+    if (body.act === 'stStatus')    { send(res, await stStatus(body.idToken, !!body.unlink)); return; }
     const uid  = await verify(body.code);
     if (!uid) { res.status(401).json({ error: '연결 코드가 맞지 않습니다 — bashy.app 설정에서 다시 확인해 주세요' }); return; }
 
@@ -523,6 +651,8 @@ module.exports = async (req, res) => {
     if (body.act === 'taskAdd') { res.status(200).json({ ok: true, ...(await taskAdd(uid, body.title)) }); return; }
     if (body.act === 'taskDone') { res.status(200).json({ ok: true, ...(await taskDone(uid, body.list, body.id, !!body.undo)) }); return; }
     if (body.act === 'ping')  { res.status(200).json({ ok: true }); return; }
+    if (body.act === 'stDevices') { try { res.status(200).json({ ok: true, ...(await stDevices(uid)) }); } catch (e) { res.status(e.code === 'NOLINK' ? 409 : 502).json({ error: e.message, nolink: e.code === 'NOLINK' }); } return; }
+    if (body.act === 'stCmd')     { try { res.status(200).json(await stCmd(uid, body)); } catch (e) { res.status(502).json({ error: e.message }); } return; }
     if (body.act === 'cfgGet') { res.status(200).json({ ok: true, cfg: await cfgGet(uid) }); return; }
     if (body.act === 'cfgPut') { res.status(200).json({ ok: true, ...(await cfgPut(uid, body.cfg)) }); return; }
     res.status(400).json({ error: '알 수 없는 act' });

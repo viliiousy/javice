@@ -17,6 +17,10 @@
     {
       "source": "/mcp/:code",
       "destination": "/api/hub?mcp=:code"
+    },
+    {
+      "source": "/st/callback",
+      "destination": "/api/hub?st=cb"
     }
   ]
 }

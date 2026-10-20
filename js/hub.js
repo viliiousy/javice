@@ -324,6 +324,114 @@ const Dev = {
   save(map) { store.set(DEV_KEY, map); },
 };
 
+// ── SmartThings 연결 (집에 서버 없이) ─────────────────────
+// bashy.app 에서 삼성 계정으로 허락해 두면, 서버(/api/hub stDevices·stCmd)가 대신 읽고 켠다.
+// 받은 기기를 Home Assistant 상태 모양(entity_id·state·attributes)으로 바꿔 HA 화면 코드를 그대로 쓴다.
+const ST = {
+  map: {}, _t: 0, _busy: false,
+  stop() { clearTimeout(this._t); this._t = 0; },
+  connect() {
+    if (!Object.keys(HA.states).length) HA.loadSnap();
+    HA.note('SmartThings 연결 중…');
+    this.poll();
+  },
+  next(ms) { clearTimeout(this._t); this._t = setTimeout(() => this.poll(), ms || (document.hidden ? 60000 : 15000)); },
+  async poll() {
+    if (HA.mode !== 'st' || this._busy) return;
+    this._busy = true;
+    try {
+      const j = await hubCall({ act: 'stDevices' });
+      this.apply(j);
+      HA.ready = true; HA.markStale(false);
+      HA.note(`SmartThings · 기기 ${j.devices.length}개`);
+      HA.render(); HA.saveSnap();
+      this.next();
+    } catch (e) {
+      HA.ready = false; HA.markStale(true);
+      if (/연결되어 있지 않습니다|nolink/i.test(e.message)) { HA.note('SmartThings 가 아직 연결되지 않았습니다 — bashy.app › 기기 연결에서 연결해 주세요', true); if (!Object.keys(HA.states).length) HA.renderEmpty(); this.next(60000); }
+      else { HA.note('SmartThings 불러오기 실패 — 다시 시도 중', true); this.next(20000); }
+    } finally { this._busy = false; }
+  },
+  apply(j) {
+    const states = {}, entArea = {}, map = {};
+    const put = (eid, state, attrs, dev, room, kind) => { states[eid] = { entity_id: eid, state: String(state), attributes: attrs }; if (room) entArea[eid] = room; map[eid] = { dev, kind }; };
+    for (const d of j.devices || []) {
+      const s = d.st || {}, caps = d.caps || [], cat = String(d.cat || '').toLowerCase(), key = 'st_' + String(d.id).replace(/[^a-z0-9]/gi, '').toLowerCase();
+      const off = s.health === 'OFFLINE' ? 'unavailable' : null;
+      const has = c => caps.includes(c);
+      const sw = s.switch || 'off';
+      const base = { friendly_name: d.name };
+      if (has('airConditionerMode') || /airconditioner|thermostat/.test(cat)) {
+        put('climate.' + key, off || (sw === 'off' ? 'off' : (s.airConditionerMode || 'cool')), { ...base, current_temperature: s.temperature, temperature: s.coolingSetpoint ?? s.heatingSetpoint, target_temp_step: 1 }, d.id, d.room, 'climate');
+      } else if (has('washerOperatingState') || has('dryerOperatingState')) {
+        const k2 = key + (has('dryerOperatingState') ? '_dryer' : '');
+        put(`sensor.${k2}_machine_state`, off || s.machineState || 'stop', base, d.id, d.room, 'appl');
+        if (s.completionTime) put(`sensor.${k2}_completion_time`, s.completionTime, {}, d.id, d.room, 'ro');
+      } else if (has('windowShade')) {
+        put('cover.' + key, off || (s.windowShade === 'closed' ? 'closed' : 'open'), base, d.id, d.room, 'cover');
+      } else if (has('lock')) {
+        put('lock.' + key, off || (s.lock === 'locked' ? 'locked' : 'unlocked'), base, d.id, d.room, 'lock');
+      } else if (has('robotCleanerMovement')) {
+        put('vacuum.' + key, off || (s.robotCleanerMovement === 'cleaning' ? 'cleaning' : 'docked'), base, d.id, d.room, 'vacuum');
+      } else if (has('switch')) {
+        const dom = /light/.test(cat) || has('switchLevel') ? 'light' : /fan/.test(cat) || has('fanSpeed') ? 'fan' : 'switch';
+        const a = { ...base };
+        if (dom === 'light' && has('switchLevel')) { a.supported_color_modes = ['brightness']; if (sw === 'on' && s.level != null) a.brightness = Math.round(s.level * 2.55); }
+        put(`${dom}.${key}`, off || sw, a, d.id, d.room, dom);
+      }
+      // 함께 달린 센서들 (에어컨 실내 온도는 위에서 이미 씀)
+      if (!has('airConditionerMode')) {
+        if (s.temperature != null) put(`sensor.${key}_temperature`, s.temperature, { friendly_name: d.name, device_class: 'temperature', unit_of_measurement: '°C' }, d.id, d.room, 'ro');
+      }
+      if (s.humidity != null) put(`sensor.${key}_humidity`, s.humidity, { friendly_name: d.name, device_class: 'humidity', unit_of_measurement: '%' }, d.id, d.room, 'ro');
+      if (s.fineDustLevel != null) put(`sensor.${key}_pm25`, s.fineDustLevel, { friendly_name: d.name, device_class: 'pm25', unit_of_measurement: 'µg/m³' }, d.id, d.room, 'ro');
+      if (s.carbonDioxide != null) put(`sensor.${key}_co2`, s.carbonDioxide, { friendly_name: d.name, device_class: 'carbon_dioxide', unit_of_measurement: 'ppm' }, d.id, d.room, 'ro');
+      if (s.contact != null) put(`binary_sensor.${key}_contact`, s.contact === 'open' ? 'on' : 'off', { friendly_name: d.name, device_class: 'door' }, d.id, d.room, 'ro');
+      if (s.motion != null) put(`binary_sensor.${key}_motion`, s.motion === 'active' ? 'on' : 'off', { friendly_name: d.name, device_class: 'motion' }, d.id, d.room, 'ro');
+    }
+    for (const x of j.scenes || []) put('scene.st_' + String(x.id).replace(/[^a-z0-9]/gi, '').toLowerCase(), 'scening', { friendly_name: x.name }, null, null, 'scene:' + x.id);
+    HA.states = states; HA.areas = j.rooms || {}; HA.entArea = entArea; HA.hidden = new Set(); HA.unitF = false;
+    this.map = map;
+  },
+  cmd(eid, capability, command, args) {
+    const m = this.map[eid]; if (!m || !m.dev) throw new Error('기기를 찾지 못했습니다');
+    return hubCall({ act: 'stCmd', device: m.dev, commands: [{ capability, command, arguments: args || [] }] });
+  },
+  setState(eid, state, attrs) { const x = HA.states[eid]; if (!x) return; HA.states[eid] = { ...x, state, attributes: { ...x.attributes, ...(attrs || {}) } }; HA.schedule(); },
+  async send(msg) {
+    if (msg.type === 'ping') return true;
+    if (msg.type !== 'call_service') throw new Error('SmartThings 에서 지원하지 않는 요청');
+    const { domain, service } = msg, data = msg.service_data || {};
+    const ids = [].concat(data.entity_id || []);
+    await Promise.all(ids.map(eid => this.one(eid, domain, service, data)));
+    this.next(1500);   // 실제 상태로 곧 다시 맞춘다
+    return true;
+  },
+  async one(eid, domain, service, data) {
+    const m = this.map[eid] || {}, cur = HA.states[eid] || {}, on = cur.state && !['off', 'closed', 'locked', 'docked', 'unavailable'].includes(cur.state);
+    if (String(m.kind || '').startsWith('scene:')) return hubCall({ act: 'stCmd', scene: m.kind.slice(6) });
+    const dom = eid.split('.')[0];
+    if (dom === 'cover') {
+      const open = service === 'open_cover' || (service === 'toggle' && !on);
+      this.setState(eid, open ? 'open' : 'closed'); return this.cmd(eid, 'windowShade', open ? 'open' : 'close');
+    }
+    if (dom === 'lock') { this.setState(eid, 'locked'); return this.cmd(eid, 'lock', 'lock'); }
+    if (dom === 'vacuum') {
+      const go = service === 'start';
+      this.setState(eid, go ? 'cleaning' : 'docked'); return this.cmd(eid, 'robotCleanerMovement', 'setRobotCleanerMovement', [go ? 'cleaning' : 'homing']);
+    }
+    if (dom === 'climate' && service === 'set_temperature') {
+      this.setState(eid, cur.state, { temperature: data.temperature }); return this.cmd(eid, 'thermostatCoolingSetpoint', 'setCoolingSetpoint', [Number(data.temperature)]);
+    }
+    if (dom === 'light' && service === 'turn_on' && data.brightness_pct != null) {
+      this.setState(eid, 'on', { brightness: Math.round(data.brightness_pct * 2.55) }); return this.cmd(eid, 'switchLevel', 'setLevel', [Math.round(data.brightness_pct)]);
+    }
+    let want = service === 'turn_on' ? true : service === 'turn_off' ? false : !on;   // toggle · media_play_pause
+    this.setState(eid, want ? (dom === 'climate' ? 'cool' : 'on') : 'off');
+    return this.cmd(eid, 'switch', want ? 'on' : 'off');
+  },
+};
+
 // ── Home Assistant ──────────────────────────────
 const HA = {
   ws: null, id: 1, pending: new Map(), states: {}, areas: {}, entArea: {}, hidden: new Set(),
@@ -349,9 +457,13 @@ const HA = {
   },
   _ui: 0,
 
+  mode: 'ha',
+  useST(c = Cfg.get()) { return c.provider === 'st' || (!c.provider && !c.haToken && !!c.code); },
   connect() {
     const c = Cfg.get();
     this.close();
+    if (this.useST(c)) { this.mode = 'st'; ST.connect(); return; }
+    this.mode = 'ha'; ST.stop();
     if (!(c.haUrl || c.haUrlExt) || !c.haToken) { this.renderEmpty(); return; }
     if (!this.ready && !Object.keys(this.states).length) this.loadSnap();
     const list = this.urls(c);
@@ -414,6 +526,7 @@ const HA = {
   note(t, bad) { $('haNote').textContent = t || ''; $('haNote').classList.toggle('bad', !!bad); },
 
   send(msg) {
+    if (this.mode === 'st') return ST.send(msg);
     return new Promise((res, rej) => {
       if (!this.ws || this.ws.readyState !== 1) { rej(new Error('Home Assistant 에 연결되어 있지 않습니다')); return; }
       const id = this.id++;
@@ -582,8 +695,8 @@ const HA = {
     this.note('');
     $('indoor').innerHTML = '';
     $('tiles').innerHTML = `<div class="empty-home">
-      <b>Home Assistant 를 연결하면</b> SmartThings · Smart Life(Tuya) · 샤오미 기기를 여기서 함께 켜고 끌 수 있습니다.<br>
-      음성으로 "거실 불 꺼 줘" 같은 명령도 Home Assistant 가 알아듣습니다.<br>
+      <b>스마트홈을 연결하면</b> 집 기기를 여기서 켜고 끌 수 있습니다.<br>
+      서버 없이 쓰려면 bashy.app › 기기 연결에서 <b>SmartThings</b> 를 연결하고, 집에 Home Assistant 가 있으면 설정에 주소와 토큰을 넣어 주세요.<br>
       <button class="chip" onclick="document.getElementById('gear').click()">설정 열기</button></div>`;
   },
 
@@ -1374,7 +1487,7 @@ const Voice = {
 // ── 클라우드 설정 · bashy 계정 연결 ───────────────────
 // 연결 코드 하나만 있으면 나머지 설정(HA·OpenClaw·호출어)은 /api/hub 의 cfgGet/cfgPut 으로 오간다.
 // 새 기기는 '연결' 을 눌러 6자리 번호를 띄우고, 로그인된 bashy.app 에서 승인하면 코드와 설정을 함께 받는다.
-const CLOUD_KEYS = ['haUrl', 'haUrlExt', 'haToken', 'aiUrl', 'aiToken', 'aiModel', 'wakeWord', 'wakeOn', 'night'];
+const CLOUD_KEYS = ['provider', 'haUrl', 'haUrlExt', 'haToken', 'aiUrl', 'aiToken', 'aiModel', 'wakeWord', 'wakeOn', 'night'];
 const Cloud = {
   pick(c) { const o = {}; for (const k of CLOUD_KEYS) if (c[k] !== undefined) o[k] = c[k]; return o; },
   // 받은 설정을 이 기기에 적용한다. 바뀐 것만 다시 연결한다.
@@ -1383,7 +1496,7 @@ const Cloud = {
     if (cfg) { for (const k of CLOUD_KEYS) if (cfg[k] !== undefined) next[k] = cfg[k]; next.cfgAt = cfg.at || new Date().toISOString(); }
     Cfg.set(next);
     if (next.code !== prev.code) { Usage.load(); Tasks.load(); }
-    if (next.haUrl !== prev.haUrl || next.haUrlExt !== prev.haUrlExt || next.haToken !== prev.haToken) { HA._retry = 0; HA._ui = 0; HA.connect(); }
+    if (next.provider !== prev.provider || next.haUrl !== prev.haUrl || next.haUrlExt !== prev.haUrlExt || next.haToken !== prev.haToken) { HA._retry = 0; HA._ui = 0; HA.connect(); }
     if (next.wakeOn !== prev.wakeOn || next.wakeWord !== prev.wakeWord) Voice.applyWake();
     Clock.tick();
   },
@@ -1479,6 +1592,7 @@ const Settings = {
   fill() {
     const c = Cfg.get(), f = $('setForm');
     for (const k of ['code', 'haUrl', 'haUrlExt', 'haToken', 'aiUrl', 'aiToken', 'aiModel']) f.elements[k].value = c[k] || '';
+    if (f.elements.provider) f.elements.provider.value = HA.useST(c) ? 'st' : 'ha';
     f.elements.night.checked = !!c.night;
     f.elements.wakeOn.checked = c.wakeOn !== false;
     f.elements.wakeWord.value = c.wakeWord || '';
@@ -1486,6 +1600,7 @@ const Settings = {
   read() {
     const f = $('setForm'), v = {};
     for (const k of ['code', 'haUrl', 'haUrlExt', 'haToken', 'aiUrl', 'aiToken', 'aiModel']) v[k] = f.elements[k].value.trim();
+    if (f.elements.provider) v.provider = f.elements.provider.value;
     v.night = f.elements.night.checked;
     v.wakeOn = f.elements.wakeOn.checked;
     v.wakeWord = f.elements.wakeWord.value.trim();
@@ -1496,7 +1611,7 @@ const Settings = {
     Cfg.set({ ...prev, ...v, cfgAt: new Date().toISOString() });
     Cloud.push();
     if (v.code !== prev.code) { Usage.load(); Tasks.load(); }
-    if (v.haUrl !== prev.haUrl || v.haUrlExt !== prev.haUrlExt || v.haToken !== prev.haToken) { HA._retry = 0; HA._ui = 0; HA.connect(); }
+    if (v.provider !== prev.provider || v.haUrl !== prev.haUrl || v.haUrlExt !== prev.haUrlExt || v.haToken !== prev.haToken) { HA._retry = 0; HA._ui = 0; HA.connect(); }
     if (v.wakeOn !== (prev.wakeOn !== false) || v.wakeWord !== (prev.wakeWord || '')) Voice.applyWake();
     Clock.tick();
     toast('저장했습니다');
@@ -1582,7 +1697,7 @@ function boot() {
   Cloud.sync();
   window.addEventListener('resize', () => { if (Usage.data) Usage.sparks(Usage.data.hist || {}); });
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { Usage.load(); Tasks.load(); Cloud.sync(); if (!HA.ready && (Cfg.get().haUrl || Cfg.get().haUrlExt)) { HA._retry = 0; HA.connect(); } }
+    if (!document.hidden) { Usage.load(); Tasks.load(); Cloud.sync(); if (HA.mode === 'st') ST.poll(); else if (!HA.ready && (Cfg.get().haUrl || Cfg.get().haUrlExt)) { HA._retry = 0; HA.connect(); } }
   });
   if (!fromApp && !Cfg.get().code && !Cfg.get().haUrl && !Cfg.get().haUrlExt) setTimeout(() => Settings.open(), 600);
 }
