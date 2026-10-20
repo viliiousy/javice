@@ -411,3 +411,40 @@ html[data-ui="v2"] .ti-dn{ color:#3B82F6; }
 html[data-ui="v2"] .ti-flat{ color:var(--text4); }
 html[data-ui="v2"] .ti-nm{ font-size:11px; color:var(--text3); }
 html[data-ui="v2"] .set-pad{ padding:8px 0; }
+
+/* ── PC(901px+) 정리 (2026-10-20) ─────────────────────────────
+   상단: 예전 오른쪽 두 줄(인바디·자산, TopStrip)은 '상단바 정보' 칩과 같은 내용이라 겹쳐 보였다 → 숨긴다.
+   폰과 같은 칩 한 줄을 쓰되, 넓은 화면에서는 두 묶음을 왼쪽에 붙여 세로선 하나로 나눈다(가운데가 텅 비지 않게).
+   경제·인바디 카드: 내용이 카드 테두리에 붙던 것 → 좌우 24px.
+   경제 목록: 한 줄이 1,400px 로 늘어 이름과 가격 사이가 비었다 → 280px 칸을 여러 열로 깐 '시세판'. */
+html[data-ui="v2"] .h-sum{ display:none !important; }
+@media (min-width:901px){
+  html[data-ui="v2"] .stats-row{ justify-content:flex-start; gap:24px; }
+  html[data-ui="v2"] .sg-r{ padding-left:24px; border-left:1px solid var(--border); gap:16px; }
+  html[data-ui="v2"] .sg-r .stat-chip{ font-size:13px; }
+  html[data-ui="v2"] .card-econ > :not(.card-head),
+  html[data-ui="v2"] .card-inbody > :not(.card-head){ padding-left:24px; padding-right:24px; }
+  html[data-ui="v2"] #econHold:empty{ display:none; }
+  html[data-ui="v2"] #econHold{ padding-top:16px; }
+  html[data-ui="v2"] #econWrap{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); column-gap:40px; padding-bottom:8px; }
+  html[data-ui="v2"] #econWrap .ec-row{ border-bottom:1px solid var(--v2-line); padding:14px 0; }
+  html[data-ui="v2"] #econWrap .ec-row:last-of-type{ border-bottom:1px solid var(--v2-line); }
+  html[data-ui="v2"] #econWrap .ec-more{ grid-column:1 / -1; }
+  html[data-ui="v2"] #econWrap .empty{ grid-column:1 / -1; }
+  html[data-ui="v2"] .ec-price{ font-family:var(--v2-num); font-weight:600; }
+  html[data-ui="v2"] .ec-hold{ max-width:none; }
+}
+html[data-ui="v2"] .jarvis-btn-glyph svg{ width:22px; height:22px; }
+
+/* PC 상단 한 줄: 날짜 │ 오늘 요약 칩 ··· AI 고리 · 프로필  (두 줄이던 것을 하나로 — 가운데가 비지 않게) */
+@media (min-width:901px){
+  html[data-ui="v2"] .header-sticky-group{ display:grid; grid-template-columns:auto minmax(0,1fr) auto auto; align-items:center;
+    column-gap:24px; padding:12px 24px; border-bottom:1px solid var(--v2-line); }
+  html[data-ui="v2"] .header-sticky-group > .header{ display:contents; }
+  html[data-ui="v2"] .header-sticky-group .h-left{ order:1; }
+  html[data-ui="v2"] .header-sticky-group > .stats-banner{ order:2; padding:0 0 0 24px !important; margin:0; border:0 !important;
+    border-left:1px solid var(--v2-line) !important; background:none; min-height:0; }
+  html[data-ui="v2"] .header-sticky-group .h-ai{ order:3; margin:0; }
+  html[data-ui="v2"] .header-sticky-group .h-right{ order:4; }
+  html[data-ui="v2"] .stats-banner .stats-row{ height:auto; }
+}

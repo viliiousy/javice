@@ -319,9 +319,189 @@ async function pairPoll(pin, pairId) {
   return { status: 200, ok: true, code: cur.code, cfg };
 }
 
+
+// ── MCP 커넥터: ChatGPT·Claude 월 구독으로 Bashy 쓰기 ─────────────────────
+// 구독(ChatGPT Plus·Claude Pro)은 API 키가 아니라서 Bashy 가 대신 부를 수 없다. 방향을 뒤집는다:
+// 사용자의 ChatGPT·Claude 가 이 서버(MCP)를 '도구' 로 부르게 한다. 그러면 생각·계산은 그 사람의 구독이 하고,
+// Bashy 는 기록을 읽고 쓰기만 한다. (Claude: 설정 › 커넥터 › 사용자 지정 커넥터 / ChatGPT: 개발자 모드 커넥터)
+// 주소 = https://bashy.app/mcp/<uid>.<mcpKey>  — 키는 설정 › AI 에서 만들고, 새로 만들면 예전 주소는 끊긴다.
+// 쓰기는 사이트와 같은 칸(/users/<uid>/u_<sub>_gl_*)에 하고 _savedAt 을 올려 열린 앱이 20초 안에 받아 가게 한다.
+async function mcpVerify(code) {
+  const c = parseCode(code);
+  if (!c) return null;
+  const uid = safeUid(c.uid);
+  const key = await fbGet(`/users/${uid}/_link/mcpKey.json`);
+  return sameSecret(key, c.key) ? uid : null;
+}
+const kstDate = (d) => {
+  if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  return new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+};
+async function uget(uid, sub, key, def) {
+  const v = await fbGet(`/users/${uid}/${encodeURIComponent('u_' + sub + '_' + key)}.json`).catch(() => null);
+  if (v == null) return def;
+  try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return def; }
+}
+async function uset(uid, sub, patch) {
+  const body = { _savedAt: String(Date.now()) };
+  for (const [k, v] of Object.entries(patch)) body['u_' + sub + '_' + k] = JSON.stringify(v);
+  const r = await fbFetch(`/users/${uid}.json`, { method: 'PATCH', body: JSON.stringify(body) });
+  if (!r.ok) throw new Error('저장 실패 ' + r.status);
+}
+const norm = s => String(s || '').replace(/\s+/g, '').toLowerCase();
+const HABIT_DEFAULT = [];
+
+const MCP_TOOLS = [
+  { name: 'get_today', description: '오늘(또는 지정한 날짜)의 Bashy 요약: 습관 체크 현황, 식단 칼로리·단백질과 목표, 체크리스트, 최근 몸무게, 구글 할 일. 사용자가 오늘 상황을 물으면 먼저 부른다.',
+    inputSchema: { type: 'object', properties: { date: { type: 'string', description: 'YYYY-MM-DD (생략하면 한국 시간 오늘)' } } } },
+  { name: 'log_meal', description: '식단에 음식을 기록한다. 칼로리·탄단지는 당신(AI)이 추정해서 넣는다. 여러 음식이면 음식마다 한 번씩 부른다.',
+    inputSchema: { type: 'object', required: ['meal', 'name', 'kcal'], properties: {
+      meal: { type: 'string', enum: ['아침', '점심', '저녁', '간식'] }, name: { type: 'string', description: '음식 이름과 양 (예: 김치찌개 1인분)' },
+      kcal: { type: 'number' }, protein: { type: 'number', description: 'g' }, carb: { type: 'number', description: 'g' }, fat: { type: 'number', description: 'g' },
+      date: { type: 'string', description: 'YYYY-MM-DD' } } } },
+  { name: 'check_habit', description: '습관을 완료(또는 취소) 표시한다. 이름 일부만 맞아도 된다.',
+    inputSchema: { type: 'object', required: ['name'], properties: { name: { type: 'string' }, done: { type: 'boolean', default: true }, date: { type: 'string' } } } },
+  { name: 'add_task', description: '구글 할 일(기본 목록)에 할 일을 추가한다. Bashy 일정 카드에 바로 보인다.',
+    inputSchema: { type: 'object', required: ['title'], properties: { title: { type: 'string' } } } },
+  { name: 'complete_task', description: '구글 할 일에서 제목이 맞는 할 일을 완료 처리한다.',
+    inputSchema: { type: 'object', required: ['title'], properties: { title: { type: 'string' } } } },
+  { name: 'log_body', description: '몸무게(필수)와 체지방률·골격근량(선택)을 인바디 기록에 남긴다.',
+    inputSchema: { type: 'object', required: ['kg'], properties: { kg: { type: 'number' }, body_fat: { type: 'number', description: '%' }, muscle: { type: 'number', description: 'kg' }, date: { type: 'string' } } } },
+  { name: 'add_memo', description: 'Bashy 메모를 추가한다.',
+    inputSchema: { type: 'object', required: ['title'], properties: { title: { type: 'string' }, content: { type: 'string' } } } },
+  { name: 'get_body_history', description: '최근 인바디(몸무게·체지방·근육량) 기록을 날짜순으로 돌려준다.',
+    inputSchema: { type: 'object', properties: { limit: { type: 'number', default: 10 } } } },
+];
+
+async function mcpCall(uid, name, a) {
+  a = a || {};
+  const sub = await googleSub(uid);
+  if (!sub && name !== 'add_task' && name !== 'complete_task') throw new Error('Bashy 기록을 찾지 못했습니다 — 앱에 한 번 로그인해 주세요');
+  if (name === 'get_today') {
+    const ds = kstDate(a.date);
+    const [habits, checked, diet, dset, cl, ib, tk] = await Promise.all([
+      uget(uid, sub, 'gl_habits_list', HABIT_DEFAULT), uget(uid, sub, 'gl_habits_' + ds, []),
+      uget(uid, sub, 'gl_diet_' + ds, {}), uget(uid, sub, 'gl_diet_settings', { calorieGoal: 2200, proteinGoal: 160 }),
+      uget(uid, sub, 'gl_checklist_v2', []), uget(uid, sub, 'gl_inbody_v1', []),
+      tasks(uid).catch(() => null),
+    ]);
+    const items = Object.values(diet || {}).flat();
+    const sum = k => Math.round(items.reduce((t, i) => t + (Number(i[k]) || 0), 0));
+    const last = (ib || []).slice().sort((x, y) => String(x.dt).localeCompare(String(y.dt))).pop() || null;
+    return {
+      date: ds,
+      habits: (habits || []).filter(h => !h.deletedFrom || h.deletedFrom > ds).map(h => ({ name: h.name, done: (checked || []).includes(h.id) })),
+      diet: { kcal: sum('cal'), protein: sum('protein'), goal_kcal: dset.calorieGoal, goal_protein: dset.proteinGoal,
+        meals: Object.fromEntries(Object.entries(diet || {}).map(([m, l]) => [m, (l || []).map(i => `${i.name} ${i.cal}kcal`)])) },
+      checklist: (cl || []).filter(i => !i.done).slice(0, 20).map(i => i.title),
+      body: last,
+      tasks: tk && tk.tasks ? tk.tasks.slice(0, 20).map(t => ({ title: t.title, due: t.due })) : '구글 연결 필요',
+    };
+  }
+  if (name === 'log_meal') {
+    const ds = kstDate(a.date), meal = ['아침', '점심', '저녁', '간식'].includes(a.meal) ? a.meal : '간식';
+    const d = await uget(uid, sub, 'gl_diet_' + ds, { 아침: [], 점심: [], 저녁: [], 간식: [] });
+    (d[meal] = d[meal] || []).push({ name: String(a.name).slice(0, 60), base: String(a.name).slice(0, 60), unit: '', qty: 1,
+      cal: Math.round(Number(a.kcal) || 0), protein: +(Number(a.protein) || 0).toFixed(1), carb: +(Number(a.carb) || 0).toFixed(1), fat: +(Number(a.fat) || 0).toFixed(1), src: 'mcp' });
+    await uset(uid, sub, { ['gl_diet_' + ds]: d });
+    const tot = Object.values(d).flat().reduce((t, i) => t + (Number(i.cal) || 0), 0);
+    return { ok: true, date: ds, meal, today_kcal: tot };
+  }
+  if (name === 'check_habit') {
+    const ds = kstDate(a.date);
+    const list = await uget(uid, sub, 'gl_habits_list', []);
+    const q = norm(a.name);
+    const h = list.find(x => norm(x.name) === q) || list.find(x => norm(x.name).includes(q) || q.includes(norm(x.name)));
+    if (!h) return { ok: false, error: '그런 습관이 없습니다', habits: list.map(x => x.name) };
+    const ck = new Set(await uget(uid, sub, 'gl_habits_' + ds, []));
+    if (a.done === false) ck.delete(h.id); else ck.add(h.id);
+    await uset(uid, sub, { ['gl_habits_' + ds]: [...ck] });
+    return { ok: true, habit: h.name, done: a.done !== false, date: ds };
+  }
+  if (name === 'add_task') { const r = await taskAdd(uid, a.title); return r.needConsent ? { ok: false, error: '구글 연결이 필요합니다 — Bashy 앱에서 다시 로그인해 주세요' } : { ok: true, title: a.title }; }
+  if (name === 'complete_task') {
+    const t = await tasks(uid);
+    if (t.needConsent) return { ok: false, error: '구글 연결이 필요합니다' };
+    const q = norm(a.title);
+    const hit = t.tasks.find(x => norm(x.title) === q) || t.tasks.find(x => norm(x.title).includes(q));
+    if (!hit) return { ok: false, error: '그런 할 일이 없습니다', open: t.tasks.slice(0, 15).map(x => x.title) };
+    await taskDone(uid, hit.list, hit.id, false);
+    return { ok: true, done: hit.title };
+  }
+  if (name === 'log_body') {
+    const ds = kstDate(a.date), kg = Number(a.kg);
+    if (!(kg > 20 && kg < 300)) throw new Error('몸무게 값이 이상합니다');
+    const r = await uget(uid, sub, 'gl_inbody_v1', []);
+    const cur = r.find(x => x.dt === ds) || {};
+    const rec = { ...cur, dt: ds, wt: Math.round(kg * 10) / 10 };
+    if (Number(a.body_fat) > 0) rec.bf = Math.round(Number(a.body_fat) * 10) / 10;
+    if (Number(a.muscle) > 0) { rec.ms = Math.round(Number(a.muscle) * 10) / 10; delete rec.msEst; }
+    const next = r.filter(x => x.dt !== ds).concat(rec).sort((x, y) => String(x.dt).localeCompare(String(y.dt)));
+    await uset(uid, sub, { gl_inbody_v1: next });
+    return { ok: true, record: rec };
+  }
+  if (name === 'add_memo') {
+    const m = await uget(uid, sub, 'gl_memos_v1', []);
+    const now = new Date().toISOString();
+    const content = String(a.content || '').slice(0, 5000);
+    const html = content.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])).replace(/\n/g, '<br>');
+    m.unshift({ id: 'memo_' + Date.now(), title: String(a.title).slice(0, 100), html, content, createdAt: now, updatedAt: now });
+    await uset(uid, sub, { gl_memos_v1: m });
+    return { ok: true };
+  }
+  if (name === 'get_body_history') {
+    const r = await uget(uid, sub, 'gl_inbody_v1', []);
+    return r.slice().sort((x, y) => String(x.dt).localeCompare(String(y.dt))).slice(-Math.min(60, Number(a.limit) || 10));
+  }
+  throw new Error('알 수 없는 도구: ' + name);
+}
+
+async function mcpHandle(req, res, code) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Mcp-Session-Id, Mcp-Protocol-Version');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.method === 'OPTIONS') { res.status(204).end(); return; }
+  if (req.method !== 'POST') { res.status(405).json({ error: 'MCP: POST 만 받습니다' }); return; }
+  const uid = await mcpVerify(code);
+  if (!uid) { res.status(401).json({ jsonrpc: '2.0', id: null, error: { code: -32001, message: '주소가 맞지 않습니다 — Bashy 설정 › AI 에서 커넥터 주소를 다시 복사해 주세요' } }); return; }
+  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  const one = async (m) => {
+    if (!m || m.id === undefined || m.id === null) return null;   // 알림(notifications/*)은 답하지 않는다
+    const ok = result => ({ jsonrpc: '2.0', id: m.id, result });
+    try {
+      if (m.method === 'initialize') return ok({ protocolVersion: (m.params && m.params.protocolVersion) || '2025-06-18',
+        capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'bashy', version: '1.0.0' },
+        instructions: 'Bashy 는 사용자의 하루 기록 앱이다(습관·식단·할 일·몸무게·메모). 사용자가 먹은 것·한 일·몸무게를 말하면 해당 도구로 기록하고, 오늘 상황을 물으면 get_today 를 먼저 부른다. 칼로리는 당신이 추정한다. 날짜는 한국 시간 기준.' });
+      if (m.method === 'ping') return ok({});
+      if (m.method === 'tools/list') return ok({ tools: MCP_TOOLS });
+      if (m.method === 'tools/call') {
+        const p = m.params || {};
+        try {
+          const out = await mcpCall(uid, p.name, p.arguments);
+          return ok({ content: [{ type: 'text', text: JSON.stringify(out) }] });
+        } catch (e) { return ok({ content: [{ type: 'text', text: '실패: ' + (e.message || e) }], isError: true }); }
+      }
+      if (m.method === 'resources/list') return ok({ resources: [] });
+      if (m.method === 'prompts/list') return ok({ prompts: [] });
+      return { jsonrpc: '2.0', id: m.id, error: { code: -32601, message: 'method not found: ' + m.method } };
+    } catch (e) { return { jsonrpc: '2.0', id: m.id, error: { code: -32603, message: e.message || String(e) } }; }
+  };
+  if (Array.isArray(body)) {
+    const out = (await Promise.all(body.map(one))).filter(Boolean);
+    if (!out.length) { res.status(202).end(); return; }
+    res.status(200).json(out); return;
+  }
+  const r = await one(body);
+  if (!r) { res.status(202).end(); return; }
+  res.status(200).json(r);
+}
+
 const send = (res, r) => { const { status, ...rest } = r; res.status(status || 200).json(rest); };
 
 module.exports = async (req, res) => {
+  const mc = (req.query && req.query.mcp) || (String(req.url || '').match(/[?&]mcp=([^&]+)/) || [])[1];
+  if (mc) { try { await mcpHandle(req, res, decodeURIComponent(mc)); } catch (e) { res.status(500).json({ error: e.message }); } return; }
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');

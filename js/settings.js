@@ -17,7 +17,7 @@ const Settings = {
   ],
   VERSION: 'v26.10.20',
   // 갈래 안의 하위 화면(뒤로 가면 그 갈래로)
-  SUB: { topinfo: ['상단바 정보', 'design'], cats: ['보일 카테고리', 'design'] },
+  SUB: { topinfo: ['상단바 정보', 'design'], cats: ['보일 카테고리', 'design'], connector: ['ChatGPT · Claude 연결', 'ai'] },
   _title(cat){ return cat ? (this.SUB[cat]?.[0] || this.CATS.find(c => c.id === cat)?.name || '설정') : '설정'; },
 
   _on(v){ return v ? '켜짐' : '꺼짐'; },
@@ -88,13 +88,14 @@ const Settings = {
       h = `<div id="setNotify" class="set-loading">불러오는 중…</div>`;
       setTimeout(async () => { const el = document.getElementById('setNotify'); if (el) { el.className=''; el.innerHTML = await Notifications.pageHtml(); } }, 0);
     } else if (cat === 'ai') {
-      h = `<div class="set-h">AI 비서</div>
-        ${this._link('기본 AI · 키 설정', 'JARVIS.showKeySetup()', '어느 AI 를 쓸지, 각 서비스의 키를 넣습니다')}
-        <div class="set-h">상단 사용량 고리에 보일 것</div>
-        <div class="set-box">${AIUsage.trackHtml()}</div>
-        <div class="set-h"></div>
-        ${this._link('AI 사용량 · 허브', 'AIUsage.open()', '남은 한도와 초기화 시각')}`;
-      setTimeout(() => document.querySelectorAll('#setBody .aiu-show').forEach(i => i.onchange = () => AIUsage.saveTrack()), 0);
+      h = `<div class="set-h">월 구독으로 쓰기 (API 키 없이)</div>
+        ${this._link('ChatGPT · Claude 에 Bashy 연결', "Settings.go('connector')", 'ChatGPT Plus·Claude 구독(무료 플랜 포함)에서 “점심 김치찌개 먹었어” 하면 Bashy 에 기록됩니다')}
+        <div class="set-h">앱 안 AI 비서 (API 키)</div>
+        ${this._link('기본 AI · 키 설정', 'JARVIS.showKeySetup()', '무료: Gemini·Groq / 유료: ChatGPT·Claude·Grok API 키')}
+        ${this._link('AI 사용량', 'AIUsage.open()', '남은 한도와 초기화 시각 · 위쪽 고리는 디자인 › 상단바 정보에서')}`;
+    } else if (cat === 'connector') {
+      h = `<div id="mcpBox" class="set-loading">주소를 준비하는 중…</div>`;
+      setTimeout(() => this.mcpPaint(), 0);
     } else if (cat === 'secure') {
       const keys = Object.values(JARVIS?.PROVIDERS || {}).filter(p => localStorage.getItem(p.key)).map(p => p.short || p.name);
       h = `<div class="set-h">저장된 키</div>
@@ -114,7 +115,7 @@ const Settings = {
       h = `${this._link('사용 도우미 다시 보기', 'App.closeModal();Onboard.open(true)', '신체정보·AI·습관·식단·운동·경제 설정')}
         ${this._item('버전', `<span class="set-val">${this.VERSION}</span>`)}`;
     }
-    return (this.SUB[cat] ? `<button type="button" class="set-back" onclick="Settings.go('${this.SUB[cat][1]}')">‹ 디자인</button>` : this._back()) + `<div class="set-page">${h}</div>`;
+    return (this.SUB[cat] ? `<button type="button" class="set-back" onclick="Settings.go('${this.SUB[cat][1]}')">‹ ${this.CATS.find(c => c.id === this.SUB[cat][1])?.name || '설정'}</button>` : this._back()) + `<div class="set-page">${h}</div>`;
   },
 
   // ── 바로 바뀌는 항목 ─────────────────────
@@ -184,6 +185,48 @@ const Settings = {
     let cfg = {}; try { cfg = JSON.parse(localStorage.getItem('hub_cfg_v1')) || {}; } catch {}
     if (cfg.code !== code) { cfg.code = code; delete cfg.cfgAt; localStorage.setItem('hub_cfg_v1', JSON.stringify(cfg)); }
     return code;
+  },
+
+  // ── 월 구독 AI 연결(MCP 커넥터) ─────────────
+  // 주소 하나를 ChatGPT(개발자 모드 커넥터)·Claude(사용자 지정 커넥터)에 넣으면, 그 AI 가 Bashy 기록을 읽고 쓴다.
+  async mcpUrl(fresh) {
+    const authed = typeof FirebaseSync !== 'undefined' && FirebaseSync.ready() && FirebaseSync._authed;
+    if (!authed) return null;
+    const l = await FirebaseSync.getLink();
+    let key = l && l.mcpKey;
+    if (!key || fresh) {
+      const b = new Uint8Array(24); crypto.getRandomValues(b);
+      key = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      if (!(await FirebaseSync.setLink({ mcpKey: key }))) return null;
+    }
+    return `https://bashy.app/mcp/${FirebaseSync._uid}.${key}`;
+  },
+  async mcpPaint(fresh) {
+    const box = document.getElementById('mcpBox'); if (!box) return;
+    const url = await this.mcpUrl(fresh);
+    if (!url) { box.textContent = '로그인(동기화)이 끝난 뒤 다시 열어 주세요.'; return; }
+    this._mcp = url;
+    box.className = 'mcp';
+    box.innerHTML = `
+      <p class="mcp-p">ChatGPT·Claude 의 <b>월 구독</b>은 API 키가 아니라서 Bashy 가 대신 부를 수 없습니다. 대신 반대로, 그 AI 가 Bashy 를 <b>도구</b>로 쓰게 연결합니다.
+        연결하면 ChatGPT·Claude 앱에서 “점심에 김치찌개 먹었어”, “물 마시기 체크해 줘”, “오늘 몸무게 81.2”, “오늘 뭐 남았어?” 라고 말하면 Bashy 에 바로 기록·조회됩니다. 계산은 그 사람의 구독이 합니다.</p>
+      <div class="mcp-url"><code>${esc(url)}</code><button class="btn-sm accent" onclick="Settings.mcpCopy()">복사</button></div>
+      <p class="mcp-warn">이 주소는 비밀번호와 같습니다. 남에게 보이지 마세요 — 새어 나갔으면 아래 ‘주소 새로 만들기’.</p>
+      <div class="set-h">Claude (무료 플랜도 1개 가능 · Pro·Max)</div>
+      <ol class="mcp-ol"><li>claude.ai 에서 <b>설정(Customize) › 커넥터 › + 추가 › 사용자 지정 커넥터</b></li>
+        <li>이름 <b>Bashy</b>, URL 칸에 위 주소 붙여 넣기, 로그인 방식은 <b>로그인 없음</b> → 추가</li>
+        <li>대화창 아래 도구 단추에서 Bashy 를 켜고 말하면 됩니다(앱에서도 동작)</li></ol>
+      <div class="set-h">ChatGPT (Plus·Pro)</div>
+      <ol class="mcp-ol"><li>chatgpt.com 에서 <b>설정 › 앱 및 커넥터 › 고급 설정 › 개발자 모드</b> 켜기</li>
+        <li><b>앱 및 커넥터 › 만들기</b> → 이름 Bashy, URL 에 위 주소, 인증 <b>없음</b> → 만들기</li>
+        <li>새 대화에서 + › 개발자 모드 › Bashy 를 고르고 말하면 됩니다. 기록할 때마다 확인을 한 번 누릅니다</li></ol>
+      <div class="set-h">할 수 있는 일</div>
+      <p class="mcp-p">오늘 요약 보기 · 식단 기록(칼로리는 AI 가 추정) · 습관 체크 · 구글 할 일 추가·완료 · 몸무게·체지방·근육량 기록 · 메모 추가 · 몸 기록 추이</p>
+      <div class="modal-btns" style="justify-content:flex-start"><button class="btn-sm" onclick="if(confirm('새 주소를 만들면 지금 연결해 둔 ChatGPT·Claude 커넥터는 끊깁니다. 계속할까요?'))Settings.mcpPaint(true)">주소 새로 만들기</button></div>`;
+  },
+  async mcpCopy() {
+    try { await navigator.clipboard.writeText(this._mcp || ''); App.showToast('복사했습니다', 'success'); }
+    catch { App.showToast('복사 실패 — 주소를 길게 눌러 복사해 주세요', 'error'); }
   },
 
   hubMenu() { const el = document.getElementById('pmHub'); if (el) el.hidden = localStorage.getItem('gl_hub_mode') !== '1'; },

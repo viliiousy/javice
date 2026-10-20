@@ -3,9 +3,20 @@
   "redirects": [
     {
       "source": "/(.*)",
-      "has": [{ "type": "host", "value": "javice.vercel.app" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "javice.vercel.app"
+        }
+      ],
       "destination": "https://bashy.app/$1",
       "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/mcp/:code",
+      "destination": "/api/hub?mcp=:code"
     }
   ]
 }

@@ -25,7 +25,7 @@ const JARVIS = {
     const wrap=document.createElement('div'); wrap.id='jarvisWrap';
     wrap.innerHTML=`
       <button id="jarvisBtn" class="jarvis-btn" onclick="JARVIS.toggle()">
-        <span class="jarvis-btn-glyph">⚡</span>
+        <span class="jarvis-btn-glyph">${typeof Icons!=="undefined"?Icons.svg("sparkle"):"AI"}</span>
         <span id="jarvisBadge" class="jarvis-badge hidden">0</span>
       </button>
       <div id="jarvisScrim" class="j-scrim hidden" onclick="JARVIS.close()"></div>
@@ -544,7 +544,7 @@ const JARVIS = {
   // 키가 없을 때: 무료 키 안내 + 구독(ChatGPT Plus·Claude Pro)만 있는 사람은 그 앱으로 같은 질문을 넘긴다.
   // 구독은 API 키가 아니어서 이 앱이 대신 부를 수 없다 — 대신 질문을 채운 채로 그 앱을 연다.
   _noKey(q) {
-    this._addMsg('ai','AI 키가 아직 없습니다. 열쇠 단추에서 무료 키(Gemini·Groq)를 넣으면 여기서 바로 답합니다.\nChatGPT·Claude 구독만 있다면 아래 단추로 같은 질문을 그 앱에서 이어 갈 수 있습니다.');
+    this._addMsg('ai','AI 키가 아직 없습니다. 열쇠 단추에서 무료 키(Gemini·Groq)를 넣으면 여기서 바로 답합니다.\nChatGPT·Claude 구독만 있다면 설정 › AI › ‘ChatGPT · Claude 에 Bashy 연결’ 을 해 두세요 — 그 앱에서 말하면 Bashy 에 바로 기록됩니다. 아래 단추는 이 질문만 그 앱으로 넘깁니다.');
     const wrap=document.getElementById('jMsgs'); if(!wrap) return;
     const d=document.createElement('div'); d.className='j-msg j-ai j-handoff';
     const e=encodeURIComponent(q);
@@ -745,7 +745,7 @@ const JARVIS = {
     return `<div class="ai-setup">
       <p class="ai-note">AI 비서가 어떤 AI 로 답할지 고릅니다. 처음이라면 <b>Gemini</b>(구글 계정으로 1분, 무료 사용량) 나 <b>Groq</b>(무료) 키를 권합니다.
         ChatGPT·Claude·Grok 은 각 회사 개발자 사이트의 <b>API 키</b>가 필요하고 쓴 만큼 요금이 붙습니다.</p>
-      <p class="ai-note">ChatGPT Plus·Claude Pro 같은 <b>월 구독</b>은 API 키가 아니라서 여기에 넣을 수 없습니다. 키가 없으면 비서 창에 'ChatGPT 에서 묻기 / Claude 에서 묻기' 단추가 떠서 같은 질문을 그 앱으로 넘겨 줍니다.</p>
+      <p class="ai-note">ChatGPT Plus·Claude Pro 같은 <b>월 구독</b>은 API 키가 아니라서 여기에 넣을 수 없습니다. 대신 설정 › AI › <b>ChatGPT · Claude 에 Bashy 연결</b>을 하면, 그 앱에서 말하는 것으로 식단·습관·할 일·몸무게를 기록할 수 있습니다(구독 요금 안에서).</p>
       <p class="ai-note">키를 넣은 AI 가 여러 개면 고른 AI 를 먼저 쓰고, 그 키가 없으면 키가 있는 다른 AI 로 자동으로 넘어갑니다.</p>
       <div class="ai-provs">${Object.entries(this.PROVIDERS).map(([id,P])=>`
         <label class="ai-prov${id===cur?' on':''}">
