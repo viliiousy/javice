@@ -649,3 +649,4 @@ html[data-ui="v2"] .mm-foot-r{ display:flex; gap:8px; flex:1; justify-content:fl
 html[data-ui="v2"] .mm-foot-r .btn-sm{ height:44px; min-width:88px; border-radius:12px; font-size:15px; }
 html[data-ui="v2"] .mm-del{ height:44px; display:inline-flex; align-items:center; gap:6px; background:none; border:0; color:var(--text3); font:inherit; font-size:14px; cursor:pointer; }
 html[data-ui="v2"] .mm-del .ic{ width:16px; height:16px; }
+.dp-card.is-off .btn-sm:disabled{ opacity:.4; cursor:default; }
