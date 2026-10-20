@@ -48,7 +48,12 @@ const DevicePair = {
         <div style="font-size:13px;font-weight:700;color:var(--text)">스마트홈 연결</div>
         <div class="dp-seg" id="dpProv">
           <button type="button" data-p="st" onclick="DevicePair._setProvider('st')">SmartThings</button>
+          <button type="button" data-p="apple" onclick="DevicePair._setProvider('apple')">애플 홈</button>
           <button type="button" data-p="ha" onclick="DevicePair._setProvider('ha')">Home Assistant</button>
+          <button type="button" data-p="google" disabled title="준비 중">구글 홈</button>
+        </div>
+        <div id="dpApple" style="display:none;font-size:12px;color:var(--text3);line-height:1.6">
+          애플 홈은 서버 API 가 없어서 <b>아이폰·아이패드의 Bashy 앱 › 허브 모드</b>에서만 동작합니다. 그 기기에서 처음 열 때 '홈 데이터 접근' 허락 창이 뜨면 허용해 주세요. 홈 앱에 등록된 방·기기·장면이 그대로 보입니다.
         </div>
         <div id="dpSt" style="display:grid;gap:8px">
           <div style="font-size:12px;color:var(--text3);line-height:1.6">집에 서버가 없어도 됩니다. 삼성 계정으로 한 번 허락하면 허브가 SmartThings 의 방·기기·장면을 그대로 가져와 켜고 끕니다.</div>
@@ -88,13 +93,14 @@ const DevicePair = {
     const st = document.getElementById('dpSt'), ha = document.getElementById('dpHa');
     if (st) st.style.display = p === 'st' ? 'grid' : 'none';
     if (ha) ha.style.display = p === 'ha' ? 'grid' : 'none';
+    const ap = document.getElementById('dpApple'); if (ap) ap.style.display = p === 'apple' ? 'block' : 'none';
   },
   async _setProvider(p, quiet) {
     if (!this._cfg) { const link = await FirebaseSync.getLink().catch(() => null); this._cfg = (link && link.hubCfg) || {}; }
     if (this._prov() === p && this._cfg.provider) { this._paintProv(); return; }
     const next = { ...(this._cfg || {}), provider: p, at: new Date().toISOString() };
     const ok = await FirebaseSync.setLink({ hubCfg: next }).catch(() => false);
-    if (ok) { this._cfg = next; if (!quiet) App.showToast(p === 'st' ? '허브가 SmartThings 를 씁니다' : '허브가 Home Assistant 를 씁니다', 'success'); }
+    if (ok) { this._cfg = next; if (!quiet) App.showToast(p === 'st' ? '허브가 SmartThings 를 씁니다' : p === 'apple' ? '허브가 애플 홈을 씁니다(아이폰·아이패드 앱)' : '허브가 Home Assistant 를 씁니다', 'success'); }
     this._paintProv();
   },
   async stStatus() {

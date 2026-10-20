@@ -432,6 +432,85 @@ const ST = {
   },
 };
 
+// ── 애플 홈 (아이폰·아이패드 Bashy 앱 안에서만) ───────────────
+// 애플 홈은 서버 API 가 없다. iOS 앱의 BashyHome 플러그인(HomeKit)이 집·방·기기·장면을 넘겨 주고,
+// 여기서 Home Assistant 상태 모양으로 바꿔 같은 타일 화면을 쓴다. 값이 바뀌면 플러그인이 'change' 로 알려 준다.
+const AH = {
+  map: {}, _sub: false,
+  P() { return Native.plugin('BashyHome'); },
+  async connect() {
+    const P = this.P();
+    if (!P) { HA.note('애플 홈은 아이폰·아이패드의 Bashy 앱 허브 모드에서만 쓸 수 있습니다', true); HA.renderEmpty(); return; }
+    if (!Object.keys(HA.states).length) HA.loadSnap();
+    HA.note('애플 홈 불러오는 중…');
+    if (!this._sub) {
+      this._sub = true;
+      try { P.addListener('change', e => this.onChange(e)); P.addListener('homes', () => this.load()); } catch (e) {}
+    }
+    this.load();
+  },
+  async load() {
+    if (HA.mode !== 'apple') return;
+    try {
+      const j = await this.P().list();
+      this._last = j; this.apply(j);
+      HA.ready = true; HA.markStale(false);
+      HA.note(`애플 홈 · 기기 ${(j.items || []).length}개`);
+      HA.render(); HA.saveSnap();
+    } catch (e) { HA.ready = false; HA.note(e.message || '애플 홈을 불러오지 못했습니다', true); }
+  },
+  apply(j) {
+    const states = {}, entArea = {}, map = {};
+    const put = (eid, state, attrs, it) => { states[eid] = { entity_id: eid, state: String(state), attributes: attrs }; if (it && it.room) entArea[eid] = it.room; if (it) map[eid] = it; };
+    for (const it of j.items || []) {
+      const v = it.v || {}, key = 'ah_' + String(it.id).replace(/[^a-z0-9]/gi, '').toLowerCase().slice(0, 24), base = { friendly_name: it.name };
+      const off = it.reachable === false ? 'unavailable' : null;
+      const on = v.on != null ? !!v.on : v.active != null ? !!Number(v.active) : false;
+      it._key = key;
+      switch (it.kind) {
+        case 'light': put('light.' + key, off || (on ? 'on' : 'off'), { ...base, ...(v.brightness != null ? { supported_color_modes: ['brightness'], brightness: on ? Math.round(v.brightness * 2.55) : undefined } : {}) }, it); break;
+        case 'switch': case 'fan': put(`${it.kind}.${key}`, off || (on ? 'on' : 'off'), base, it); break;
+        case 'climate': put('climate.' + key, off || (!on ? 'off' : Number(v.mode) === 1 ? 'heat' : Number(v.mode) === 3 ? 'cool' : (v.target != null && v.cur != null && v.target > v.cur ? 'heat' : 'cool')), { ...base, current_temperature: v.cur, temperature: v.target, target_temp_step: 0.5 }, it); break;
+        case 'cover': put('cover.' + key, off || (Number(v.pos) > 0 ? 'open' : 'closed'), base, it); break;
+        case 'lock': put('lock.' + key, off || (Number(v.lock) === 1 ? 'locked' : 'unlocked'), base, it); break;
+        case 'temp': if (v.cur != null) put(`sensor.${key}_temperature`, Math.round(v.cur * 10) / 10, { ...base, device_class: 'temperature', unit_of_measurement: '°C' }, it); break;
+        case 'humidity': if (v.humidity != null) put(`sensor.${key}_humidity`, Math.round(v.humidity), { ...base, device_class: 'humidity', unit_of_measurement: '%' }, it); break;
+        case 'contact': put(`binary_sensor.${key}_contact`, Number(v.contact) === 1 ? 'on' : 'off', { ...base, device_class: 'door' }, it); break;
+        case 'motion': put(`binary_sensor.${key}_motion`, v.motion ? 'on' : 'off', { ...base, device_class: 'motion' }, it); break;
+      }
+    }
+    for (const x of j.scenes || []) put('scene.ah_' + String(x.id).replace(/[^a-z0-9]/gi, '').toLowerCase().slice(0, 24), 'scening', { friendly_name: x.name }, { scene: x.id });
+    HA.states = states; HA.areas = j.rooms || {}; HA.entArea = entArea; HA.hidden = new Set(); HA.unitF = false;
+    this.map = map;
+  },
+  // 기기 값이 바뀌었다는 알림 → 마지막으로 받은 목록에서 그 값만 고쳐 다시 그린다
+  onChange(e) {
+    const j = this._last; if (!j) return;
+    const it = (j.items || []).find(x => x.id === e.id); if (!it) return;
+    it.v = { ...(it.v || {}), [e.key]: e.value };
+    this.apply(j); HA.schedule(); HA.saveSnap();
+  },
+  async send(msg) {
+    if (msg.type === 'ping') return true;
+    if (msg.type !== 'call_service') throw new Error('애플 홈에서 지원하지 않는 요청');
+    const P = this.P(); if (!P) throw new Error('애플 홈을 쓸 수 없는 기기입니다');
+    const { domain, service } = msg, data = msg.service_data || {};
+    for (const eid of [].concat(data.entity_id || [])) {
+      const it = this.map[eid] || {}, cur = HA.states[eid] || {}, on = cur.state && !['off', 'closed', 'locked', 'unavailable'].includes(cur.state);
+      if (it.scene) { await P.scene({ id: it.scene }); continue; }
+      const dom = eid.split('.')[0];
+      if (dom === 'cover') { const open = service === 'open_cover' || (service === 'toggle' && !on); await P.set({ id: it.id, key: 'pos', value: open ? 100 : 0 }); continue; }
+      if (dom === 'lock') { await P.set({ id: it.id, key: 'lock', value: 1 }); continue; }
+      if (dom === 'climate' && service === 'set_temperature') { await P.set({ id: it.id, key: 'target', value: Number(data.temperature) }); continue; }
+      if (dom === 'light' && service === 'turn_on' && data.brightness_pct != null) { await P.set({ id: it.id, key: 'brightness', value: Math.round(data.brightness_pct) }); await P.set({ id: it.id, key: 'on', value: true }).catch(() => {}); continue; }
+      const want = service === 'turn_on' ? true : service === 'turn_off' ? false : !on;
+      await P.set({ id: it.id, key: dom === 'climate' ? 'active' : 'on', value: want });
+    }
+    clearTimeout(this._re); this._re = setTimeout(() => this.load(), 600);
+    return true;
+  },
+};
+
 // ── Home Assistant ──────────────────────────────
 const HA = {
   ws: null, id: 1, pending: new Map(), states: {}, areas: {}, entArea: {}, hidden: new Set(),
@@ -462,6 +541,7 @@ const HA = {
   connect() {
     const c = Cfg.get();
     this.close();
+    if (c.provider === 'apple') { ST.stop(); this.mode = 'apple'; AH.connect(); return; }
     if (this.useST(c)) { this.mode = 'st'; ST.connect(); return; }
     this.mode = 'ha'; ST.stop();
     if (!(c.haUrl || c.haUrlExt) || !c.haToken) { this.renderEmpty(); return; }
@@ -527,6 +607,7 @@ const HA = {
 
   send(msg) {
     if (this.mode === 'st') return ST.send(msg);
+    if (this.mode === 'apple') return AH.send(msg);
     return new Promise((res, rej) => {
       if (!this.ws || this.ws.readyState !== 1) { rej(new Error('Home Assistant 에 연결되어 있지 않습니다')); return; }
       const id = this.id++;
@@ -1592,7 +1673,8 @@ const Settings = {
   fill() {
     const c = Cfg.get(), f = $('setForm');
     for (const k of ['code', 'haUrl', 'haUrlExt', 'haToken', 'aiUrl', 'aiToken', 'aiModel']) f.elements[k].value = c[k] || '';
-    if (f.elements.provider) f.elements.provider.value = HA.useST(c) ? 'st' : 'ha';
+    if (f.elements.provider) f.elements.provider.value = c.provider === 'apple' ? 'apple' : HA.useST(c) ? 'st' : 'ha';
+    const ap = f.querySelector('option[value="apple"]'); if (ap) ap.disabled = !Native.plugin('BashyHome');
     f.elements.night.checked = !!c.night;
     f.elements.wakeOn.checked = c.wakeOn !== false;
     f.elements.wakeWord.value = c.wakeWord || '';
@@ -1697,7 +1779,7 @@ function boot() {
   Cloud.sync();
   window.addEventListener('resize', () => { if (Usage.data) Usage.sparks(Usage.data.hist || {}); });
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { Usage.load(); Tasks.load(); Cloud.sync(); if (HA.mode === 'st') ST.poll(); else if (!HA.ready && (Cfg.get().haUrl || Cfg.get().haUrlExt)) { HA._retry = 0; HA.connect(); } }
+    if (!document.hidden) { Usage.load(); Tasks.load(); Cloud.sync(); if (HA.mode === 'st') ST.poll(); else if (HA.mode === 'apple') AH.load(); else if (!HA.ready && (Cfg.get().haUrl || Cfg.get().haUrlExt)) { HA._retry = 0; HA.connect(); } }
   });
   if (!fromApp && !Cfg.get().code && !Cfg.get().haUrl && !Cfg.get().haUrlExt) setTimeout(() => Settings.open(), 600);
 }

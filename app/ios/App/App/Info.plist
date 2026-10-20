@@ -28,6 +28,8 @@
 	<string>식품 바코드를 찍고 식단 사진을 남기기 위해 카메라를 씁니다.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>식단·인바디 사진을 앨범에서 골라 기록하기 위해 사진 보관함을 씁니다.</string>
+	<key>NSHomeKitUsageDescription</key>
+	<string>허브 화면에서 애플 홈에 등록된 조명·스위치·에어컨 등을 보여 주고 켜고 끄기 위해 홈 데이터에 접근합니다.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>음성으로 명령하거나 메모를 남길 때 마이크를 씁니다.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
