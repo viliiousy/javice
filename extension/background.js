@@ -53,6 +53,17 @@ chrome.tabs.onUpdated.addListener((id, info, tab) => {
 chrome.runtime.onMessage.addListener((msg, _s, reply) => {
   if (msg && msg.type === 'collect-now') { collectAll().then(reply); return true; }
   if (msg && msg.type === 'test-code')   { testCode(msg.code).then(reply); return true; }
+  // bashy.app 페이지가 넘겨 준 계정 코드(content.js) — 맞는 코드면 저장하고 바로 한 번 보낸다
+  if (msg && msg.type === 'set-code') {
+    (async () => {
+      const { code } = await chrome.storage.local.get('code');
+      if (code === msg.code) return reply({ ok: true, same: true });
+      const r = await testCode(msg.code);
+      if (r && r.ok) { await chrome.storage.local.set({ code: msg.code }); try { await collectAll(); } catch (e) {} }
+      reply(r);
+    })();
+    return true;
+  }
   return false;
 });
 

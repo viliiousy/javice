@@ -249,7 +249,7 @@ const JARVIS = {
     this._addMsg('user',msg);
     this._setStatus('생각 중...');
     const key=this._getKey();
-    if(!key){ this._addMsg('ai','⚠️ 위쪽 열쇠 단추에서 AI 를 고르고 키를 넣어 주세요.\nGroq 은 console.groq.com 에서 무료로 받을 수 있습니다.'); this._setStatus('대기 중'); return; }
+    if(!key){ this._noKey(msg); this._setStatus('대기 중'); return; }
     try{
       const raw=await this._callAPI(key,msg);
       this._handleReply(raw);
@@ -541,6 +541,20 @@ const JARVIS = {
   },
 
   // ── UI 헬퍼 ───────────────────────────
+  // 키가 없을 때: 무료 키 안내 + 구독(ChatGPT Plus·Claude Pro)만 있는 사람은 그 앱으로 같은 질문을 넘긴다.
+  // 구독은 API 키가 아니어서 이 앱이 대신 부를 수 없다 — 대신 질문을 채운 채로 그 앱을 연다.
+  _noKey(q) {
+    this._addMsg('ai','AI 키가 아직 없습니다. 열쇠 단추에서 무료 키(Gemini·Groq)를 넣으면 여기서 바로 답합니다.\nChatGPT·Claude 구독만 있다면 아래 단추로 같은 질문을 그 앱에서 이어 갈 수 있습니다.');
+    const wrap=document.getElementById('jMsgs'); if(!wrap) return;
+    const d=document.createElement('div'); d.className='j-msg j-ai j-handoff';
+    const e=encodeURIComponent(q);
+    d.innerHTML=`<div class="j-avatar"></div><div class="j-ho">
+      <a class="btn-sm" href="https://chatgpt.com/?q=${e}" target="_blank" rel="noopener">ChatGPT 에서 묻기</a>
+      <a class="btn-sm" href="https://claude.ai/new?q=${e}" target="_blank" rel="noopener">Claude 에서 묻기</a>
+      <button class="btn-sm accent" onclick="JARVIS.showKeySetup()">키 넣기</button></div>`;
+    wrap.appendChild(d); wrap.scrollTop=wrap.scrollHeight;
+  },
+
   _addMsg(type, text) {
     const wrap=document.getElementById('jMsgs'); if(!wrap) return;
     const isAI=type!=='user';
@@ -577,12 +591,14 @@ const JARVIS = {
                  pref:{ text:[/^gpt-5(\.\d+)?-mini$/,/^gpt-4\.1-mini$/,/^gpt-4o-mini$/,/mini/], vision:[/^gpt-5(\.\d+)?-mini$/,/^gpt-4\.1-mini$/,/^gpt-4o-mini$/,/mini/] } },
     anthropic: { name:'Claude',      short:'Claude',  url:'https://api.anthropic.com/v1',   key:'gl_ai_key_anthropic',  keyUrl:'https://console.anthropic.com/settings/keys', ph:'sk-ant-…',
                  pref:{ text:[/haiku/,/sonnet/], vision:[/haiku/,/sonnet/] } },
-    gemini:    { name:'Gemini',      short:'Gemini',  url:'https://generativelanguage.googleapis.com/v1beta/openai', key:'gl_ai_key_gemini', keyUrl:'https://aistudio.google.com/apikey', ph:'AIza…',
+    gemini:    { name:'Gemini (무료 사용량)', short:'Gemini',  url:'https://generativelanguage.googleapis.com/v1beta/openai', key:'gl_ai_key_gemini', keyUrl:'https://aistudio.google.com/apikey', ph:'AIza…',
                  pref:{ text:[/flash-lite/,/flash/], vision:[/flash/] } },
     xai:       { name:'Grok',        short:'Grok',    url:'https://api.x.ai/v1',            key:'gl_ai_key_xai',        keyUrl:'https://console.x.ai', ph:'xai-…',
                  pref:{ text:[/grok.*(mini|fast)/,/grok/], vision:[/grok.*vision/,/grok-4/,/grok/] } },
   },
-  get prov(){ const p=localStorage.getItem('gl_ai_prov'); return this.PROVIDERS[p]?p:'groq'; },
+  // 따로 고르지 않았으면 키를 넣어 둔 AI 를 쓴다(무료 → 유료 순). 아무 키도 없으면 Gemini 를 권한다.
+  FREE_FIRST: ['gemini','groq','openai','anthropic','xai'],
+  get prov(){ const p=localStorage.getItem('gl_ai_prov'); if(this.PROVIDERS[p]) return p; return this.FREE_FIRST.find(x=>this._keyOf(x)) || 'gemini'; },
   _keyOf(p){ return localStorage.getItem(this.PROVIDERS[p].key)||''; },
   // 고른 제공자의 키. 그 키가 비어 있으면 키가 있는 다른 제공자로 넘어간다 — 아무 키라도 있으면 비서는 동작한다.
   _active(){
@@ -727,9 +743,10 @@ const JARVIS = {
   setupHtml() {
     const cur=this.prov;
     return `<div class="ai-setup">
-      <p class="ai-note">AI 비서가 어떤 AI 로 답할지 고릅니다. <b>Groq</b> 은 무료 키로 바로 쓸 수 있고,
-        ChatGPT·Claude·Gemini·Grok 은 각 회사 개발자 사이트에서 <b>API 키</b>를 따로 받아야 합니다
-        (유료 구독과는 별개이며 쓴 만큼 요금이 붙습니다. Gemini 는 무료 사용량이 있습니다).</p>
+      <p class="ai-note">AI 비서가 어떤 AI 로 답할지 고릅니다. 처음이라면 <b>Gemini</b>(구글 계정으로 1분, 무료 사용량) 나 <b>Groq</b>(무료) 키를 권합니다.
+        ChatGPT·Claude·Grok 은 각 회사 개발자 사이트의 <b>API 키</b>가 필요하고 쓴 만큼 요금이 붙습니다.</p>
+      <p class="ai-note">ChatGPT Plus·Claude Pro 같은 <b>월 구독</b>은 API 키가 아니라서 여기에 넣을 수 없습니다. 키가 없으면 비서 창에 'ChatGPT 에서 묻기 / Claude 에서 묻기' 단추가 떠서 같은 질문을 그 앱으로 넘겨 줍니다.</p>
+      <p class="ai-note">키를 넣은 AI 가 여러 개면 고른 AI 를 먼저 쓰고, 그 키가 없으면 키가 있는 다른 AI 로 자동으로 넘어갑니다.</p>
       <div class="ai-provs">${Object.entries(this.PROVIDERS).map(([id,P])=>`
         <label class="ai-prov${id===cur?' on':''}">
           <input type="radio" name="aiProv" value="${id}" ${id===cur?'checked':''} onchange="JARVIS._pickProv(this)">
@@ -751,7 +768,7 @@ const JARVIS = {
   },
   saveSetup() {
     const box=document.querySelector('.ai-setup'); if(!box) return false;
-    const p=box.querySelector('input[name="aiProv"]:checked')?.value || 'groq';
+    const p=box.querySelector('input[name="aiProv"]:checked')?.value || this.prov;
     box.querySelectorAll('.ai-key').forEach(i=>{
       const k=i.value.trim(), lk=this.PROVIDERS[i.dataset.prov].key;
       if(k) localStorage.setItem(lk,k); else localStorage.removeItem(lk);

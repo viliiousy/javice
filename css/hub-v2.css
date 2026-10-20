@@ -95,11 +95,11 @@ body{ font-family:'IBM Plex Sans KR','Pretendard Variable',Pretendard,system-ui,
 .dv-ic, .dv-sw{ border-radius:12px; }
 .dv-sw.on{ background:var(--on-bg); color:var(--on); border-color:transparent; }
 
-/* 앱으로 돌아가기 (허브 모드에서만) */
-.back-app{ position:fixed; right:calc(max(10px, env(safe-area-inset-right)) + 48px); bottom:max(10px, env(safe-area-inset-bottom));
-  height:40px; padding:0 14px; border-radius:20px; border:1px solid var(--line); background:#101113; color:var(--fg2);
-  font:inherit; font-size:13px; display:none; align-items:center; gap:6px; cursor:pointer; z-index:5; }
+/* 앱으로 돌아가기 (허브 모드에서만) — 음성 줄 오른쪽 끝, 작게. 집 기기 칸과 겹치지 않는다 */
+.back-app{ margin-left:auto; flex:none; height:32px; padding:0 12px; border-radius:16px; border:1px solid var(--line); background:none; color:var(--fg3);
+  font:inherit; font-size:12px; display:none; align-items:center; cursor:pointer; }
 body.hub-mode .back-app{ display:inline-flex; }
+.voice{ display:flex; align-items:center; gap:16px; }
 .gear{ color:var(--fg3); }
 
 @media (max-width:820px), (orientation:portrait){
@@ -107,4 +107,41 @@ body.hub-mode .back-app{ display:inline-flex; }
   .h-right{ padding-left:0; }
   .u-card{ border-left:0; padding:16px 0; border-top:1px solid var(--line); }
   .u-card:first-child{ border-top:0; }
+}
+
+/* 휴대폰 가로(높이가 낮은 화면): 글자·간격을 한 단계씩 줄인다 */
+@media (max-height:500px){
+  .hub{ padding:max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    grid-template-columns:minmax(240px, 32%) 1fr; }
+  .h-left{ padding-right:16px; } .h-right{ padding-left:16px; }
+  .clock{ padding-bottom:12px; }
+  .time{ font-size:clamp(48px, 9vh, 72px); }
+  .date{ margin-top:8px; font-size:14px; }
+  .wx-row{ margin-top:4px; font-size:13px; }
+  .tasks{ padding:12px 0 4px; }
+  .tk{ padding:8px 0; font-size:14px; }
+  .tk-dot{ width:18px; height:18px; border-radius:6px; }
+  .p-head{ margin-bottom:8px; } .p-head h2{ font-size:15px; }
+  .panel{ padding-bottom:12px; } .home{ padding-top:12px; }
+  .u-ring{ width:48px; height:48px; }
+  .u-name{ font-size:14px; } .u-meta{ font-size:12px; }
+  .tiles{ grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:6px; }
+  .tile{ min-height:84px; padding:10px; gap:4px; border-radius:12px; }
+  .tile .t-ic{ width:22px; height:22px; }
+  .tile .t-name{ font-size:13px; } .tile .t-state{ font-size:12px; }
+  .tile.ro .t-state{ font-size:18px; }
+  .chip, .areas .chip{ height:30px; padding:0 10px; font-size:12px; }
+  .voice{ padding-top:8px; gap:10px; }
+  .mic{ width:40px; height:40px; }
+  .v-hint{ font-size:13px; } .v-reply{ font-size:14px; }
+}
+@media (max-height:500px) and (orientation:landscape){
+  body{ overflow:hidden; }
+  .hub{ height:100dvh; min-height:0; grid-template-columns:minmax(240px, 32%) 1fr; }
+  .u-cards{ grid-template-columns:repeat(3, 1fr); }
+  .tiles{ overflow:auto; }
+  .h-left{ border-right:1px solid var(--line); padding-right:16px; }
+  .h-right{ padding-left:16px; }
+  .u-card{ border-left:1px solid var(--line); border-top:0; padding:0 12px; }
+  .u-card:first-child{ border-left:0; padding-left:0; }
 }

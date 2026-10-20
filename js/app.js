@@ -69,6 +69,9 @@ const App = {
     // 허브에서 '연결 코드가 없다' 며 돌아왔으면 이 계정으로 연결해 주고 다시 허브로
     if(/[?&]linkhub=1/.test(location.search)) Settings.hubLink(120000).then(c=>{ if(c) location.replace('hub.html?from=app'); else App.showToast('로그인한 뒤 설정 › 기기·허브에서 허브를 열어 주세요','error'); });
     else if(localStorage.getItem('gl_hub_mode')==='1') Settings.hubLink().catch(()=>{});
+    try{ Settings.hubMenu(); }catch(e){}
+    // 휴대폰 앱은 세로로 쓴다(허브에서 가로로 돌렸다가 돌아온 경우 포함). 태블릿은 자유
+    try{ const SO=Platform.native&&window.Capacitor.Plugins.ScreenOrientation; if(SO&&Math.min(screen.width,screen.height)<600) SO.lock({orientation:'portrait'}).catch(()=>{}); }catch(e){}
     try { Diet.render(new Date()); } catch(e){ console.warn('Diet render',e); }
     try { Fitness.render(new Date()); } catch(e){ console.warn('Fitness render',e); }
     try { Checklist.render(); }     catch(e){ console.warn('Checklist render',e); }
@@ -309,7 +312,8 @@ const App = {
         // 새 디자인: 큰 날짜 숫자 + 작은 두 줄(월 / 요일). 오늘이 아니면 요일 자리에 '오늘로' 표시.
         const wd = d.toLocaleDateString('ko-KR',{weekday:'long'});
         const yy = d.getFullYear() !== now.getFullYear() ? `${String(d.getFullYear()).slice(2)}년 ` : '';
-        elDate.innerHTML = `<b class="hd-n">${d.getDate()}</b><span class="hd-s">${yy}${d.getMonth()+1}월<br>${isToday ? wd : `<em>${wd}</em>`}</span>`;
+        const wdc = dow===0 ? 'wd-sun' : dow===6 ? 'wd-sat' : 'wd-day';
+        elDate.innerHTML = `<b class="hd-n">${d.getDate()}</b><span class="hd-s">${yy}${d.getMonth()+1}월${isToday ? '<i class="hd-today">TODAY</i>' : ''}<br><span class="${wdc}">${wd}</span></span>`;
       } else
       elDate.textContent = isMobile
         ? `${String(d.getFullYear()).slice(2)}년 ${d.getMonth()+1}월 ${d.getDate()}일`

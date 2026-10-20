@@ -3696,3 +3696,6 @@ html.dark .fold-btn{ background:#1A1B1E; }
 .ln-scopes a, .ln-links a{ color:#B4B7BD; text-decoration:underline; text-underline-offset:3px; text-decoration-color:#33363C; }
 .ln-links{ margin-top:32px; display:flex; gap:16px; font-size:13px; }
 @media (max-width:360px){ .ln-h{ font-size:40px; } .ln-list li{ grid-template-columns:32px 64px 1fr; } }
+.j-handoff .j-avatar{ visibility:hidden; }
+.j-ho{ display:flex; flex-wrap:wrap; gap:8px; }
+.j-ho .btn-sm{ text-decoration:none; }

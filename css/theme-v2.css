@@ -55,6 +55,11 @@ html[data-ui="v2"] .hd-n{
 }
 html[data-ui="v2"] .hd-s{ font-size:12px; line-height:1.35; color:var(--text3); font-weight:500; white-space:nowrap; }
 html[data-ui="v2"] .hd-s em{ font-style:normal; color:var(--accent); }
+html[data-ui="v2"] .hd-today{ font-style:normal; font-family:var(--v2-num); font-size:9px; font-weight:600; letter-spacing:.08em;
+  color:var(--accent); margin-left:6px; vertical-align:1px; }
+html[data-ui="v2"] .hd-s .wd-day{ color:var(--text); }
+html[data-ui="v2"] .hd-s .wd-sat{ color:#3B82F6; }
+html[data-ui="v2"] .hd-s .wd-sun{ color:#EF4444; }
 html[data-ui="v2"] .h-date-sub{ display:none; }
 
 /* AI 사용량 고리 */

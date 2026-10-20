@@ -98,7 +98,7 @@ const Settings = {
     } else if (cat === 'device') {
       const hub = localStorage.getItem('gl_hub_mode') === '1';
       h = `<div class="set-h">허브</div>
-        ${this._item('허브 모드', this._sw(hub, 'Settings.toggleHub()'), '태블릿·거치용 벽 화면. 켜 두면 앱을 열자마자 큰 시계·할 일·AI 사용량·집 기기 화면이 뜹니다')}
+        ${this._item('허브 모드', this._sw(hub, 'Settings.toggleHub()'), '켜 두면 프로필 메뉴에 \'허브 모드로 전환\' 단추가 생깁니다. 누르면 큰 시계·할 일·AI 사용량·집 기기 화면(가로)으로 바뀝니다')}
         ${this._link('지금 허브 화면 열기', 'Settings.openHub()', '허브 오른쪽 아래 ‹ 앱으로 를 누르면 돌아옵니다')}
         <div class="set-h">기기</div>
         ${this._link('기기 연결', 'DevicePair.open()', '허브 태블릿·다른 기기를 이 계정에 연결')}`;
@@ -152,8 +152,9 @@ const Settings = {
   toggleHub() {
     const on = localStorage.getItem('gl_hub_mode') !== '1';
     localStorage.setItem('gl_hub_mode', on ? '1' : '0');
-    if (on) { App.showToast('허브 모드를 켰습니다 — 허브로 이동합니다', 'success'); setTimeout(() => this.openHub(), 600); }
-    else this._re('device');
+    App.showToast(on ? '프로필 메뉴에 \'허브 모드로 전환\' 단추를 넣었습니다' : '허브 모드 단추를 뺐습니다', 'success');
+    this.hubMenu(); this._re('device');
+    if (on) this.hubLink().catch(() => {});
   },
 
   // 허브는 따로 로그인하지 않는다. 이 앱에 로그인한 구글 계정의 연결 코드를 허브 설정에 넣어 주면
@@ -176,6 +177,8 @@ const Settings = {
     if (cfg.code !== code) { cfg.code = code; delete cfg.cfgAt; localStorage.setItem('hub_cfg_v1', JSON.stringify(cfg)); }
     return code;
   },
+
+  hubMenu() { const el = document.getElementById('pmHub'); if (el) el.hidden = localStorage.getItem('gl_hub_mode') !== '1'; },
 
   async openHub() {
     App.showToast('허브를 여는 중…');

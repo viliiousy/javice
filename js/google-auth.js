@@ -401,6 +401,7 @@ const Auth = {
     localStorage.removeItem('gl_expiry');
     localStorage.removeItem('gl_scope');
     localStorage.removeItem('gl_offline');
+    try { FirebaseSync.clearSecrets(); } catch {}
     location.reload();
   },
 

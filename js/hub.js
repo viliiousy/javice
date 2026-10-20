@@ -51,6 +51,8 @@ const Native = {
   plugin(name) {
     const C = window.Capacitor;
     if (!this.on) return null;
+    // 이 앱에 없는 플러그인은 null — Bashy 앱 안에서 허브를 열면 태블릿 앱 전용(JarvisListener 등)이 없다
+    if (C.isPluginAvailable && !C.isPluginAvailable(name)) return null;
     return (C.Plugins && C.Plugins[name]) || (C.registerPlugin ? C.registerPlugin(name) : null);
   },
 };
@@ -116,7 +118,7 @@ const Usage = {
   init() { this.load(); setInterval(() => { if (!document.hidden) this.load(); }, 60000); },
 
   async load() {
-    if (!Cfg.get().code) { this.render(null, '연결 코드를 넣으면 보입니다'); return; }
+    if (!Cfg.get().code) { this.render(null, '설정에서 bashy 계정을 연결하면 보입니다'); return; }
     try {
       const j = await hubCall({ act: 'state', days: 1 });
       this.data = j;
@@ -253,7 +255,7 @@ const Tasks = {
     });
   },
   async load() {
-    if (!Cfg.get().code) { this.note('연결 코드를 넣으면 보입니다'); return; }
+    if (!Cfg.get().code) { this.note('설정에서 bashy 계정을 연결하면 보입니다'); return; }
     try {
       const j = await hubCall({ act: 'tasks' });
       if (j.needConsent) { this.note(j.reason || '구글 할일 권한이 필요합니다'); return; }
@@ -1071,6 +1073,7 @@ const Voice = {
 
   // 띠링 — 두 음을 짧게. 파일 없이 만들어서 어디서든 같은 소리.
   chime() {
+    if (this.leaving) return;
     try {
       const C = window.AudioContext || window.webkitAudioContext;
       const ctx = this._ac || (this._ac = new C());
@@ -1088,6 +1091,7 @@ const Voice = {
   },
 
   done() {
+    if (this.leaving) return;
     try {
       const C = window.AudioContext || window.webkitAudioContext;
       const ctx = this._ac || (this._ac = new C());
@@ -1542,8 +1546,25 @@ const Settings = {
 };
 
 // ── 앱(네이티브)일 때만 하는 일 ─────────────────────
+// 앱으로 돌아가기: 듣던 마이크를 먼저 끄고(끄지 않으면 넘어가는 순간 인식이 끊기며 '띠링' 이 울렸다), 화면 방향을 풀고 이동한다
+async function backToApp() {
+  Voice.leaving = true;
+  try { Voice.webStop(); } catch (e) {}
+  const J = Native.plugin('JarvisListener');
+  if (J) { try { await Promise.race([J.stop(), new Promise(r => setTimeout(r, 400))]); } catch (e) {} }
+  const SO = Native.plugin('ScreenOrientation');
+  if (SO) { try { await SO.lock({ orientation: 'portrait' }); } catch (e) {} }
+  location.href = 'index.html?nohub=1';
+}
+
 function nativeSetup() {
+  const b = $('backApp'); if (b) b.addEventListener('click', backToApp);
   if (!Native.on) return;
+  // 휴대폰에서 허브를 열면 가로로 돌린다(태블릿은 원래 가로)
+  if (document.body.classList.contains('hub-mode')) {
+    const SO = Native.plugin('ScreenOrientation');
+    if (SO) SO.lock({ orientation: 'landscape' }).catch(() => {});
+  }
   const KA = Native.plugin('KeepAwake');
   if (KA) KA.keepAwake().catch(() => {});
   const SB = Native.plugin('StatusBar');

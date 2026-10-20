@@ -46,7 +46,7 @@ const AIUsage = {
   init() {
     // 로그인(Firebase 인증)이 끝나야 읽을 수 있다. 끝날 때까지 가볍게 기다린다.
     const wait = setInterval(() => {
-      if (this._authed()) { clearInterval(wait); this.refresh(); }
+      if (this._authed()) { clearInterval(wait); this.refresh(); this.linkExtension(); }
     }, 1500);
     setTimeout(() => clearInterval(wait), 120000);
     this._timer = setInterval(() => { if (this._authed() && !document.hidden) this.refresh(); }, 5 * 60 * 1000);
@@ -180,23 +180,30 @@ const AIUsage = {
   },
 
   open() {
-    App.openModal('@sparkle AI 사용량 · 허브', `
+    const ext = document.documentElement.dataset.bashyExt;
+    App.openModal('@sparkle AI 사용량', `
       <div class="aiu-wrap">
         ${['claude', 'chatgpt', 'higgsfield'].filter(k => this.shown().includes(k)).map(k => this._svc(k)).join('')}
-        <div class="aiu-link"><div class="aiu-head"><b>위쪽에 표시할 AI</b></div>${this.trackHtml()}
-          <div class="modal-btns" style="justify-content:flex-start"><button class="btn-sm" onclick="AIUsage.saveTrack();App.showToast('저장했습니다','success')">표시 저장</button></div></div>
         <div class="aiu-link">
-          <div class="aiu-head"><b>연결 코드</b><span class="aiu-sub">PC 수집 확장 · 태블릿 허브에 붙여 넣습니다</span></div>
-          <div id="aiuCodeBox" class="aiu-code aiu-sub">확인 중…</div>
+          <div class="aiu-head"><b>PC 크롬 사용량 수집 확장</b><span class="aiu-sub">${ext ? '이 브라우저에 설치됨 · 계정에 자동 연결' : '이 브라우저에서는 보이지 않음'}</span></div>
+          <div class="aiu-sub" style="margin-top:4px">Claude·ChatGPT·Higgsfield 는 남은 사용량을 API 로 알려 주지 않아서, PC 크롬에 로그인된 사이트에서 확장이 5분마다 읽어 옵니다.
+            확장을 설치한 크롬에서 bashy.app 에 한 번 로그인하면 연결은 저절로 됩니다.</div>
           <div class="modal-btns" style="justify-content:flex-start;flex-wrap:wrap">
-            <button class="btn-sm" onclick="AIUsage.copyCode()">복사</button>
-            <button class="btn-sm" onclick="AIUsage.newCode()">새 코드 만들기</button>
-            <a class="btn-sm aiu-a" href="${this.HUB_URL}" target="_blank" rel="noopener">태블릿 허브 열기</a>
+            <a class="btn-sm aiu-a" href="https://github.com/viliiousy/javice/blob/main/docs/extension-install.md" target="_blank" rel="noopener">설치 방법</a>
           </div>
-          <div class="aiu-sub" style="margin-top:6px">새 코드를 만들면 예전 코드를 쓰던 기기는 연결이 끊깁니다.</div>
+          <div class="aiu-sub" style="margin-top:6px">위쪽에 표시할 AI 는 설정 › 디자인 › 상단바 정보에서 고릅니다.</div>
         </div>
-      </div>`, () => this._loadCode());
+      </div>`);
     this.refresh();
+    this.linkExtension();
+  },
+
+  // 확장이 이 페이지에 붙어 있으면(content script 가 data-bashy-ext 를 남긴다) 계정 연결 코드를 넘겨 준다.
+  // 사용자가 코드를 복사·붙여 넣을 일이 없게.
+  async linkExtension() {
+    if (!document.documentElement.dataset.bashyExt || !this._authed()) return;
+    const code = typeof Settings !== 'undefined' ? await Settings.hubLink(0) : null;
+    if (code) window.postMessage({ type: 'bashy-ext-code', code }, location.origin);
   },
 
   _code: null,

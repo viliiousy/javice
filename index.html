@@ -33,7 +33,7 @@
         if(dark) document.documentElement.classList.add('dark');
       }catch(e){}
       // 허브 모드: 태블릿·거치용으로 켜 두면 앱을 열자마자 허브 화면으로 간다 (설정 › 기기 · 허브)
-      try{ if(localStorage.getItem('gl_hub_mode')==='1' && !/[?&]nohub/.test(location.search)) location.replace('hub.html?from=app'); }catch(e){}
+      // 허브 모드는 자동으로 넘어가지 않는다 — 켜 두면 프로필 메뉴에 '허브 모드로 전환' 단추가 생긴다
       // 디자인 판: v2(새 디자인) 기본, v1 은 예전 모습. 프로필 메뉴 → 디자인 에서 바꾼다.
       try{ document.documentElement.dataset.ui = localStorage.getItem('gl_ui') || 'v2'; }catch(e){ document.documentElement.dataset.ui='v2'; }
     })();
@@ -98,7 +98,8 @@
       <div id="profileMenu" class="profile-menu hidden">
         <div class="pm-who"><b id="pmName"></b><small id="pmMail"></small></div>
         <div class="profile-menu-item" data-ic="gear" onclick="Settings.open()">설정</div>
-        <div class="profile-menu-item" data-ic="sparkle" onclick="AIUsage.open()">AI 사용량 · 허브</div>
+        <div class="profile-menu-item" data-ic="sparkle" onclick="AIUsage.open()">AI 사용량</div>
+        <div class="profile-menu-item" id="pmHub" data-ic="monitor" onclick="Settings.openHub()" hidden>허브 모드로 전환</div>
         <div class="profile-menu-item pm-out" data-ic="logout" onclick="Auth.logout()">로그아웃</div>
       </div>
     </div>

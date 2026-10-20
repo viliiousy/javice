@@ -16,10 +16,29 @@ const FirebaseSync = {
     this._uid       = normalizedUid;
     this._legacyUid = normalizedUid;
     this._dbUrl     = dbUrl.replace(/\/$/, '');
+    this._ownerCheck(normalizedUid);
     console.log('[FB] 초기화:', this._uid);
   },
 
   ready() { return !!(this._uid && this._dbUrl); },
+
+  // 계정마다 따로 두지 않는 기기 공용 칸(AI 키·디자인 설정 등). 사용자 데이터(u_<id>_*)는 계정별 접두사가 있어 안전하다.
+  DEVICE_KEYS: ['gl_ai_key','gl_ai_prov','gl_ai_key_openai','gl_ai_key_anthropic','gl_ai_key_gemini','gl_ai_key_xai','gl_aiu_show','gl_cat_colors','gl_top_info','gl_home_cats','hub_cfg_v1','gl_hub_mode'],
+  SECRET_KEYS: ['gl_ai_key','gl_ai_key_openai','gl_ai_key_anthropic','gl_ai_key_gemini','gl_ai_key_xai','hub_cfg_v1'],
+
+  // 같은 기기에서 다른 구글 계정으로 들어오면, 앞 사람의 AI 키·설정이 새 계정에 보이고
+  // 다음 저장 때 새 계정으로 올라가 버렸다. 주인이 바뀌면 공용 칸을 비우고 시작한다.
+  _ownerCheck(id) {
+    const prev = localStorage.getItem('gl_owner');
+    if (prev && prev !== id) {
+      this.DEVICE_KEYS.forEach(k => localStorage.removeItem(k));
+      Object.keys(localStorage).filter(k => k.startsWith('gl_ai_models_')).forEach(k => localStorage.removeItem(k));
+      console.log('[FB] 계정이 바뀌어 기기 공용 설정을 비웠습니다');
+    }
+    localStorage.setItem('gl_owner', id);
+  },
+  // 로그아웃: 비밀(키)은 이 기기에 남기지 않는다. 다시 로그인하면 계정에서 내려온다.
+  clearSecrets() { this.SECRET_KEYS.forEach(k => localStorage.removeItem(k)); },
 
   // ── Firebase 인증 ───────────────────────
   // 구글 액세스 토큰으로 Firebase에도 로그인한다.
@@ -117,7 +136,7 @@ const FirebaseSync = {
 
   _collectData() {
     const data   = UserStore.getAllData();
-    const extras = ['gl_ai_key','gl_ai_prov','gl_ai_key_openai','gl_ai_key_anthropic','gl_ai_key_gemini','gl_ai_key_xai','gl_aiu_show','gl_ui','gl_haptic','gl_tts','gl_dark','gl_cat_colors'];
+    const extras = ['gl_ai_key','gl_ai_prov','gl_ai_key_openai','gl_ai_key_anthropic','gl_ai_key_gemini','gl_ai_key_xai','gl_aiu_show','gl_ui','gl_haptic','gl_tts','gl_dark','gl_cat_colors','gl_top_info','gl_home_cats'];
     extras.forEach(k => { const v=localStorage.getItem(k); if(v!=null) data[k]=v; });
     data['_savedAt'] = String(Date.now());
     return data;
