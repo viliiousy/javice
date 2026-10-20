@@ -132,7 +132,23 @@ const ExMedia = {
   img(e) { return this.DIR + e.id + '.webp'; },
   // 정렬해 둔 두 프레임(시작·끝 자세, 정사각형 두 칸) — img/exf/. 바닥·기구가 같은 자리에 오도록 맞춰 둔 그림이다.
   FDIR: 'img/exf/',
-  frames(e) { return this.FDIR + e.id + '.webp'; },
+  // 앱(iOS·안드로이드)은 화면 파일을 앱 안에 넣어 두므로, 새로 만든 그림은 앱을 다시 빌드해야 보였다.
+  // 서버(bashy.app)의 그림 목록(img/exf/have.json)을 읽어, 앱 안에 없는 그림은 서버에서 바로 가져온다.
+  REMOTE: new Set(),
+  frames(e) { return (this.REMOTE.has(e.id) ? 'https://bashy.app/' + this.FDIR : this.FDIR) + e.id + '.webp'; },
+  async syncRemote() {
+    if (!(typeof Platform !== 'undefined' && Platform.native) || typeof EX_HAVE === 'undefined') return;
+    const add = ids => { let n = 0; for (const id of ids || []) if (!EX_HAVE.has(id)) { EX_HAVE.add(id); this.REMOTE.add(id); n++; } return n; };
+    try { add(JSON.parse(localStorage.getItem('gl_exf_remote') || '[]')); } catch {}
+    try {
+      const r = await fetch('https://bashy.app/img/exf/have.json', { cache: 'no-cache' });
+      if (!r.ok) return;
+      const ids = await r.json();
+      const n = add(ids);
+      localStorage.setItem('gl_exf_remote', JSON.stringify([...this.REMOTE]));
+      if (n) { try { Fitness.render(App?.S?.selDate || new Date()); } catch {} }
+    } catch {}
+  },
   // 그림이 실제로 있는 운동인지 (없으면 자리 자체를 만들지 않는다)
   has(e) { return !!e && (typeof EX_HAVE === 'undefined' || EX_HAVE.has(e.id)); },
   thumbFor(name) { const e = this.find(name); return this.has(e) ? this.frames(e) : ''; },
@@ -161,3 +177,5 @@ const ExMedia = {
     im.src = this.frames(e);
   },
 };
+
+try { setTimeout(() => ExMedia.syncRemote(), 1500); } catch (e) {}

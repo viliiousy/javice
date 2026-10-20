@@ -60,4 +60,5 @@ for f in sorted(glob.glob(SRC + '/*.webp')):
 import json as _j
 _ids = sorted(f[:-5] for f in os.listdir(DST) if f.endswith('.webp'))
 _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+open(os.path.join(_root, 'img', 'exf', 'have.json'), 'w').write(_j.dumps(_ids))   # 앱이 새 빌드 없이 새 그림을 알아채게(서버에서 읽음)
 open(os.path.join(_root, 'js', 'ex-have.js'), 'w').write('// 자동 생성: scripts/ex-frames.py 를 돌린 뒤 갱신 — 정렬 프레임(img/exf)이 있는 운동 id\nconst EX_HAVE = new Set(' + _j.dumps(_ids) + ');\n')

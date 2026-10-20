@@ -22,5 +22,20 @@
       "source": "/st/callback",
       "destination": "/api/hub?st=cb"
     }
+  ],
+  "headers": [
+    {
+      "source": "/img/exf/have.json",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    }
   ]
 }
