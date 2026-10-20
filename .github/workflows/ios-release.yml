@@ -1,0 +1,49 @@
+name: iOS release (TestFlight)
+
+# 맥미니 없이 아이폰 앱을 빌드해 App Store Connect(TestFlight)에 올린다.
+# 필요한 비밀값 3개 (Settings › Secrets and variables › Actions):
+#   ASC_KEY_ID        App Store Connect › 사용자 및 액세스 › 통합 › 팀 키 의 '키 ID'
+#   ASC_ISSUER_ID     같은 화면 위쪽의 '발급자 ID'
+#   ASC_KEY_P8        내려받은 AuthKey_XXXX.p8 파일 내용 전체 (역할: 관리자 — 인증서·프로필을 자동으로 만든다)
+# 실행: Actions › iOS release › Run workflow (자동 실행은 하지 않는다 — 올릴 때만 누른다)
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: macos-15
+    env:
+      TEAM: 4A96B688B4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: 키 파일
+        env: { P8: '${{ secrets.ASC_KEY_P8 }}' }
+        run: |
+          [ -n "$P8" ] || { echo "ASC_KEY_P8 비밀값이 없습니다"; exit 1; }
+          mkdir -p ~/.asc && printf '%s' "$P8" > ~/.asc/key.p8
+      - working-directory: app
+        run: |
+          npm ci --no-audit --no-fund
+          npm run sync
+      - name: 빌드·업로드
+        working-directory: app
+        run: |
+          BUILD=$(TZ=Asia/Seoul date +%Y%m%d%H%M)
+          AUTH="-allowProvisioningUpdates -authenticationKeyPath $HOME/.asc/key.p8 -authenticationKeyID ${{ secrets.ASC_KEY_ID }} -authenticationKeyIssuerID ${{ secrets.ASC_ISSUER_ID }}"
+          cat > /tmp/ExportOptions.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$TEAM</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          PLIST
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath /tmp/Bashy.xcarchive DEVELOPMENT_TEAM=$TEAM CURRENT_PROJECT_VERSION=$BUILD $AUTH archive | tail -40
+          xcodebuild -exportArchive -archivePath /tmp/Bashy.xcarchive -exportOptionsPlist /tmp/ExportOptions.plist -exportPath /tmp/export $AUTH | tail -40
+          echo "✅ 업로드 완료 — 빌드 $BUILD" | tee -a "$GITHUB_STEP_SUMMARY"
