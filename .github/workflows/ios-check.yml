@@ -20,8 +20,9 @@ jobs:
       - working-directory: app
         run: |
           xcodebuild -version
+          code=0
           xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
-            -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build > /tmp/build.log 2>&1; code=$?
+            -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build > /tmp/build.log 2>&1 || code=$?
           tail -40 /tmp/build.log
           echo '──── 오류 ────'; grep -E "error:|\.swift:[0-9]+:[0-9]+: (error|warning: unre)" /tmp/build.log | sort -u | head -40
           test $code -eq 0
