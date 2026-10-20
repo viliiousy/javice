@@ -172,7 +172,10 @@ const Fitness = {
           <span class="fx-chk" aria-hidden="true"></span>
         </div>`;}).join('')}
       </div>
-      <div class="habit-add-btn" onclick="Fitness.showInlineAdd(new Date('${dsx}T00:00:00'))">+ 운동 추가</div>`;
+      <div class="fit-foot">
+        ${isToday && done<allEx.length ? `<button class="btn-sm accent fit-start" onclick="WorkoutMode.start('${dsx}')">운동 시작 · 세트와 쉬는 시간 타이머</button>` : ''}
+        <div class="habit-add-btn" onclick="Fitness.showInlineAdd(new Date('${dsx}T00:00:00'))">+ 운동 추가</div>
+      </div>`;
   },
 
   // 그날 기록(무게×횟수)이 있으면 그것을, 없으면 지난 기록으로 본 오늘 권장 무게를 한 줄로
@@ -304,10 +307,20 @@ const Fitness = {
     App.showToast(`'${name}' 루틴 저장됨 ✓`, 'success');
   },
 
+  // 그날 할 운동 목록(계획 + 그날만 교체 + 직접 추가) — 카드·운동 모드가 같이 쓴다
+  exercisesFor(date) {
+    const d = new Date(date), ds = this._dateStr(d);
+    const plan = this.planFor(d.getDay());
+    const sw = (typeof PlanGen!=='undefined') ? PlanGen.swapsFor(ds) : {};
+    const planEx = plan.exercises.map((x,i)=> sw[i] ? { ...x, name:sw[i], hp:undefined } : x);
+    return { plan, list:[...planEx, ...this.getCustomExercises(d)] };
+  },
+
   toggle(idx, dateStr=null) {
     try { Haptic.light(); } catch(e){}
     const d = dateStr ? new Date(dateStr+'T00:00:00') : new Date();
-    if (this._dateStr(d)!==this._dateStr(new Date())) return;
+    // 지난 날짜도 체크할 수 있다(깜빡하고 못 누른 날). 앞으로의 날짜만 막는다.
+    if (this._dateStr(d) > this._dateStr(new Date())) { App.showToast('아직 오지 않은 날은 체크할 수 없습니다'); return; }
     const chk=this._checked(d);
     const i=chk.indexOf(idx);
     if (i===-1) chk.push(idx); else chk.splice(i,1);

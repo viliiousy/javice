@@ -197,8 +197,8 @@
           <span class="card-title" data-ic="dumbbell">운동</span>
           <span id="fitBadge" class="badge"></span>
           <div class="fit-head-btns">
-            <button class="btn-sm" onclick="Fitness.showDayPlan()" title="내 루틴 만들기·요일 배정">루틴 설정</button>
-            <button class="btn-sm accent" onclick="Fitness.showInlineAdd(App?.S?.selDate)" title="이 날 한 운동 추가">+ 운동</button>
+            <button class="btn-sm" onclick="FitSettings.open()" title="루틴·가진 기구·추천하지 않을 운동">설정</button>
+            <button class="btn-sm accent" onclick="WorkoutMode.start()" title="세트·쉬는 시간 타이머로 운동하기">운동 시작</button>
           </div>
         </div>
         <div id="fitnessWrap" class="fitness-wrap"></div>
@@ -275,6 +275,7 @@
 <script src="js/tabs.js"></script>
 <script src="js/top-info.js"></script>
 <script src="js/plan-gen.js"></script>
+<script src="js/workout-mode.js"></script>
 <script src="js/app.js"></script>
 <script src="js/jarvis.js"></script>
 <script src="js/native-app.js"></script>

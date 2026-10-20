@@ -289,6 +289,11 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
   },
   _range(sets) { const m = String(sets || '').match(/(\d+)\s*[-~]\s*(\d+)/); if (m) return [+m[1], +m[2]]; const k = String(sets || '').match(/×\s*(\d+)/); return k ? [+k[1], +k[1]] : [8, 12]; },
   // 더블 프로그레션 제안
+  // 오늘 권장 무게(숫자) — 운동 모드가 칸에 미리 채운다
+  nextWeight(name, sets, ds) {
+    const t = this.suggest(name, sets, ds).match(/오늘 ([\d.]+)kg/);
+    return t ? Number(t[1]) : null;
+  },
   suggest(name, sets, ds) {
     const L = this.last(name, ds); if (!L) return '';
     const [lo, hi] = this._range(sets);
@@ -330,32 +335,57 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
   },
 
   // ── 운동 교체 ───────────────────────────
+  // 이름 → 자극 부위. 목록에 없는 이름(홈트 플랜·직접 쓴 이름)도 낱말로 짐작한다.
+  partOf(name) {
+    const n = String(name || '');
+    const slot = Object.keys(this.POOL).find(k => this.POOL[k].includes(n));
+    if (slot) return this.PART_OF[slot];
+    const hit = Object.keys(EX_DB).find(k => EX_DB[k].includes(n));
+    if (hit) return hit;
+    const R = [
+      [/걷기|러닝|달리기|자전거|사이클|싸이클|줄넘기|유산소|Zone ?2|트레드밀|로잉|버피|점핑|등산|수영/i, '유산소'],
+      [/컬(?!.*레그)|바이셉|이두/, '이두'], [/트라이셉|삼두|킥백|푸쉬다운|딥스/, '삼두'],
+      [/레이즈(?!.*레그)|숄더|어깨|오버헤드|파이크|페이스 풀|리어/, '어깨'],
+      [/스쿼트|런지|레그|하체|힙|브릿지|카프|데드리프트|글루트|둔근|허벅지/, '하체'],
+      [/풀 ?업|친 ?업|로우|풀다운|등|턱걸이|슈퍼맨/, '등'],
+      [/푸쉬업|팔굽혀|벤치|체스트|가슴|플라이|프레스/, '가슴'],
+      [/플랭크|크런치|복근|코어|싯업|레그 레이즈|데드 ?벅|트위스트/, '복근'],
+    ];
+    const m = R.find(([re]) => re.test(n));
+    return m ? m[1] : null;
+  },
+  // 교체 후보: ① 같은 동작 칸 → ② 같은 동작 이름 → ③ 같은 부위. 가진 기구로 먼저 고르고,
+  // 그래도 없으면 기구를 따지지 않고(대신 '기구 필요' 표시) 같은 부위에서 고른다 — 빈 목록은 보이지 않는다.
   alternatives(name) {
     const p = this.profile() || {};
     const slot = Object.keys(this.POOL).find(k => this.POOL[k].includes(name));
-    const out = [];
-    const add = n => { if (n !== name && !out.includes(n) && this.allowed(n, p)) out.push(n); };
-    if (slot) this.POOL[slot].forEach(add);
-    const part = slot ? this.PART_OF[slot] : Object.keys(EX_DB).find(k => EX_DB[k].includes(name));
+    const part = this.partOf(name);
+    const kw = String(name).replace(/덤벨|바벨|케이블|머신|스미스|케틀벨|밴드|원 암|인클라인|디클라인|시티드|스탠딩|\(.*?\)/g, '').trim().split(/\s+/).pop();
+    const cands = [];
+    if (slot) cands.push(...this.POOL[slot]);
     if (part && EX_DB[part]) {
-      const kw = String(name).replace(/덤벨|바벨|케이블|머신|스미스|케틀벨|밴드|원 암|인클라인|디클라인|시티드|스탠딩/g, '').trim().split(/\s+/).pop();
-      EX_DB[part].filter(n => kw && n.includes(kw)).forEach(add);   // 같은 동작 이름(예: '로우', '컬')
-      EX_DB[part].forEach(add);
+      if (kw) cands.push(...EX_DB[part].filter(n => n.includes(kw)));
+      const pool = Object.values(this.POOL).flat().filter(n => this.partOf(n) === part);
+      cands.push(...pool, ...EX_DB[part]);
     }
-    return out.slice(0, 12);
+    const uniq = [...new Set(cands)].filter(n => n !== name && !this.bans().includes(n));
+    const ok = uniq.filter(n => this.allowed(n, p)).map(n => ({ n, need: false }));
+    const more = ok.length >= 6 ? [] : uniq.filter(n => !this.allowed(n, p)).slice(0, 8 - ok.length).map(n => ({ n, need: true }));
+    return ok.slice(0, 12).concat(more);
   },
   openSwap(idx, name, ds, rid) {
     this._sw = { idx, name, ds, rid };
     const alts = this.alternatives(name);
     App.openModal('@dumbbell 운동 교체', `
-      <p class="pg-note"><b>${esc(name)}</b> 대신 같은 동작·부위의 운동입니다. 가진 기구로만 골랐습니다.</p>
-      <div class="sw-list">${alts.map((n, i) => {
-        const th = typeof ExMedia !== 'undefined' ? ExMedia.thumbFor(n) : '';
-        return `<button class="sw-row" onclick="PlanGen._swap(${i})">${th ? `<span class="ex-th">${ExMedia.poseHtml(th)}</span>` : '<span class="ex-th none"></span>'}<span>${esc(n)}</span></button>`;
-      }).join('') || '<p class="pg-note">바꿀 운동이 없습니다 — 기구 설정을 확인해 주세요</p>'}</div>
+      <p class="pg-note"><b>${esc(name)}</b> 대신 같은 동작 → 같은 자극 부위 순서입니다. 가진 기구로 하는 것부터, 모자라면 기구가 필요한 것도 표시합니다.</p>
+      <div class="sw-list">${alts.map((a, i) => {
+        const th = typeof ExMedia !== 'undefined' ? ExMedia.thumbFor(a.n) : '';
+        const eq = (this.EQUIP.find(([e]) => e === this.equipOf(a.n)) || [])[1];
+        return `<button class="sw-row" onclick="PlanGen._swap(${i})">${th ? `<span class="ex-th">${ExMedia.poseHtml(th)}</span>` : '<span class="ex-th none"></span>'}<span class="sw-nm">${esc(a.n)}${a.need ? `<small>${esc(eq || '기구')} 필요</small>` : ''}</span></button>`;
+      }).join('') || `<p class="pg-note">이 운동의 자극 부위를 알 수 없어 추천을 못 했습니다. '+ 운동 추가' 에서 직접 골라 주세요.</p>`}</div>
       <label class="sw-ban"><input type="checkbox" id="swBan"> '${esc(name)}' 은(는) 앞으로 추천하지 않기</label>
       <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div>`);
-    this._alts = alts;
+    this._alts = alts.map(a => a.n);
   },
   _swap(i) {
     const n = (this._alts || [])[i]; const s = this._sw; if (!n || !s) return;
