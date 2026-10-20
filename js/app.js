@@ -179,7 +179,9 @@ const App = {
     upcoming.splice(6); // 근일주일 일정 최대 6개 표시
 
     // 긴급 할일 TOP 3
-    const urgentTasks=[...allPending].sort((a,b)=>{
+    // 설정 › 일정과 할일 › '상단에 지난 할일도 보이기' — 끄면 기한이 지난 것은 위 줄에서 뺀다
+    const showOver = localStorage.getItem('gl_top_overdue')!=='0';
+    const urgentTasks=[...allPending].filter(t=>showOver||!t.due||t.due.split('T')[0]>=nowDateStr).sort((a,b)=>{
       const aO=a.due&&new Date(a.due)<now?1:0,bO=b.due&&new Date(b.due)<now?1:0;
       const aS=(a.starred?8:0)+(aO?4:0)+(a.due?2:0),bS=(b.starred?8:0)+(bO?4:0)+(b.due?2:0);
       if(bS!==aS) return bS-aS;
@@ -217,7 +219,8 @@ const App = {
     const tskC = pending>0?`<div class="stat-chip" data-s="tasks" title="남은 할일">${ic('tasks')}할일 <b>${pending}</b></div>`:'';
     const clC  = clAll>0?`<div class="stat-chip ${clDone===clAll?'stat-green':''}" data-s="checklist" title="체크리스트">${ic('pen')}체크 <b>${clDone}/${clAll}</b></div>`:'';
     const calC = `<div class="stat-chip ${calGoal&&calLeft<0?'stat-red':calPct>=80?'stat-green':''}" data-s="diet" title="${calGoal?(calLeft>=0?'남은 칼로리':'초과한 칼로리'):'먹은 칼로리'}">${ic('diet')}${calTxt}</div>`;
-    const chipsHTML=`<div class="sg sg-l">${habC}${tskC}${clC}</div><div class="sg sg-r">${typeof TopInfo!=='undefined'?TopInfo.bodyChips(calC):calC+kgTxt}</div>`;
+    const stC = typeof TopInfo!=='undefined' ? TopInfo.stockChip() : '';
+    const chipsHTML=`<div class="sg sg-l">${habC}${tskC}${clC}</div>${stC?`<div class="sg sg-s">${stC}</div>`:''}<div class="sg sg-r">${typeof TopInfo!=='undefined'?TopInfo.bodyChips(calC):calC+kgTxt}</div>`;
     // 인바디·자산은 이 줄에서 빠졌다. 헤더 오른쪽 두 줄(TopStrip)로 옮겼다 —
     // 같은 줄에 여섯 칸이 붙으면 모바일에서 두 줄로 접히면서 정작 오늘 할 일이 밀렸다.
     try { TopStrip.render(); } catch(e){}

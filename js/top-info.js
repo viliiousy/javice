@@ -43,7 +43,7 @@ const TopInfo = {
       const v = last(k); if (v == null) continue;
       out += `<div class="stat-chip stat-${k}" data-s="inbody" title="최근 기록">${lbl[k] ? `<span class="ti-lb">${lbl[k]}</span>` : ''}<b>${v}</b>${unit[k]}${this._trend(recs, k)}</div>`;
     }
-    return out + this.stockChip();
+    return out;
   },
 
   // 주식: 오늘 등락. 보유는 평가액 가중 평균, 관심종목은 앞 2개.
@@ -67,7 +67,7 @@ const TopInfo = {
     const favs = (cfg.favorites || []).slice(0, 2);
     if (!favs.length) return '';
     return `<div class="stat-chip stat-stock" data-s="econ" title="관심종목 오늘 등락">${favs.map((it, i) =>
-      `<span class="ti-st${i ? ' ti-st2' : ''}"><span class="ti-nm">${esc(String(it.name || '').slice(0, 4))}</span> ${pc((Econ.PRICES[Econ.keyOf(it)] || {}).pct)}</span>`).join(' ')}</div>`;
+      `<span class="ti-st${i ? ' ti-st2' : ''}"><span class="ti-nm">${esc(String(it.name || '').replace(/\s*\(.*$/, '').slice(0, 5))}</span> ${pc((Econ.PRICES[Econ.keyOf(it)] || {}).pct)}</span>`).join(' ')}</div>`;
   },
 
   // 설정 화면
