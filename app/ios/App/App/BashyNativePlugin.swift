@@ -67,7 +67,7 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
                 for a in Activity<WorkoutAttributes>.activities { await a.end(nil, dismissalPolicy: .immediate) }
                 let started = Date(timeIntervalSince1970: (call.getDouble("startedAt") ?? Date().timeIntervalSince1970 * 1000) / 1000)
                 do {
-                    _ = try Activity.request(attributes: WorkoutAttributes(startedAt: started), content: .init(state: st, staleDate: nil), pushType: nil)
+                    _ = try Activity.request(attributes: WorkoutAttributes(startedAt: started), content: .init(state: st, staleDate: st.restEnd), pushType: nil)
                     call.resolve(["ok": true])
                 } catch { call.resolve(["ok": false, "error": error.localizedDescription]) }
             }
@@ -76,7 +76,7 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func liveUpdate(_ call: CAPPluginCall) {
         if #available(iOS 16.2, *) {
             guard let st = liveState(call) as? WorkoutAttributes.ContentState else { call.resolve(); return }
-            Task { for a in Activity<WorkoutAttributes>.activities { await a.update(.init(state: st, staleDate: nil)) }; call.resolve(["ok": true]) }
+            Task { for a in Activity<WorkoutAttributes>.activities { await a.update(.init(state: st, staleDate: st.restEnd)) }; call.resolve(["ok": true]) }
         } else { call.resolve(["ok": false]) }
     }
     @objc func liveEnd(_ call: CAPPluginCall) {
@@ -88,11 +88,16 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
     // 알림 소리(쉬는 시간 끝)는 Library/Sounds 에 있어야 iOS 가 찾는다. 앱 화면 파일(public/sounds)에서 한 번 복사해 둔다.
     private func installSounds() {
         let fm = FileManager.default
-        guard let lib = fm.urls(for: .libraryDirectory, in: .userDomainMask).first,
-              let src = Bundle.main.url(forResource: "rest_end", withExtension: "wav", subdirectory: "public/sounds") else { return }
-        let dir = lib.appendingPathComponent("Sounds"), dst = dir.appendingPathComponent("rest_end.wav")
+        guard let lib = fm.urls(for: .libraryDirectory, in: .userDomainMask).first else { return }
+        let dir = lib.appendingPathComponent("Sounds")
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        if !fm.fileExists(atPath: dst.path) { try? fm.copyItem(at: src, to: dst) }
+        // rest_count: 3초 째깍 + 끝 알림음 — 앱이 잠들어 있어도 알림 하나로 카운트다운까지 들린다
+        for name in ["rest_end", "rest_count"] {
+            guard let src = Bundle.main.url(forResource: name, withExtension: "wav", subdirectory: "public/sounds") else { continue }
+            let dst = dir.appendingPathComponent(name + ".wav")
+            try? fm.removeItem(at: dst)
+            try? fm.copyItem(at: src, to: dst)
+        }
     }
 
     // 허브 모드: 가로(양쪽 다 허용) / 그 밖: 세로. 휴대폰을 옆으로 눕힌 방향 그대로 돌아가게 둘 다 연다.

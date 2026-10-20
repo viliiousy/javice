@@ -161,6 +161,14 @@ struct WorkoutAttributes: ActivityAttributes {
 }
 
 
+// 쉬는 시간이 끝났는지: 끝나는 시각을 staleDate 로 넘겨 두면 그 순간 시스템이 화면을 다시 그린다(isStale=true)
+// → 앱이 잠들어 있어도 주황 카운트다운이 0 에서 흰색 운동 시간으로 바뀐다
+@available(iOS 16.2, *)
+private func restEndOf(_ ctx: ActivityViewContext<WorkoutAttributes>) -> Date? {
+    guard !ctx.isStale, let end = ctx.state.restEnd, end > Date() else { return nil }
+    return end
+}
+
 struct WorkoutLiveView: View {
     let ctx: ActivityViewContext<WorkoutAttributes>
     var body: some View {
@@ -173,7 +181,7 @@ struct WorkoutLiveView: View {
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
-                if let end = s.restEnd, end > Date() {
+                if let end = restEndOf(ctx) {
                     Text("쉬는 시간").font(.system(size: 11, weight: .medium)).foregroundColor(Color.white.opacity(0.6))
                     Text(timerInterval: Date()...end, countsDown: true).font(.system(size: 30, weight: .semibold).monospacedDigit())
                         .foregroundColor(accent).multilineTextAlignment(.trailing).frame(width: 96, alignment: .trailing)
@@ -200,7 +208,7 @@ struct WorkoutLiveActivity: Widget {
                     Text(ctx.state.step.isEmpty ? "운동 중" : ctx.state.step).font(.system(size: 12, weight: .semibold)).foregroundColor(accent)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    if let end = ctx.state.restEnd, end > Date() {
+                    if let end = restEndOf(ctx) {
                         Text(timerInterval: Date()...end, countsDown: true).font(.system(size: 18, weight: .semibold).monospacedDigit()).foregroundColor(accent).frame(width: 64, alignment: .trailing)
                     } else {
                         Text(ctx.attributes.startedAt, style: .timer).font(.system(size: 16, weight: .semibold).monospacedDigit()).frame(width: 72, alignment: .trailing)
@@ -215,7 +223,7 @@ struct WorkoutLiveActivity: Widget {
             } compactLeading: {
                 Image(systemName: "dumbbell.fill").foregroundColor(accent)
             } compactTrailing: {
-                if let end = ctx.state.restEnd, end > Date() {
+                if let end = restEndOf(ctx) {
                     Text(timerInterval: Date()...end, countsDown: true).monospacedDigit().foregroundColor(accent).frame(width: 44)
                 } else {
                     Text(ctx.attributes.startedAt, style: .timer).monospacedDigit().frame(width: 48)

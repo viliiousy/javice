@@ -3890,3 +3890,25 @@ body.wk-on{ overflow:hidden; }
 .lg-row .inp[readonly]{ cursor:pointer; text-align:center; }
 /* 쉬는 시간 화면은 세트 줄(밀어서 삭제용으로 겹쳐 둔 층)보다 위에 */
 .wk-rest{ z-index:20; }
+
+/* 운동 끝내기 — 아래에서 올라오는 작은 시트 (8px 단위) */
+.wk-end{ position:fixed; inset:0; z-index:460; }
+.wk-end-bg{ position:absolute; inset:0; background:rgba(0,0,0,.55); opacity:0; transition:opacity .2s; }
+.wk-end-sh{ position:absolute; left:0; right:0; bottom:0; max-width:480px; margin:0 auto; background:#17181B; color:#ECEDEE;
+  border-radius:16px 16px 0 0; padding:24px 16px calc(16px + env(safe-area-inset-bottom)); display:grid; gap:8px;
+  transform:translateY(100%); transition:transform .22s cubic-bezier(.2,.8,.2,1); }
+.wk-end.on .wk-end-bg{ opacity:1; } .wk-end.on .wk-end-sh{ transform:none; }
+.wk-end-t{ font-size:18px; font-weight:600; letter-spacing:-.01em; }
+.wk-end-m{ display:flex; align-items:center; gap:8px; font-size:13px; color:#8B8F97; margin-bottom:16px; }
+.wk-end-m .num{ font-family:'Space Grotesk',sans-serif; color:#ECEDEE; font-weight:500; }
+.wk-end-m b.num{ margin-right:2px; }
+.wk-end-m i{ width:3px; height:3px; border-radius:50%; background:#3A3D44; }
+.wk-end-go{ height:48px; border:0; border-radius:12px; background:#FF6A2B; color:#101113; font:inherit; font-size:15px; font-weight:600; cursor:pointer; }
+.wk-end-row{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.wk-end-ghost, .wk-end-del{ height:44px; border:1px solid #2A2C31; border-radius:12px; background:none; color:#ECEDEE; font:inherit; font-size:14px; cursor:pointer; }
+.wk-end-del{ color:#8B8F97; }
+.wk-end-del.arm{ color:#FF6A2B; border-color:#FF6A2B; }
+
+/* 운동 교체 — 원래 추천 운동 */
+.sw-orig{ display:grid; gap:4px; margin-bottom:8px; }
+.sw-h{ font-size:12px; color:var(--text3); }
