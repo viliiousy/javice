@@ -544,7 +544,7 @@ const InBody = {
     this.saveRecords(recs);
     this.render();
     App.closeModal();
-    App.showToast('인바디 기록됨 ✓', 'success');
+    App.showToast('인바디 기록됨', 'success');
   },
 
   remove(dt) {
@@ -607,6 +607,6 @@ const InBody = {
     this.saveRecords([...byDate.values()]);
     this.render();
     App.closeModal();
-    App.showToast(`${added}건 가져왔습니다 ✓`, 'success');
+    App.showToast(`${added}건 가져왔습니다`, 'success');
   },
 };

@@ -119,7 +119,7 @@ const App = {
       this._renderCalPanel();
       this._updateStatsBanner();
       this._updateHeaderDate(this.S.selDate); // 동기화 후 할일 뱃지 즉시 반영
-      this.showToast(`동기화 완료 ✓ (일정 ${this.S.events.length}개)`,'success');
+      this.showToast(`동기화 완료 (일정 ${this.S.events.length}개)`,'success');
     } catch(err){
       console.error('[Sync]',err);
       this.showToast('동기화 실패: '+err.message,'error');
@@ -238,11 +238,11 @@ const App = {
       <div class="stats-urgent-row">
         ${urgentTasks.map(t=>{
           const due=t.due?new Date(t.due):null,over=!!t.due&&_dueEnd(t)<now;
-          return `<div class="stats-urgent-chip${over?' urgent-over':''}${t.starred?' urgent-star':''}" data-s="tasks">${t.starred?'⭐':''}${esc(t.title.length>15?t.title.slice(0,14)+'…':t.title)}${due?` <span class="${over?'stats-overdue':'stats-due'}">${_fmtDate(due)}</span>`:''}</div>`;
+          return `<div class="stats-urgent-chip${over?' urgent-over':''}${t.starred?' urgent-star':''}" data-s="tasks">${t.starred?'<b class="uc-star">★</b>':''}${esc(t.title.length>15?t.title.slice(0,14)+'…':t.title)}${due?` <span class="${over?'stats-overdue':'stats-due'}">${_fmtDate(due)}</span>`:''}</div>`;
         }).join('')}
       </div>`:'';
 
-    const jarvisHTML=lastMsg?`<div class="stats-jarvis"><span class="stats-jarvis-icon">⚡</span><span class="stats-jarvis-txt">${esc(lastMsg.slice(0,90))}</span></div>`:'';
+    const jarvisHTML=lastMsg?`<div class="stats-jarvis"><span class="stats-jarvis-icon">AI</span><span class="stats-jarvis-txt">${esc(lastMsg.slice(0,90))}</span></div>`:'';
 
     // 폰: 일정·할일 칩을 한 줄로 합쳐 옆으로 밀어 보게 — 두 줄이면 상단바가 너무 두꺼워진다
     let listHTML=upcomingHTML+urgentHTML;
@@ -343,7 +343,7 @@ const App = {
 
       if(isToday) {
         // 오늘: 초록색 강제
-        elDay.innerHTML = '<span id="todayBadge">🕐 오늘</span> · ' + dayStr;
+        elDay.innerHTML = '<span id="todayBadge">오늘</span> · ' + dayStr;
         const badge = document.getElementById('todayBadge');
         if(badge) {
           badge.style.color = '#059669';
@@ -534,8 +534,8 @@ const App = {
         <div class="event-time" style="color:${col}">${allDay?'종일':_fmtTime(s)}</div>
         <div>
           <div class="event-title">${esc(e.summary||'(제목 없음)')}</div>
-          ${e._calName&&e._calName!=='주요 일정'?`<div class="event-loc" style="color:${col}">📅 ${esc(e._calName)}</div>`:''}
-          ${e.location?`<div class="event-loc">📍 ${esc(e.location)}</div>`:''}
+          ${e._calName&&e._calName!=='주요 일정'?`<div class="event-loc" style="color:${col}">${esc(e._calName)}</div>`:''}
+          ${e.location?`<div class="event-loc">${esc(e.location)}</div>`:''}
         </div>
       </div>`;
     }).join('');
@@ -656,9 +656,9 @@ const App = {
       :`<option value="primary">기본 캘린더</option>`;
     this.openModal(`@plus ${ds}`,`
       <div class="lp-menu">
-        <button class="lp-btn" onclick="App.closeModal();App._showAddEventModalForDate(new Date('${d.toDateString()}'))">📅 일정 추가</button>
-        <button class="lp-btn" onclick="App.closeModal();App._showAddTaskForDate(new Date('${d.toDateString()}'))">✅ 할일 추가</button>
-        <button class="lp-btn" onclick="App.closeModal();App._showAddChecklistForDate(new Date('${d.toDateString()}'))">✍️ 체크리스트 추가</button>
+        <button class="lp-btn" onclick="App.closeModal();App._showAddEventModalForDate(new Date('${d.toDateString()}'))">일정 추가</button>
+        <button class="lp-btn" onclick="App.closeModal();App._showAddTaskForDate(new Date('${d.toDateString()}'))">할일 추가</button>
+        <button class="lp-btn" onclick="App.closeModal();App._showAddChecklistForDate(new Date('${d.toDateString()}'))">체크리스트 추가</button>
       </div>
       <div style="margin-top:14px"><label class="modal-lbl">기본 캘린더</label>
         <select id="lpDefCal" class="inp inp-sm" onchange="GoogleCalendar.saveSettings({...GoogleCalendar.getSettings(),default:this.value})">${calOptions}</select>
@@ -702,7 +702,7 @@ const App = {
       this.S.events.push(ev);
       this.S.events.sort((a,b)=>new Date(a.start?.dateTime||a.start?.date)-new Date(b.start?.dateTime||b.start?.date));
       CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,this.S.selDate);
-      this._renderCalPanel(); this.closeModal(); this.showToast('일정 추가됨 ✓','success');
+      this._renderCalPanel(); this.closeModal(); this.showToast('일정 추가됨','success');
     }catch{ this.showToast('일정 추가 실패','error'); }
   },
 
@@ -777,7 +777,7 @@ const App = {
       this.S.tasks[listId].unshift(task);
       this._renderTasks();
       CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,this.S.selDate);
-      this.closeModal(); this.showToast('할일 추가됨 ✓','success');
+      this.closeModal(); this.showToast('할일 추가됨','success');
       this._updateStatsBanner();
     }catch{ this.showToast('추가 실패','error'); }
   },
@@ -802,7 +802,7 @@ const App = {
     items.push({id:'cl_'+Date.now(),title,dueDate:due||null,done:false,createdAt:new Date().toISOString()});
     Checklist.saveItems(items); Checklist.render();
     CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,this.S.selDate);
-    this.closeModal(); this.showToast('추가됨 ✓','success');
+    this.closeModal(); this.showToast('추가됨','success');
     this._updateStatsBanner();
   },
 
@@ -813,9 +813,9 @@ const App = {
     const col=e._calColor||_evColor(e.colorId);
     this.openModal('@calendar 일정',`
       <h4 style="font-size:16px;font-weight:700;margin-bottom:12px">${esc(e.summary||'(제목 없음)')}</h4>
-      ${e._calName?`<p style="font-size:12px;color:${col};margin-bottom:8px">📅 ${esc(e._calName)}</p>`:''}
+      ${e._calName?`<p style="font-size:12px;color:${col};margin-bottom:8px">${esc(e._calName)}</p>`:''}
       <p style="color:var(--text2);font-size:13px;margin-bottom:8px">${e.start?.date||_fmtFull(s)}<br>${allDay?'종일':_fmtTime(s)+(en?' — '+_fmtTime(en):'')}</p>
-      ${e.location?`<p style="color:var(--text2);font-size:13px;margin-bottom:8px">📍 ${esc(e.location)}</p>`:''}
+      ${e.location?`<p style="color:var(--text2);font-size:13px;margin-bottom:8px">${esc(e.location)}</p>`:''}
       ${e.description?`<div style="color:var(--text2);font-size:13px;padding:10px;background:var(--card2);border-radius:8px;white-space:pre-wrap;margin-bottom:12px">${esc(e.description)}</div>`:''}
       <button onclick="App._delEvent('${e.id}','${e._calId||''}')" style="width:100%;padding:9px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:8px;color:var(--red);cursor:pointer;font-family:inherit;font-size:13px">🗑 일정 삭제</button>
     `);
@@ -1064,7 +1064,7 @@ const App = {
       }
       this._renderTasks();
       CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,this.S.selDate);
-      this.closeModal(); this.showToast('저장됨 ✓','success');
+      this.closeModal(); this.showToast('저장됨','success');
       this._updateStatsBanner();
     }catch(e){ this.showToast('저장 실패: '+e.message,'error'); }
   },
@@ -1078,7 +1078,7 @@ const App = {
       this._renderTasks();
       this._updateStatsBanner();
       !done?Sounds?.check():Sounds?.uncheck();
-      this.showToast(!done?'완료! ✓':'다시 할일로','success');
+      this.showToast(!done?'완료!':'다시 할일로','success');
     }catch{ this.showToast('업데이트 실패','error'); }
   },
 
@@ -1206,7 +1206,7 @@ const App = {
     if(typeof Sounds!=='undefined'){
       Sounds.enabled=!Sounds.enabled;
       const el=document.getElementById('soundLabel');
-      if(el) el.textContent=Sounds.enabled?'🔔 사운드 켜짐':'🔕 사운드 꺼짐';
+      if(el) el.textContent=Sounds.enabled?'사운드 켜짐':'사운드 꺼짐';
       if(Sounds.enabled) Sounds.click();
     }
     document.getElementById('profileMenu')?.classList.add('hidden');

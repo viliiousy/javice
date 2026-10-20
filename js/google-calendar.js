@@ -108,7 +108,7 @@ const GoogleCalendar = {
       return;
     }
     const s = this.getSettings();
-    App.openModal('📅 캘린더 설정', `
+    App.openModal('@calendar 캘린더 설정', `
       <p style="font-size:12px;color:var(--text2);margin-bottom:12px">표시할 캘린더를 선택하고 기본 캘린더를 설정하세요.</p>
       <div style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto">
         ${this._allCalendars.map(cal=>`

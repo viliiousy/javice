@@ -190,7 +190,7 @@ const Habits = {
       const cat=this._catOf(h), C=this.CATS[cat];
       // 약은 '몇 시에' 가 이름만큼 중요하다. 그것만 줄에 붙인다.
       const timeLabel = (cat==='med' && h.time)
-        ? `<span class="habit-time">${esc(h.time)}${h.notify===false?'':' 🔔'}</span>` : '';
+        ? `<span class="habit-time">${esc(h.time)}${h.notify===false?'':' · 알림'}</span>` : '';
       // 순서 바꾸는 중에는 밀기·길게누르기를 붙이지 않는다 — 끌어야 하는데 삭제가 열린다.
       return `<div class="habit-item${isDone?' done':''}${reorder?' reorder-mode':''}"
         data-reorderable="${h.id}"${reorder?'':` data-row data-i="${h.id}" data-label="${esc(h.name)}"`}>
@@ -198,7 +198,7 @@ const Habits = {
         <div class="habit-chk" onclick="event.stopPropagation();Habits._handleTap('${h.id}','${ds2}')">${isDone?'✓':''}</div>
         <span class="habit-name" onclick="event.stopPropagation();Habits.showEditHabit('${h.id}')"
           >${Icons.svg(C.ic,'hb-cat-ic')}${h.emoji?esc(h.emoji)+' ':''}${esc(h.name)}${timeLabel}${daysLabel}</span>
-        ${st>0&&!reorder?`<span class="habit-streak">🔥${st}</span>`:''}
+        ${st>0&&!reorder?`<span class="habit-streak">${st}일 연속</span>`:''}
         ${reorder?`<button class="cl-del-btn edit-del-btn" onclick="event.stopPropagation();Habits._delFrom('${h.id}','${ds2}')" title="삭제">✕</button>`:''}
       </div>`;
     }).join('')
@@ -458,7 +458,7 @@ const Habits = {
     const renderDate = App?.S?.selDate || new Date();
     this.render(renderDate);
     App.closeModal();
-    App.showToast('습관 추가됨 ✓','success');
+    App.showToast('습관 추가됨','success');
     FirebaseSync?.scheduleSave();
   },
 
@@ -498,7 +498,7 @@ const Habits = {
     h.days=days.length?days:[0,1,2,3,4,5,6];
     this.saveList(list);
     this.render(App?.S?.selDate||new Date());
-    App.closeModal(); App.showToast('저장됨 ✓','success');
+    App.closeModal(); App.showToast('저장됨','success');
   },
 
   showManageModal() { this.showInlineAdd(); },

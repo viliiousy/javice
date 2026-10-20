@@ -214,7 +214,7 @@ const Auth = {
         this._applyToken(d);
         localStorage.setItem('gl_offline', d['저장됨'] ? '1' : '0');
         await this._fetchUserInfo();
-        App.showToast(d['저장됨'] ? '백그라운드 동기화 켜짐 ✓' : '로그인됨 (동기화는 다음에)',
+        App.showToast(d['저장됨'] ? '백그라운드 동기화 켜짐' : '로그인됨 (동기화는 다음에)',
                       d['저장됨'] ? 'success' : '');
       } catch (e) {
         console.error('[Auth] 코드 교환 실패:', e);
@@ -249,7 +249,7 @@ const Auth = {
       if (d.hasRefresh) { localStorage.setItem('gl_offline', '1'); return; }
     } catch { return; }
 
-    App.openModal('🔄 백그라운드 동기화', `
+    App.openModal('@refresh 백그라운드 동기화', `
       <p class="modal-lbl" style="line-height:1.7">
         지금은 한 시간마다 로그인 창이 다시 떠야 하고, 앱을 열지 않으면 서버가 일정을 읽지 못합니다.<br><br>
         <b>한 번만</b> 허용하면 그 뒤로는 창이 뜨지 않고, 아침 알림에 오늘 일정도 담을 수 있습니다.
@@ -475,7 +475,7 @@ const Auth = {
         FirebaseSync.startPolling();
         // 데려온 기록은 아직 이 브라우저에만 있다. 올려 두지 않으면 다음 기기에서 또 없다.
         if (adopted) { FirebaseSync.scheduleSave(); App.showToast(`이전 기록 ${adopted}건을 계정으로 옮겼습니다`, 'success'); }
-        else if (loaded) App.showToast('동기화 완료 ✓', 'success');
+        else if (loaded) App.showToast('동기화 완료', 'success');
         // 서버에 리프레시 토큰이 없으면 최초 1회 동의를 제안한다 (모달, 스누즈 가능)
         if (!(typeof Platform !== 'undefined' && Platform.native)) setTimeout(() => this._maybeOfferOffline(), 2500);   // 앱은 로그인 때 이미 오프라인 동의를 받는다
       }

@@ -152,7 +152,7 @@ const Checklist = {
     const due=document.getElementById('clDue')?.value||null;
     const items=this.getItems();
     items.push({id:'cl_'+Date.now(),title,dueDate:due||null,done:false,createdAt:new Date().toISOString()});
-    this.saveItems(items); this.render(); App.closeModal(); App.showToast('추가됨 ✓','success');
+    this.saveItems(items); this.render(); App.closeModal(); App.showToast('추가됨','success');
     App._updateStatsBanner();
     CalendarUI.render(document.getElementById('miniCal'),App.S.calDate,App.S.events,App.S.selDate);
   },
@@ -178,7 +178,7 @@ const Checklist = {
     const items=this.getItems();
     const it=items.find(i=>i.id===id);
     if(it){ it.title=title; it.dueDate=document.getElementById('clEditDue')?.value||null; }
-    this.saveItems(items); this.render(); App.closeModal(); App.showToast('저장됨 ✓','success');
+    this.saveItems(items); this.render(); App.closeModal(); App.showToast('저장됨','success');
     CalendarUI.render(document.getElementById('miniCal'),App.S.calDate,App.S.events,App.S.selDate);
   },
 

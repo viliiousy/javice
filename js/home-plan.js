@@ -193,11 +193,11 @@ const HomePlan = {
         <div class="hp-yt-section">
           <a class="hp-yt-btn" href="${this.ytUrl(x.yt.ko)}" target="_blank" rel="noopener">
             <span class="hp-yt-icon">▶</span>
-            <span class="hp-yt-txt">🇰🇷 ${esc(x.n)} 자세 영상</span>
+            <span class="hp-yt-txt">${esc(x.n)} 자세 영상</span>
           </a>
           <a class="hp-yt-btn" href="${this.ytUrl(x.yt.en)}" target="_blank" rel="noopener">
             <span class="hp-yt-icon">▶</span>
-            <span class="hp-yt-txt">🇺🇸 ${esc(x.e)} Form Guide</span>
+            <span class="hp-yt-txt">${esc(x.e)} Form Guide</span>
           </a>
         </div>
         <div class="hp-info-rows">
@@ -215,7 +215,7 @@ const HomePlan = {
   _scheduleHtml() {
     return `
       <div class="hp-schedule">
-        <h3 class="hp-section-title">📅 주간 스케줄</h3>
+        <h3 class="hp-section-title">주간 스케줄</h3>
         <div class="hp-week-grid">
           <div class="hp-day hp-day-on"><span class="hp-day-d">월</span><span class="hp-day-t">DAY A<br>푸시</span></div>
           <div class="hp-day hp-day-off"><span class="hp-day-d">화</span><span class="hp-day-t">휴식<br>or 유산소</span></div>
@@ -228,7 +228,7 @@ const HomePlan = {
       </div>
 
       <div class="hp-panel">
-        <h3 class="hp-section-title">📈 점진적 과부하 가이드</h3>
+        <h3 class="hp-section-title">점진적 과부하 가이드</h3>
         <ul class="hp-list">
           <li><strong>1~2주:</strong> 추천 중량 하한, 폼 완성 집중</li>
           <li><strong>3~4주:</strong> 추천 중량 상한으로 올리기</li>
@@ -238,7 +238,7 @@ const HomePlan = {
       </div>
 
       <div class="hp-panel">
-        <h3 class="hp-section-title">⚡ 주 4일 확장 (8주 후)</h3>
+        <h3 class="hp-section-title">주 4일 확장 (8주 후)</h3>
         <ul class="hp-list">
           <li><strong>월:</strong> 가슴 + 삼두</li>
           <li><strong>화:</strong> 등 + 이두</li>
@@ -248,7 +248,7 @@ const HomePlan = {
       </div>
 
       <div class="hp-panel">
-        <h3 class="hp-section-title">🎯 8주 목표</h3>
+        <h3 class="hp-section-title">8주 목표</h3>
         <ul class="hp-list">
           <li>풀업 무보조 5회 이상</li>
           <li>푸시업 30회 이상</li>
@@ -258,7 +258,7 @@ const HomePlan = {
       </div>
 
       <div class="hp-tip">
-        💡 <strong>휴식일 유산소:</strong> 걷기 30~40분 (심박 120~130) 또는 Zone2 자전거. 격렬한 유산소는 피하고 회복 집중.
+        <strong>휴식일 유산소:</strong> 걷기 30~40분 (심박 120~130) 또는 Zone2 자전거. 격렬한 유산소는 피하고 회복 집중.
       </div>`;
   },
 
@@ -271,7 +271,7 @@ const HomePlan = {
     // 탭 버튼
     const tabs = this.DAY_LABELS.map((d, i) =>
       `<button class="hp-tab${i === tabIdx ? ' hp-tab-on' : ''}" onclick="HomePlan.switchTab(${i})">${d.name}<small>${d.sub}</small></button>`
-    ).join('') + `<button class="hp-tab${tabIdx === 3 ? ' hp-tab-on' : ''}" onclick="HomePlan.switchTab(3)">📅<small>스케줄</small></button>`;
+    ).join('') + `<button class="hp-tab${tabIdx === 3 ? ' hp-tab-on' : ''}" onclick="HomePlan.switchTab(3)">${typeof Icons!=='undefined'?Icons.svg('calendar'):''}<small>스케줄</small></button>`;
 
     let content = '';
     if (tabIdx < 3) {
@@ -279,7 +279,7 @@ const HomePlan = {
       const label = this.DAY_LABELS[tabIdx];
       content = `<div class="hp-desc">${label.desc}</div>` +
         day.map((x, i) => this._exCard(x, tabIdx, i)).join('') +
-        `<div class="hp-tip">💡 ${this.TIPS[tabIdx]}</div>`;
+        `<div class="hp-tip">${this.TIPS[tabIdx]}</div>`;
     } else {
       content = this._scheduleHtml();
     }

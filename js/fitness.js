@@ -261,7 +261,7 @@ const Fitness = {
     });
     this.saveDayPlan(dp);
     App.closeModal();
-    App.showToast('요일별 운동 저장됨 ✓','success');
+    App.showToast('요일별 운동 저장됨','success');
     this.render(App?.S?.selDate || new Date());
   },
 
@@ -305,7 +305,7 @@ const Fitness = {
     this.saveDayPlan(dp);
     this._cart = []; this._rid = null;
     App.closeModal(); this.render(App?.S?.selDate || new Date());
-    App.showToast(`'${name}' 루틴 저장됨 ✓`, 'success');
+    App.showToast(`'${name}' 루틴 저장됨`, 'success');
   },
 
   // 그날 할 운동 목록(계획 + 그날만 교체 + 직접 추가) — 카드·운동 모드가 같이 쓴다
@@ -548,7 +548,7 @@ const Fitness = {
     this._cart=[];
     this.render(d);
     App.closeModal();
-    App.showToast(`${cart.length}개 추가됨 ✓`,'success');
+    App.showToast(`${cart.length}개 추가됨`,'success');
   },
 
   _delCustom(customIdx, dateStr=null) {

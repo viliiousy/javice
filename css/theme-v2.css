@@ -560,3 +560,47 @@ html[data-ui="v2"] .toast::before{ content:''; flex:none; width:6px; height:6px;
 html[data-ui="v2"] .toast.success::before{ background:#FF6A2B; }
 html[data-ui="v2"] .toast.error::before{ background:#E5484D; }
 html[data-ui="v2"] .toast.hidden{ display:none; }
+
+/* ── v2 잔재 정리 (점검 결과) ───────────────────── */
+/* 첫 실행 안내: 보라 타일·유리 흐림·회색 상자 → 선 */
+html[data-ui="v2"] .ob-wrap{ backdrop-filter:none; -webkit-backdrop-filter:none; background:rgba(0,0,0,.45); }
+html[data-ui="v2"] .ob-logo{ background:var(--text); color:var(--card); }
+html[data-ui="v2"] .ob-logo .ic{ fill:currentColor; }
+html[data-ui="v2"] .ob-list{ gap:0; }
+html[data-ui="v2"] .ob-list li, html[data-ui="v2"] .ob-tip{ background:none; border-radius:0; border-bottom:1px solid var(--v2-line); padding:12px 0; }
+html[data-ui="v2"] .ob-list .ic{ color:var(--text3); }
+html[data-ui="v2"] .ob-btn.pri{ background:var(--text); border-color:var(--text); color:var(--card); }
+html[data-ui="v2"] .ob-ic{ background:var(--card2); }
+/* AI 단추·순서 모드의 보라 그림자 */
+html[data-ui="v2"] .jarvis-btn, html[data-ui="v2"] .jarvis-btn:hover{ box-shadow:0 2px 8px rgba(0,0,0,.18); }
+html[data-ui="v2"] .habit-item.reorder-mode, html[data-ui="v2"] .cl-item.reorder-mode{ border-color:var(--border2); background:var(--card2); }
+/* 홈트 플랜 창 */
+html[data-ui="v2"] .hp-tab{ border-radius:18px; background:none; }
+html[data-ui="v2"] .hp-tab-on{ background:var(--text); border-color:var(--text); color:var(--card); }
+html[data-ui="v2"] .hp-tab .ic{ width:16px; height:16px; }
+html[data-ui="v2"] .hp-tag-muscle, html[data-ui="v2"] .hp-tag-sets, html[data-ui="v2"] .hp-tag-rest{ background:none !important; border:1px solid var(--border); color:var(--text2) !important; }
+html[data-ui="v2"] .hp-ex, html[data-ui="v2"] .hp-ex-open{ border:0; border-bottom:1px solid var(--v2-line); border-radius:0; box-shadow:none !important; background:none; }
+html[data-ui="v2"] .hp-tip{ background:none; border-left:2px solid var(--accent); border-radius:0; }
+/* 창 안의 상자형 줄 → 선 */
+html[data-ui="v2"] .cardset-row, html[data-ui="v2"] .sw-row{ background:none; border:0; border-bottom:1px solid var(--v2-line); border-radius:0; margin:0; padding:12px 0; }
+html[data-ui="v2"] .wk-pick .sw-row{ padding:12px 0; }
+html[data-ui="v2"] .sw-row .ex-th:empty, html[data-ui="v2"] .sw-row .ex-th.none{ display:none; }
+html[data-ui="v2"] .ai-prov.on{ background:none; border-color:var(--text); }
+html[data-ui="v2"] .lp-btn{ background:none; border:0; border-bottom:1px solid var(--v2-line); border-radius:0; text-align:left; padding:14px 0; }
+/* 요일 고르기·선택 칩: 꽉 찬 주황 대신 잉크 */
+html[data-ui="v2"] .day-pick-btn:has(input:checked){ background:var(--text) !important; border-color:var(--text) !important; color:var(--card) !important; }
+/* 습관 주간 칸: 회색 상자 없이 */
+html[data-ui="v2"] .hw-row > *{ background:none; }
+/* 기기 연결 번호 칸 */
+html[data-ui="v2"] #dpPin{ background:var(--card2) !important; font-family:var(--v2-num) !important; outline:none; border:1px solid var(--border); border-radius:12px; }
+/* 경제 알림 설정 스위치를 설정 화면 스위치와 같은 크기로 */
+html[data-ui="v2"] .ec-sw{ width:50px; height:30px; }
+html[data-ui="v2"] .ec-sw span{ border-radius:15px; }
+html[data-ui="v2"] .ec-sw span:before{ width:24px; height:24px; }
+html[data-ui="v2"] .ec-sw input:checked+span:before{ transform:translateX(20px); }
+html[data-ui="v2"] .ec-rm{ border-color:var(--border); color:var(--text2); }
+/* 상단바 별표·AI 표시 */
+html[data-ui="v2"] .uc-star{ color:var(--accent); font-weight:600; margin-right:2px; }
+html[data-ui="v2"] .stats-jarvis-icon{ font-family:var(--v2-num); font-size:10px; font-weight:600; color:var(--accent); letter-spacing:.06em; }
+html[data-ui="v2"] .habit-streak{ font-family:var(--v2-num); font-size:11px; color:var(--accent); }
+html[data-ui="v2"] .econ-login, html[data-ui="v2"] .ec-login-need{ color:var(--text3) !important; }

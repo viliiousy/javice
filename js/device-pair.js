@@ -21,7 +21,7 @@ const DevicePair = {
     App.openModal('@grid 기기 연결', `
       <div style="display:grid;gap:12px">
         <div style="font-size:13px;color:var(--text2);line-height:1.6">
-          태블릿 허브 화면의 <b>⚙ 설정 → bashy 계정으로 연결</b>을 누르면 나오는 6자리 번호를 넣어 주세요.
+          태블릿 허브 화면의 <b>설정 → bashy 계정으로 연결</b>을 누르면 나오는 6자리 번호를 넣어 주세요.
           승인하면 그 기기가 이 계정의 AI 사용량·할 일과 저장된 스마트홈 설정을 바로 씁니다.
         </div>
         <input id="dpPin" inputmode="numeric" maxlength="7" autocomplete="one-time-code" placeholder="000 000" value="${pin}"

@@ -284,7 +284,7 @@ const Diet = {
     const q=(document.getElementById('dietSearch')?.value||'').trim();
     if(!q) return;
     const key=JARVIS._getKey();
-    if(!key){ App.showToast('Bashy API 키를 먼저 설정해주세요 (⚡→🔑)','error'); return; }
+    if(!key){ App.showToast('Bashy API 키를 먼저 설정해주세요 (설정 › AI)','error'); return; }
     const btn=document.getElementById('dietAiBtn');
     const box=document.getElementById('dietAiRes');
     if(btn){ btn.disabled=true; btn.textContent='찾는 중…'; }
@@ -586,7 +586,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     const box = document.getElementById('lblResult');
     if(!box) return;
     if(!JARVIS._getKey()){
-      box.innerHTML = `<div class="diet-empty-hint">Bashy API 키를 먼저 설정해주세요 (⚡→🔑)</div>`; return;
+      box.innerHTML = `<div class="diet-empty-hint">Bashy API 키를 먼저 설정해주세요 (설정 › AI)</div>`; return;
     }
     box.innerHTML = `<div class="diet-empty-hint">표를 읽는 중…</div>`;
     // 이 프롬프트의 핵심은 '추정하지 마라' 다. 아는 제품이라도 기억으로 채우면
@@ -768,7 +768,7 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
     const n=cart.length, kcal=this._cartCal();
     this._cart=[];
     App.closeModal();
-    App.showToast(`${n}개 · ${kcal}kcal 추가됨 ✓`,'success');
+    App.showToast(`${n}개 · ${kcal}kcal 추가됨`,'success');
     this.render(date);
   },
 
@@ -800,7 +800,7 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
         </div>
       </div>`:'';
 
-    App.openModal(`${this.EMOJIS[meal]} ${meal} 추가`,`
+    App.openModal(`@diet ${meal} 추가`,`
       <input id="dietSearch" class="inp diet-search" autocomplete="off"
         placeholder="음식 검색 — 초성도 됩니다 (예: ㄷㄱㅅㅅ)"
         oninput="Diet.searchFood(this.value,'${meal}','${ds}')">
@@ -848,12 +848,12 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
   showPhotoAnalysis(dateStr=null){
     const ds=dateStr||this._localDateStr();
     const key=JARVIS._getKey();
-    if(!key){ App.showToast('Bashy API 키를 먼저 설정해주세요 (⚡→🔑)','error'); return; }
+    if(!key){ App.showToast('Bashy API 키를 먼저 설정해주세요 (설정 › AI)','error'); return; }
     App.openModal('@camera 음식 사진 AI 분석',`
       <p style="color:var(--text2);font-size:13px;margin-bottom:10px">사진을 업로드하면 AI가 자동 분석합니다.</p>
       <div style="margin-bottom:10px"><label class="modal-lbl">식사 구분</label>
         <select id="photoMeal" class="inp inp-sm">
-          ${this.MEALS.map(m=>`<option value="${m}"${m===this._suggestMeal()?'selected':''}>${this.EMOJIS[m]} ${m}</option>`).join('')}
+          ${this.MEALS.map(m=>`<option value="${m}"${m===this._suggestMeal()?'selected':''}>${m}</option>`).join('')}
         </select>
       </div>
       <div id="photoDropZone" class="photo-drop-zone" onclick="document.getElementById('photoFileInput').click()">
@@ -923,7 +923,7 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
       data[meal].push(food); this.addToHistory(food);
     });
     this.saveData(data,date); this.render(date);
-    App.closeModal(); App.showToast(`📷 ${meal}에 ${foods.length}개 추가됨 ✓`,'success');
+    App.closeModal(); App.showToast(`${meal}에 ${foods.length}개 추가됨`,'success');
     this._photoBase64=null;
   },
 
@@ -934,7 +934,7 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
     const days=['일','월','화','수','목','금','토'];
     App.openModal('@gear 식단 목표 설정',`
       <div style="margin-bottom:12px">
-        <div style="font-weight:700;font-size:13px;margin-bottom:8px">📅 평일 기본 목표</div>
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px">평일 기본 목표</div>
         <div class="modal-row"><label class="modal-lbl">칼로리 (kcal)</label>
           <input id="sCalG" type="number" value="${s.calorieGoal}" class="inp inp-sm" style="width:90px"></div>
         <div class="modal-grid2">
@@ -944,7 +944,7 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
         </div>
       </div>
       <div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:12px">
-        <div style="font-weight:700;font-size:13px;margin-bottom:8px">🏖️ 휴일 목표</div>
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px">휴일 목표</div>
         <div class="modal-row" style="flex-wrap:wrap;gap:5px"><label class="modal-lbl" style="width:100%">휴일 요일 선택</label>
           ${days.map((d,i)=>`<label style="cursor:pointer;padding:3px 8px;border:1px solid var(--border);border-radius:20px;font-size:12px;background:${rest.includes(i)?'var(--accent)':'var(--bg)'};color:${rest.includes(i)?'white':'var(--text2)'}">
             <input type="checkbox" value="${i}" ${rest.includes(i)?'checked':''} class="rest-day-chk" style="display:none"> ${d}</label>`).join('')}
@@ -986,6 +986,6 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
       restDays,
     }));
     FirebaseSync?.scheduleSave();
-    this.render(); App.closeModal(); App.showToast('저장됨 ✓','success');
+    this.render(); App.closeModal(); App.showToast('저장됨','success');
   },
 };

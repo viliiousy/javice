@@ -97,7 +97,7 @@ const Econ = {
       this.C = null; this.cfg();
       this.save();
       this.render();
-      App.showToast('이전 관심종목 설정을 가져왔습니다 ✓','success');
+      App.showToast('이전 관심종목 설정을 가져왔습니다','success');
     } catch {}
   },
 
@@ -200,7 +200,7 @@ const Econ = {
       <div class="ec-nav">
         ${[['main','메인'],['hold','보유'],['watch','관심종목'],['charts','차트']].map(([v,l]) =>
           `<button class="${this.view===v?'on':''}" onclick="Econ.tab('${v}')">${l}</button>`).join('')}
-        <button class="ec-gear" onclick="Econ.settings()" title="알림 설정">⚙</button>
+        <button class="ec-gear" onclick="Econ.settings()" title="알림 설정" aria-label="알림 설정">${typeof Icons!=='undefined'?Icons.svg('gear'):'설정'}</button>
       </div>
       <div id="ecBody"></div>`);
     document.querySelector('#modal .modal-box')?.classList.add('wide');
@@ -268,8 +268,8 @@ const Econ = {
       h += `<div class="ec-lhead"><span class="ec-lt">${esc(wl.name)}</span>
         <label class="ec-sw"><input type="checkbox" ${wl.alert?'checked':''} onchange="Econ.listAlert('${wl.id}',this.checked)"><span></span></label>
         <span class="ec-meta">알림</span>
-        <button class="btn-sm" onclick="Econ.renameList('${wl.id}')">✎</button>
-        <button class="btn-sm ec-rm" onclick="Econ.delList('${wl.id}')">🗑</button></div>
+        <button class="btn-sm" onclick="Econ.renameList('${wl.id}')">이름</button>
+        <button class="btn-sm ec-rm" onclick="Econ.delList('${wl.id}')">삭제</button></div>
         <input class="inp ec-search" placeholder="이 리스트에 종목 추가 — 검색" oninput="Econ.search(this.value,'L')"><div id="ecLRes"></div>`;
       h += wl.items.length
         ? `<div class="ec-grid">${wl.items.map(it => this._card(it,'L:'+wl.id)).join('')}</div>`
@@ -326,7 +326,7 @@ const Econ = {
       const c = this.cfg(), k = this.keyOf(it);
       if (c.favorites.some(x => this.keyOf(x) === k)) { App.showToast('이미 담았어요'); return; }
       c.favorites.push(Object.assign({ alert:true }, it));
-      this.queueSave(); App.showToast(`★ ${it.name} 담음`, 'success');
+      this.queueSave(); App.showToast(`${it.name} 담음`, 'success');
       try { this._drawMain(); this.render(); } catch {}
       return;
     }
@@ -343,7 +343,7 @@ const Econ = {
     if (where === 'F') {
       if (c.favorites.some(x => this.keyOf(x) === k)) { App.showToast('이미 즐겨찾기에 있어요'); return; }
       c.favorites.push(Object.assign({ alert:true }, it));
-      this.queueSave(); App.showToast('★ 즐겨찾기 추가','success'); this._drawMain(); this.render();
+      this.queueSave(); App.showToast('즐겨찾기 추가','success'); this._drawMain(); this.render();
     } else {
       const w = c.watchlists.find(x => x.id === this.activeList);
       if (!w) return;
@@ -535,7 +535,7 @@ const Econ = {
   // 캡처는 브라우저 밖으로 나가지 않고, AI 에게는 그림만 보낸다. 로그인 정보는 어디에도 안 남는다.
   showHoldScan() {
     if (!JARVIS._getKey()) {
-      App.showToast('Bashy API 키를 먼저 설정해주세요 (⚡→🔑)','error'); return;
+      App.showToast('Bashy API 키를 먼저 설정해주세요 (설정 › AI)','error'); return;
     }
     App.openModal('@camera 캡처로 보유 종목 채우기', `
       <p class="ec-hint" style="margin-bottom:10px">
@@ -685,7 +685,7 @@ JSON 만 출력. 다른 말 금지.
     }
     this.queueSave(); App.closeModal();
     this._drawHold(); this._paintHold();
-    App.showToast(`보유 ${added?`${added}종목 추가`:''}${added&&updated?' · ':''}${updated?`${updated}종목 갱신`:''} ✓`,'success');
+    App.showToast(`보유 ${added?`${added}종목 추가`:''}${added&&updated?' · ':''}${updated?`${updated}종목 갱신`:''}`,'success');
   },
 
   holdSet(k, f, v) {
@@ -756,10 +756,10 @@ JSON 만 출력. 다른 말 금지.
       <div>${rows || '<p class="ec-hint">시간을 추가하세요</p>'}</div>
       <button class="btn-sm" onclick="Econ._times.push('08:00');Econ._renderSettings()">＋ 시간 추가</button>
       <label class="modal-lbl" style="margin-top:16px">장 시작·마감 시세 알림</label>
-      ${mk('kr_open','🇰🇷 한국 장 시작 (09:00)')}
-      ${mk('kr_close','🇰🇷 한국 장 마감 (15:30)')}
-      ${mk('us_open','🇺🇸 미국 장 시작 (밤 22:30경)')}
-      ${mk('us_close','🇺🇸 미국 장 마감 (새벽 05:00경)')}
+      ${mk('kr_open','한국 장 시작 (09:00)')}
+      ${mk('kr_close','한국 장 마감 (15:30)')}
+      ${mk('us_open','미국 장 시작 (밤 22:30경)')}
+      ${mk('us_close','미국 장 마감 (새벽 05:00경)')}
       <p class="ec-hint">켜면 그 시각에 메인 + 알림 켠 리스트 시세를 텔레그램으로 보냅니다.</p>
       <div class="modal-row" style="margin-top:14px"><label class="modal-lbl">급변동 알림 기준 (%)</label>
         <input id="ecMove" type="number" class="inp inp-sm" value="${c.move_pct||10}"></div>
@@ -775,7 +775,7 @@ JSON 만 출력. 다른 말 금지.
     delete c.report_time;
     c.move_pct = parseFloat(document.getElementById('ecMove')?.value) || 10;
     this.save();
-    App.showToast('설정 저장됨 ✓','success');
+    App.showToast('설정 저장됨','success');
     this.open(this.view);
   },
 

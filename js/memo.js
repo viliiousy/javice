@@ -203,7 +203,7 @@ const Memo = {
     const t = String(text || '').trim();
     if (!t) return;
     const done = () => { el?.classList.add('cp-ok'); setTimeout(()=>el?.classList.remove('cp-ok'), 900);
-                         App?.showToast('복사됨 ✓','success'); Sounds?.click(); };
+                         App?.showToast('복사됨','success'); Sounds?.click(); };
     if (navigator.clipboard?.writeText) navigator.clipboard.writeText(t).then(done).catch(()=>this._copyFallback(t,done));
     else this._copyFallback(t, done);
   },
@@ -498,7 +498,7 @@ const Memo = {
     this._sel = after.cloneRange();
     ed.focus();
     this.paintMarks(ed);
-    App.showToast('복사 링크 만듦 ✓','success');
+    App.showToast('복사 링크 만듦','success');
   },
 
   // 고른 범위에 걸린 복사 링크들.
@@ -535,7 +535,7 @@ const Memo = {
     const items = this.getItems();
     items.unshift({ id:'memo_'+Date.now(), title, html, content,
       createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() });
-    this.saveItems(items); this.render(); App.closeModal(); App.showToast('메모 저장됨 ✓','success');
+    this.saveItems(items); this.render(); App.closeModal(); App.showToast('메모 저장됨','success');
   },
 
   _saveEdit(id){
@@ -545,7 +545,7 @@ const Memo = {
     const items = this.getItems();
     const m = items.find(x => x.id === id);
     if(m){ m.title=title; m.html=html; m.content=content; m.updatedAt=new Date().toISOString(); }
-    this.saveItems(items); this.render(); App.closeModal(); App.showToast('수정됨 ✓','success');
+    this.saveItems(items); this.render(); App.closeModal(); App.showToast('수정됨','success');
   },
 
   remove(id){

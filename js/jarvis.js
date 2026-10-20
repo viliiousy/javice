@@ -40,9 +40,9 @@ const JARVIS = {
           </div>
         </div>
         <div id="jMsgs" class="j-msgs">
-          <div class="j-msg j-ai"><div class="j-avatar">⚡</div>
+          <div class="j-msg j-ai"><div class="j-avatar">B</div>
             <div class="j-bubble">AI 비서입니다. 말하거나 입력하면 기록해 드려요.<br>
-              <span style="font-size:11px;color:var(--accent-l)">할일·일정·체크리스트·습관·식단·메모 관리 가능<br>📷 사진으로 식단 자동 분석</span>
+              <span style="font-size:11px;color:var(--accent-l)">할일·일정·체크리스트·습관·식단·메모 관리 가능<br>사진으로 식단 자동 분석</span>
             </div>
           </div>
         </div>
@@ -139,13 +139,13 @@ const JARVIS = {
     const dietData = (typeof Diet!=='undefined') ? Diet.getData() : {아침:[],점심:[],저녁:[],간식:[]};
 
     if(hour>=9 && hour<11 && !this._sentReminders.has('breakfast') && dietData['아침'].length===0){
-      reminders.push({ id:'breakfast', msg:'🌅 아침 식사를 아직 기록하지 않으셨어요. 잊지 마세요!' });
+      reminders.push({ id:'breakfast', msg:'아침 식사를 아직 기록하지 않으셨어요. 잊지 마세요!' });
     }
     if(hour>=13 && hour<15 && !this._sentReminders.has('lunch') && dietData['점심'].length===0){
-      reminders.push({ id:'lunch', msg:'🌞 점심 식사를 아직 기록하지 않으셨어요.' });
+      reminders.push({ id:'lunch', msg:'점심 식사를 아직 기록하지 않으셨어요.' });
     }
     if(hour>=19 && hour<21 && !this._sentReminders.has('dinner') && dietData['저녁'].length===0){
-      reminders.push({ id:'dinner', msg:'🌙 저녁 식사를 아직 기록하지 않으셨어요.' });
+      reminders.push({ id:'dinner', msg:'저녁 식사를 아직 기록하지 않으셨어요.' });
     }
 
     // ── 오늘 마감 할일 리마인더 ──────────
@@ -159,7 +159,7 @@ const JARVIS = {
         });
       });
       if(dueToday.length>0){
-        reminders.push({ id:'due_today', msg:`📋 오늘 마감 할일 ${dueToday.length}개 있습니다: ${dueToday.slice(0,2).join(', ')}${dueToday.length>2?` 외 ${dueToday.length-2}개`:''}` });
+        reminders.push({ id:'due_today', msg:`오늘 마감 할일 ${dueToday.length}개 있습니다: ${dueToday.slice(0,2).join(', ')}${dueToday.length>2?` 외 ${dueToday.length-2}개`:''}` });
       }
     }
 
@@ -172,7 +172,7 @@ const JARVIS = {
         });
       });
       if(overdue.length>0){
-        reminders.push({ id:'overdue', msg:`⚠️ 기한 초과된 할일 ${overdue.length}개: ${overdue.slice(0,2).join(', ')}${overdue.length>2?` 외 ${overdue.length-2}개`:''}` });
+        reminders.push({ id:'overdue', msg:`기한 초과된 할일 ${overdue.length}개: ${overdue.slice(0,2).join(', ')}${overdue.length>2?` 외 ${overdue.length-2}개`:''}` });
       }
     }
 
@@ -188,7 +188,7 @@ const JARVIS = {
         const ev=upcoming[0];
         const evTime=new Date(ev.start.dateTime);
         const diff=Math.round((evTime-now)/60000);
-        reminders.push({ id:'upcoming_event', msg:`📅 ${diff}분 후 일정: "${ev.summary}" (${evTime.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false})})` });
+        reminders.push({ id:'upcoming_event', msg:`${diff}분 후 일정: "${ev.summary}" (${evTime.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false})})` });
       }
     }
 
@@ -208,13 +208,13 @@ const JARVIS = {
 
   // ── 📷 사진 분석 ─────────────────────
   triggerPhoto() {
-    if(!this._getKey()){ this._addMsg('ai','🔑 API 키를 먼저 설정해주세요.'); this.showKeySetup(); return; }
+    if(!this._getKey()){ this._addMsg('ai','API 키를 먼저 설정해주세요.'); this.showKeySetup(); return; }
     document.getElementById('jPhotoInput')?.click();
   },
   _onPhotoSelected(input) {
     const file=input.files[0]; if(!file) return; input.value='';
     const reader=new FileReader();
-    reader.onload=e=>{ const b64=e.target.result.split(',')[1]; this._addMsg('user','📷 음식 사진 분석'); this._analyzeFood(b64,file.type||'image/jpeg'); };
+    reader.onload=e=>{ const b64=e.target.result.split(',')[1]; this._addMsg('user','음식 사진 분석'); this._analyzeFood(b64,file.type||'image/jpeg'); };
     reader.readAsDataURL(file);
   },
   async _analyzeFood(base64,mimeType) {
@@ -230,11 +230,11 @@ const JARVIS = {
       let parsed; try{ const m=text.match(/\{[\s\S]*\}/); parsed=m?JSON.parse(m[0]):null; }catch{}
       if(!parsed?.foods){ this._addMsg('ai','음식을 인식하지 못했습니다.'); return; }
       const meal=parsed.meal||'저녁';
-      this._addMsg('ai',`✅ ${meal} 분석!\n${parsed.foods.map(f=>`${f.name}(${f.amount||'?'}) ${f.cal}kcal`).join(', ')}\n합계: ${parsed.total_cal}kcal`);
+      this._addMsg('ai',`${meal} 분석\n${parsed.foods.map(f=>`${f.name}(${f.amount||'?'}) ${f.cal}kcal`).join(', ')}\n합계: ${parsed.total_cal}kcal`);
       const d=Diet.getData(); if(!d[meal])d[meal]=[];
       parsed.foods.forEach(f=>{ const food={name:f.name+(f.amount?`(${f.amount})`:''),cal:f.cal||0,protein:f.protein||0,carb:f.carb||0,fat:f.fat||0}; d[meal].push(food); Diet.addToHistory(food); });
       Diet.saveData(d); Diet.render();
-      App.showToast(`📷 ${meal}에 ${parsed.foods.length}개 추가 ✓`,'success');
+      App.showToast(`${meal}에 ${parsed.foods.length}개 추가`,'success');
       App._updateStatsBanner();
     }catch(err){ this._addMsg('ai',`분석 실패: ${err.message}`); }
     this._setStatus('대기 중');
@@ -294,7 +294,7 @@ const JARVIS = {
           App.S.tasks[lid].unshift(t);
           App._renderTasks();
           CalendarUI.render(document.getElementById('miniCal'),App.S.calDate,App.S.events,App.S.selDate);
-          App.showToast(`✅ 할일: ${action.title}`,'success');
+          App.showToast(`할일: ${action.title}`,'success');
           break;
         }
         case 'edit_task': {
@@ -303,7 +303,7 @@ const JARVIS = {
           const updated=await GoogleTasks.updateTask(lid,action.taskId,{title:action.title,notes:action.notes,due:action.due});
           const t=App.S.tasks[lid]?.find(x=>x.id===action.taskId);
           if(t) Object.assign(t,{title:updated.title,notes:updated.notes||'',due:updated.due||null});
-          App._renderTasks(); App.showToast(`✏️ 할일 수정됨`,'success'); break;
+          App._renderTasks(); App.showToast(`할일 수정됨`,'success'); break;
         }
         case 'delete_task': {
           if(!Auth.isLoggedIn()) break;
@@ -312,7 +312,7 @@ const JARVIS = {
           if(!lid||!tid) break;
           await GoogleTasks.deleteTask(lid,tid);
           App.S.tasks[lid]=App.S.tasks[lid]?.filter(t=>t.id!==tid);
-          App._renderTasks(); App.showToast(`🗑 할일 삭제됨`,'success'); break;
+          App._renderTasks(); App.showToast(`할일 삭제됨`,'success'); break;
         }
         case 'add_event': {
           if(!Auth.isLoggedIn()) break;
@@ -320,27 +320,27 @@ const JARVIS = {
           App.S.events.push(ev);
           App.S.events.sort((a,b)=>new Date(a.start?.dateTime||a.start?.date)-new Date(b.start?.dateTime||b.start?.date));
           CalendarUI.render(document.getElementById('miniCal'),App.S.calDate,App.S.events,App.S.selDate);
-          App._renderCalPanel(); App.showToast(`📅 일정: ${action.summary}`,'success'); break;
+          App._renderCalPanel(); App.showToast(`일정: ${action.summary}`,'success'); break;
         }
         case 'delete_event': {
           if(!Auth.isLoggedIn()) break;
           const ev=App.S.events.find(e=>e.id===action.eventId||(action.title&&e.summary?.includes(action.title)));
-          if(ev){ await GoogleCalendar.deleteEvent(ev.id,ev._calId||'primary'); App.S.events=App.S.events.filter(e=>e.id!==ev.id); App._renderCalPanel(); App.showToast('🗑 일정 삭제됨','success'); } break;
+          if(ev){ await GoogleCalendar.deleteEvent(ev.id,ev._calId||'primary'); App.S.events=App.S.events.filter(e=>e.id!==ev.id); App._renderCalPanel(); App.showToast('일정 삭제됨','success'); } break;
         }
         case 'add_checklist': {
           const items=Checklist.getItems();
           items.push({id:'cl_'+Date.now(),title:action.title,dueDate:action.dueDate||null,done:false,createdAt:new Date().toISOString()});
-          Checklist.saveItems(items); Checklist.render(); App.showToast(`✍️ 체크리스트: ${action.title}`,'success'); break;
+          Checklist.saveItems(items); Checklist.render(); App.showToast(`체크리스트: ${action.title}`,'success'); break;
         }
         case 'edit_checklist': {
           const items=Checklist.getItems();
           const it=items.find(i=>i.id===action.id||(action.searchTitle&&i.title.includes(action.searchTitle||action.title)));
-          if(it){ if(action.newTitle) it.title=action.newTitle; if(action.dueDate!==undefined) it.dueDate=action.dueDate; Checklist.saveItems(items); Checklist.render(); App.showToast('✏️ 체크리스트 수정됨','success'); } break;
+          if(it){ if(action.newTitle) it.title=action.newTitle; if(action.dueDate!==undefined) it.dueDate=action.dueDate; Checklist.saveItems(items); Checklist.render(); App.showToast('체크리스트 수정됨','success'); } break;
         }
         case 'delete_checklist': {
           const before=Checklist.getItems();
           const after=before.filter(i=>!(i.id===action.id||(action.title&&i.title.includes(action.title))));
-          if(after.length<before.length){ Checklist.saveItems(after); Checklist.render(); App.showToast('🗑 체크리스트 삭제됨','success'); } break;
+          if(after.length<before.length){ Checklist.saveItems(after); Checklist.render(); App.showToast('체크리스트 삭제됨','success'); } break;
         }
         case 'toggle_checklist': {
           const items=Checklist.getItems();
@@ -350,17 +350,17 @@ const JARVIS = {
         case 'add_memo': {
           const items=Memo.getItems();
           items.unshift({id:'memo_'+Date.now(),title:action.title,content:action.content||'',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
-          Memo.saveItems(items); Memo.render(); App.showToast(`📝 메모: ${action.title}`,'success'); break;
+          Memo.saveItems(items); Memo.render(); App.showToast(`메모: ${action.title}`,'success'); break;
         }
         case 'edit_memo': {
           const items=Memo.getItems();
           const m=items.find(i=>i.id===action.id||(action.searchTitle&&i.title.includes(action.searchTitle)));
-          if(m){ if(action.title) m.title=action.title; if(action.content!==undefined) m.content=action.content; m.updatedAt=new Date().toISOString(); Memo.saveItems(items); Memo.render(); App.showToast('✏️ 메모 수정됨','success'); } break;
+          if(m){ if(action.title) m.title=action.title; if(action.content!==undefined) m.content=action.content; m.updatedAt=new Date().toISOString(); Memo.saveItems(items); Memo.render(); App.showToast('메모 수정됨','success'); } break;
         }
         case 'delete_memo': {
           const before=Memo.getItems();
           const after=before.filter(m=>!(m.id===action.id||(action.title&&m.title.includes(action.title))));
-          if(after.length<before.length){ Memo.saveItems(after); Memo.render(); App.showToast('🗑 메모 삭제됨','success'); } break;
+          if(after.length<before.length){ Memo.saveItems(after); Memo.render(); App.showToast('메모 삭제됨','success'); } break;
         }
         case 'log_food': {
           const _targetDate = action.date ? new Date(action.date+'T00:00:00') : new Date();
@@ -369,15 +369,15 @@ const JARVIS = {
           const food={name:action.name,cal:action.cal||0,protein:action.protein||0,carb:action.carb||0,fat:action.fat||0};
           d[meal].push(food); Diet.saveData(d, _targetDate); Diet.addToHistory(food); Diet.render(_targetDate);
           const _dl = action.date && action.date!==new Date().toISOString().split('T')[0] ? ` (${action.date})` : '';
-          App.showToast(`🥗 ${meal}: ${action.name}${_dl}`,'success'); break;
+          App.showToast(`${meal}: ${action.name}${_dl}`,'success'); break;
         }
         case 'delete_food': {
           const dd=Diet.getData(); const meal=action.meal||'간식';
-          if(dd[meal]){ dd[meal]=dd[meal].filter(f=>!f.name.includes(action.name||'__')); Diet.saveData(dd); Diet.render(); App.showToast('🗑 식단 삭제됨','success'); } break;
+          if(dd[meal]){ dd[meal]=dd[meal].filter(f=>!f.name.includes(action.name||'__')); Diet.saveData(dd); Diet.render(); App.showToast('식단 삭제됨','success'); } break;
         }
         case 'complete_habit': {
           const chk=Habits.getChecked();
-          if(!chk.includes(action.habitId)){ chk.push(action.habitId); Habits.setChecked(chk); Habits.render(); App.showToast(`✅ 습관 완료`,'success'); } break;
+          if(!chk.includes(action.habitId)){ chk.push(action.habitId); Habits.setChecked(chk); Habits.render(); App.showToast(`습관 완료`,'success'); } break;
         }
         case 'uncheck_habit': {
           const chk2=Habits.getChecked(); const ui=chk2.indexOf(action.habitId);
@@ -386,12 +386,12 @@ const JARVIS = {
         case 'add_habit': {
           const list=Habits.getList();
           list.push({id:'h'+Date.now(),name:action.name,emoji:action.emoji||'✅',days:action.days||[0,1,2,3,4,5,6]});
-          Habits.saveList(list); Habits.render(); App.showToast(`✅ 습관 추가: ${action.name}`,'success'); break;
+          Habits.saveList(list); Habits.render(); App.showToast(`습관 추가: ${action.name}`,'success'); break;
         }
         case 'delete_habit': {
           const hl=Habits.getList();
           const after=hl.filter(h=>!(h.id===action.habitId||(action.name&&h.name.includes(action.name))));
-          if(after.length<hl.length){ Habits.saveList(after); Habits.render(); App.showToast('🗑 습관 삭제됨','success'); } break;
+          if(after.length<hl.length){ Habits.saveList(after); Habits.render(); App.showToast('습관 삭제됨','success'); } break;
         }
       }
     }catch(err){ console.error('[JARVIS action]',action.type,err); }
@@ -511,7 +511,7 @@ const JARVIS = {
       }catch(e){ this.listening=false; this._setVoice(false); App.showToast('음성 인식을 시작하지 못했습니다','error'); }
       return;
     }
-    if(!this.recognition){ App.showToast(/iPad|iPhone|iPod/.test(navigator.userAgent)?'키보드의 🎤 단추로 말해 주세요':'이 브라우저는 음성 인식을 지원하지 않습니다',''); inp?.focus(); return; }
+    if(!this.recognition){ App.showToast(/iPad|iPhone|iPod/.test(navigator.userAgent)?'키보드의 마이크 단추로 말해 주세요':'이 브라우저는 음성 인식을 지원하지 않습니다',''); inp?.focus(); return; }
     try{ this.recognition.start(); this.listening=true; this._setVoice(true); }catch{ App.showToast('마이크 권한이 필요합니다','error'); }
   },
   _stopListen() {
@@ -563,7 +563,7 @@ const JARVIS = {
     const clean=esc(text).replace(/\n/g,'<br>');
     const isReminder=type==='reminder';
     d.innerHTML=isAI
-      ?`<div class="j-avatar">${isReminder?'🔔':'⚡'}</div><div class="j-bubble${type==='tip'?' j-tip':isReminder?' j-reminder':''}">${clean}</div>`
+      ?`<div class="j-avatar">${isReminder?'!':'B'}</div><div class="j-bubble${type==='tip'?' j-tip':isReminder?' j-reminder':''}">${clean}</div>`
       :`<div class="j-bubble j-bubble-user">${clean}</div>`;
     wrap.appendChild(d);
     wrap.scrollTop=wrap.scrollHeight;

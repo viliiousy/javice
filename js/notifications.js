@@ -197,7 +197,7 @@ const Notifications = {
         App.showToast('알림 등록 실패: ' + reg.error, 'error');
         return false;
       }
-      App.showToast('✅ 백그라운드 알림 활성화됨', 'success');
+      App.showToast('백그라운드 알림 활성화됨', 'success');
       return true;
     } catch (e) {
       console.error('[Notif] 구독 실패:', e);
