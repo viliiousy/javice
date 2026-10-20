@@ -277,6 +277,9 @@ const WorkoutMode = {
     const doneN = S.ex.filter(e => e.done).length;
     const A = v => esc(v).replace(/'/g, '&#39;');
     const nowK = x.rows.findIndex(q => !q.ok);
+    // 운동 순서: 지금 운동 앞의 것은 위에, 뒤의 것은 아래에 (예: 3번째면 1·2 → 지금 운동 → 4·5·6·7)
+    const li = (a, b) => S.ex.slice(a, b).map((e, j) => { const i = a + j; return `<button class="wk-li${e.done ? ' done' : ''}" onclick="WorkoutMode.go(${i})">
+          <span>${i + 1}</span><b>${esc(e.name)}</b><i>${e.done ? '완료' : e.rows.filter(r => r.ok).length + '/' + e.rows.length}</i></button>`; }).join('');
     el.innerHTML = `
       <div class="wk-top">
         <button class="wk-x" onclick="WorkoutMode.finish()">끝내기</button>
@@ -284,6 +287,7 @@ const WorkoutMode = {
         <button class="wk-x" onclick="WorkoutMode.restSetting()">${pf.timer ? '휴식 ' + this._fmt(pf.rest) : '휴식 끔'}${pf.sound ? '' : ' · 무음'}</button>
       </div>
       <div class="wk-body">
+        ${S.cur > 0 ? `<div class="wk-list wk-before">${li(0, S.cur)}</div>` : ''}
         <div class="wk-stage">${th ? `<div class="wk-pose">${ExMedia.poseHtml(th, esc(x.name))}</div>` : `<div class="wk-pose none">${typeof Icons !== 'undefined' ? Icons.svg('dumbbell') : ''}<span>자세 그림 준비 중</span></div>`}</div>
         <div class="wk-ex-tx">
           <div class="wk-n">${S.cur + 1}<i>/${S.ex.length}</i>${part ? `<span class="wk-part">${esc(part)}</span>` : ''}</div>
@@ -305,8 +309,7 @@ const WorkoutMode = {
           </div><button class="wk-sdel" onclick="WorkoutMode.delSet(${k})">삭제</button></div>`).join('')}
           <div class="wk-row-btns"><button class="btn-sm" onclick="WorkoutMode.addSet()">+ 세트</button><span class="wk-hint">세트를 왼쪽으로 밀면 삭제</span></div>
         </div>`}
-        <div class="wk-list">${S.ex.map((e, i) => `<button class="wk-li${i === S.cur ? ' cur' : ''}${e.done ? ' done' : ''}" onclick="WorkoutMode.go(${i})">
-          <span>${i + 1}</span><b>${esc(e.name)}</b><i>${e.done ? '완료' : e.rows.filter(r => r.ok).length + '/' + e.rows.length}</i></button>`).join('')}</div>
+        ${S.cur < S.ex.length - 1 ? `<div class="wk-list wk-after">${li(S.cur + 1, S.ex.length)}</div>` : ''}
       </div>
       <div class="wk-bar">
         ${x.cardio || nowK < 0

@@ -74,8 +74,8 @@ const Settings = {
         ${this._item('테마', this._seg(App._theme, [['system','시스템'],['light','밝게'],['dark','어둡게']], 'Settings.setTheme'))}
         ${this._item('아이콘', this._seg(Icons.mode, [['simple','심플'],['color','컬러']], 'Settings.setIcons'))}
         <div class="set-h">메인 화면</div>
-        ${this._link('보일 카테고리', "Settings.go('cats')", `${Tabs.DEF.filter(t => Tabs.tabOn(t.id)).map(t => t.label).join(' · ')} — 카테고리와 그 안의 카드를 켜고 끕니다`)}
-        ${this._link('상단바 정보', "Settings.go('topinfo')", '몸무게·체지방·BMI·근육량·추세·주식 등락·AI 사용량')}`;
+        ${this._link('상단바 정보', "Settings.go('topinfo')", '몸무게·체지방·BMI·근육량·추세·주식 등락·AI 사용량')}
+        ${this._link('보일 카테고리', "Settings.go('cats')", `${Tabs.DEF.filter(t => Tabs.tabOn(t.id)).map(t => t.label).join(' · ')} — 카테고리와 그 안의 카드를 켜고 끕니다`)}`;
     } else if (cat === 'topinfo') {
       h = TopInfo.pageHtml();
     } else if (cat === 'cats') {

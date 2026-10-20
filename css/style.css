@@ -3863,3 +3863,8 @@ body.wk-on{ overflow:hidden; }
 .wh-row b{ font-weight:600; }
 .lg-hist{ margin:12px 0 4px; }
 .lg-hist summary{ cursor:pointer; font-size:13px; color:var(--text2, var(--text)); padding:6px 0; }
+
+/* 운동 모드: 지난 운동은 위, 남은 운동은 아래 */
+.wk-list.wk-before{ margin:0 0 16px; border-top:0; border-bottom:1px solid #1E2024; }
+.wk-list.wk-before .wk-li{ padding:8px 0; }
+.wk-list.wk-before .wk-li:last-child{ border-bottom:0; }

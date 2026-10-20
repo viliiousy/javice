@@ -32,7 +32,7 @@ const TopInfo = {
   // 몸 지표 칩들 (칼로리 칩은 app.js 가 만든 것을 그대로 받는다)
   bodyChips(calChip) {
     const c = this.get();
-    let out = c.kcal ? calChip : '';
+    let out = '';
     let recs = [];
     try { recs = (typeof InBody !== 'undefined' && InBody.getRecords()) || []; } catch (e) {}
     const last = k => { for (let i = recs.length - 1; i >= 0; i--) if (Number(recs[i][k]) > 0) return recs[i][k]; return null; };
@@ -43,7 +43,8 @@ const TopInfo = {
       const v = last(k); if (v == null) continue;
       out += `<div class="stat-chip stat-${k}" data-s="inbody" title="최근 기록">${lbl[k] ? `<span class="ti-lb">${lbl[k]}</span>` : ''}<b>${v}</b>${unit[k]}${this._trend(recs, k)}</div>`;
     }
-    return out;
+    // 칼로리는 늘 왼쪽, 몸 수치(몸무게·체지방·BMI·근육량)는 한 묶음으로 오른쪽에 모은다
+    return (c.kcal ? calChip : '') + (out ? `<span class="ti-grp">${out}</span>` : '');
   },
 
   // 주식: 오늘 등락. 보유는 평가액 가중 평균, 관심종목은 앞 2개.

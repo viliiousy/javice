@@ -544,3 +544,8 @@ html[data-ui="v2"] .stats-row .sg-l{ order:0; }
   html[data-ui="v2"] .stats-upcoming-chip, html[data-ui="v2"] .stats-urgent-chip{ height:24px; padding:0 8px !important; font-size:11.5px !important; line-height:22px; display:inline-flex; align-items:center; flex:none; max-width:46vw; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   html[data-ui="v2"] .stats-upcoming-chip .chip-ic{ width:11px; height:11px; }
 }
+
+/* 상단바 몸 수치: 칼로리는 왼쪽, 나머지는 묶어서 오른쪽 */
+html[data-ui="v2"] .sg-r .ti-grp{ display:flex; align-items:center; gap:inherit; margin-left:auto; }
+html[data-ui="v2"] .stats-row.dense .sg-r{ justify-content:flex-start !important; }
+html[data-ui="v2"] .stats-row.dense .sg-r .ti-grp{ gap:8px; }
