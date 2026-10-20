@@ -74,8 +74,8 @@ const PlanGen = {
     legs:  ['하체', ['squat', 'hinge', 'lunge', 'quad', 'ham', 'calf', 'core']],
   },
   // 주당 일수 × 경력 → 날 순서 (연구 요약의 분할표)
-  split(days, level, loc, equip) {
-    const lowGear = loc === 'body' || (loc === 'home' && !equip.includes('barbell') && !equip.includes('machine'));
+  split(days, level, have) {
+    const lowGear = !have.includes('barbell') && !have.includes('machine');
     const adv = level === 'mid';
     if (days <= 2) return ['fullA', 'fullB'];
     if (days === 3) return adv && !lowGear ? ['push', 'pull', 'legs'] : ['fullA', 'fullB', 'fullC'];
@@ -105,12 +105,20 @@ const PlanGen = {
   ban(name) { const b = this.bans(); if (!b.includes(name)) { b.push(name); UserStore.set(this.BAN_KEY, JSON.stringify(b)); window.FirebaseSync?.scheduleSave?.(); } },
 
   // 이 사람이 쓸 수 있는 기구 (맨몸은 늘 가능)
+  ALL_EQUIP: ['dumbbell', 'barbell', 'machine', 'cable', 'bar', 'band', 'kettlebell', 'trx'],
+  // 운동 장소: 이름을 붙여 여러 곳(헬스장 A·회사 헬스장·집…)을 두고, 장소마다 보유 운동기구를 따로 저장한다.
+  // 예전 설정(loc: gym/home/body + equip)은 첫 장소로 옮겨 온다. '추천하지 않을 기구'(exclude)는 장소와 상관없이 사람에게 붙는다.
+  places(p) {
+    p = p || this.profile() || {};
+    if (Array.isArray(p.places) && p.places.length) return p.places;
+    const loc = p.loc || 'gym';
+    return [{ id: 'pl_' + loc, name: loc === 'gym' ? '헬스장' : loc === 'home' ? '집' : '집 (맨몸)',
+      equip: loc === 'gym' ? this.ALL_EQUIP.slice() : loc === 'body' ? (p.equip || []).filter(e => e === 'bar' || e === 'band') : (p.equip || []).slice() }];
+  },
+  place(p) { p = p || this.profile() || {}; const ps = this.places(p); return ps.find(x => x.id === p.place) || ps[0]; },
   have(p) {
     p = p || this.profile() || {};
-    let set;
-    if (!p.loc || p.loc === 'gym') set = ['dumbbell', 'barbell', 'machine', 'cable', 'bar', 'band', 'kettlebell', 'trx'];
-    else if (p.loc === 'body') set = (p.equip || []).filter(e => e === 'bar' || e === 'band');
-    else set = p.equip || [];
+    const set = this.place(p).equip || [];
     const ex = p.exclude || [];
     return ['body', ...set.filter(e => !ex.includes(e))];
   },
@@ -130,7 +138,7 @@ const PlanGen = {
   // ── 플랜 만들기 ─────────────────────────
   generate(p) {
     const days = Math.max(2, Math.min(6, Number(p.days) || 3));
-    const order = this.split(days, p.level, p.loc, p.equip || []);
+    const order = this.split(days, p.level, this.have(p));
     let n = this.COUNT[p.mins] || 5;
     if (p.level === 'new') n -= 1;
     const [mainSet, accSet] = this.SETS[p.goal] || this.SETS.muscle;
@@ -180,7 +188,6 @@ const PlanGen = {
   Q: [
     ['goal', '목표', [['muscle', '근육 키우기'], ['strength', '힘 세지기'], ['lose', '체중 감량'], ['health', '건강·체력']]],
     ['level', '운동 경력', [['new', '처음 (6개월 미만)'], ['beg', '초급 (2년 미만)'], ['mid', '중급 이상']]],
-    ['loc', '어디서 하나요', [['gym', '헬스장'], ['home', '집 (기구 있음)'], ['body', '집 (맨몸)']]],
     ['days', '일주일에 몇 번', [[2, '2회'], [3, '3회'], [4, '4회'], [5, '5회'], [6, '6회']]],
     ['mins', '한 번에 몇 분', [[30, '30분'], [45, '45분'], [60, '60분'], [75, '75분+']]],
   ],
@@ -211,7 +218,11 @@ const PlanGen = {
     const p = this._p;
     const row = (t, inner, sub) => `<div class="pg-q"><div class="pg-t">${t}${sub ? `<small>${sub}</small>` : ''}</div><div class="pg-cs">${inner}</div></div>`;
     let h = this.Q.map(([k, t, opts]) => row(t, opts.map(([v, l]) => this._chip(k, v, l)).join(''))).join('');
-    if (p.loc !== 'gym') h += row('가진 기구', this.EQUIP.filter(([e]) => p.loc === 'home' || e === 'bar' || e === 'band').map(([e, l]) => this._chip('equip', e, l, true)).join(''), '여러 개 고를 수 있습니다');
+    if (!p.places) { p.places = this.places(p); p.place = p.places[0].id; }
+    const pl = this.place(p);
+    h += row('운동 장소', p.places.map(x => `<button type="button" class="pg-c${x.id === pl.id ? ' on' : ''}" onclick="PlanGen._pickPlace('${x.id}')">${esc(x.name)}</button>`).join('')
+      + `<button type="button" class="pg-c pg-add" onclick="PlanGen._addPlace()">+ 장소</button>`, '헬스장을 여러 곳 다니면 장소마다 기구를 따로 정해 둡니다');
+    h += row(`보유 운동기구 · ${esc(pl.name)}`, this.EQUIP.map(([e, l]) => `<button type="button" class="pg-c${(pl.equip || []).includes(e) ? ' on' : ''}" onclick="PlanGen._togglePlaceEq('${e}')">${l}</button>`).join(''), '없는 기구는 눌러서 끕니다 · 맨몸 운동은 늘 들어갑니다');
     h += row('더 키우고 싶은 부위', ['가슴', '등', '어깨', '하체', '이두', '삼두', '복근'].map(x => this._chip('focus', x, x, true)).join(''), '선택 · 최대 2개 권장');
     h += row('유산소', this._chip('cardio', true, '쉬는 날에 넣기') + this._chip('cardio', false, '넣지 않기'));
     h += row('아픈 곳', [['shoulder', '어깨'], ['back', '허리'], ['knee', '무릎'], ['wrist', '손목']].map(([v, l]) => this._chip('injury', v, l, true)).join(''), '그 부위에 부담이 큰 동작을 뺍니다');
@@ -222,6 +233,18 @@ const PlanGen = {
         <span>${r.exercises.map(x => esc(x.name)).join(' · ') || '가능한 운동이 없습니다 — 기구를 더 골라 주세요'}</span></div>`).join('')}
       <p class="pg-note">세트 ${esc((this.SETS[p.goal] || this.SETS.muscle).join(' / '))} · 종목 ${plan.routines[0]?.exercises.length || 0}개 · 쉬는 날 ${p.cardio ? '가벼운 유산소' : '휴식'}</p></div>`;
     b.innerHTML = h;
+  },
+  _pickPlace(id) { this._p.place = id; this._paint(); },
+  _addPlace() {
+    const name = prompt('운동 장소 이름 (예: 회사 헬스장, 집)'); if (!name || !name.trim()) return;
+    const id = 'pl_' + Date.now().toString(36);
+    this._p.places = (this._p.places || this.places(this._p)).concat({ id, name: name.trim().slice(0, 20), equip: this.ALL_EQUIP.slice() });
+    this._p.place = id; this._paint();
+  },
+  _togglePlaceEq(e) {
+    const pl = this._p.places.find(x => x.id === this._p.place) || this._p.places[0];
+    pl.equip = (pl.equip || []).includes(e) ? pl.equip.filter(x => x !== e) : (pl.equip || []).concat(e);
+    this._paint();
   },
   make() {
     const p = this._p;
@@ -252,7 +275,7 @@ const PlanGen = {
     const logs = this.recentLogs();
     App.showToast('AI 가 플랜을 짜는 중…');
     const prompt = `당신은 근력 운동 코치입니다. 아래 조건과 지난 기록으로 주간 루틴을 짜 주세요.
-조건: ${JSON.stringify({ 목표: p.goal, 경력: p.level, 장소: p.loc, 주당: p.days, 분: p.mins, 집중: p.focus, 아픈곳: p.injury })}
+조건: ${JSON.stringify({ 목표: p.goal, 경력: p.level, 장소: this.place(p).name, 기구: this.have(p), 주당: p.days, 분: p.mins, 집중: p.focus, 아픈곳: p.injury })}
 기본안(규칙 기반): ${JSON.stringify(base.routines.map(r => ({ name: r.name, ex: r.exercises.map(x => x.name + ' ' + x.sets) })))}
 지난 4주 기록(날짜 운동: 무게×횟수): ${logs.length ? logs.join(' | ') : '없음'}
 규칙: 운동 이름은 반드시 아래 목록에서만 고른다. 날 수는 ${base.routines.length}개. 기록이 있으면 각 종목 sets 뒤에 다음 목표 무게를 '@60kg' 처럼 붙인다(모든 세트가 반복 상한이면 +2.5~5kg, 두 번 연속 하한 미만이면 -10%).
@@ -315,6 +338,7 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
       <p class="pg-note">${esc(this.suggest(name, sets, ds) || '처음 기록입니다 — 2~3회 더 할 수 있는 무게로 시작하세요')}</p>
       <div id="lgRows" class="lg-rows">${Array.from({ length: n }, (_, i) => this._lgRow(i, cur[i])).join('')}</div>
       <button class="habit-add-btn" onclick="PlanGen._lgAdd()">+ 세트</button>
+      <details class="lg-hist"><summary>지난 기록 · 그래프</summary><div class="wh">${typeof WorkoutHistory!=='undefined' ? WorkoutHistory.html(name) : ''}</div></details>
       <div class="modal-btns"><button class="btn-sm accent" onclick="PlanGen._lgSave()">저장</button><button class="btn-sm" onclick="App.closeModal()">취소</button></div>`);
   },
   _lgRow(i, s) {

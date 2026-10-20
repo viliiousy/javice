@@ -3797,3 +3797,69 @@ body.wk-on{ overflow:hidden; }
 .wk-pick .sw-row{ padding:12px 14px; } .wk-pick b{ font-weight:600; font-size:14px; }
 .fit-from{ font-size:12px; color:var(--text3); margin:8px 0 0; } .fit-from a{ color:var(--accent); }
 .wk[hidden]{ display:none !important; }
+
+/* ── 오늘의 운동: '다음'·체크 대신 배경색 (다음 = 옅은 주황, 완료 = 진한 주황 + 취소선) ── */
+.fx-next, .fx-chk{ display:none !important; }
+.fit-list .fx{ border-radius:12px; padding:8px; margin:0 -8px; border-bottom:0; transition:background .2s; }
+.fit-list .fx + .fx{ margin-top:4px; }
+.fit-list .fx.next{ background:rgba(255,106,43,.10); }
+.fit-list .fx.done{ background:rgba(255,106,43,.24); }
+.fit-list .fx.done .fx-nm{ text-decoration:line-through; text-decoration-color:rgba(255,106,43,.9); text-decoration-thickness:1.5px; }
+
+/* ── 운동 모드 v2: 큰 자세 그림 · 부위 · 도구 · 세트 밀어서 삭제 ── */
+.wk-stage{ display:flex; justify-content:center; margin:0 0 16px; }
+.wk-stage .wk-pose{ width:min(100%, 320px); height:auto; aspect-ratio:1/1; border-radius:20px; background:#f2f3f5; }
+.wk-stage .wk-pose .fx-img, .wk-stage .wk-pose > *{ position:absolute; inset:0; }
+.wk-pose.none{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; background:#17181B; color:#8B8F97; font-size:12px; }
+.wk-pose.none svg{ position:static !important; width:40px; height:40px; }
+.wk-ex-tx h2{ margin:4px 0; font-size:24px; font-weight:600; letter-spacing:-.01em; }
+.wk-ex-tx p{ margin:0; font-size:13px; color:#8B8F97; line-height:1.5; } .wk-ex-tx em{ font-style:normal; color:#FF6A2B; }
+.wk-part{ display:inline-block; margin-left:8px; padding:2px 8px; border-radius:10px; background:rgba(255,106,43,.14); color:#FF8A55; font-size:12px; font-weight:600; font-family:'IBM Plex Sans KR',sans-serif; vertical-align:1px; }
+.wk-tools{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.wk-tool{ height:36px; padding:0 14px; border-radius:18px; border:1px solid #26282D; background:#17181B; color:#ECEDEE; font:inherit; font-size:13px; cursor:pointer; }
+.wk-sw{ position:relative; overflow:hidden; border-top:1px solid #1E2024; }
+.wk-sw .wk-set{ border-top:0; background:#101113; position:relative; z-index:1; transition:transform .2s; touch-action:pan-y; }
+.wk-sdel{ position:absolute; right:0; top:0; bottom:0; width:72px; border:0; background:#E5484D; color:#fff; font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+.wk-hint{ align-self:center; font-size:11px; color:#5E626A; margin-left:auto; }
+@media (hover:hover){ .wk-sw:hover .wk-set{ transform:translateX(-72px); } }
+.wk-rb.last{ color:#FF6A2B; }
+
+/* 시작 확인 */
+.wk-cf{ display:grid; grid-template-columns:repeat(4,1fr); border-top:1px solid var(--border); border-bottom:1px solid var(--border); margin:4px 0 12px; }
+.wk-cf div{ padding:12px 0; text-align:left; } .wk-cf div + div{ padding-left:12px; border-left:1px solid var(--border); }
+.wk-cf b{ display:block; font-size:22px; font-weight:600; font-family:'Space Grotesk','IBM Plex Sans KR',sans-serif; color:var(--text); }
+.wk-cf span{ font-size:11px; color:var(--text3); }
+.wk-cf-list{ margin:0 0 8px; padding:0; list-style:none; counter-reset:c; max-height:40vh; overflow:auto; }
+.wk-cf-list li{ display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--border); font-size:14px; }
+.wk-cf-list li span{ color:var(--text3); font-size:13px; white-space:nowrap; }
+
+/* 쉬는 시간 휠 */
+.wk-wheel-wrap{ position:relative; height:200px; margin:4px 0 12px; }
+.wk-wheel{ height:100%; overflow-y:auto; scroll-snap-type:y mandatory; scrollbar-width:none; -webkit-mask-image:linear-gradient(transparent, #000 35%, #000 65%, transparent); mask-image:linear-gradient(transparent, #000 35%, #000 65%, transparent); }
+.wk-wheel::-webkit-scrollbar{ display:none; }
+.wk-wpad{ height:80px; }
+.wk-wv{ height:40px; line-height:40px; text-align:center; scroll-snap-align:center; font-family:'Space Grotesk',sans-serif; font-size:20px; color:var(--text3); transition:color .15s, font-size .15s; }
+.wk-wv.on{ color:var(--text); font-size:26px; font-weight:600; }
+.wk-wsel{ position:absolute; left:0; right:0; top:80px; height:40px; border-top:1px solid var(--accent); border-bottom:1px solid var(--accent); pointer-events:none; }
+
+/* 운동 설정: 장소 */
+.fs-pl-acts{ display:flex; gap:16px; margin-top:8px; }
+.fs-lnk{ border:0; background:none; padding:0; color:var(--text3); font:inherit; font-size:12.5px; text-decoration:underline; cursor:pointer; }
+.pg-c.pg-add{ border-style:dashed; }
+
+/* 운동 기록 · 그래프 */
+.wh-stats{ display:grid; grid-template-columns:repeat(4,1fr); border-top:1px solid var(--border); border-bottom:1px solid var(--border); margin-bottom:12px; }
+.wh-stats div{ padding:10px 0; } .wh-stats div + div{ padding-left:10px; border-left:1px solid var(--border); }
+.wh-stats b{ display:block; font-size:18px; font-weight:600; font-family:'Space Grotesk','IBM Plex Sans KR',sans-serif; color:var(--text); }
+.wh-stats span{ font-size:11px; color:var(--text3); }
+.wh-svg{ width:100%; height:auto; display:block; margin-bottom:8px; }
+.wh-bar{ fill:var(--border2, #2a2c31); }
+.wh-line{ fill:none; stroke:#FF6A2B; stroke-width:2; }
+.wh-dot{ fill:#FF6A2B; }
+.wh-t{ font-size:10px; fill:var(--text3, #8B8F97); font-family:'Space Grotesk',sans-serif; }
+.wh-list{ max-height:30vh; overflow:auto; }
+.wh-row{ display:grid; grid-template-columns:64px 1fr auto; gap:8px; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px; }
+.wh-row > span:first-child{ color:var(--text3); }
+.wh-row b{ font-weight:600; }
+.lg-hist{ margin:12px 0 4px; }
+.lg-hist summary{ cursor:pointer; font-size:13px; color:var(--text2, var(--text)); padding:6px 0; }
