@@ -24,6 +24,8 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "liveUpdate", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "liveEnd", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "playSound", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "restSchedule", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "restCancel", returnType: CAPPluginReturnPromise),
     ]
 
     // ── 효과음 (쉬는 시간 째깍·끝 알림) ─────────────
@@ -47,6 +49,67 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
             p.play()
             call.resolve()
         }
+    }
+
+    // ── 쉬는 시간 타이머(앱을 내려 둬도) ─────────────
+    // 끝나는 시각에 맞춰 '3초 째깍 + 끝 알림음'(rest_count.wav)을 오디오 엔진에 예약해 둔다.
+    // 엔진이 도는 동안(무음 출력 포함) 앱이 깨어 있어서 알림 없이 소리만 정확히 나고,
+    // 끝나는 순간 잠금 화면·다이내믹 아일랜드를 흰 운동 시간으로 직접 바꾼다.
+    private var restEngine: AVAudioEngine?
+    private var restWork: DispatchWorkItem?
+    @objc func restSchedule(_ call: CAPPluginCall) {
+        let endMs = call.getDouble("endAt") ?? 0, sound = call.getBool("sound") ?? true
+        DispatchQueue.main.async {
+            self.stopRest()
+            let delay = Date(timeIntervalSince1970: endMs / 1000).timeIntervalSinceNow
+            guard delay > 0.3 else { call.resolve(["ok": false]); return }
+            let ses = AVAudioSession.sharedInstance()
+            try? ses.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try? ses.setActive(true)
+            let eng = AVAudioEngine(), node = AVAudioPlayerNode()
+            guard let url = Bundle.main.url(forResource: "rest_count", withExtension: "wav", subdirectory: "public/sounds"),
+                  let file = try? AVAudioFile(forReading: url) else { call.resolve(["ok": false]); return }
+            eng.attach(node)
+            eng.connect(node, to: eng.mainMixerNode, format: file.processingFormat)
+            do { try eng.start() } catch { call.resolve(["ok": false, "error": error.localizedDescription]); return }
+            let rate = file.processingFormat.sampleRate, lead = 3.0
+            if delay >= lead {
+                let at = AVAudioTime(hostTime: mach_absolute_time() + AVAudioTime.hostTime(forSeconds: delay - lead))
+                node.scheduleFile(file, at: at, completionHandler: nil)
+            } else {
+                let skip = AVAudioFramePosition((lead - delay) * rate)
+                node.scheduleSegment(file, startingFrame: skip, frameCount: AVAudioFrameCount(max(0, file.length - skip)), at: nil, completionHandler: nil)
+            }
+            node.volume = sound ? 1 : 0
+            node.play()
+            self.restEngine = eng
+            let work = DispatchWorkItem { [weak self] in
+                self?.liveRestEnded()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) { if self?.restEngine === eng { self?.stopRest() } }
+            }
+            self.restWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+            call.resolve(["ok": true])
+        }
+    }
+    @objc func restCancel(_ call: CAPPluginCall) {
+        DispatchQueue.main.async { self.stopRest(); call.resolve() }
+    }
+    private func stopRest() {
+        restWork?.cancel(); restWork = nil
+        restEngine?.stop(); restEngine = nil
+    }
+    private func liveRestEnded() {
+        #if canImport(ActivityKit)
+        if #available(iOS 16.2, *) {
+            Task {
+                for a in Activity<WorkoutAttributes>.activities {
+                    var st = a.content.state; st.restEnd = nil
+                    await a.update(.init(state: st, staleDate: nil))
+                }
+            }
+        }
+        #endif
     }
 
     // ── 운동 중 잠금 화면 표시(라이브 액티비티) ─────────────

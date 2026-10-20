@@ -127,6 +127,31 @@ const WorkoutHistory = {
       <div class="wh-list">${ss.slice(0, 10).map(s => `<div class="wh-row"><span class="num">${s.ds.slice(2).replace(/-/g, '.')}</span>
         <span>${s.sets.map(x => x.w ? `${x.w}×${x.r}` : `${x.r}회`).join(' · ')}</span><b class="num">${k(s.vol)}</b></div>`).join('')}</div>`;
   },
+  // 기록 보기(카드 아래): 운동한 날들을 최근부터 — 종목을 누르면 그 운동의 그래프
+  openAll() {
+    const days = [];
+    for (let i = 0; i <= 120 && days.length < 30; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const ds = Fitness._dateStr(d), L = PlanGen.log(ds), names = Object.keys(L).filter(n => (L[n] || []).length);
+      if (names.length) days.push({ ds, d, L, names });
+    }
+    const m30 = days.filter(x => (Date.now() - x.d) / 864e5 <= 30);
+    const vol = L => Object.values(L).flat().reduce((t, s) => t + (Number(s.w) || 0) * (Number(s.r) || 0), 0);
+    const k = n => Math.round(n).toLocaleString('ko-KR'), DOW = '일월화수목금토';
+    const A = v => esc(v).replace(/'/g, '&#39;');
+    App.openModal('@chart 운동 기록', days.length ? `
+      <div class="wh-stats">
+        <div><b class="num">${m30.length}</b><span>최근 30일 운동한 날</span></div>
+        <div><b class="num">${k(m30.reduce((t, x) => t + vol(x.L), 0))}</b><span>30일 볼륨 kg</span></div>
+        <div><b class="num">${days[0].ds.slice(5).replace('-', '/')}</b><span>마지막</span></div></div>
+      <div class="wh-days">${days.map(x => `<div class="wh-day">
+        <div class="wh-dh"><b class="num">${x.ds.slice(5).replace('-', '/')}</b><span>${DOW[x.d.getDay()]}</span><i class="num">${k(vol(x.L))}kg</i></div>
+        ${x.names.map(n => `<button class="wh-ex" onclick="WorkoutHistory.open('${A(n)}')"><span>${esc(n)}</span><em class="num">${x.L[n].map(s => s.w ? `${s.w}×${s.r}` : `${s.r}회`).join(' · ')}</em></button>`).join('')}
+      </div>`).join('')}</div>
+      <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div>`
+      : `<p class="pg-note">아직 남긴 운동 기록이 없습니다. 운동 모드에서 세트를 완료하거나 연필 단추로 무게·횟수를 남기면 여기에 쌓입니다.</p>
+      <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div>`);
+  },
   open(name) {
     App.openModal('@chart ' + name + ' 기록', `<div class="wh">${this.html(name)}</div>
       <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div>`);
@@ -208,7 +233,7 @@ const WorkoutMode = {
       const prev = PlanGen.last(x.name, ds);
       const n = Math.max(this._nSets(x.sets), (log[x.name] || []).length);
       const cardio = PlanGen.partOf(x.name) === '유산소';
-      const nw = PlanGen.nextWeight(x.name, x.sets, ds);
+      const nw = x.w !== '' && x.w != null && Number(x.w) > 0 ? Number(x.w) : PlanGen.nextWeight(x.name, x.sets, ds);
       let th = ''; try { th = Fitness._thumb(x, plan || {}); } catch (e) {}
       return { name: x.name, sets: x.sets, key: x.key, th, cardio, done: done.includes(i), sug: PlanGen.suggest(x.name, x.sets, ds),
         rows: Array.from({ length: cardio ? 1 : n }, (_, k) => {
@@ -245,7 +270,8 @@ const WorkoutMode = {
     const ex = this._build(ds);
     if (!ex.length) return;
     this.st = { ds, t0: Date.now(), cur: Math.max(0, ex.findIndex(e => !e.done)), restEnd: 0, ex,
-      snapLog: PlanGen.log(ds), snapChk: Fitness._checked(new Date(ds + 'T00:00:00')), snapSwap: UserStore.get(PlanGen.SWAP_PREFIX + ds) || '{}' };
+      snapLog: PlanGen.log(ds), snapChk: Fitness._checked(new Date(ds + 'T00:00:00')), snapSwap: UserStore.get(PlanGen.SWAP_PREFIX + ds) || '{}',
+      snapDay: UserStore.get(Fitness._dayKey(ds)) || '', planNames: ex.map(e => e.name) };
     this._open();
   },
   _resume(sv) {
@@ -296,6 +322,7 @@ const WorkoutMode = {
           <h2>${esc(x.name)}</h2><p>${esc(x.sets || '')}${x.sug ? ` · <em>${esc(x.sug)}</em>` : ''}</p>
           <div class="wk-tools">
             <button class="wk-tool" onclick="WorkoutMode.swap()">⇄ 운동 교체</button>
+            <button class="wk-tool" onclick="WorkoutMode.addEx()">+ 운동 추가</button>
             <button class="wk-tool" onclick="WorkoutHistory.open('${A(x.name)}')">기록 · 그래프</button>
             ${em ? `<button class="wk-tool" onclick="ExMedia.open('${A(x.name)}')">자세 요령</button>` : ''}
           </div>
@@ -350,7 +377,7 @@ const WorkoutMode = {
     const left = (S.restEnd - Date.now()) / 1000;
     if (left <= 0) { S.restEnd = 0; r.hidden = true; r.innerHTML = ''; this._end(); this.live(); return; }
     const sec = Math.ceil(left);
-    if (left < this.COUNT + 1.5 && !document.hidden && !this._nc) { this._nc = 1; this._cancelNotify(); }   // 화면이 켜져 있으면 앱이 직접 울린다(두 번 울리지 않게)
+    if (left < 1.5 && !document.hidden && !this._nc && !this._nr) { this._nc = 1; this._cancelNotify(); }   // 화면이 켜져 있으면 앱이 직접 울린다(두 번 울리지 않게)
     if (sec <= this.COUNT && sec !== this._lastTick) { this._lastTick = sec; this._tickSound(); }
     r.hidden = false;
     const pct = Math.max(0, Math.min(1, left / (S.restTot || 1)));
@@ -460,38 +487,46 @@ const WorkoutMode = {
   },
   _tickSound() {
     try { Haptic.light(); } catch (e) {}
-    if (!this.prefs().sound) return;
+    if (!this.prefs().sound || this._nr) return;   // 아이폰은 예약해 둔 소리가 울린다
     if (this._native('tick')) return;
     this._audio(); this._beep(1046, 0.08, 0.25);
   },
   _end() {
     try { Haptic.warn(); navigator.vibrate?.([300, 150, 300, 150, 300]); } catch (e) {}
-    if (this.prefs().sound && !this._native('rest_end')) {   // 약 2초: 두 음을 네 번
+    if (this.prefs().sound && !this._nr && !this._native('rest_end')) {   // 약 2초: 두 음을 네 번
       this._audio();
       for (let i = 0; i < 4; i++) { this._beep(880, 0.18, 0.35, i * 0.5); this._beep(1318, 0.22, 0.35, i * 0.5 + 0.2); }
     }
   },
   // 앱을 내려 둬도 쉬는 시간이 끝나면 울리게 기기 알림을 예약한다 (2초 알림음 · 무음이면 소리 없이)
-  // 알림은 끝나기 3초 전에 울리고, 소리 파일(rest_count)이 3초 째깍 + 끝 알림음이다.
-  // 앱이 백그라운드면 자바스크립트 타이머가 멈추므로 카운트다운도 알림 소리 하나로 낸다.
+  // 쉬는 시간 끝 소리
+  //  · 아이폰: 앱이 오디오 엔진에 '3초 째깍 + 끝 알림음'을 예약한다 → 앱을 내려 둬도 알림 없이 소리만,
+  //    끝나는 순간 잠금 화면·아일랜드도 흰 운동 시간으로 바뀐다. 이때는 화면 쪽 소리는 내지 않는다(두 번 울리지 않게).
+  //  · 그 밖(안드로이드 등): 끝나는 시각에 알림 하나(끝 알림음). 화면이 켜져 있으면 앱이 직접 째깍·끝 소리를 낸다.
   COUNT: 3,
   async _notify(sec) {
-    this._cancelNotify(); this._nc = 0;
-    const P = typeof LocalNotify !== 'undefined' && LocalNotify.P; if (!P) return;
-    const snd = this.prefs().sound, lead = sec > this.COUNT + 1 ? this.COUNT : 0;
-    const file = lead ? 'rest_count.wav' : 'rest_end.wav';
-    try {
-      if (!this._chan && P.createChannel) {
-        this._chan = 1;
-        await P.createChannel({ id: 'rest', name: '쉬는 시간', importance: 5, sound: 'rest_end.wav', vibration: true, visibility: 1 }).catch(() => {});
-        await P.createChannel({ id: 'rest3', name: '쉬는 시간 카운트다운', importance: 5, sound: 'rest_count.wav', vibration: true, visibility: 1 }).catch(() => {});
-      }
-      await P.schedule({ notifications: [{ id: 7997, title: lead ? '쉬는 시간 3초 남음' : '쉬는 시간 끝', body: this._nextLabel(), channelId: lead ? 'rest3' : 'rest',
-        sound: snd ? file : undefined, schedule: { at: new Date(Date.now() + (sec - lead) * 1000), allowWhileIdle: true } }] });
-    } catch (e) {}
+    this._cancelNotify(); this._nc = 0; this._nr = false;
+    const snd = this.prefs().sound;
+    const B = window.Capacitor?.Plugins?.BashyNative;
+    if (B && B.restSchedule && window.Capacitor?.getPlatform?.() === 'ios') {
+      try { const r = await B.restSchedule({ endAt: Date.now() + sec * 1000, sound: snd }); this._nr = !!(r && r.ok); } catch (e) {}
+      if (this._nr) { this.live(); return; }
+    }
+    const P = typeof LocalNotify !== 'undefined' && LocalNotify.P;
+    if (P) {
+      try {
+        if (!this._chan && P.createChannel) { this._chan = 1; await P.createChannel({ id: 'rest', name: '쉬는 시간', importance: 5, sound: 'rest_end.wav', vibration: true, visibility: 1 }).catch(() => {}); }
+        await P.schedule({ notifications: [{ id: 7997, title: '쉬는 시간 끝', body: this._nextLabel(), channelId: 'rest',
+          sound: snd ? 'rest_end.wav' : undefined, schedule: { at: new Date(Date.now() + sec * 1000), allowWhileIdle: true } }] });
+      } catch (e) {}
+    }
     this.live();
   },
-  _cancelNotify() { const P = typeof LocalNotify !== 'undefined' && LocalNotify.P; if (P) P.cancel({ notifications: [{ id: 7997 }] }).catch(() => {}); },
+  _cancelNotify() {
+    const P = typeof LocalNotify !== 'undefined' && LocalNotify.P; if (P) P.cancel({ notifications: [{ id: 7997 }] }).catch(() => {});
+    const B = window.Capacitor?.Plugins?.BashyNative; if (this._nr && B && B.restCancel) B.restCancel().catch(() => {});
+    this._nr = false;
+  },
 
   // ── 잠금 화면 표시 ───────────────────────────
   // 아이폰: 라이브 액티비티(잠금 화면·다이내믹 아일랜드에 지금 운동 + 쉬는 시간 카운트다운)
@@ -531,22 +566,13 @@ const WorkoutMode = {
     const S = this.st, x = S.ex[S.cur];
     const orig = x.orig && x.orig !== x.name ? x.orig : '';
     const alts = PlanGen.alternatives(orig || x.name).filter(a => a.n !== x.name && a.n !== orig);
-    this._alts = [orig, ...alts.map(a => a.n)];
-    const row = (n, i, extra = '') => {
-      const th = typeof ExMedia !== 'undefined' ? ExMedia.thumbFor(n) : '';
-      return `<button class="sw-row" onclick="WorkoutMode._doSwap(${i})">${th ? `<span class="ex-th">${ExMedia.poseHtml(th)}</span>` : '<span class="ex-th none"></span>'}<span class="sw-nm">${esc(n)}${extra}</span></button>`;
-    };
-    App.openModal('@dumbbell 운동 교체', `
-      ${orig ? `<div class="sw-orig"><div class="sw-h">원래 추천 운동</div>${row(orig, 0, '<small>이 운동으로 되돌리기</small>')}</div>` : ''}
-      <p class="pg-note">지금 <b>${esc(x.name)}</b>${PlanGen.partOf(x.name) ? ` (${esc(PlanGen.partOf(x.name))})` : ''} 대신 — 같은 동작 → 같은 자극 부위 순서. 이번 운동에서만 바뀝니다.</p>
-      <div class="sw-list">${alts.map((a, i) => {
-        const eq = (PlanGen.EQUIP.find(([e]) => e === PlanGen.equipOf(a.n)) || [])[1];
-        return row(a.n, i + 1, a.need ? `<small>${esc(eq || '기구')} 필요</small>` : '');
-      }).join('') || '<p class="pg-note">바꿀 운동을 찾지 못했습니다.</p>'}</div>
-      <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div>`);
+    const eqn = a => ((PlanGen.EQUIP.find(([e]) => e === PlanGen.equipOf(a.n)) || [])[1] || '기구') + ' 필요';
+    Fitness.pickOne({ title: '운동 교체', recLabel: `${x.name} 대신 — 추천`,
+      head: orig ? `<p class="pg-note">원래 추천 운동은 <b>${esc(orig)}</b> 입니다. 맨 위에서 되돌릴 수 있습니다.</p>` : '',
+      recommend: [...(orig ? [{ n: orig, small: '원래 추천 운동 · 되돌리기' }] : []), ...alts.map(a => ({ n: a.n, small: a.need ? eqn(a) : '' }))],
+      exclude: [x.name], onPick: n => this._swapTo(n) });
   },
-  _doSwap(i) {
-    const n = (this._alts || [])[i]; if (!n) return;
+  _swapTo(n) {
     const S = this.st, x = S.ex[S.cur];
     if (!x.orig) x.orig = x.name;            // 처음 추천된 운동을 기억해 두었다가 되돌릴 수 있게
     const back = n === x.orig;
@@ -554,16 +580,24 @@ const WorkoutMode = {
     { const L = PlanGen.log(S.ds); if (L[x.name] && !(S.snapLog || {})[x.name]) { delete L[x.name]; PlanGen.saveLog(S.ds, L); } }   // 바꾸기 전 이름으로 남은 기록은 지운다(새 이름으로 다시 저장)
     x.name = n; x.th = ''; x.sug = PlanGen.suggest(n, x.sets, S.ds); x.cardio = PlanGen.partOf(n) === '유산소';
     x.rows = x.rows.map(r => r.ok ? r : { w: nw ?? (prev ? prev.sets[0].w : ''), r: r.r, ok: false });
-    // 카드에도 그날만 교체로 남긴다(계획 운동일 때) — 원래 운동으로 돌아오면 교체 표시를 지운다
-    if (x.key && /^p\d+$/.test(x.key)) {
-      const k = PlanGen.SWAP_PREFIX + S.ds; let m = {}; try { m = JSON.parse(UserStore.get(k) || '{}') || {}; } catch {}
-      if (back) delete m[+x.key.slice(1)]; else m[+x.key.slice(1)] = n;
-      UserStore.set(k, JSON.stringify(m)); window.FirebaseSync?.scheduleSave?.();
-    }
     if (back) delete x.orig;
     this._saveLog();
-    App.closeModal(); this.paint(); this._persist();
+    this.paint(); this._persist();
     App.showToast(back ? `원래 운동(${n})으로 되돌렸습니다` : `${n} 으로 바꿨습니다`, 'success');
+  },
+  // 운동 중에 종목 하나 더 — 지금 운동 바로 뒤에 넣는다
+  addEx() {
+    const favs = Fitness.getFavs();
+    Fitness.pickOne({ title: '운동 추가', recLabel: favs.length ? '즐겨찾기' : '', recommend: favs.map(n => ({ n })), onPick: n => {
+      const S = this.st, ds = S.ds, sets = Fitness.DEFAULT_SETS;
+      const prev = PlanGen.last(n, ds), nw = PlanGen.nextWeight(n, sets, ds), cardio = PlanGen.partOf(n) === '유산소';
+      const e = { name: n, sets, key: 'n' + Date.now().toString(36), th: '', cardio, done: false, sug: PlanGen.suggest(n, sets, ds),
+        rows: Array.from({ length: cardio ? 1 : this._nSets(sets) }, (_, k) => { const P = prev && prev.sets[Math.min(k, prev.sets.length - 1)];
+          return { w: nw ?? (P ? P.w : ''), r: nw != null ? this._reps(sets) : (P ? P.r : this._reps(sets)), ok: false }; }) };
+      S.ex.splice(S.cur + 1, 0, e);
+      this.paint(); this._persist();
+      App.showToast(`${n} 을(를) 다음 운동으로 넣었습니다`, 'success');
+    } });
   },
   nextEx(auto) {
     const S = this.st, x = S.ex[S.cur];
@@ -626,13 +660,25 @@ const WorkoutMode = {
     PlanGen.saveLog(S.ds, S.snapLog || {});
     Fitness._save(S.snapChk || [], new Date(S.ds + 'T00:00:00'));
     if (S.snapSwap != null) UserStore.set(PlanGen.SWAP_PREFIX + S.ds, S.snapSwap);   // 이번에 바꾼 운동도 되돌린다
+    if (S.snapDay != null) UserStore.set(Fitness._dayKey(S.ds), S.snapDay);
     window.FirebaseSync?.scheduleSave?.();
     this._clearSaved(); this._stop(); this.st = null; this.close();
     try { Fitness.render(new Date(S.ds + 'T00:00:00')); } catch (e) {}
     App.showToast('이번 운동은 저장하지 않았습니다');
   },
+  // 시작할 때와 목록(종목·순서)이 달라졌으면 '오늘만 / 플랜에도' 를 먼저 묻는다
   _finishSave() {
     const S = this.st; if (!S) return;
+    const now = S.ex.map(e => e.name);
+    if (!S._scoped && S.planNames && now.join('|') !== S.planNames.join('|')) {
+      Fitness.askScope(S.ds, scope => {
+        if (!scope) return;   // 취소 — 운동 화면 그대로
+        S._scoped = true;
+        App.showToast(Fitness.applyList(S.ds, S.ex.map(e => ({ name: e.name, sets: e.sets })), scope), 'success');
+        this._finishSave();
+      });
+      return;
+    }
     this._saveLog(); this._check();
     // 다 못 끝냈으면 진행 상황을 남겨 둔다 — 같은 날 '운동 시작' 을 다시 누르면 이어서(시간도 이어서) 한다
     const left = S.ex.some(e => !e.done && e.rows.some(r => !r.ok));

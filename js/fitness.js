@@ -63,7 +63,7 @@ const Fitness = {
     let pick = this.dayPlan()[dow];
     const R = this.routines();
     if (!['A','B','C','cardio','rest','none'].includes(pick) && !R[pick]) pick = this._defaultFor(dow);   // 예전 Hevy 루틴 id 는 무시
-    if (R[pick]) return { name:R[pick].name, exercises:(R[pick].exercises||[]).map(x=>({ name:x.name, sets:x.sets||'' })), src:'routine', rid:pick };
+    if (R[pick]) return { name:R[pick].name, exercises:(R[pick].exercises||[]).map(x=>({ name:x.name, sets:x.sets||'', ...(x.w?{w:x.w}:{}) })), src:'routine', rid:pick };
     if (pick === 'none')   return { name:'계획 없음', exercises:[], src:'none' };
     if (pick === 'rest')   return { name:'휴식', exercises:[], src:'day' };
     if (pick === 'cardio') return { ...this.CARDIO, src:'day' };
@@ -115,6 +115,9 @@ const Fitness = {
     const tabs = DOW.map((dn,i)=>`<button class="fit-day${i===dow?' on':''}${i===0?' sun':''}" onclick="Fitness.pickDay(${i}, '${Fitness._dateStr(date)}')"><b>${dn}</b><span>${esc(shortNm(this.planFor(i)))}</span></button>`).join('');
     const container = document.getElementById('fitnessWrap');
     const ds = Fitness._dateStr(date);
+    if (this._ed && this._ed.ds !== ds) this._ed = null;   // 다른 날로 옮기면 수정은 접는다
+    this._headBtns(!!this._ed, ds, isToday);
+    if (this._ed) { this._renderEdit(container, tabs, plan); return; }
 
     if (!allEx.length) {
       // 계획이 휴식일이어도 그날 실제로 운동했으면 기록과 피드백은 보여야 한다.
@@ -134,7 +137,7 @@ const Fitness = {
         ${Icons.big('moon')}
         <p>휴식일입니다.<br><span style="color:var(--text3);font-size:12px">다른 요일을 눌러 계획을 볼 수 있어요</span></p>
       </div>`}
-      <div class="habit-add-btn" onclick="Fitness.showInlineAdd(new Date('${Fitness._dateStr(date)}T00:00:00'))">+ 운동 추가</div>`;
+      <button class="habit-add-btn" onclick="WorkoutHistory.openAll()">기록 보기</button>`;
       return;
     }
 
@@ -162,19 +165,13 @@ const Fitness = {
           </button>
           <div class="fx-tx"><div class="fx-nm">${esc(ex.name)}</div><div class="fx-sets num">${esc(ex.sets||'')}</div>${this._logLine(ex, dsx)}</div>
           <button type="button" class="fx-act" onclick="event.stopPropagation();PlanGen.openLog('${A(ex.name)}','${A(ex.sets||'')}','${dsx}')" aria-label="무게 기록">${typeof Icons!=='undefined'?Icons.svg('pen','fx-aic'):'기록'}</button>
-          ${!custom?`<button type="button" class="fx-act" onclick="event.stopPropagation();PlanGen.openSwap(${ex.pi},'${A(ex.name)}','${dsx}',${plan.src==='routine'&&!plan.from?`'${plan.rid}'`:'null'})" aria-label="운동 교체">⇄</button>`:''}
         </div>`;}).join('')}
       </div>
       ${plan.from ? `<p class="fit-from">${plan.from.slice(5).replace('-','/')} 계획을 오늘 하는 중 · <a href="javascript:Fitness.undoFrom('${dsx}')">되돌리기</a></p>` : ''}
       <div class="fit-foot">
-        ${(()=>{ const sv = typeof WorkoutMode!=='undefined' && WorkoutMode.saved(); if (sv && sv.ex && sv.ex.length && sv.ds===Fitness._dateStr(new Date()) && isToday) return `<button class="btn-sm accent fit-start" onclick="WorkoutMode.startFor('${dsx}')">이어서 운동하기 · ${sv.ex.filter(e=>e.done).length}/${sv.ex.length} 종목</button>`; return (isToday||isPast) && done<allEx.length ? `<button class="btn-sm accent fit-start" onclick="WorkoutMode.startFor('${dsx}')">운동 시작 · 세트와 쉬는 시간 타이머</button>` : ''; })()}
-        <div class="habit-add-btn" onclick="Fitness.showInlineAdd(new Date('${dsx}T00:00:00'))">+ 운동 추가</div>
+        <button class="habit-add-btn" onclick="WorkoutHistory.openAll()">기록 보기</button>
       </div>`;
-    try { RowUI.paint(container.querySelector('.fit-list'), {
-      edit: key => { const it = allEx.find(x=>x.key===key); if (it) PlanGen.openLog(it.name, it.sets||'', dsx); },
-      del:  key => Fitness.removeItem(dsx, key),
-      reorder: order => Fitness.reorder(dsx, order),
-    }); } catch(e) { console.warn('RowUI fit', e); }
+    // 평소에는 보기·체크만 — 교체·순서·빼기는 '수정' 에서
   },
 
   undoFrom(ds) { const d=new Date(ds+'T00:00:00'); this._save([], d); UserStore.set(this._orderKey(ds), '[]'); UserStore.set(PlanGen.SWAP_PREFIX+ds, '{}'); UserStore.set(this._fromKey(ds), ''); FirebaseSync?.scheduleSave(); this.render(new Date(ds+'T00:00:00')); },
@@ -270,7 +267,7 @@ const Fitness = {
   showRoutineEdit(id) {
     const R = this.routines(), r = id && R[id];
     this._rid = id || null;
-    this._cart = r ? (r.exercises||[]).map(x => ({ name:x.name, sets:x.sets||this.DEFAULT_SETS })) : [];
+    this._cart = r ? (r.exercises||[]).map(x => ({ name:x.name, sets:x.sets||this.DEFAULT_SETS, ...(x.w?{w:x.w}:{}) })) : [];
     const dp = this.dayPlan();
     const DOW = ['일','월','화','수','목','금','토'];
     const days = DOW.map((d,i) => `<label class="day-pick-btn"><input type="checkbox" class="rt-day" value="${i}" ${id && dp[i]===id?'checked':''}><span>${d}</span></label>`).join('');
@@ -294,7 +291,7 @@ const Fitness = {
     if (!cart.length) { App.showToast('운동을 하나 이상 골라 주세요', 'error'); return; }
     const R = this.routines();
     const id = this._rid || ('r_' + Date.now().toString(36));
-    R[id] = { name, exercises: cart.map(x => ({ name:x.name, sets:x.sets||this.DEFAULT_SETS })) };
+    R[id] = { name, exercises: cart.map(x => ({ name:x.name, sets:x.sets||this.DEFAULT_SETS, ...(x.w?{w:x.w}:{}) })) };
     this.saveRoutines(R);
     const dp = this.dayPlan();
     const picked = [...document.querySelectorAll('.rt-day:checked')].map(c => c.value);
@@ -323,6 +320,8 @@ const Fitness = {
   exercisesFor(date) {
     const d = new Date(date), ds = this._dateStr(d);
     const plan = this.planOn(d);
+    const ov = this.dayOverride(ds);
+    if (ov) return { plan, list: ov.map((x,i)=>({ ...x, di:i, key:'d'+i })) };
     const sw = (typeof PlanGen!=='undefined') ? PlanGen.swapsFor(ds) : {};
     let list = plan.exercises.map((x,i)=> sw[i]==='__skip' ? null : sw[i] ? { ...x, name:sw[i], hp:undefined, pi:i, key:'p'+i } : { ...x, pi:i, key:'p'+i }).filter(Boolean)
       .concat(this.getCustomExercises(d).map((x,i)=>({ ...x, ci:i, key:'c'+i })));
@@ -421,19 +420,21 @@ const Fitness = {
       const rest=src.filter(([,n])=>!favs.includes(n));
       return fav.concat(rest).slice(0,60);
     }
-    const lower=q.toLowerCase(), isCho=/^[ㄱ-ㅎ]+$/.test(q);
+    // 띄어쓰기는 보지 않는다 — '원암덤벨' 과 '원 암 덤벨' 이 같은 운동을 찾는다
+    const sp=v=>String(v).replace(/\s+/g,'');
+    const lower=sp(q.toLowerCase()), qc=sp(q), isCho=/^[ㄱ-ㅎ]+$/.test(qc);
     const out=[];
     for(const [p,n] of src){
-      const nm=n.toLowerCase();
+      const nm=sp(n.toLowerCase());
       let rank=-1;
       if(isCho){
-        const ch=this._cho(n);
-        if(ch.startsWith(q)) rank=1; else if(ch.includes(q)) rank=3;
+        const ch=sp(this._cho(n));
+        if(ch.startsWith(qc)) rank=1; else if(ch.includes(qc)) rank=3;
       } else {
         if(nm===lower) rank=0;
         else if(nm.startsWith(lower)) rank=1;
         else if(nm.includes(lower)) rank=2;
-        else if(this._cho(n).includes(q)) rank=4;
+        else if(sp(this._cho(n)).includes(qc)) rank=4;
       }
       if(rank<0) continue;
       out.push([favs.includes(n)?-1:rank, n.length, p, n]);
@@ -460,7 +461,7 @@ const Fitness = {
     this._hits=hits;
     const q=String(this._q||'').trim();
     // 목록에 없는 운동도 이름만 쳐서 바로 넣을 수 있다.
-    const own = q && !hits.some(h=>h[1]===q)
+    const own = q && !hits.some(h=>h[1].replace(/\s+/g,'')===q.replace(/\s+/g,''))
       ? `<div class="ex-row ex-own" onclick="Fitness.pickOwn()"><span class="ex-row-main"><span class="ex-row-nm">＋ '${esc(q)}' 직접 추가</span><span class="ex-row-part">목록에 없는 운동</span></span></div>` : '';
     if(!hits.length) return own || '<div class="ex-empty">결과가 없습니다</div>';
     const favs=this.getFavs();
@@ -549,6 +550,168 @@ const Fitness = {
     this.render(d);
     App.closeModal();
     App.showToast(`${cart.length}개 추가됨`,'success');
+  },
+
+  // ── 운동 하나 고르기(교체·추가 공용) ─────────────
+  // 검색어가 없으면 추천(o.recommend), 있으면 전체 종목에서 찾는다(띄어쓰기·초성 상관없이). 목록에 없으면 직접 입력.
+  pickOne(o) {
+    this._po = o;
+    App.openModal('@dumbbell ' + o.title, `${o.head||''}
+      <input id="poQ" class="inp" autocomplete="off" placeholder="운동 검색 — 띄어쓰기·초성 상관없이" oninput="Fitness._poPaint()">
+      <div id="poList" class="sw-list po-list"></div>
+      <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div>`);
+    setTimeout(()=>this._poPaint(), 0);
+  },
+  _poRow(n, i, small='') {
+    const th = typeof ExMedia!=='undefined' ? ExMedia.thumbFor(n) : '';
+    return `<button class="sw-row" onclick="Fitness._poPick(${i})">${th?`<span class="ex-th">${ExMedia.poseHtml(th)}</span>`:'<span class="ex-th none"></span>'}<span class="sw-nm">${esc(n)}${small?`<small>${small}</small>`:''}</span></button>`;
+  },
+  _poPaint() {
+    const o=this._po, box=document.getElementById('poList'); if(!o||!box) return;
+    const q=(document.getElementById('poQ')?.value||'').trim();
+    if(!q){
+      const rec=o.recommend||[];
+      this._poNames=rec.map(r=>r.n);
+      box.innerHTML = rec.length ? (o.recLabel?`<div class="sw-h">${esc(o.recLabel)}</div>`:'') + rec.map((r,i)=>this._poRow(r.n,i,r.small||'')).join('')
+        : '<p class="pg-note">위에 운동 이름을 검색해 주세요.</p>';
+      return;
+    }
+    const hits=this._search(null,q).filter(([,n])=>!(o.exclude||[]).includes(n)).slice(0,40);
+    this._poNames=hits.map(h=>h[1]);
+    const own = !hits.some(h=>h[1].replace(/\s+/g,'')===q.replace(/\s+/g,'')) ? (this._poNames.push(q.slice(0,40)), this._poRow(q.slice(0,40), this._poNames.length-1, '목록에 없는 운동 · 직접 추가')) : '';
+    box.innerHTML = hits.map(([p,n],i)=>this._poRow(n,i,esc(p))).join('') + own || '<p class="pg-note">결과가 없습니다</p>';
+  },
+  _poPick(i) { const n=(this._poNames||[])[i], o=this._po; if(!n||!o) return; App.closeModal(); this._po=null; o.onPick(n); },
+
+  // ── 그날만 바꾼 목록 / 플랜에 적용 ─────────────
+  // 수정(카드)이나 운동 모드에서 목록을 바꾸면 '오늘만' 또는 '앞으로 이 플랜에도' 중 하나로 저장한다.
+  _dayKey(ds){ return 'gl_fit_day_'+ds; },
+  dayOverride(ds){ try{ const v=JSON.parse(UserStore.get(this._dayKey(ds))||'null'); return Array.isArray(v)?v:null; }catch{ return null; } },
+  _clean(list){ return list.map(x=>{ const o={ name:x.name, sets:x.sets||this.DEFAULT_SETS }; if(x.w!==''&&x.w!=null) o.w=x.w; return o; }); },
+  applyList(ds, list, scope) {
+    const d=new Date(ds+'T00:00:00'), before=this.exercisesFor(d).list;
+    const doneNames=new Set(this._checked(d).map(i=>before[i]?.name).filter(Boolean));
+    const items=this._clean(list);
+    let msg='오늘 운동만 바꿨습니다';
+    if(scope==='plan'){
+      const plan=this.planOn(d), dow=plan.from ? new Date(plan.from+'T00:00:00').getDay() : d.getDay();
+      const R=this.routines();
+      if(plan.src==='routine' && R[plan.rid]){ R[plan.rid].exercises=items; this.saveRoutines(R); msg=`'${R[plan.rid].name}' 플랜에 적용했습니다`; }
+      else {
+        const id='r_'+Date.now().toString(36), DOW='일월화수목금토';
+        const name = plan.src==='none'||!plan.name||plan.name==='휴식' ? `${DOW[dow]}요일 운동` : plan.name;
+        R[id]={ name, exercises:items }; this.saveRoutines(R);
+        const dp=this.dayPlan(); dp[dow]=id; this.saveDayPlan(dp);
+        msg=`앞으로 ${DOW[dow]}요일에 '${name}' 으로 합니다`;
+      }
+      UserStore.set(this._dayKey(ds), '');
+    } else UserStore.set(this._dayKey(ds), JSON.stringify(items));
+    // 그날 걸어 둔 교체·추가·순서는 이제 목록에 다 들어갔다
+    UserStore.set(this._orderKey(ds), '[]');
+    if(typeof PlanGen!=='undefined') UserStore.set(PlanGen.SWAP_PREFIX+ds, '{}');
+    UserStore.set(this._customKey(d), '[]');
+    FirebaseSync?.scheduleSave();
+    const after=this.exercisesFor(d).list;
+    this._save(after.map((x,i)=>doneNames.has(x.name)?i:-1).filter(i=>i>=0), d);
+    return msg;
+  },
+  // '오늘만 / 앞으로도' 묻기
+  askScope(ds, done) {
+    const d=new Date(ds+'T00:00:00'), plan=this.planOn(d), DOW='일월화수목금토';
+    const dow=plan.from ? new Date(plan.from+'T00:00:00').getDay() : d.getDay();
+    const pname = plan.src==='routine' ? `'${plan.name}' 플랜` : plan.src==='home' ? `'${plan.name}'` : `매주 ${DOW[dow]}요일`;
+    this._scopeCb=done;
+    App.openModal('@dumbbell 바뀐 운동을 어떻게 저장할까요?', `
+      <div class="wk-pick">
+        <button class="sw-row" onclick="Fitness._scope('day')"><span class="sw-nm"><b>${ds.slice(5).replace('-','/')} 오늘만</b><small>플랜은 그대로 두고 이날 목록만 바꿉니다</small></span></button>
+        <button class="sw-row" onclick="Fitness._scope('plan')"><span class="sw-nm"><b>앞으로 ${esc(pname)}에도</b><small>다음부터 이 요일 운동이 이 목록으로 나옵니다</small></span></button>
+      </div>
+      <div class="modal-btns"><button class="btn-sm" onclick="Fitness._scope(null)">취소</button></div>`);
+  },
+  _scope(v){ const cb=this._scopeCb; this._scopeCb=null; App.closeModal(); if(cb) cb(v); },
+
+  // ── 카드 수정 모드 ─────────────────────────
+  // 평소 카드는 보기·체크만. '수정' 을 눌러야 교체·순서(꾹 눌러 끌기)·세트/무게·빼기·추가가 나온다.
+  toggleEdit() {
+    const ds=this._dateStr(App?.S?.selDate||new Date());
+    if(!this._ed){
+      const { list }=this.exercisesFor(new Date(ds+'T00:00:00'));
+      this._ed={ ds, list:list.map(x=>({ name:x.name, sets:x.sets||this.DEFAULT_SETS, w:x.w??'' })), dirty:false };
+      this.render(new Date(ds+'T00:00:00')); return;
+    }
+    const ed=this._ed;
+    if(!ed.dirty){ this._ed=null; this.render(new Date(ed.ds+'T00:00:00')); return; }
+    this.askScope(ed.ds, scope=>{
+      if(!scope) return;   // 취소 — 수정 모드 그대로
+      const msg=this.applyList(ed.ds, ed.list, scope);
+      this._ed=null; this.render(new Date(ed.ds+'T00:00:00'));
+      App.showToast(msg,'success');
+    });
+  },
+  cancelEdit(){ const ed=this._ed; this._ed=null; if(ed) this.render(new Date(ed.ds+'T00:00:00')); },
+  _edPaint(){ if(this._ed) this.render(new Date(this._ed.ds+'T00:00:00')); },
+  _edSetsLabel(x){
+    const n=WorkoutMode._nSets(x.sets), r=WorkoutMode._reps(x.sets);
+    return `${n}세트 × ${r}회${x.w!==''&&x.w!=null&&Number(x.w)>0?` · ${x.w}kg`:''}`;
+  },
+  edSets(i){
+    const x=this._ed?.list[i]; if(!x) return;
+    const W=[]; for(let v=0; v<=200; v+=2.5) W.push(v);
+    const cw=Number(x.w)||0;
+    Wheel.open({ title:x.name, cols:[
+      { vals:Array.from({length:10},(_,k)=>k+1), cur:WorkoutMode._nSets(x.sets), fmt:v=>v+'세트' },
+      { vals:Array.from({length:30},(_,k)=>k+1), cur:WorkoutMode._reps(x.sets), fmt:v=>v+'회' },
+      { vals:W, cur:W.reduce((a,b)=>Math.abs(b-cw)<Math.abs(a-cw)?b:a,0), fmt:v=>v?v+'kg':'맨몸' },
+    ], done:([n,r,w])=>{ x.sets=`${n}×${r}`; x.w=w||''; this._ed.dirty=true; this._edPaint(); } });
+  },
+  edSwap(i){
+    const x=this._ed?.list[i]; if(!x) return;
+    const orig = x.orig && x.orig!==x.name ? x.orig : '';
+    const alts = typeof PlanGen!=='undefined' ? PlanGen.alternatives(orig||x.name).filter(a=>a.n!==x.name&&a.n!==orig) : [];
+    const eqn = a => ((PlanGen.EQUIP.find(([e])=>e===PlanGen.equipOf(a.n))||[])[1]||'기구')+' 필요';
+    this.pickOne({ title:'운동 교체', recLabel:`${x.name} 대신 — 추천`,
+      head: orig ? `<p class="pg-note">원래 추천 운동은 <b>${esc(orig)}</b> 입니다. 맨 위에서 되돌릴 수 있습니다.</p>` : '',
+      recommend: [...(orig?[{ n:orig, small:'원래 추천 운동 · 되돌리기' }]:[]), ...alts.map(a=>({ n:a.n, small:a.need?eqn(a):'' }))],
+      exclude:[x.name],
+      onPick:n=>{ if(!x.orig) x.orig=x.name; if(n===x.orig) delete x.orig; x.name=n; this._ed.dirty=true; this._edPaint(); } });
+  },
+  edDel(i){ if(!this._ed) return; this._ed.list.splice(i,1); this._ed.dirty=true; this._edPaint(); },
+  edAdd(){
+    const favs=this.getFavs();
+    this.pickOne({ title:'운동 추가', recLabel: favs.length?'즐겨찾기':'', recommend:favs.map(n=>({ n })),
+      onPick:n=>{ this._ed.list.push({ name:n, sets:this.DEFAULT_SETS, w:'' }); this._ed.dirty=true; this._edPaint(); } });
+  },
+  edReorder(keys){ const L=this._ed.list; this._ed.list=keys.map(k=>L[+k]).filter(Boolean); this._ed.dirty=true; this._edPaint(); },
+  _renderEdit(container, tabs, plan){
+    const ed=this._ed;
+    container.innerHTML=`
+      <div class="fit-days">${tabs}</div>
+      <div class="fit-ed-note">꾹 눌러 끌면 순서가 바뀝니다 · 세트·무게를 누르면 바꿉니다</div>
+      <div class="fit-list fit-ed">
+      ${ed.list.map((x,i)=>{ const src=this._thumb(x, plan); return `<div class="fx fx-ed" data-row data-i="${i}" data-label="${esc(x.name)}">
+          <span class="fx-grip" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="fx-th${src?'':' none'}">${typeof Icons!=='undefined'?Icons.svg('dumbbell','fx-ic'):''}${src?`<span class="fx-img">${ExMedia.poseHtml(src)}</span>`:''}</span>
+          <div class="fx-tx"><div class="fx-nm">${esc(x.name)}${x.orig?'<span class="fx-sw">교체됨</span>':''}</div>
+            <button type="button" class="fx-cfg num" onclick="event.stopPropagation();Fitness.edSets(${i})">${this._edSetsLabel(x)}</button></div>
+          <button type="button" class="fx-act" onclick="event.stopPropagation();Fitness.edSwap(${i})" aria-label="운동 교체">⇄</button>
+          <button type="button" class="fx-act fx-x" onclick="event.stopPropagation();Fitness.edDel(${i})" aria-label="빼기">✕</button>
+        </div>`; }).join('') || '<p class="pg-note" style="padding:12px 0">운동이 없습니다. 아래에서 추가해 주세요.</p>'}
+      </div>
+      <button class="habit-add-btn" onclick="Fitness.edAdd()">+ 운동 추가</button>
+      <div class="fit-ed-btns"><button class="btn-sm" onclick="Fitness.cancelEdit()">취소</button><button class="btn-sm accent" onclick="Fitness.toggleEdit()">${ed.dirty?'저장':'완료'}</button></div>`;
+    try { RowUI.paint(container.querySelector('.fit-list'), {
+      edit: k => Fitness.edSets(+k), del: k => Fitness.edDel(+k), reorder: order => Fitness.edReorder(order),
+    }); } catch(e) { console.warn('RowUI fit-ed', e); }
+  },
+  _headBtns(editing, dsx, isToday){
+    const eb=document.getElementById('fitEditBtn'), sb=document.getElementById('fitStartBtn');
+    if(eb){ eb.textContent=editing?'완료':'수정'; eb.classList.toggle('accent', !!editing); }
+    if(sb){
+      sb.hidden=!!editing;
+      const sv=typeof WorkoutMode!=='undefined'&&WorkoutMode.saved();
+      sb.textContent = sv&&sv.ex&&sv.ex.length&&sv.ds===this._dateStr(new Date())&&isToday ? `이어서 ${sv.ex.filter(e=>e.done).length}/${sv.ex.length}` : '시작';
+      sb.onclick=()=>WorkoutMode.startFor(dsx);
+    }
   },
 
   _delCustom(customIdx, dateStr=null) {
