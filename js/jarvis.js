@@ -755,11 +755,41 @@ const JARVIS = {
         </label>`).join('')}</div>
       ${Object.entries(this.PROVIDERS).map(([id,P])=>`
         <div class="ai-keyrow" data-prov="${id}"${id===cur?'':' hidden'}>
+          ${id==='groq' ? this._groqGuide() : ''}
           <label class="modal-lbl">${P.name} API 키 <a href="${P.keyUrl}" target="_blank" rel="noopener">발급받기 ↗</a></label>
-          <input type="password" class="inp ai-key" data-prov="${id}" placeholder="${P.ph}" value="${esc(this._keyOf(id))}" autocomplete="off">
+          <div class="ai-keyline"><input type="password" class="inp ai-key" data-prov="${id}" placeholder="${P.ph}" value="${esc(this._keyOf(id))}" autocomplete="off">
+            <button type="button" class="btn-sm" onclick="JARVIS.testKey('${id}', this)">확인</button></div>
+          <div class="ai-keymsg" data-prov="${id}"></div>
         </div>`).join('')}
       <p class="ai-note">키는 이 계정에만 저장되고, 이 기기에서 각 AI 회사로 바로 보냅니다.</p>
     </div>`;
+  },
+  // 무료 Groq 키를 사용자 본인이 받는 길 — 앱이 대신 내주는 키는 없다(각자 자기 계정·자기 한도)
+  _groqGuide() {
+    return `<ol class="ai-guide">
+      <li><a href="https://console.groq.com/keys" target="_blank" rel="noopener"><b>console.groq.com</b></a> 을 열고 구글 계정으로 가입합니다 (무료 · 카드 등록 없음)</li>
+      <li><b>Create API Key</b> → 이름 아무거나(예: Bashy) → 나온 키를 <b>복사</b> (gsk_ 로 시작 · 이 화면에서 한 번만 보입니다)</li>
+      <li>아래 칸에 붙여 넣고 <b>확인</b> → 연결되면 저장</li>
+    </ol><p class="ai-note">무료 한도: 하루 약 1,000번 대화·사진 분석. 키는 내 계정에만 저장되고, 이 기기에서 Groq 로 바로 보냅니다.</p>`;
+  },
+  // 넣은 키가 실제로 되는지 모델 목록을 한 번 불러 본다
+  async testKey(p, btn) {
+    const box=document.querySelector(`.ai-setup .ai-key[data-prov="${p}"]`);
+    const msg=document.querySelector(`.ai-setup .ai-keymsg[data-prov="${p}"]`);
+    const key=(box?.value||'').trim(); if(!msg) return;
+    if(!key){ msg.className='ai-keymsg bad'; msg.textContent='키를 먼저 붙여 넣어 주세요'; return; }
+    msg.className='ai-keymsg'; msg.textContent='확인 중…'; if(btn) btn.disabled=true;
+    try{
+      const P=this.PROVIDERS[p];
+      const r = p==='anthropic'
+        ? await fetch(P.url+'/models',{ headers:{ 'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' } })
+        : await fetch(P.url+'/models',{ headers:{ Authorization:`Bearer ${key}` } });
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(j?.error?.message || (r.status===401?'키가 맞지 않습니다':'HTTP '+r.status));
+      const n=(j.data||j.models||[]).length;
+      msg.className='ai-keymsg ok'; msg.textContent=`연결됨 — 쓸 수 있는 모델 ${n}개. 저장을 누르면 이 키로 답합니다.`;
+    }catch(e){ msg.className='ai-keymsg bad'; msg.textContent='실패: '+(e.message||e); }
+    if(btn) btn.disabled=false;
   },
   _pickProv(input) {
     const box=input.closest('.ai-setup');
