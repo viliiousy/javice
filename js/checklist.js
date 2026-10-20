@@ -75,9 +75,12 @@ const Checklist = {
   // 꾹 눌러 끌어 놓은 순서를 저장한다 (js/rowui.js)
   _applyOrder(order) {
     const items = this.getItems();
-    const out = order.map(id => items.find(i => i.id === id)).filter(Boolean);
+    // 화면은 늘 '안 한 것 → 한 것' 순서라 저장도 같은 순서로 맞추고 바로 다시 그린다(놓은 자리에서 튀지 않게)
+    const ord = order.map(id => items.find(i => i.id === id)).filter(Boolean);
+    const out = [...ord.filter(i => !i.done), ...ord.filter(i => i.done)];
     items.forEach(i => { if (!out.includes(i)) out.push(i); });
     this.saveItems(out);
+    try { this.render(); } catch(e){}
     try { Sounds?.click(); } catch(e){}
   },
 

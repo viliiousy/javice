@@ -296,11 +296,13 @@ const Habits = {
     } else { Sounds?.uncheck(); }
   },
 
-  // 화면에 보이는 순서대로 세우고, 그 안에 없던 것(그날 안 보이는 습관)은 원래 자리 순서대로 뒤에 붙인다.
+  // 화면에 보이는 순서대로 세운다.
   _applyOrder(newOrder) {
     const list = this.getList();
-    const ordered = newOrder.map(id => list.find(h => h.id === id)).filter(Boolean);
-    list.forEach(h => { if (!ordered.includes(h)) ordered.push(h); });
+    // 그날 보이는 습관끼리만 자리를 바꾸고, 안 보이는 습관(다른 요일 등)은 제자리에 둔다
+    const vis = new Set(newOrder);
+    const q = newOrder.map(id => list.find(h => h.id === id)).filter(Boolean);
+    const ordered = list.map(h => vis.has(h.id) ? (q.shift() || h) : h);
     this.saveList(ordered);
     Sounds?.click();
   },

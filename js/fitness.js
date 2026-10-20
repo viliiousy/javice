@@ -331,8 +331,8 @@ const Fitness = {
     return { plan, list };
   },
   // 순서 바꾸기·빼기 뒤에 '완료' 표시가 다른 줄로 옮겨 가지 않게 key 로 다시 맞춘다
-  _remapChecks(d, before, after) {
-    const done = new Set(this._checked(d).map(i => before[i]?.key).filter(Boolean));
+  _remapChecks(d, before, after, rename = k => k, gone = null) {
+    const done = new Set(this._checked(d).map(i => before[i]?.key).filter(k => k && k !== gone).map(rename));
     this._save(after.map((x,i)=> done.has(x.key) ? i : -1).filter(i=>i>=0), d);
   },
   reorder(ds, keys) {
@@ -344,20 +344,25 @@ const Fitness = {
   removeItem(ds, key) {
     const d = new Date(ds+'T00:00:00'), { plan, list } = this.exercisesFor(d), it = list.find(x=>x.key===key);
     if (!it) return;
+    let rename = k => k;   // 빼고 나면 뒤쪽 번호가 하나씩 당겨진다 — 체크·순서·교체 기록도 같이 당긴다
     if (it.ci != null) {
       const c = this.getCustomExercises(d); c.splice(it.ci,1); this.saveCustomExercises(c,d);
-      // 직접 추가 번호가 당겨지니 순서 기록의 c 번호도 고친다
+      rename = k => /^c\d+$/.test(k) && +k.slice(1) > it.ci ? 'c'+(+k.slice(1)-1) : k;
       let ord=[]; try{ ord=JSON.parse(UserStore.get(this._orderKey(ds))||'[]'); }catch{}
-      ord = ord.filter(k=>k!==key).map(k=>/^c\d+$/.test(k)&&+k.slice(1)>it.ci?'c'+(+k.slice(1)-1):k);
-      UserStore.set(this._orderKey(ds), JSON.stringify(ord));
+      UserStore.set(this._orderKey(ds), JSON.stringify(ord.filter(k=>k!==key).map(rename)));
     } else if (plan.src==='routine' && confirm(`'${it.name}' 을(를) 루틴에서도 뺄까요?\n확인 = 루틴에서 빼기(앞으로도) · 취소 = 오늘만 빼기`)) {
       const R = this.routines(); R[plan.rid].exercises.splice(it.pi,1); this.saveRoutines(R);
+      rename = k => /^p\d+$/.test(k) && +k.slice(1) > it.pi ? 'p'+(+k.slice(1)-1) : k;
+      let ord=[]; try{ ord=JSON.parse(UserStore.get(this._orderKey(ds))||'[]'); }catch{}
+      UserStore.set(this._orderKey(ds), JSON.stringify(ord.filter(k=>k!==key).map(rename)));
+      const sk = PlanGen.SWAP_PREFIX+ds; let m={}; try{ m=JSON.parse(UserStore.get(sk)||'{}')||{}; }catch{}
+      const m2={}; Object.entries(m).forEach(([i,v])=>{ i=+i; if(i!==it.pi) m2[i>it.pi?i-1:i]=v; }); UserStore.set(sk, JSON.stringify(m2));
     } else {
       const k = PlanGen.SWAP_PREFIX + ds; let m = {}; try { m = JSON.parse(UserStore.get(k)||'{}')||{}; } catch {}
       m[it.pi] = '__skip'; UserStore.set(k, JSON.stringify(m));
     }
     FirebaseSync?.scheduleSave();
-    this._remapChecks(d, list, this.exercisesFor(d).list);
+    this._remapChecks(d, list, this.exercisesFor(d).list, rename, key);
     this.render(d);
     App.showToast(`${it.name} 뺐습니다`, 'success');
   },
