@@ -5,6 +5,5 @@ import Capacitor
 class BashyViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(BashyNativePlugin())
-        bridge?.registerPluginInstance(BashyHomePlugin())   // 애플 홈 (허브 화면에서 씀)
     }
 }

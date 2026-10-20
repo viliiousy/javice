@@ -48,7 +48,6 @@ const DevicePair = {
         <div style="font-size:13px;font-weight:700;color:var(--text)">스마트홈 연결</div>
         <div class="dp-seg" id="dpProv">
           <button type="button" data-p="st" onclick="DevicePair._setProvider('st')">SmartThings</button>
-          <button type="button" data-p="apple" onclick="DevicePair._setProvider('apple')">애플 홈</button>
           <button type="button" data-p="ha" onclick="DevicePair._setProvider('ha')">Home Assistant</button>
           <button type="button" data-p="google" disabled title="준비 중">구글 홈</button>
         </div>
