@@ -242,6 +242,8 @@ const App = {
     const jarvisHTML=lastMsg?`<div class="stats-jarvis"><span class="stats-jarvis-icon">⚡</span><span class="stats-jarvis-txt">${esc(lastMsg.slice(0,90))}</span></div>`:'';
 
     el.innerHTML=`<div class="stats-row">${chipsHTML}</div>${upcomingHTML}${urgentHTML}${jarvisHTML}`;
+    // 칩 개수에 따라 글씨를 한 단계씩 줄인다(폰에서 한 줄을 지키려고) — 넘치면 줄 안에서만 옆으로 민다
+    try { const row=el.querySelector('.stats-row'); const n=row.querySelectorAll('.stat-chip').length; row.dataset.n=n; row.classList.toggle('dense', n>=5); row.classList.toggle('denser', n>=7); } catch(e){}
 
     // 칩별 반짝임
     if(changed){

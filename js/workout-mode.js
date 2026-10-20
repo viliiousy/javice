@@ -68,6 +68,42 @@ const WorkoutMode = {
   _nSets(sets) { const m = String(sets || '').match(/^(\d+)\s*[×x]/i); return m ? Math.min(10, +m[1]) : 3; },
   _reps(sets) { const r = PlanGen._range(sets); return r[1] || r[0] || 10; },
 
+  // 고른 날짜로 시작. 지난 날 계획이면 오늘 기록으로 할지, 앞으로 요일까지 옮길지 묻는다.
+  startFor(ds) {
+    const today = Fitness._dateStr(new Date());
+    ds = ds || Fitness._dateStr((App?.S?.selDate) || new Date());
+    if (ds > today) { App.showToast('아직 오지 않은 날입니다 — 오늘이나 지난 날을 골라 주세요'); return; }
+    if (ds === today) return this.start(ds);
+    const from = new Date(ds + 'T00:00:00'), DOW = '일월화수목금토';
+    const { list } = Fitness.exercisesFor(from);
+    if (!list.length) { App.showToast(`${ds.slice(5).replace('-', '/')} 에는 계획된 운동이 없습니다`); return; }
+    const tp = Fitness.planOn(new Date());
+    const md = ds.slice(5).replace('-', '/');
+    App.openModal('@dumbbell 지난 운동 하기', `
+      <p class="pg-note"><b>${md}(${DOW[from.getDay()]}) ${esc(Fitness.planFor(from.getDay()).name)}</b> 을(를) 지금 합니다. 어떻게 남길까요?</p>
+      <div class="wk-pick">
+        <button class="sw-row" onclick="WorkoutMode.bring('${ds}', false)"><span class="sw-nm"><b>오늘 기록으로 (이번만)</b><small>오늘 계획(${esc(tp.name)}) 대신 이 운동을 오늘 합니다. 앞으로의 요일 계획은 그대로</small></span></button>
+        <button class="sw-row" onclick="WorkoutMode.bring('${ds}', true)"><span class="sw-nm"><b>오늘 기록 + 앞으로 요일도 바꾸기</b><small>${DOW[from.getDay()]}요일 계획과 ${DOW[new Date().getDay()]}요일 계획을 서로 바꿉니다</small></span></button>
+        <button class="sw-row" onclick="App.closeModal();WorkoutMode.start('${ds}')"><span class="sw-nm"><b>${md} 기록으로</b><small>그날 한 것으로 남깁니다(깜빡하고 못 남긴 경우)</small></span></button>
+      </div>`);
+  },
+  bring(ds, swapDays) {
+    const today = Fitness._dateStr(new Date());
+    // 오늘 목록이 통째로 바뀌므로, 오늘 계획에 걸어 둔 체크·순서·교체는 비운다(직접 추가한 운동과 기록은 그대로)
+    Fitness._save([], new Date()); UserStore.set(Fitness._orderKey(today), '[]'); UserStore.set(PlanGen.SWAP_PREFIX + today, '{}');
+    UserStore.set(Fitness._fromKey(today), ds);
+    if (swapDays) {
+      const a = new Date(ds + 'T00:00:00').getDay(), b = new Date().getDay();
+      const dp = Fitness.dayPlan(), pa = dp[a] ?? Fitness._defaultFor(a), pb = dp[b] ?? Fitness._defaultFor(b);
+      dp[a] = pb; dp[b] = pa; Fitness.saveDayPlan(dp);
+      UserStore.set(Fitness._fromKey(today), '');   // 요일을 바꿨으니 오늘 계획이 곧 그 운동이다
+    }
+    window.FirebaseSync?.scheduleSave?.();
+    App.closeModal();
+    try { App.selectCalDate ? App.selectCalDate(new Date()) : Fitness.render(new Date()); } catch (e) {}
+    this.start(today);
+  },
+
   start(ds) {
     ds = ds || Fitness._dateStr(new Date());
     const { list } = Fitness.exercisesFor(new Date(ds + 'T00:00:00'));

@@ -66,8 +66,8 @@ const TopInfo = {
     }
     const favs = (cfg.favorites || []).slice(0, 2);
     if (!favs.length) return '';
-    return `<div class="stat-chip stat-stock" data-s="econ" title="관심종목 오늘 등락">${favs.map(it =>
-      `<span class="ti-nm">${esc(String(it.name || '').slice(0, 4))}</span> ${pc((Econ.PRICES[Econ.keyOf(it)] || {}).pct)}`).join(' ')}</div>`;
+    return `<div class="stat-chip stat-stock" data-s="econ" title="관심종목 오늘 등락">${favs.map((it, i) =>
+      `<span class="ti-st${i ? ' ti-st2' : ''}"><span class="ti-nm">${esc(String(it.name || '').slice(0, 4))}</span> ${pc((Econ.PRICES[Econ.keyOf(it)] || {}).pct)}</span>`).join(' ')}</div>`;
   },
 
   // 설정 화면

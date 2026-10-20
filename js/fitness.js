@@ -75,14 +75,10 @@ const Fitness = {
     if (!document.getElementById('fitnessWrap')) return;
     const d    = new Date(date);
     const dow  = planIdx!==null ? planIdx : d.getDay();
-    const plan = this.planFor(dow);
+    const { plan, list:allEx } = planIdx!==null && planIdx!==d.getDay() ? { plan:this.planFor(dow), list:this.planFor(dow).exercises.map((x,i)=>({...x,pi:i,key:'p'+i})) } : this.exercisesFor(d);
     const chk  = this._checked(d);
-    const custom = this.getCustomExercises(d);
     const isToday = this._dateStr(d)===this._dateStr(new Date());
-    // 교체(루틴이 아닌 플랜의 그날만) 적용
-    const sw = (typeof PlanGen!=='undefined') ? PlanGen.swapsFor(this._dateStr(d)) : {};
-    const planEx = plan.exercises.map((x,i)=> sw[i] ? { ...x, name:sw[i], hp:undefined } : x);
-    const allEx = [...planEx, ...custom];
+    const isPast = this._dateStr(d) < this._dateStr(new Date());
 
     // 카드 타이틀
     const titleEl = document.querySelector('.card-fitness .card-title');
@@ -159,24 +155,31 @@ const Fitness = {
         const src = this._thumb(ex, plan);
         const info = ex.hp!=null&&plan.src==='home' ? `HomePlan.open(${plan.day},${ex.hp})`
                    : (typeof ExMedia!=='undefined'&&ExMedia.find(ex.name)) ? `ExMedia.open('${esc(ex.name).replace(/'/g,'&#39;')}')` : '';
-        const custom = i>=plan.exercises.length;
-        return `<div class="fx${on(i)?' done':''}" onclick="Fitness.toggle(${i},'${dsx}')">
+        const custom = ex.ci!=null;
+        return `<div class="fx${on(i)?' done':''}" data-row data-i="${ex.key}" data-label="${esc(ex.name)}" onclick="Fitness.toggle(${i},'${dsx}')">
           <button type="button" class="fx-th${src?'':' none'}" ${info?`onclick="event.stopPropagation();${info}"`:'tabindex="-1"'} aria-label="${esc(ex.name)} 자세 보기">
             ${typeof Icons!=='undefined'?Icons.svg('dumbbell','fx-ic'):''}${src?`<span class="fx-img">${ExMedia.poseHtml(src)}</span>`:''}
           </button>
           <div class="fx-tx"><div class="fx-nm">${esc(ex.name)}</div><div class="fx-sets num">${esc(ex.sets||'')}</div>${this._logLine(ex, dsx)}</div>
           <button type="button" class="fx-act" onclick="event.stopPropagation();PlanGen.openLog('${A(ex.name)}','${A(ex.sets||'')}','${dsx}')" aria-label="무게 기록">${typeof Icons!=='undefined'?Icons.svg('pen','fx-aic'):'기록'}</button>
-          ${!custom?`<button type="button" class="fx-act" onclick="event.stopPropagation();PlanGen.openSwap(${i},'${A(ex.name)}','${dsx}',${plan.src==='routine'?`'${plan.rid}'`:'null'})" aria-label="운동 교체">⇄</button>`:''}
+          ${!custom?`<button type="button" class="fx-act" onclick="event.stopPropagation();PlanGen.openSwap(${ex.pi},'${A(ex.name)}','${dsx}',${plan.src==='routine'&&!plan.from?`'${plan.rid}'`:'null'})" aria-label="운동 교체">⇄</button>`:''}
           ${i===nextI&&isToday?'<span class="fx-next">다음</span>':''}
-          ${custom?`<button type="button" class="fx-del" onclick="event.stopPropagation();Fitness._delCustom(${i-plan.exercises.length},'${dsx}')" aria-label="삭제">✕</button>`:''}
           <span class="fx-chk" aria-hidden="true"></span>
         </div>`;}).join('')}
       </div>
+      ${plan.from ? `<p class="fit-from">${plan.from.slice(5).replace('-','/')} 계획을 오늘 하는 중 · <a href="javascript:Fitness.undoFrom('${dsx}')">되돌리기</a></p>` : ''}
       <div class="fit-foot">
-        ${isToday && done<allEx.length ? `<button class="btn-sm accent fit-start" onclick="WorkoutMode.start('${dsx}')">운동 시작 · 세트와 쉬는 시간 타이머</button>` : ''}
+        ${(isToday||isPast) && done<allEx.length ? `<button class="btn-sm accent fit-start" onclick="WorkoutMode.startFor('${dsx}')">운동 시작 · 세트와 쉬는 시간 타이머</button>` : ''}
         <div class="habit-add-btn" onclick="Fitness.showInlineAdd(new Date('${dsx}T00:00:00'))">+ 운동 추가</div>
       </div>`;
+    try { RowUI.paint(container.querySelector('.fit-list'), {
+      edit: key => { const it = allEx.find(x=>x.key===key); if (it) PlanGen.openLog(it.name, it.sets||'', dsx); },
+      del:  key => Fitness.removeItem(dsx, key),
+      reorder: order => Fitness.reorder(dsx, order),
+    }); } catch(e) { console.warn('RowUI fit', e); }
   },
+
+  undoFrom(ds) { const d=new Date(ds+'T00:00:00'); this._save([], d); UserStore.set(this._orderKey(ds), '[]'); UserStore.set(PlanGen.SWAP_PREFIX+ds, '{}'); UserStore.set(this._fromKey(ds), ''); FirebaseSync?.scheduleSave(); this.render(new Date(ds+'T00:00:00')); },
 
   // 그날 기록(무게×횟수)이 있으면 그것을, 없으면 지난 기록으로 본 오늘 권장 무게를 한 줄로
   _logLine(ex, ds) {
@@ -308,12 +311,57 @@ const Fitness = {
   },
 
   // 그날 할 운동 목록(계획 + 그날만 교체 + 직접 추가) — 카드·운동 모드가 같이 쓴다
+  // 그날 할 운동 목록 — 카드·운동 모드가 같이 쓴다.
+  //   계획(요일 루틴, 또는 '다른 날 계획을 오늘로' 옮긴 것) + 그날만 교체 + 그날만 빼기 + 직접 추가 + 그날 순서
+  // 줄마다 pi(계획 몇 번째) 또는 ci(직접 추가 몇 번째)와 key 를 달아 둔다 — 순서를 바꿔도 교체·삭제가 제자리를 찾게.
+  _fromKey(ds){ return 'gl_fit_from_'+ds; },
+  _orderKey(ds){ return 'gl_fit_order_'+ds; },
+  planOn(date) {
+    const d = new Date(date), ds = this._dateStr(d);
+    const from = UserStore.get(this._fromKey(ds));
+    const dow = from ? new Date(from+'T00:00:00').getDay() : d.getDay();
+    return { ...this.planFor(dow), from: from || null };
+  },
   exercisesFor(date) {
     const d = new Date(date), ds = this._dateStr(d);
-    const plan = this.planFor(d.getDay());
+    const plan = this.planOn(d);
     const sw = (typeof PlanGen!=='undefined') ? PlanGen.swapsFor(ds) : {};
-    const planEx = plan.exercises.map((x,i)=> sw[i] ? { ...x, name:sw[i], hp:undefined } : x);
-    return { plan, list:[...planEx, ...this.getCustomExercises(d)] };
+    let list = plan.exercises.map((x,i)=> sw[i]==='__skip' ? null : sw[i] ? { ...x, name:sw[i], hp:undefined, pi:i, key:'p'+i } : { ...x, pi:i, key:'p'+i }).filter(Boolean)
+      .concat(this.getCustomExercises(d).map((x,i)=>({ ...x, ci:i, key:'c'+i })));
+    let ord = []; try { ord = JSON.parse(UserStore.get(this._orderKey(ds))||'[]'); } catch {}
+    if (ord.length) list.sort((a,b)=>{ const x=ord.indexOf(a.key), y=ord.indexOf(b.key); return (x<0?999:x)-(y<0?999:y); });
+    return { plan, list };
+  },
+  // 순서 바꾸기·빼기 뒤에 '완료' 표시가 다른 줄로 옮겨 가지 않게 key 로 다시 맞춘다
+  _remapChecks(d, before, after) {
+    const done = new Set(this._checked(d).map(i => before[i]?.key).filter(Boolean));
+    this._save(after.map((x,i)=> done.has(x.key) ? i : -1).filter(i=>i>=0), d);
+  },
+  reorder(ds, keys) {
+    const d = new Date(ds+'T00:00:00'), before = this.exercisesFor(d).list;
+    UserStore.set(this._orderKey(ds), JSON.stringify(keys)); FirebaseSync?.scheduleSave();
+    this._remapChecks(d, before, this.exercisesFor(d).list);
+    this.render(d);
+  },
+  removeItem(ds, key) {
+    const d = new Date(ds+'T00:00:00'), { plan, list } = this.exercisesFor(d), it = list.find(x=>x.key===key);
+    if (!it) return;
+    if (it.ci != null) {
+      const c = this.getCustomExercises(d); c.splice(it.ci,1); this.saveCustomExercises(c,d);
+      // 직접 추가 번호가 당겨지니 순서 기록의 c 번호도 고친다
+      let ord=[]; try{ ord=JSON.parse(UserStore.get(this._orderKey(ds))||'[]'); }catch{}
+      ord = ord.filter(k=>k!==key).map(k=>/^c\d+$/.test(k)&&+k.slice(1)>it.ci?'c'+(+k.slice(1)-1):k);
+      UserStore.set(this._orderKey(ds), JSON.stringify(ord));
+    } else if (plan.src==='routine' && confirm(`'${it.name}' 을(를) 루틴에서도 뺄까요?\n확인 = 루틴에서 빼기(앞으로도) · 취소 = 오늘만 빼기`)) {
+      const R = this.routines(); R[plan.rid].exercises.splice(it.pi,1); this.saveRoutines(R);
+    } else {
+      const k = PlanGen.SWAP_PREFIX + ds; let m = {}; try { m = JSON.parse(UserStore.get(k)||'{}')||{}; } catch {}
+      m[it.pi] = '__skip'; UserStore.set(k, JSON.stringify(m));
+    }
+    FirebaseSync?.scheduleSave();
+    this._remapChecks(d, list, this.exercisesFor(d).list);
+    this.render(d);
+    App.showToast(`${it.name} 뺐습니다`, 'success');
   },
 
   toggle(idx, dateStr=null) {

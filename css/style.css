@@ -3793,3 +3793,7 @@ body.wk-on{ overflow:hidden; }
 .fit-foot{ display:grid; gap:8px; }
 .fit-start{ width:100%; height:44px; }
 .sw-nm{ display:flex; flex-direction:column; } .sw-nm small{ font-size:11px; color:var(--text3); }
+.wk-pick{ display:grid; gap:8px; margin-top:8px; }
+.wk-pick .sw-row{ padding:12px 14px; } .wk-pick b{ font-weight:600; font-size:14px; }
+.fit-from{ font-size:12px; color:var(--text3); margin:8px 0 0; } .fit-from a{ color:var(--accent); }
+.wk[hidden]{ display:none !important; }

@@ -11,6 +11,7 @@ const Settings = {
     { id:'voice',  ic:'volume',  name:'음성 · 소리 · 진동', sub:() => `답 읽기 ${Settings._on(JARVIS?._ttsEnabled)} · 효과음 ${Settings._on(Sounds?.enabled)} · 진동 ${Settings._on(Haptic.on)}` },
     { id:'notify', ic:'bell',    name:'알림',        sub:() => { try { return Notifications.getSettings().enabled ? '켜짐 · 습관·식단·할일·일정' : '꺼짐'; } catch(e){ return ''; } } },
     { id:'ai',     ic:'sparkle', name:'AI',          sub:() => { try { const P = JARVIS.PROVIDERS[JARVIS._active()]; return `기본 ${P ? (P.short || P.name) : '미설정'} · 사용량 추적`; } catch(e){ return 'AI 비서 · 사용량 추적'; } } },
+    { id:'econ',   ic:'trend',   name:'경제 · 증권', sub:() => '증권사 연동 · 보유 종목 · 관심 종목' },
     { id:'device', ic:'monitor', name:'기기 · 허브', sub:() => `허브 모드 ${localStorage.getItem('gl_hub_mode')==='1'?'켜짐':'꺼짐'} · 기기 연결` },
     { id:'secure', ic:'key',     name:'보안 · 계정', sub:() => '저장된 키 · 로그아웃 · 계정 삭제' },
     { id:'help',   ic:'book',    name:'도움말',      sub:() => '사용 도우미 · 버전' },
@@ -93,6 +94,15 @@ const Settings = {
         <div class="set-h">앱 안 AI 비서 (API 키)</div>
         ${this._link('기본 AI · 키 설정', 'JARVIS.showKeySetup()', '무료: Groq·Gemini / 유료: ChatGPT·Claude·Grok API 키')}
         ${this._link('AI 사용량', 'AIUsage.open()', '남은 한도와 초기화 시각 · 위쪽 고리는 디자인 › 상단바 정보에서')}`;
+    } else if (cat === 'econ') {
+      h = `<div class="set-h">보유 종목 가져오기</div>
+        ${this._link('증권사 연동', 'App.closeModal();Econ.showBroker()', '한국투자증권 Open API 앱키로 보유 종목·수량·평단을 그대로 가져옵니다')}
+        ${this._link('캡처로 채우기', 'App.closeModal();Econ.showHoldScan()', '다른 증권사는 보유 화면 캡처를 AI 가 읽어 채웁니다')}
+        <div class="set-h">목록</div>
+        ${this._link('보유 종목 편집', "App.closeModal();Econ.open('hold')", '수량·평단 고치기, 평가액·수익률 보기')}
+        ${this._link('관심 종목 · 지수', 'App.closeModal();Econ.open()', '시세를 볼 종목 담기·빼기')}
+        <div class="set-h">위쪽 표시</div>
+        ${this._link('상단바에 주식 등락 보이기', "Settings.go('topinfo')", '보유 / 관심종목의 오늘 등락 %')}`;
     } else if (cat === 'connector') {
       h = `<div id="mcpBox" class="set-loading">주소를 준비하는 중…</div>`;
       setTimeout(() => this.mcpPaint(), 0);
