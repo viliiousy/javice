@@ -1,6 +1,6 @@
 {
   "name": "bashy-app",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "Bashy 앱 (Capacitor) — iOS·안드로이드. 화면은 번들(www), 서버는 bashy.app",
   "scripts": {
