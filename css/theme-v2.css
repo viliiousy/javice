@@ -529,3 +529,18 @@ html[data-ui="v2"] .stat-chip b.ti-dn, html[data-ui="v2"] .stat-chip .ti-dn{ col
 html[data-ui="v2"] .stats-row .sg-s{ order:2; }
 html[data-ui="v2"] .stats-row .sg-r{ order:1; }
 html[data-ui="v2"] .stats-row .sg-l{ order:0; }
+
+/* 폰 상단바 슬림화 — 글씨를 줄여서라도 높이를 줄인다 (요약 2줄 + 일정·할일 1줄) */
+@media (max-width:900px){
+  html[data-ui="v2"] .stats-row .sg-l{ gap:0; }
+  html[data-ui="v2"] .stats-row .sg-l .stat-chip{ height:26px !important; padding:0 8px !important; font-size:11px !important; }
+  html[data-ui="v2"] .stats-row .sg-l .stat-chip b{ font-size:13px !important; }
+  html[data-ui="v2"] .stats-row.dense{ row-gap:2px; padding:0; }
+  html[data-ui="v2"] .stats-row .sg-s .stat-chip{ font-size:10.5px !important; white-space:nowrap; }
+  html[data-ui="v2"] .stats-row .sg-s .stat-chip b{ font-size:12px !important; }
+  html[data-ui="v2"] .stats-row.dense .stat-chip b{ font-size:13px !important; }
+  html[data-ui="v2"] .stats-row.dense .sg-r{ height:22px; align-items:center; }
+  html[data-ui="v2"] .stats-upcoming, html[data-ui="v2"] .stats-urgent-row{ padding-top:4px; gap:4px; }
+  html[data-ui="v2"] .stats-upcoming-chip, html[data-ui="v2"] .stats-urgent-chip{ height:24px; padding:0 8px !important; font-size:11.5px !important; line-height:22px; display:inline-flex; align-items:center; flex:none; max-width:46vw; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  html[data-ui="v2"] .stats-upcoming-chip .chip-ic{ width:11px; height:11px; }
+}

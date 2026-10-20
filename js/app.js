@@ -244,7 +244,13 @@ const App = {
 
     const jarvisHTML=lastMsg?`<div class="stats-jarvis"><span class="stats-jarvis-icon">⚡</span><span class="stats-jarvis-txt">${esc(lastMsg.slice(0,90))}</span></div>`:'';
 
-    el.innerHTML=`<div class="stats-row">${chipsHTML}</div>${upcomingHTML}${urgentHTML}${jarvisHTML}`;
+    // 폰: 일정·할일 칩을 한 줄로 합쳐 옆으로 밀어 보게 — 두 줄이면 상단바가 너무 두꺼워진다
+    let listHTML=upcomingHTML+urgentHTML;
+    if (window.innerWidth<=900 && upcomingHTML && urgentHTML) {
+      const inner=h=>h.replace(/^\s*<div[^>]*>/,'').replace(/<\/div>\s*$/,'');
+      listHTML=`<div class="stats-upcoming stats-merged">${inner(upcomingHTML)}${inner(urgentHTML)}</div>`;
+    }
+    el.innerHTML=`<div class="stats-row">${chipsHTML}</div>${listHTML}${jarvisHTML}`;
     // 칩 개수에 따라 글씨를 한 단계씩 줄인다(폰에서 한 줄을 지키려고) — 넘치면 줄 안에서만 옆으로 민다
     try { const row=el.querySelector('.stats-row'); const n=row.querySelectorAll('.stat-chip').length; row.dataset.n=n; row.classList.toggle('dense', n>=5); row.classList.toggle('denser', n>=7); } catch(e){}
 

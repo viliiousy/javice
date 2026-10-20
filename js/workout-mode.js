@@ -162,7 +162,10 @@ const WorkoutMode = {
   // 시작 단추: 끝내지 않은 운동이 있으면 바로 이어서. 지난 날이면 어떻게 남길지 묻는다. 아니면 '시작할까요?'
   startFor(ds) {
     const sv = this.saved();
-    if (sv && sv.ex && sv.ex.length) return this._resume(sv);
+    if (sv && sv.ex && sv.ex.length) {
+      if (sv.ds === Fitness._dateStr(new Date())) return this._resume(sv);
+      this._clearSaved();   // 지난 날에 남겨 둔 것은 이미 기록에 저장되어 있다
+    }
     const today = Fitness._dateStr(new Date());
     ds = ds || Fitness._dateStr((App?.S?.selDate) || new Date());
     if (ds > today) { App.showToast('아직 오지 않은 날입니다 — 오늘이나 지난 날을 골라 주세요'); return; }
@@ -198,7 +201,7 @@ const WorkoutMode = {
 
   // 시작 전 한 번 묻기 — 종목·세트·예상 시간·예상 볼륨
   _build(ds) {
-    const { list } = Fitness.exercisesFor(new Date(ds + 'T00:00:00'));
+    const { list, plan } = Fitness.exercisesFor(new Date(ds + 'T00:00:00'));
     const done = Fitness._checked(new Date(ds + 'T00:00:00'));
     const log = PlanGen.log(ds);
     return list.map((x, i) => {
@@ -206,7 +209,8 @@ const WorkoutMode = {
       const n = Math.max(this._nSets(x.sets), (log[x.name] || []).length);
       const cardio = PlanGen.partOf(x.name) === '유산소';
       const nw = PlanGen.nextWeight(x.name, x.sets, ds);
-      return { name: x.name, sets: x.sets, key: x.key, cardio, done: done.includes(i), sug: PlanGen.suggest(x.name, x.sets, ds),
+      let th = ''; try { th = Fitness._thumb(x, plan || {}); } catch (e) {}
+      return { name: x.name, sets: x.sets, key: x.key, th, cardio, done: done.includes(i), sug: PlanGen.suggest(x.name, x.sets, ds),
         rows: Array.from({ length: cardio ? 1 : n }, (_, k) => {
           const L = (log[x.name] || [])[k], P = prev && prev.sets[Math.min(k, prev.sets.length - 1)];
           return L ? { w: L.w, r: L.r, ok: true } : { w: nw ?? (P ? P.w : ''), r: nw != null ? this._reps(x.sets) : (P ? P.r : this._reps(x.sets)), ok: false };
@@ -267,7 +271,8 @@ const WorkoutMode = {
     const S = this.st, el = document.getElementById('wkMode'); if (!S || !el) return;
     const x = S.ex[S.cur], pf = this.prefs();
     const em = typeof ExMedia !== 'undefined' ? ExMedia.find(x.name) : null;
-    const th = typeof ExMedia !== 'undefined' ? ExMedia.thumbFor(x.name) : '';
+    let th = typeof ExMedia !== 'undefined' ? ExMedia.thumbFor(x.name) : '';
+    if (!th) th = x.th || '';
     const part = PlanGen.partOf(x.name) || (em && em.part) || '';
     const doneN = S.ex.filter(e => e.done).length;
     const A = v => esc(v).replace(/'/g, '&#39;');
@@ -487,7 +492,7 @@ const WorkoutMode = {
     const n = (this._alts || [])[i]; if (!n) return;
     const S = this.st, x = S.ex[S.cur];
     const nw = PlanGen.nextWeight(n, x.sets, S.ds), prev = PlanGen.last(n, S.ds);
-    x.name = n; x.sug = PlanGen.suggest(n, x.sets, S.ds); x.cardio = PlanGen.partOf(n) === '유산소';
+    x.name = n; x.th = ''; x.sug = PlanGen.suggest(n, x.sets, S.ds); x.cardio = PlanGen.partOf(n) === '유산소';
     x.rows = x.rows.map(r => r.ok ? r : { w: nw ?? (prev ? prev.sets[0].w : ''), r: r.r, ok: false });
     // 카드에도 그날만 교체로 남긴다(계획 운동일 때)
     if (x.key && /^p\d+$/.test(x.key)) {
@@ -531,9 +536,8 @@ const WorkoutMode = {
     App.openModal('@dumbbell 운동을 끝낼까요?', `
       <p class="pg-note">지금까지 ${this._fmt((Date.now() - S.t0) / 1000)} · ${sets}세트를 했습니다.</p>
       <div class="wk-pick">
-        <button class="sw-row" onclick="App.closeModal();WorkoutMode._finishSave()"><span class="sw-nm"><b>저장하고 끝내기</b><small>한 세트의 무게·횟수와 완료한 운동을 기록에 남깁니다</small></span></button>
+        <button class="sw-row" onclick="App.closeModal();WorkoutMode._finishSave()"><span class="sw-nm"><b>저장하고 끝내기</b><small>한 세트의 무게·횟수를 기록에 남깁니다 — 다 못 했으면 ‘운동 시작’ 으로 이어서 할 수 있습니다</small></span></button>
         <button class="sw-row" onclick="App.closeModal();WorkoutMode._finishDiscard()"><span class="sw-nm"><b>저장하지 않고 끝내기</b><small>이번 운동에서 남긴 것을 모두 지우고 시작 전으로 돌립니다</small></span></button>
-        <button class="sw-row" onclick="App.closeModal();WorkoutMode.pause()"><span class="sw-nm"><b>나중에 이어 하기</b><small>그대로 남겨 두고 나갑니다 — ‘운동 시작’ 을 누르면 시간이 이어서 갑니다</small></span></button>
       </div>
       <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">계속하기</button></div>`);
   },
@@ -549,7 +553,11 @@ const WorkoutMode = {
   },
   _finishSave() {
     const S = this.st; if (!S) return;
-    this._saveLog(); this._check(); this._clearSaved(); this._stop();
+    this._saveLog(); this._check();
+    // 다 못 끝냈으면 진행 상황을 남겨 둔다 — 같은 날 '운동 시작' 을 다시 누르면 이어서(시간도 이어서) 한다
+    const left = S.ex.some(e => !e.done && e.rows.some(r => !r.ok));
+    if (left) { S.restEnd = 0; this._persist(); } else this._clearSaved();
+    this._stop();
     const min = Math.round((Date.now() - S.t0) / 60000);
     const vol = S.ex.reduce((t, e) => t + e.rows.filter(r => r.ok).reduce((a, r) => a + (Number(r.w) || 0) * (Number(r.r) || 0), 0), 0);
     const sets = S.ex.reduce((t, e) => t + e.rows.filter(r => r.ok).length, 0);
@@ -557,7 +565,7 @@ const WorkoutMode = {
     if (el) el.innerHTML = `<div class="wk-done">
       <div class="wk-dt">오늘 운동 끝</div>
       <div class="wk-dn"><div><b class="num">${min}</b><span>분</span></div><div><b class="num">${sets}</b><span>세트</span></div><div><b class="num">${Math.round(vol).toLocaleString('ko-KR')}</b><span>kg 볼륨</span></div></div>
-      <p>${S.ex.filter(e => e.done).length} / ${S.ex.length} 종목 완료 · 무게와 횟수는 기록에 남았고, 다음 운동에서 권장 무게로 이어집니다.</p>
+      <p>${S.ex.filter(e => e.done).length} / ${S.ex.length} 종목 완료 · 무게와 횟수는 기록에 남았고, 다음 운동에서 권장 무게로 이어집니다.${S.ex.some(e => !e.done) ? ' 남은 운동은 오늘 ‘운동 시작’ 을 누르면 이어서 할 수 있습니다.' : ''}</p>
       <button class="wk-main" onclick="WorkoutMode.close()">닫기</button></div>`;
     try { Haptic.success(); } catch (e) {}
     this.st = null;

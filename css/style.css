@@ -3809,7 +3809,7 @@ body.wk-on{ overflow:hidden; }
 /* ── 운동 모드 v2: 큰 자세 그림 · 부위 · 도구 · 세트 밀어서 삭제 ── */
 .wk-stage{ display:flex; justify-content:center; margin:0 0 16px; }
 .wk-stage .wk-pose{ width:min(100%, 320px); height:auto; aspect-ratio:1/1; border-radius:20px; background:#f2f3f5; }
-.wk-stage .wk-pose .fx-img, .wk-stage .wk-pose > *{ position:absolute; inset:0; }
+.wk-stage .wk-pose:not(.none) > *{ position:absolute; inset:0; }
 .wk-pose.none{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; background:#17181B; color:#8B8F97; font-size:12px; }
 .wk-pose.none svg{ position:static !important; width:40px; height:40px; }
 .wk-ex-tx h2{ margin:4px 0; font-size:24px; font-weight:600; letter-spacing:-.01em; }

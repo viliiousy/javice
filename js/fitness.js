@@ -167,7 +167,7 @@ const Fitness = {
       </div>
       ${plan.from ? `<p class="fit-from">${plan.from.slice(5).replace('-','/')} 계획을 오늘 하는 중 · <a href="javascript:Fitness.undoFrom('${dsx}')">되돌리기</a></p>` : ''}
       <div class="fit-foot">
-        ${(()=>{ const sv = typeof WorkoutMode!=='undefined' && WorkoutMode.saved(); if (sv && sv.ex && sv.ex.length) return `<button class="btn-sm accent fit-start" onclick="WorkoutMode.startFor('${dsx}')">이어서 운동하기 · ${sv.ex.filter(e=>e.done).length}/${sv.ex.length} 종목</button>`; return (isToday||isPast) && done<allEx.length ? `<button class="btn-sm accent fit-start" onclick="WorkoutMode.startFor('${dsx}')">운동 시작 · 세트와 쉬는 시간 타이머</button>` : ''; })()}
+        ${(()=>{ const sv = typeof WorkoutMode!=='undefined' && WorkoutMode.saved(); if (sv && sv.ex && sv.ex.length && sv.ds===Fitness._dateStr(new Date()) && isToday) return `<button class="btn-sm accent fit-start" onclick="WorkoutMode.startFor('${dsx}')">이어서 운동하기 · ${sv.ex.filter(e=>e.done).length}/${sv.ex.length} 종목</button>`; return (isToday||isPast) && done<allEx.length ? `<button class="btn-sm accent fit-start" onclick="WorkoutMode.startFor('${dsx}')">운동 시작 · 세트와 쉬는 시간 타이머</button>` : ''; })()}
         <div class="habit-add-btn" onclick="Fitness.showInlineAdd(new Date('${dsx}T00:00:00'))">+ 운동 추가</div>
       </div>`;
     try { RowUI.paint(container.querySelector('.fit-list'), {
