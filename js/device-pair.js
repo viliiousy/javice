@@ -29,14 +29,12 @@ const DevicePair = {
     setTimeout(() => clearInterval(wait), 120000);
   },
 
-  open(pin = '') {
+  // 허브 태블릿 QR(?pair=번호)로 들어왔을 때만 쓰는 승인 창
+  openPair(pin = '') {
     pin = String(pin).replace(/\D/g, '').slice(0, 6);
-    App.openModal('@grid 기기 연결', `
+    App.openModal('@grid 허브 태블릿 승인', `
       <div style="display:grid;gap:12px">
-        <div style="font-size:13px;color:var(--text2);line-height:1.6">
-          태블릿 허브 화면의 <b>설정 → bashy 계정으로 연결</b>을 누르면 나오는 6자리 번호를 넣어 주세요.
-          승인하면 그 기기가 이 계정의 AI 사용량·할 일과 저장된 스마트홈 설정을 바로 씁니다.
-        </div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.6">허브 태블릿 화면에 뜬 6자리 번호가 맞으면 승인을 눌러 주세요. 그 태블릿이 이 계정의 할 일·AI 사용량·스마트홈 설정을 씁니다.</div>
         <input id="dpPin" inputmode="numeric" maxlength="7" autocomplete="one-time-code" placeholder="000 000" value="${pin}"
           style="font:700 26px/1 ui-monospace,Menlo,monospace;letter-spacing:.2em;text-align:center;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--bg2);color:var(--text)">
         <div id="dpMsg" style="font-size:12.5px;color:var(--text3);min-height:1.2em"></div>
@@ -44,27 +42,35 @@ const DevicePair = {
           <button class="btn-sm" onclick="App.closeModal()">취소</button>
           <button class="btn-sm accent" id="dpGo" onclick="DevicePair.approve()">승인</button>
         </div>
-        <div style="height:1px;background:var(--border);margin:6px 0"></div>
-        <div style="font-size:13px;font-weight:700;color:var(--text)">스마트홈 연결</div>
+      </div>`);
+  },
+
+  open(pin = '') {
+    if (pin) return this.openPair(pin);
+    App.openModal('@grid 스마트홈 연결', `
+      <div style="display:grid;gap:12px">
+        <div style="font-size:13px;color:var(--text2);line-height:1.6">허브가 집 기기를 어디서 가져올지 고릅니다. <b>계정 연결</b>은 SmartThings·구글 홈을 함께 쓸 수 있고, <b>Home Assistant</b>는 집 서버 하나만 씁니다.</div>
         <div class="dp-seg" id="dpProv">
-          <button type="button" data-p="st" onclick="DevicePair._setProvider('st')">SmartThings</button>
+          <button type="button" data-p="st" onclick="DevicePair._setProvider('st')">계정 연결</button>
           <button type="button" data-p="ha" onclick="DevicePair._setProvider('ha')">Home Assistant</button>
-          <button type="button" data-p="google" disabled title="준비 중">구글 홈</button>
         </div>
-        <div id="dpApple" style="display:none;font-size:12px;color:var(--text3);line-height:1.6">
-          애플 홈은 서버 API 가 없어서 <b>아이폰·아이패드의 Bashy 앱 › 허브 모드</b>에서만 동작합니다. 그 기기에서 처음 열 때 '홈 데이터 접근' 허락 창이 뜨면 허용해 주세요. 홈 앱에 등록된 방·기기·장면이 그대로 보입니다.
-        </div>
-        <div id="dpSt" style="display:grid;gap:8px">
-          <div style="font-size:12px;color:var(--text3);line-height:1.6">집에 서버가 없어도 됩니다. 삼성 계정으로 한 번 허락하면 허브가 SmartThings 의 방·기기·장면을 그대로 가져와 켜고 끕니다.</div>
-          <div id="dpStMsg" style="font-size:12.5px;color:var(--text2);min-height:1.2em">확인 중…</div>
-          <div class="modal-btns" id="dpStBtns"></div>
+        <div id="dpSt" style="display:grid;gap:14px">
+          <div class="dp-card">
+            <div class="dp-card-h"><b>SmartThings</b><span id="dpStMsg">확인 중…</span></div>
+            <div class="dp-card-p">삼성 계정으로 한 번 허락하면 SmartThings 앱의 방·기기·장면을 허브에서 그대로 켜고 끕니다.</div>
+            <div class="modal-btns" id="dpStBtns"></div>
+          </div>
+          <div class="dp-card is-off">
+            <div class="dp-card-h"><b>구글 홈</b><span>준비 중</span></div>
+            <div class="dp-card-p">구글 계정으로 허락하면 구글 홈 기기를 SmartThings 기기와 함께 보여 줍니다. 구글 승인 절차가 끝나면 열립니다.</div>
+            <div class="modal-btns"><button class="btn-sm" disabled>구글 홈 계정 연결하기</button></div>
+          </div>
         </div>
         <div id="dpHa" style="display:grid;gap:12px">
-        <div style="font-size:13px;font-weight:700;color:var(--text)">Home Assistant 설정 (클라우드에 저장)</div>
-        <div style="font-size:12px;color:var(--text3);line-height:1.6">여기 한 번 저장해 두면, 새 태블릿이나 앱을 다시 깐 태블릿은 위의 '연결' 만 하면 이 설정을 그대로 받아 갑니다.</div>
+        <div style="font-size:12px;color:var(--text3);line-height:1.6">집 Wi-Fi 의 Home Assistant 서버에 바로 붙습니다. 여기 저장하면 같은 계정의 허브가 모두 이 설정을 받아 갑니다.</div>
         <label style="font-size:12px;color:var(--text2)">Home Assistant 주소 (집)
-          <input id="dpHaUrl" class="inp inp-sm" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://172.30.1.14"></label>
-        <label style="font-size:12px;color:var(--text2)">외부 주소
+          <input id="dpHaUrl" class="inp inp-sm" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://192.168.0.10:8123"></label>
+        <label style="font-size:12px;color:var(--text2)">외부 주소 (선택)
           <input id="dpHaExt" class="inp inp-sm" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://bashy-bot.duckdns.org"></label>
         <label style="font-size:12px;color:var(--text2)">장기 액세스 토큰
           <input id="dpHaTok" class="inp inp-sm" type="password" autocomplete="off" spellcheck="false" placeholder="HA 프로필 → 보안 → 장기 액세스 토큰"></label>
@@ -72,7 +78,6 @@ const DevicePair = {
         <div class="modal-btns"><button class="btn-sm accent" onclick="DevicePair.saveCfg()">설정 저장</button></div>
         </div>
       </div>`);
-    setTimeout(() => { const i = document.getElementById('dpPin'); if (i && !pin) i.focus(); }, 50);
     this.loadCfg().then(() => { this._paintProv(); this.stStatus(); });
   },
 
@@ -99,7 +104,7 @@ const DevicePair = {
     if (this._prov() === p && this._cfg.provider) { this._paintProv(); return; }
     const next = { ...(this._cfg || {}), provider: p, at: new Date().toISOString() };
     const ok = await FirebaseSync.setLink({ hubCfg: next }).catch(() => false);
-    if (ok) { this._cfg = next; if (!quiet) App.showToast(p === 'st' ? '허브가 SmartThings 를 씁니다' : p === 'apple' ? '허브가 애플 홈을 씁니다(아이폰·아이패드 앱)' : '허브가 Home Assistant 를 씁니다', 'success'); }
+    if (ok) { this._cfg = next; if (!quiet) App.showToast(p === 'st' ? '허브가 연결한 계정(SmartThings·구글 홈)을 씁니다' : p === 'apple' ? '허브가 애플 홈을 씁니다(아이폰·아이패드 앱)' : '허브가 Home Assistant 를 씁니다', 'success'); }
     this._paintProv();
   },
   async stStatus() {
@@ -108,11 +113,11 @@ const DevicePair = {
     try {
       const j = await this._api({ act: 'stStatus' });
       if (j.linked) {
-        msg(`연결됨 · 방 ${j.rooms}개 · 기기 ${j.devices}개`);
-        btns.innerHTML = `<button class="btn-sm" onclick="DevicePair.stUnlink()">연결 해제</button><button class="btn-sm accent" onclick="DevicePair.stLink()">다시 연결</button>`;
+        msg(`연결됨 · 방 ${j.rooms} · 기기 ${j.devices}`);
+        btns.innerHTML = `<button class="btn-sm" onclick="DevicePair.stUnlink()">연결 해제</button><button class="btn-sm" onclick="DevicePair.stLink()">다른 SmartThings 계정 연결하기</button>`;
       } else {
         msg(j.ready === false ? 'SmartThings 연동을 준비하고 있습니다. 조금 뒤 다시 열어 주세요.' : (j.error ? '연결이 끊겼습니다 — 다시 연결해 주세요' : '아직 연결하지 않았습니다.'));
-        btns.innerHTML = j.ready === false ? '' : `<button class="btn-sm accent" onclick="DevicePair.stLink()">SmartThings 연결하기</button>`;
+        btns.innerHTML = j.ready === false ? '' : `<button class="btn-sm accent" onclick="DevicePair.stLink()">SmartThings 계정 연결하기</button>`;
       }
     } catch (e) { msg(e.message); btns.innerHTML = ''; }
   },

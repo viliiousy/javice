@@ -1143,6 +1143,7 @@ html.dark .profile-menu { background:var(--card); border-color:var(--border); }
   border-radius:12px; box-shadow:var(--shadow-lg);
   z-index:200; min-width:160px; overflow:hidden;
 }
+.profile-menu-item[hidden]{ display:none !important; }
 .profile-menu-item {
   display:flex; align-items:center; gap:9px;
   padding:11px 16px; font-size:13px; color:var(--text);

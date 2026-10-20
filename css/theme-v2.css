@@ -611,6 +611,12 @@ html[data-ui="v2"] .econ-login, html[data-ui="v2"] .ec-login-need{ color:var(--t
 .dp-seg button + button{ border-left:1px solid var(--border); }
 .dp-seg button:disabled{ color:var(--text3); opacity:.6; cursor:default; }
 .dp-seg button.on{ background:var(--text); color:var(--card); font-weight:600; }
+.dp-card{ display:grid; gap:8px; padding:14px 0 0; border-top:1px solid var(--border); }
+.dp-card-h{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; font-size:14px; color:var(--text); }
+.dp-card-h span{ font-size:12.5px; color:var(--text3); text-align:right; }
+.dp-card-p{ font-size:12px; color:var(--text3); line-height:1.6; }
+.dp-card .modal-btns{ justify-content:flex-start; }
+.dp-card.is-off .dp-card-h b{ color:var(--text3); }
 
 /* 메모 서식 줄 — 상자 없이 선 하나 위에 44px 단추. 묶음 사이만 띄우고, 켜진 서식은 먹색 */
 html[data-ui="v2"] .mm-form .mm-bar{ display:flex; align-items:center; gap:16px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none;

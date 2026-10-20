@@ -101,20 +101,27 @@
         <legend>스마트홈</legend>
         <label>연결 방식
           <select name="provider" id="provSel">
-            <option value="st">SmartThings — 집에 서버 없이</option>
-            <option value="ha">Home Assistant — 집에 서버가 있을 때</option>
-            <option value="google" disabled>구글 홈 (준비 중)</option>
+            <option value="st">계정 연결 — SmartThings · 구글 홈 함께</option>
+            <option value="ha">Home Assistant — 집 서버만</option>
           </select>
         </label>
 
         <div class="prov" data-prov="st">
-          <div class="st-state"><span id="stState">확인 중…</span><button type="button" id="stLink" class="chip chip-acc">SmartThings 연결하기</button></div>
-          <ol class="s-steps">
-            <li>위 <b>SmartThings 연결하기</b>를 누르면 삼성 계정 로그인 화면이 열립니다.</li>
-            <li>로그인한 뒤 Bashy 가 기기를 읽고 켜도록 <b>허용</b>을 누릅니다.</li>
-            <li>bashy.app 으로 돌아오면 끝입니다. 이 화면을 닫으면 SmartThings 앱에 등록된 방·기기·장면이 허브에 나타납니다.</li>
-          </ol>
-          <p class="s-help">입력할 주소나 토큰이 없습니다. 연결은 bashy 계정에 저장되어, 같은 계정으로 연결한 다른 허브도 바로 씁니다. bashy.app › 프로필 › 기기 연결에서도 연결·해제할 수 있습니다.</p>
+          <div class="pv-acct">
+            <div class="st-state"><b>SmartThings</b><span id="stState">확인 중…</span></div>
+            <ol class="s-steps">
+              <li>아래 <b>SmartThings 계정 연결하기</b>를 누르면 삼성 계정 로그인 화면이 열립니다.</li>
+              <li>기기가 등록된 삼성 계정으로 로그인하고, 집(위치)을 고른 뒤 <b>인증</b>을 누릅니다.</li>
+              <li>bashy.app 으로 돌아오면 끝입니다. 이 화면을 닫으면 방·기기·장면이 허브에 나타납니다.</li>
+            </ol>
+            <button type="button" id="stLink" class="chip chip-acc">SmartThings 계정 연결하기</button>
+          </div>
+          <div class="pv-acct is-off">
+            <div class="st-state"><b>구글 홈</b><span>준비 중</span></div>
+            <p class="s-help">구글 계정으로 허락하면 구글 홈 기기를 SmartThings 기기와 함께 보여 줍니다. 구글 승인 절차가 끝나면 열립니다.</p>
+            <button type="button" class="chip" disabled>구글 홈 계정 연결하기</button>
+          </div>
+          <p class="s-help">입력할 주소나 토큰이 없습니다. 연결은 bashy 계정에 저장되어, 같은 계정의 다른 허브도 바로 씁니다.</p>
         </div>
 
         <div class="prov" data-prov="ha">

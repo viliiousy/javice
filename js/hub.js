@@ -1686,11 +1686,11 @@ const Settings = {
     btn.hidden = false; el.textContent = '확인 중…';
     try {
       const j = await hubCall({ act: 'stDevices' });
-      el.innerHTML = `<b>연결됨</b> · 방 ${Object.keys(j.rooms || {}).length}개 · 기기 ${(j.devices || []).length}개`;
-      btn.textContent = '다시 연결';
+      el.textContent = `연결됨 · 방 ${Object.keys(j.rooms || {}).length} · 기기 ${(j.devices || []).length}`;
+      btn.textContent = '다른 SmartThings 계정 연결하기'; btn.classList.remove('chip-acc');
     } catch (e) {
       el.textContent = /연결되어 있지 않습니다/.test(e.message) ? '아직 연결하지 않았습니다' : /준비 중/.test(e.message) ? 'SmartThings 연동 준비 중입니다 (서버 설정 대기)' : '확인 실패: ' + e.message;
-      btn.textContent = 'SmartThings 연결하기';
+      btn.textContent = 'SmartThings 계정 연결하기'; btn.classList.add('chip-acc');
     }
   },
   async stLink() {

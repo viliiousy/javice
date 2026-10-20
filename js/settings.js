@@ -13,7 +13,7 @@ const Settings = {
     { id:'ai',     ic:'sparkle', name:'AI',          sub:() => { try { const P = JARVIS.PROVIDERS[JARVIS._active()]; return `기본 ${P ? (P.short || P.name) : '미설정'} · 사용량 추적`; } catch(e){ return 'AI 비서 · 사용량 추적'; } } },
     { id:'cal',    ic:'calendar', name:'일정과 할일', sub:() => `보일 캘린더 · 상단 지난 할일 ${localStorage.getItem('gl_top_overdue')==='0'?'숨김':'보임'}` },
     { id:'econ',   ic:'trend',   name:'경제 · 증권', sub:() => '증권사 연동 · 보유 종목 · 관심 종목' },
-    { id:'device', ic:'monitor', name:'기기 · 허브', sub:() => `허브 모드 ${localStorage.getItem('gl_hub_mode')==='1'?'켜짐':'꺼짐'} · 기기 연결` },
+    { id:'device', ic:'monitor', name:'스마트홈 허브', sub:() => `허브 모드 ${localStorage.getItem('gl_hub_mode')==='1'?'켜짐':'꺼짐'} · SmartThings · 구글 홈 · Home Assistant` },
     { id:'secure', ic:'key',     name:'보안 · 계정', sub:() => '저장된 키 · 로그아웃 · 계정 삭제' },
     { id:'help',   ic:'book',    name:'도움말',      sub:() => '사용 도우미 · 버전' },
   ],
@@ -127,8 +127,8 @@ const Settings = {
       h = `<div class="set-h">허브</div>
         ${this._item('허브 모드', this._sw(hub, 'Settings.toggleHub()'), '켜 두면 프로필 메뉴에 \'허브 모드로 전환\' 단추가 생깁니다. 누르면 큰 시계·할 일·AI 사용량·집 기기 화면(가로)으로 바뀝니다')}
         ${this._link('지금 허브 화면 열기', 'Settings.openHub()', '허브 오른쪽 아래 ‹ 앱으로 를 누르면 돌아옵니다')}
-        <div class="set-h">기기</div>
-        ${this._link('기기 연결', 'DevicePair.open()', '허브 태블릿·다른 기기를 이 계정에 연결')}`;
+        <div class="set-h">스마트홈</div>
+        ${this._link('스마트홈 연결', 'DevicePair.open()', 'SmartThings · 구글 홈 · Home Assistant 연결')}`;
     } else if (cat === 'help') {
       h = `${this._link('사용 도우미 다시 보기', 'App.closeModal();Onboard.open(true)', '신체정보·AI·습관·식단·운동·경제 설정')}
         ${this._item('버전', `<span class="set-val">${this.VERSION}</span>`)}`;

@@ -1119,6 +1119,7 @@ const App = {
     const menu=document.getElementById('profileMenu');
     if(!menu) return;
     menu.classList.toggle('hidden');
+    try{ Settings.hubMenu(); }catch(e){}   // 다른 기기에서 동기화된 허브 모드 값까지 반영
     // 프로필 아이콘 위치 기준으로 메뉴 위치 설정
     if(!menu.classList.contains('hidden')){
       const hUser=document.getElementById('hUser');

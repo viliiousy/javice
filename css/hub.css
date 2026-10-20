@@ -284,9 +284,15 @@ body.night .hub{ filter:brightness(.45); }
 /* 스마트홈 연결 방식별 칸 */
 .prov[hidden]{ display:none !important; }
 .prov{ display:grid; gap:12px; }
-.st-state{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:14px; color:var(--fg2); }
-.st-state b{ color:var(--fg); font-weight:600; }
+.st-state{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; font-size:13px; color:var(--fg3); }
+.st-state b{ color:var(--fg); font-weight:600; font-size:15px; }
+.pv-acct{ display:grid; gap:10px; justify-items:start; padding-top:12px; border-top:1px solid var(--line); }
+.pv-acct > *{ justify-self:stretch; }
+.pv-acct > .chip{ justify-self:start; }
+.pv-acct.is-off b{ color:var(--fg3); }
 .s-steps{ margin:0; padding-left:20px; display:grid; gap:6px; font-size:13px; line-height:1.55; color:var(--fg2); }
 .s-steps b{ color:var(--fg); font-weight:600; }
 .s-auto{ margin-right:auto; font-size:12px; color:var(--fg3); }
 .st-state [hidden]{ display:none !important; }
+#stLink[hidden]{ display:none !important; }
+.pv-acct .chip:disabled{ opacity:.4; cursor:default; }
