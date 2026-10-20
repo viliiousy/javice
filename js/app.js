@@ -217,7 +217,7 @@ const App = {
     const tskC = pending>0?`<div class="stat-chip" data-s="tasks" title="남은 할일">${ic('tasks')}할일 <b>${pending}</b></div>`:'';
     const clC  = clAll>0?`<div class="stat-chip ${clDone===clAll?'stat-green':''}" data-s="checklist" title="체크리스트">${ic('pen')}체크 <b>${clDone}/${clAll}</b></div>`:'';
     const calC = `<div class="stat-chip ${calGoal&&calLeft<0?'stat-red':calPct>=80?'stat-green':''}" data-s="diet" title="${calGoal?(calLeft>=0?'남은 칼로리':'초과한 칼로리'):'먹은 칼로리'}">${ic('diet')}${calTxt}</div>`;
-    const chipsHTML=`<div class="sg sg-l">${habC}${tskC}${clC}</div><div class="sg sg-r">${calC}${kgTxt}</div>`;
+    const chipsHTML=`<div class="sg sg-l">${habC}${tskC}${clC}</div><div class="sg sg-r">${typeof TopInfo!=='undefined'?TopInfo.bodyChips(calC):calC+kgTxt}</div>`;
     // 인바디·자산은 이 줄에서 빠졌다. 헤더 오른쪽 두 줄(TopStrip)로 옮겼다 —
     // 같은 줄에 여섯 칸이 붙으면 모바일에서 두 줄로 접히면서 정작 오늘 할 일이 밀렸다.
     try { TopStrip.render(); } catch(e){}
@@ -262,6 +262,7 @@ const App = {
         chip.onclick=()=>{
           const sec=chip.dataset.s;
           if(sec==='inbody'){ try{ TopStrip.go('card-inbody'); }catch(e){} return; }
+          if(sec==='econ'){ try{ TopStrip.go('card-econ'); }catch(e){} return; }
           const map={habits:'.card-habits',diet:'.card-diet',tasks:'.card-calendar',checklist:'.card-checklist'};
           const target=document.querySelector(map[sec]);
           if(target){

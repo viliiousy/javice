@@ -426,9 +426,10 @@ const Econ = {
           oninput="Econ.search(this.value,'H')">
         <button class="btn-sm ec-scan" onclick="Econ.showHoldScan()" title="증권사 앱 캡처에서 읽어 오기">${
           typeof Icons !== 'undefined' ? Icons.svg('camera') : '📷'}캡처로 채우기</button>
+        <button class="btn-sm ec-scan" onclick="Econ.showBroker()" title="증권사 Open API 로 보유 종목 가져오기">증권사 연동</button>
       </div><div id="ecHRes"></div>`;
     if (!hs.length) {
-      h += `<p class="empty">보유 종목이 없습니다<br><span class="ec-hint">증권사 계좌 조회 API 는 개인에게 열려 있지 않습니다(마이데이터 허가 사항). 증권사 앱의 보유 화면을 캡처해 <b>캡처로 채우기</b>를 누르면 종목·수량·평단을 읽어 옵니다. 직접 검색해 넣어도 되고, 어느 쪽이든 현재가·평가액·수익률은 자동으로 계산됩니다.</span></p>`;
+      h += `<p class="empty">보유 종목이 없습니다<br><span class="ec-hint">한국투자증권 계좌라면 <b>증권사 연동</b>으로 보유 종목을 그대로 가져옵니다. 다른 증권사는 보유 화면을 캡처해 <b>캡처로 채우기</b>를 누르면 종목·수량·평단을 읽어 옵니다. 직접 검색해 넣어도 되고, 어느 쪽이든 현재가·평가액·수익률은 자동으로 계산됩니다.</span></p>`;
     } else {
       const cls = s.profit >= 0 ? 'ec-up' : 'ec-dn';
       h += `<div class="ec-hold-sum">
@@ -469,6 +470,60 @@ const Econ = {
         <button class="btn-sm ec-rm" onclick="Econ.holdRemove('${k}')">삭제</button>
       </div></div>`;
   },
+  // ── 증권사 연동 (한국투자증권 KIS Open API) ──────────────
+  // 키는 이 계정의 _link 에만 저장한다(기기에 남지 않음). 조회는 서버(api/broker)가 대신 한다 —
+  // KIS 는 브라우저에서 직접 부를 수 없고, 토큰을 하루 한 번만 받아 같이 써야 해서다.
+  // 가져온 종목은 캡처 읽기와 같은 미리 보기를 거쳐 담는다(종목 맞추기·덮어쓰기 규칙 동일).
+  async showBroker() {
+    let k = {};
+    try { const l = await FirebaseSync.getLink(); k = (l && l.kis) || {}; } catch {}
+    const has = !!k.appkey;
+    App.openModal('증권사 연동', `
+      <p class="ec-hint" style="margin-top:0">지금은 <b>한국투자증권</b>을 지원합니다. KIS Developers(apiportal.koreainvestment.com)에서
+        본인 계좌로 <b>앱키·앱시크릿</b>을 발급받아 넣어 주세요. 해외 주식은 홈페이지에서 '해외주식 API 사용 동의'를 해야 함께 옵니다.
+        키움·토스증권은 '허용 IP 등록' 이 필요해 아직 연결할 수 없습니다 — 캡처로 채우기를 써 주세요.</p>
+      <div class="modal-row"><label class="modal-lbl">앱키 (App Key)</label><input id="kisKey" class="inp" autocomplete="off" placeholder="${has ? '저장됨 — 바꿀 때만 입력' : 'PS…'}"></div>
+      <div class="modal-row"><label class="modal-lbl">앱시크릿 (App Secret)</label><input id="kisSec" class="inp" type="password" autocomplete="off" placeholder="${has ? '저장됨 — 바꿀 때만 입력' : ''}"></div>
+      <div class="modal-row"><label class="modal-lbl">계좌번호</label><input id="kisAcct" class="inp" inputmode="numeric" placeholder="12345678-01" value="${k.cano ? esc(k.cano + '-' + (k.prdt || '01')) : ''}"></div>
+      <label class="ec-hint" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="kisMock" ${k.mock ? 'checked' : ''}> 모의투자 계좌</label>
+      <div id="kisRes"></div>
+      <div class="modal-btns">
+        <button class="btn-sm accent" id="kisGo" onclick="Econ.brokerFetch()">${has ? '보유 종목 가져오기' : '저장하고 가져오기'}</button>
+        ${has ? '<button class="btn-sm" onclick="Econ.brokerForget()">연동 해제</button>' : ''}
+        <button class="btn-sm" onclick="Econ.open(\'hold\')">닫기</button>
+      </div>`);
+  },
+  async brokerFetch() {
+    const box = document.getElementById('kisRes'), go = document.getElementById('kisGo');
+    const key = document.getElementById('kisKey')?.value.trim(), sec = document.getElementById('kisSec')?.value.trim();
+    const acct = (document.getElementById('kisAcct')?.value || '').replace(/[^0-9]/g, '');
+    const mock = !!document.getElementById('kisMock')?.checked;
+    try {
+      if (go) { go.disabled = true; go.textContent = '가져오는 중…'; }
+      const l = await FirebaseSync.getLink(); const cur = (l && l.kis) || {};
+      if (acct.length < 8) throw new Error('계좌번호 10자리(앞 8 + 뒤 2)를 넣어 주세요');
+      const next = { ...cur, cano: acct.slice(0, 8), prdt: acct.slice(8, 10) || '01', mock };
+      if (key) next.appkey = key; if (sec) next.appsecret = sec;
+      if (!next.appkey || !next.appsecret) throw new Error('앱키와 앱시크릿을 넣어 주세요');
+      if (JSON.stringify(next) !== JSON.stringify(cur) && !(await FirebaseSync.setLink({ kis: next }))) throw new Error('키 저장 실패 — 잠시 뒤 다시');
+      const idToken = await firebase.auth().currentUser.getIdToken();
+      const r = await fetch(Platform.api('/api/broker'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken, act: 'holdings' }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      if (!j.rows || !j.rows.length) throw new Error('보유 종목이 없습니다' + (j.notes?.length ? ' · ' + j.notes.join(' · ') : ''));
+      this._hsRows = await this._hsMatch(j.rows);
+      if (box) box.innerHTML = this._hsPreview() + (j.notes?.length ? `<p class="ec-hint">${esc(j.notes.join(' · '))}</p>` : '');
+    } catch (e) {
+      if (box) box.innerHTML = `<p class="ec-hint" style="color:var(--red)">${esc(e.message || e)}</p>`;
+    }
+    if (go) { go.disabled = false; go.textContent = '다시 가져오기'; }
+  },
+  async brokerForget() {
+    if (!confirm('증권사 연동을 해제할까요? 저장된 앱키·시크릿을 지웁니다(담아 둔 보유 종목은 그대로).')) return;
+    await FirebaseSync.setLink({ kis: null, kisTok: null });
+    App.showToast('연동을 해제했습니다', 'success'); this.open('hold');
+  },
+
   // ── 캡처로 보유 채우기 ──────────────────────────────
   // 삼성증권에는 개인이 쓸 수 있는 트레이딩 Open API 가 없다(2026-08 확인).
   // 오픈뱅킹은 계좌 잔액·이체만이고 주식 보유는 안 준다. 마이데이터는 허가 사업자용이다.

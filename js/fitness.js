@@ -79,7 +79,10 @@ const Fitness = {
     const chk  = this._checked(d);
     const custom = this.getCustomExercises(d);
     const isToday = this._dateStr(d)===this._dateStr(new Date());
-    const allEx = [...plan.exercises, ...custom];
+    // 교체(루틴이 아닌 플랜의 그날만) 적용
+    const sw = (typeof PlanGen!=='undefined') ? PlanGen.swapsFor(this._dateStr(d)) : {};
+    const planEx = plan.exercises.map((x,i)=> sw[i] ? { ...x, name:sw[i], hp:undefined } : x);
+    const allEx = [...planEx, ...custom];
 
     // 카드 타이틀
     const titleEl = document.querySelector('.card-fitness .card-title');
@@ -127,7 +130,8 @@ const Fitness = {
         ${Icons.big('dumbbell')}
         <p><b>아직 이 요일의 운동 계획이 없어요</b><br><span>내 루틴을 만들어 요일에 붙이거나, 그날 한 운동만 바로 기록해도 됩니다.</span></p>
         <div class="fit-empty-btns">
-          <button class="btn-sm accent" onclick="Fitness.showRoutineEdit()">루틴 만들기</button>
+          <button class="btn-sm accent" onclick="PlanGen.open()">맞춤 플랜 만들기</button>
+          <button class="btn-sm" onclick="Fitness.showRoutineEdit()">루틴 직접 만들기</button>
           <button class="btn-sm" onclick="Fitness.showDayPlan()">요일에 배정</button>
         </div>
       </div>` : `<div style="text-align:center;padding:20px 16px;color:var(--text2)">
@@ -151,6 +155,7 @@ const Fitness = {
       <div class="fit-prog"><div class="fit-prog-bar"><i style="width:${pct}%"></i></div><span class="num">${done} / ${allEx.length}</span></div>
       <div class="fit-list">
       ${allEx.map((ex,i)=>{
+        const A = v => esc(v).replace(/'/g,'&#39;');
         const src = this._thumb(ex, plan);
         const info = ex.hp!=null&&plan.src==='home' ? `HomePlan.open(${plan.day},${ex.hp})`
                    : (typeof ExMedia!=='undefined'&&ExMedia.find(ex.name)) ? `ExMedia.open('${esc(ex.name).replace(/'/g,'&#39;')}')` : '';
@@ -159,13 +164,24 @@ const Fitness = {
           <button type="button" class="fx-th${src?'':' none'}" ${info?`onclick="event.stopPropagation();${info}"`:'tabindex="-1"'} aria-label="${esc(ex.name)} 자세 보기">
             ${typeof Icons!=='undefined'?Icons.svg('dumbbell','fx-ic'):''}${src?`<span class="fx-img">${ExMedia.poseHtml(src)}</span>`:''}
           </button>
-          <div class="fx-tx"><div class="fx-nm">${esc(ex.name)}</div><div class="fx-sets num">${esc(ex.sets||'')}</div></div>
+          <div class="fx-tx"><div class="fx-nm">${esc(ex.name)}</div><div class="fx-sets num">${esc(ex.sets||'')}</div>${this._logLine(ex, dsx)}</div>
+          <button type="button" class="fx-act" onclick="event.stopPropagation();PlanGen.openLog('${A(ex.name)}','${A(ex.sets||'')}','${dsx}')" aria-label="무게 기록">${typeof Icons!=='undefined'?Icons.svg('pen','fx-aic'):'기록'}</button>
+          ${!custom?`<button type="button" class="fx-act" onclick="event.stopPropagation();PlanGen.openSwap(${i},'${A(ex.name)}','${dsx}',${plan.src==='routine'?`'${plan.rid}'`:'null'})" aria-label="운동 교체">⇄</button>`:''}
           ${i===nextI&&isToday?'<span class="fx-next">다음</span>':''}
           ${custom?`<button type="button" class="fx-del" onclick="event.stopPropagation();Fitness._delCustom(${i-plan.exercises.length},'${dsx}')" aria-label="삭제">✕</button>`:''}
           <span class="fx-chk" aria-hidden="true"></span>
         </div>`;}).join('')}
       </div>
       <div class="habit-add-btn" onclick="Fitness.showInlineAdd(new Date('${dsx}T00:00:00'))">+ 운동 추가</div>`;
+  },
+
+  // 그날 기록(무게×횟수)이 있으면 그것을, 없으면 지난 기록으로 본 오늘 권장 무게를 한 줄로
+  _logLine(ex, ds) {
+    if (typeof PlanGen==='undefined') return '';
+    const L = PlanGen.log(ds)[ex.name];
+    if (L && L.length) return `<div class="fx-log num">${L.map(s=>s.w?`${s.w}kg×${s.r}`:`${s.r}회`).join(' · ')}</div>`;
+    const sg = PlanGen.suggest(ex.name, ex.sets, ds);
+    return sg ? `<div class="fx-log fx-sug">${esc(sg)}</div>` : '';
   },
 
   // 요일을 누르면 앱 전체의 날짜가 그날로 바뀐다 — 상단 날짜·요약·식단·습관이 함께 따라온다
@@ -225,6 +241,7 @@ const Fitness = {
         <div class="rt-hd">내 루틴</div>
         ${rlist || '<div class="rt-empty">아직 만든 루틴이 없습니다</div>'}
         <button class="habit-add-btn" onclick="Fitness.showRoutineEdit()">+ 새 루틴 만들기</button>
+        <button class="habit-add-btn" onclick="PlanGen.open()">맞춤 플랜 다시 만들기 (목표·기구·요일·제외 기구)</button>
       </div>
       <div class="modal-btns">
         <button onclick="Fitness._saveDayPlan()" class="btn-sm accent">저장</button>
@@ -328,9 +345,11 @@ const Fitness = {
   _parts(){ return Object.keys(typeof EX_DB!=='undefined' ? EX_DB : {}); },
   _search(part, q){
     if(typeof EX_DB==='undefined') return [];
-    const src = part && EX_DB[part] ? EX_DB[part].map(n=>[part,n])
+    let src = part && EX_DB[part] ? EX_DB[part].map(n=>[part,n])
               : Object.entries(EX_DB).flatMap(([p,ns])=>ns.map(n=>[p,n]));
     q=String(q||'').trim();
+    // 추천하지 않을 기구·운동은 목록에서 뺀다(설정 › 맞춤 플랜)
+    if(typeof PlanGen!=='undefined') src=src.filter(([,n])=>PlanGen.pickerOk(n));
     const favs=this.getFavs();
     if(!q){
       // 검색어가 없으면 즐겨찾기를 위로 올려 그대로 보여준다 (god_life 와 같은 규칙)

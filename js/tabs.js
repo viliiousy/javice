@@ -38,6 +38,30 @@ const Tabs = {
   ],
 
   OFF_KEY: 'gl_cards_off',
+  TABS_OFF_KEY: 'gl_tabs_off',
+  getTabsOff() { try { return JSON.parse(UserStore.get(this.TABS_OFF_KEY) || '[]'); } catch { return []; } },
+  tabOn(id) { return !this.getTabsOff().includes(id); },
+  _onTabs() { return this.DEF.filter(t => this.tabOn(t.id)); },
+  // 카테고리(탭) 켜고 끄기 — 하나는 남아야 한다
+  toggleTab(id, on) {
+    let off = this.getTabsOff();
+    if (!on && this._onTabs().length <= 1 && this.tabOn(id)) { App.showToast('카테고리는 하나 이상 남아야 합니다', 'error'); Settings._re('cats'); return; }
+    off = on ? off.filter(x => x !== id) : (off.includes(id) ? off : off.concat(id));
+    UserStore.set(this.TABS_OFF_KEY, JSON.stringify(off));
+    window.FirebaseSync?.scheduleSave?.();
+    this._paintBar(); this.applyOff();
+    if (!this.tabOn(this._cur)) this.set(this._onTabs()[0].id, true); else this.set(this._cur, true);
+    Settings._re('cats');
+  },
+  catsHtml() {
+    const off = this.getOff();
+    return this.DEF.map(t => {
+      const on = this.tabOn(t.id);
+      return `<div class="set-h">${t.label}</div>
+        ${Settings._item(`${t.label} 카테고리`, Settings._sw(on, `Tabs.toggleTab('${t.id}', ${!on})`), on ? '아래 탭과 카드가 보입니다' : '탭과 카드가 모두 숨겨집니다(기록은 그대로)')}
+        ${on ? this.CARDS.filter(c => c.tab === t.id).map(c => Settings._item(c.name, Settings._sw(!off.includes(c.cls), `Tabs.toggleCard('${c.cls}', ${off.includes(c.cls)});Settings._re('cats')`))).join('') : ''}`;
+    }).join('');
+  },
   _cur: 'today',
   get current(){ return this._cur; },
   tabOf(cardClass){
@@ -61,7 +85,7 @@ const Tabs = {
     const bar = document.getElementById('tabbar');
     if (!bar) return;
     const j = this.JARVIS_TAB;
-    bar.innerHTML = this.DEF.map(t =>
+    bar.innerHTML = this._onTabs().map(t =>
       `<button class="tab-btn" data-t="${t.id}" onclick="Tabs.set('${t.id}')" aria-label="${t.label}">
         ${Icons.svg(t.icon, 'tab-ic')}<span class="tab-lb">${t.label}</span>
       </button>`).join('')
@@ -72,7 +96,7 @@ const Tabs = {
   },
 
   set(id, silent) {
-    if (!this.DEF.some(t => t.id === id)) id = 'today';
+    if (!this.DEF.some(t => t.id === id) || !this.tabOn(id)) id = (this._onTabs()[0] || this.DEF[0]).id;
     this._cur = id;
     document.body.dataset.tab = id;
     try { if (typeof JARVIS !== 'undefined' && JARVIS.isOpen) JARVIS.close(); } catch(e){}
@@ -94,7 +118,7 @@ const Tabs = {
     const off = this.getOff();
     this.CARDS.forEach(c => {
       const el = document.querySelector('.' + c.cls);
-      if (el) el.classList.toggle('card-off', off.includes(c.cls));
+      if (el) el.classList.toggle('card-off', off.includes(c.cls) || !this.tabOn(c.tab));
     });
   },
 
@@ -105,6 +129,7 @@ const Tabs = {
     if (typeof FirebaseSync !== 'undefined') FirebaseSync.scheduleSave?.();
     this.applyOff();
     this._paintSettings();
+    try { App._updateStatsBanner(); } catch (e) {}
   },
 
   openSettings() {

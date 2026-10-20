@@ -15,7 +15,10 @@ const Settings = {
     { id:'secure', ic:'key',     name:'보안 · 계정', sub:() => '저장된 키 · 로그아웃 · 계정 삭제' },
     { id:'help',   ic:'book',    name:'도움말',      sub:() => '사용 도우미 · 버전' },
   ],
-  VERSION: 'v26.10.19',
+  VERSION: 'v26.10.20',
+  // 갈래 안의 하위 화면(뒤로 가면 그 갈래로)
+  SUB: { topinfo: ['상단바 정보', 'design'], cats: ['보일 카테고리', 'design'] },
+  _title(cat){ return cat ? (this.SUB[cat]?.[0] || this.CATS.find(c => c.id === cat)?.name || '설정') : '설정'; },
 
   _on(v){ return v ? '켜짐' : '꺼짐'; },
   _uiName(){ return document.documentElement.dataset.ui === 'v1' ? '예전 디자인' : '새 디자인'; },
@@ -24,14 +27,14 @@ const Settings = {
 
   open(cat) {
     document.getElementById('profileMenu')?.classList.add('hidden');
-    App.openModal(cat ? this.CATS.find(c => c.id === cat)?.name || '설정' : '설정', `<div id="setBody" class="set">${cat ? this._page(cat) : this._home()}</div>`);
+    App.openModal(this._title(cat), `<div id="setBody" class="set">${cat ? this._page(cat) : this._home()}</div>`);
     document.getElementById('modal')?.classList.add('set-modal');
   },
   go(cat) {
     const b = document.getElementById('setBody'); if (!b) return this.open(cat);
     b.innerHTML = cat ? this._page(cat) : this._home();
     const t = document.getElementById('modalTitle');
-    if (t) t.textContent = cat ? (this.CATS.find(c => c.id === cat)?.name || '설정') : '설정';
+    if (t) t.textContent = this._title(cat);
     b.scrollTop = 0;
   },
   _re(cat){ this.go(cat); },
@@ -69,7 +72,12 @@ const Settings = {
         ${this._item('테마', this._seg(App._theme, [['system','시스템'],['light','밝게'],['dark','어둡게']], 'Settings.setTheme'))}
         ${this._item('아이콘', this._seg(Icons.mode, [['simple','심플'],['color','컬러']], 'Settings.setIcons'))}
         <div class="set-h">메인 화면</div>
-        ${this._link('메인 카드 고르기', 'App.showCardSettings()', '탭마다 보일 카드를 켜고 끕니다')}`;
+        ${this._link('보일 카테고리', "Settings.go('cats')", `${Tabs.DEF.filter(t => Tabs.tabOn(t.id)).map(t => t.label).join(' · ')} — 카테고리와 그 안의 카드를 켜고 끕니다`)}
+        ${this._link('상단바 정보', "Settings.go('topinfo')", '몸무게·체지방·BMI·근육량·추세·주식 등락·AI 사용량')}`;
+    } else if (cat === 'topinfo') {
+      h = TopInfo.pageHtml();
+    } else if (cat === 'cats') {
+      h = Tabs.catsHtml();
     } else if (cat === 'voice') {
       h = `<div class="set-h">AI 비서</div>
         ${this._item('답을 소리로 읽기', this._sw(JARVIS?._ttsEnabled, 'Settings.toggleTTS()'), 'AI 답을 음성으로 들려 줍니다')}
@@ -106,7 +114,7 @@ const Settings = {
       h = `${this._link('사용 도우미 다시 보기', 'App.closeModal();Onboard.open(true)', '신체정보·AI·습관·식단·운동·경제 설정')}
         ${this._item('버전', `<span class="set-val">${this.VERSION}</span>`)}`;
     }
-    return this._back() + `<div class="set-page">${h}</div>`;
+    return (this.SUB[cat] ? `<button type="button" class="set-back" onclick="Settings.go('${this.SUB[cat][1]}')">‹ 디자인</button>` : this._back()) + `<div class="set-page">${h}</div>`;
   },
 
   // ── 바로 바뀌는 항목 ─────────────────────

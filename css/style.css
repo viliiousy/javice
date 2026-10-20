@@ -3699,3 +3699,26 @@ html.dark .fold-btn{ background:#1A1B1E; }
 .j-handoff .j-avatar{ visibility:hidden; }
 .j-ho{ display:flex; flex-wrap:wrap; gap:8px; }
 .j-ho .btn-sm{ text-decoration:none; }
+
+/* ── 맞춤 플랜 · 기록 · 교체 (js/plan-gen.js) ── */
+.pg-q{ padding:12px 0; border-bottom:1px solid var(--border); }
+.pg-t{ font-size:13px; font-weight:600; color:var(--text); margin-bottom:8px; display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
+.pg-t small{ font-weight:400; color:var(--text3); font-size:12px; }
+.pg-cs{ display:flex; flex-wrap:wrap; gap:6px; }
+.pg-c{ height:34px; padding:0 12px; border-radius:17px; border:1px solid var(--border); background:none; color:var(--text2); font:inherit; font-size:13px; cursor:pointer; }
+.pg-c.on{ background:var(--text); color:var(--bg); border-color:var(--text); font-weight:600; }
+.pg-prev{ padding-top:12px; }
+.pg-day{ display:grid; gap:2px; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px; }
+.pg-day b{ font-weight:600; } .pg-day span{ color:var(--text3); line-height:1.5; }
+.pg-note{ font-size:12px; color:var(--text3); line-height:1.5; margin:8px 0; }
+.fx-act{ flex:none; width:32px; height:32px; border-radius:8px; border:1px solid var(--border); background:none; color:var(--text3); font-size:14px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+.fx-act .fx-aic{ width:15px; height:15px; }
+.fx-log{ font-size:11px; color:var(--text2); margin-top:2px; }
+.fx-sug{ color:var(--accent); }
+.lg-rows{ display:grid; gap:8px; margin:8px 0; }
+.lg-row{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text3); }
+.lg-row .inp{ width:76px; } .lg-n{ width:18px; font-weight:600; color:var(--text2); }
+.sw-list{ display:grid; gap:6px; max-height:52vh; overflow:auto; }
+.sw-row{ display:flex; align-items:center; gap:10px; padding:6px 8px; border:1px solid var(--border); border-radius:10px; background:none; color:var(--text); font:inherit; font-size:14px; text-align:left; cursor:pointer; }
+.sw-row .ex-th{ width:44px; height:44px; flex:none; border-radius:8px; overflow:hidden; background:var(--card2); }
+.sw-ban{ display:flex; gap:8px; align-items:center; font-size:12px; color:var(--text3); margin-top:12px; }

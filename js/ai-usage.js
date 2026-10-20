@@ -33,7 +33,7 @@ const AIUsage = {
   trackHtml() {
     const on = this.shown();
     return `<div class="aiu-track-pick">${this.TRACK.map(t => `
-      <label class="ob-chk${t.ok ? '' : ' off'}"><input type="checkbox" class="aiu-show" value="${t.id}" ${t.ok && on.includes(t.id) ? 'checked' : ''} ${t.ok ? '' : 'disabled'}>
+      <label class="ob-chk${t.ok ? '' : ' off'}"><input type="checkbox" class="aiu-show" value="${t.id}" ${t.ok && on.includes(t.id) ? 'checked' : ''} ${t.ok ? '' : 'disabled'} onchange="AIUsage.saveTrack()">
         <span>${t.name}</span>${t.ok ? '' : '<i>준비 중</i>'}</label>`).join('')}</div>`;
   },
   saveTrack() {

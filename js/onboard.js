@@ -290,20 +290,23 @@ const Onboard = {
   _fit() {
     return `<p class="ob-p">운동은 미리 정해 두지 않았습니다. 어떻게 시작할지 골라 주세요.</p>
       <div class="ob-opts" id="obFit">
-        <button class="ob-opt on" data-v="own" onclick="Onboard._opt(this)"><b>내 루틴 직접 만들기</b><span>660여 개 종목에서 골라 요일별로 배정합니다</span></button>
-        <button class="ob-opt" data-v="home" onclick="Onboard._opt(this)"><b>홈트 3분할 플랜 쓰기</b><span>월 푸시 · 수 풀 · 금 하체, 사이사이 유산소</span></button>
+        <button class="ob-opt on" data-v="plan" onclick="Onboard._opt(this)"><b>맞춤 플랜 만들기 (추천)</b><span>목표·경력·장소와 기구·주당 횟수·시간·아픈 곳 7가지를 고르면 요일별 루틴을 짜 줍니다</span></button>
+        <button class="ob-opt" data-v="own" onclick="Onboard._opt(this)"><b>내 루틴 직접 만들기</b><span>660여 개 종목에서 골라 요일별로 배정합니다</span></button>
         <button class="ob-opt" data-v="later" onclick="Onboard._opt(this)"><b>그날그날 기록만</b><span>계획 없이 한 운동만 ‘+ 운동 추가’ 로 남깁니다</span></button>
       </div>
       ${this._tips([
-        ['dumbbell', '체크로 기록', '오늘 운동 목록에서 한 종목을 누르면 완료로 표시됩니다.'],
+        ['dumbbell', '체크로 기록', '종목을 누르면 완료, 연필로 무게·횟수를 남기면 다음 무게를 알려 줍니다.'],
+        ['trend', '운동 교체', '⇄ 를 누르면 같은 동작·부위의 다른 운동으로 바꿉니다. 쓰기 싫은 기구는 플랜 설정에서 뺄 수 있어요.'],
         ['zap', '자세 보기', '종목 옆 i 를 누르면 자세 그림과 요령, ▶ 는 자세 영상을 찾아 줍니다.'],
       ])}`;
   },
   _opt(b) { b.parentElement.querySelectorAll('.ob-opt').forEach(x => x.classList.toggle('on', x === b)); },
   _saveFit() {
-    const v = document.querySelector('#obFit .ob-opt.on')?.dataset.v || 'own';
+    const v = document.querySelector('#obFit .ob-opt.on')?.dataset.v || 'plan';
     if (typeof Fitness === 'undefined') return;
-    if (v === 'home') {
+    if (v === 'plan') {
+      this._afterFinish = () => { Tabs?.set?.('body'); setTimeout(() => PlanGen.open(), 300); };
+    } else if (v === 'home') {
       UserStore.set('gl_fit_blank', '0');
       Fitness.saveDayPlan({});
     } else if (v === 'own') {
