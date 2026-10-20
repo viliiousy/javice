@@ -332,8 +332,11 @@ const ST_AUTH = 'https://api.smartthings.com/oauth/authorize';
 const ST_TOKEN = 'https://auth-global.api.smartthings.com/oauth/token';
 const ST_SCOPE = 'r:devices:* x:devices:* r:locations:* r:scenes:* x:scenes:*';
 const ST_REDIRECT = process.env.ST_REDIRECT || 'https://bashy.app/st/callback';
-const stReady = () => !!(process.env.ST_CLIENT_ID && process.env.ST_CLIENT_SECRET);
-const stBasic = () => 'Basic ' + Buffer.from(`${process.env.ST_CLIENT_ID}:${process.env.ST_CLIENT_SECRET}`).toString('base64');
+// 대시보드에 붙여 넣을 때 섞인 공백·줄바꿈을 걷어낸다
+const ST_ID = () => String(process.env.ST_CLIENT_ID || '').trim();
+const ST_SECRET = () => String(process.env.ST_CLIENT_SECRET || '').trim();
+const stReady = () => !!(ST_ID() && ST_SECRET());
+const stBasic = () => 'Basic ' + Buffer.from(`${ST_ID()}:${ST_SECRET()}`).toString('base64');
 
 async function stStart(idToken) {
   const uid = await uidFromIdToken(idToken);
@@ -345,7 +348,7 @@ async function stStartUid(uid) {
   if (!stReady()) return { status: 503, error: 'SmartThings 연동 준비 중입니다(서버 설정 필요)' };
   const nonce = crypto.randomBytes(18).toString('base64url');
   await fbFetch(`/st_state/${nonce}.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid, exp: Date.now() + 10 * 60 * 1000 }) });
-  const q = new URLSearchParams({ client_id: process.env.ST_CLIENT_ID, response_type: 'code', redirect_uri: ST_REDIRECT, scope: ST_SCOPE, state: nonce });
+  const q = new URLSearchParams({ client_id: ST_ID(), response_type: 'code', redirect_uri: ST_REDIRECT, scope: ST_SCOPE, state: nonce });
   return { status: 200, ok: true, url: `${ST_AUTH}?${q}` };
 }
 
@@ -369,7 +372,7 @@ async function stCallback(req, res) {
   const st = await fbGet(`/st_state/${nonce}.json`);
   await fbFetch(`/st_state/${nonce}.json`, { method: 'DELETE' });
   if (!st || !(st.exp > Date.now()) || !st.uid) return back('expired');
-  try { await stSaveTok(safeUid(st.uid), await stTokReq({ grant_type: 'authorization_code', code, redirect_uri: ST_REDIRECT, client_id: process.env.ST_CLIENT_ID })); }
+  try { await stSaveTok(safeUid(st.uid), await stTokReq({ grant_type: 'authorization_code', code, redirect_uri: ST_REDIRECT, client_id: ST_ID() })); }
   catch (e) { console.error('[st cb]', e.message); return back('fail'); }
   return back('ok');
 }
@@ -377,7 +380,7 @@ async function stToken(uid) {
   const t = await fbGet(`/users/${uid}/_link/st.json`);
   if (!t || !t.rt) throw Object.assign(new Error('SmartThings 가 연결되어 있지 않습니다 — bashy.app › 기기 연결에서 연결해 주세요'), { code: 'NOLINK' });
   if (t.at && t.exp > Date.now()) return t.at;
-  const j = await stTokReq({ grant_type: 'refresh_token', refresh_token: t.rt, client_id: process.env.ST_CLIENT_ID });
+  const j = await stTokReq({ grant_type: 'refresh_token', refresh_token: t.rt, client_id: ST_ID() });
   return (await stSaveTok(uid, j)).at;
 }
 async function stGet(tok, path) {
