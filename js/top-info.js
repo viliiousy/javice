@@ -41,7 +41,7 @@ const TopInfo = {
     for (const k of ['wt', 'bf', 'bmi', 'ms']) {
       if (!c[k]) continue;
       const v = last(k); if (v == null) continue;
-      out += `<div class="stat-chip stat-${k}" data-s="inbody" title="최근 기록">${lbl[k] ? `<span class="ti-lb">${lbl[k]}</span>` : ''}<b>${v}</b>${unit[k]}${c.trend ? this._trend(recs, k) : ''}</div>`;
+      out += `<div class="stat-chip stat-${k}" data-s="inbody" title="최근 기록">${lbl[k] ? `<span class="ti-lb">${lbl[k]}</span>` : ''}<b>${v}</b>${unit[k]}${this._trend(recs, k)}</div>`;
     }
     return out + this.stockChip();
   },
@@ -74,9 +74,8 @@ const TopInfo = {
   pageHtml() {
     const c = this.get();
     const sw = (k) => Settings._sw(!!c[k], `TopInfo.toggle('${k}')`);
-    return `<div class="set-h">상단바 오른쪽에 보일 것</div>
+    return `<div class="set-h">상단바 오른쪽에 보일 것</div><p class="pg-note" style="margin:0 0 4px">직전 기록보다 오르면 빨간 ▲, 내리면 파란 ▼ 가 함께 붙습니다.</p>
       ${this.METRICS.map(([k, n]) => Settings._item(n, sw(k))).join('')}
-      ${Settings._item('추세 화살표', sw('trend'), '직전 기록보다 오르면 빨간 ▲, 내리면 파란 ▼')}
       ${Settings._item('주식', Settings._seg(c.stock, [['off', '끔'], ['hold', '보유'], ['watch', '관심']], 'TopInfo.setStock'), '오늘(전날 대비) 등락 %')}
       <div class="set-h">AI 사용량 고리</div>
       <div class="set-pad">${typeof AIUsage !== 'undefined' ? AIUsage.trackHtml() : ''}</div>`;

@@ -448,3 +448,15 @@ html[data-ui="v2"] .jarvis-btn-glyph svg{ width:22px; height:22px; }
   html[data-ui="v2"] .header-sticky-group .h-right{ order:4; }
   html[data-ui="v2"] .stats-banner .stats-row{ height:auto; }
 }
+
+/* PC 상단을 다시 한 줄로: 다가오는 일정·급한 할일·AI 한마디 줄은 헤더에서 뺀다(카드에 이미 있다) */
+@media (min-width:901px){
+  html[data-ui="v2"] .header-sticky-group .stats-upcoming,
+  html[data-ui="v2"] .header-sticky-group .stats-urgent-row,
+  html[data-ui="v2"] .header-sticky-group .stats-jarvis{ display:none !important; }
+  html[data-ui="v2"] .header-sticky-group{ padding-top:8px; padding-bottom:8px; }
+  html[data-ui="v2"] .header-sticky-group .stats-row{ flex-wrap:nowrap; }
+}
+/* 등락 색: 오르면 빨강, 내리면 파랑 — 칩의 굵은 숫자 색보다 앞선다 */
+html[data-ui="v2"] .stat-chip b.ti-up, html[data-ui="v2"] .stat-chip .ti-up{ color:#EF4444 !important; }
+html[data-ui="v2"] .stat-chip b.ti-dn, html[data-ui="v2"] .stat-chip .ti-dn{ color:#3B82F6 !important; }
