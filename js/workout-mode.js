@@ -245,7 +245,7 @@ const WorkoutMode = {
     const ex = this._build(ds);
     if (!ex.length) return;
     this.st = { ds, t0: Date.now(), cur: Math.max(0, ex.findIndex(e => !e.done)), restEnd: 0, ex,
-      snapLog: PlanGen.log(ds), snapChk: Fitness._checked(new Date(ds + 'T00:00:00')) };
+      snapLog: PlanGen.log(ds), snapChk: Fitness._checked(new Date(ds + 'T00:00:00')), snapSwap: UserStore.get(PlanGen.SWAP_PREFIX + ds) || '{}' };
     this._open();
   },
   _resume(sv) {
@@ -495,6 +495,7 @@ const WorkoutMode = {
     const n = (this._alts || [])[i]; if (!n) return;
     const S = this.st, x = S.ex[S.cur];
     const nw = PlanGen.nextWeight(n, x.sets, S.ds), prev = PlanGen.last(n, S.ds);
+    { const L = PlanGen.log(S.ds); if (L[x.name] && !(S.snapLog || {})[x.name]) { delete L[x.name]; PlanGen.saveLog(S.ds, L); } }   // 바꾸기 전 이름으로 남은 기록은 지운다(새 이름으로 다시 저장)
     x.name = n; x.th = ''; x.sug = PlanGen.suggest(n, x.sets, S.ds); x.cardio = PlanGen.partOf(n) === '유산소';
     x.rows = x.rows.map(r => r.ok ? r : { w: nw ?? (prev ? prev.sets[0].w : ''), r: r.r, ok: false });
     // 카드에도 그날만 교체로 남긴다(계획 운동일 때)
@@ -502,6 +503,7 @@ const WorkoutMode = {
       const k = PlanGen.SWAP_PREFIX + S.ds; let m = {}; try { m = JSON.parse(UserStore.get(k) || '{}') || {}; } catch {}
       m[+x.key.slice(1)] = n; UserStore.set(k, JSON.stringify(m)); window.FirebaseSync?.scheduleSave?.();
     }
+    this._saveLog();
     App.closeModal(); this.paint(); this._persist();
     App.showToast(`${n} 으로 바꿨습니다`, 'success');
   },
@@ -550,6 +552,8 @@ const WorkoutMode = {
     const S = this.st; if (!S) return;
     PlanGen.saveLog(S.ds, S.snapLog || {});
     Fitness._save(S.snapChk || [], new Date(S.ds + 'T00:00:00'));
+    if (S.snapSwap != null) UserStore.set(PlanGen.SWAP_PREFIX + S.ds, S.snapSwap);   // 이번에 바꾼 운동도 되돌린다
+    window.FirebaseSync?.scheduleSave?.();
     this._clearSaved(); this._stop(); this.st = null; this.close();
     try { Fitness.render(new Date(S.ds + 'T00:00:00')); } catch (e) {}
     App.showToast('이번 운동은 저장하지 않았습니다');

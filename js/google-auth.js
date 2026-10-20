@@ -462,7 +462,7 @@ const Auth = {
       const normalizedUid = UserStore.getUser();
       // 오프라인 모드 시절 기록을 계정으로 데려온다. 반드시 load() 앞이다 —
       // 클라우드에 같은 키가 있으면 그쪽이 최신이므로 뒤에 오는 load() 가 덮어써야 맞다.
-      const adopted = UserStore.adoptOffline();
+      const adopted = UserStore.adoptOffline() + (UserStore.adoptLoose ? UserStore.adoptLoose() : 0);
 
       if (typeof FirebaseSync !== 'undefined' &&
           CONFIG.FIREBASE_DB_URL &&

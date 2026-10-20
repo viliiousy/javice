@@ -10,12 +10,15 @@ const FirebaseSync = {
   _lastSaveTs: 0,
   _lastEditTs: 0,
   _pollTimer:  null,
+  _synced:     null,   // 마지막으로 서버와 맞춘 값 {키: 값}. 이것과 다른 칸만 올린다(다른 기기 편집을 덮지 않게)
+  _retry:      0,
 
   init(normalizedUid, dbUrl) {
     if (!normalizedUid || !dbUrl || dbUrl.includes('YOUR_FIREBASE')) return;
     this._uid       = normalizedUid;
     this._legacyUid = normalizedUid;
     this._dbUrl     = dbUrl.replace(/\/$/, '');
+    this._synced    = null;
     this._ownerCheck(normalizedUid);
     console.log('[FB] 초기화:', this._uid);
   },
@@ -134,25 +137,42 @@ const FirebaseSync = {
     }
   },
 
+  EXTRAS: ['gl_ai_key','gl_ai_prov','gl_ai_key_openai','gl_ai_key_anthropic','gl_ai_key_gemini','gl_ai_key_xai','gl_aiu_show','gl_ui','gl_haptic','gl_tts','gl_dark','gl_cat_colors','gl_top_info','gl_home_cats','gl_top_overdue'],
+  _allLocal() {
+    const data = UserStore.getAllData();
+    this.EXTRAS.forEach(k => { const v=localStorage.getItem(k); if(v!=null) data[k]=v; });
+    return data;
+  },
+  _mine(k) { return k.startsWith(`u_${UserStore.getUser()}_`) || this.EXTRAS.includes(k); },
+  // 서버와 마지막으로 맞춘 뒤 이 기기에서 바뀐 칸 (지운 칸은 null)
+  _dirty() {
+    const all = this._allLocal();
+    if (!this._synced) return all;               // 아직 서버와 맞춘 적이 없으면 전부
+    const out = {};
+    Object.entries(all).forEach(([k, v]) => { if (this._synced[k] !== v) out[k] = v; });
+    Object.keys(this._synced).forEach(k => { if (!(k in all) && this._mine(k)) out[k] = null; });
+    return out;
+  },
   _collectData() {
-    const data   = UserStore.getAllData();
-    const extras = ['gl_ai_key','gl_ai_prov','gl_ai_key_openai','gl_ai_key_anthropic','gl_ai_key_gemini','gl_ai_key_xai','gl_aiu_show','gl_ui','gl_haptic','gl_tts','gl_dark','gl_cat_colors','gl_top_info','gl_home_cats','gl_top_overdue'];
-    extras.forEach(k => { const v=localStorage.getItem(k); if(v!=null) data[k]=v; });
+    const data = this._dirty();
     data['_savedAt'] = String(Date.now());
     return data;
   },
 
   _restore(remoteData) {
     if (!remoteData || typeof remoteData !== 'object') return 0;
+    // 이 기기에서 아직 못 올린 칸은 덮지 않는다(올린 뒤 다른 기기로 간다)
+    const dirty = this._synced ? this._dirty() : {};
+    const synced = {};
     let n = 0;
     Object.entries(remoteData).forEach(([k,v]) => {
       // '_' 로 시작하는 칸은 앱 데이터가 아니라 서버가 쓰는 자리다(_savedAt, _link).
-      // 예전엔 _savedAt 만 걸렀는데, 그러면 새로 생긴 _link 가 localStorage 에
-      // '[object Object]' 로 내려앉는다. 규칙으로 막아 둔다.
       if (!k || k.charAt(0)==='_' || v==null) return;
-      localStorage.setItem(k, String(v));
-      n++;
+      synced[k] = String(v);
+      if (k in dirty) return;
+      if (localStorage.getItem(k) !== String(v)) { localStorage.setItem(k, String(v)); n++; }
     });
+    this._synced = synced;
     return n;
   },
 
@@ -183,14 +203,22 @@ const FirebaseSync = {
     }
     this._syncing = true;
     try {
-      const data = this._collectData();
-      // 빈 데이터 저장 방지 - _savedAt 외에 실제 데이터 없으면 스킵
-      const realKeys = Object.keys(data).filter(k => k !== '_savedAt');
-      if(realKeys.length === 0) {
-        console.warn('[FB] 빈 데이터 저장 방지');
-        this._syncing = false;
-        return;
+      // 다른 기기가 그사이 저장했으면 먼저 받아 합친다(내가 바꾼 칸은 그대로 둔다)
+      if (this._synced) {
+        const r = await fetch(`${this._dbUrl}/users/${this._uid}/_savedAt.json${await this._q()}`);
+        if (r.ok) {
+          const remoteTs = parseInt(await r.json()||'0',10);
+          if (remoteTs > this._lastSaveTs) {
+            this._syncing = false;
+            const ok = await this.load();
+            this._syncing = true;
+            if (ok) this._refreshUI(true);
+          }
+        }
       }
+      const data = this._collectData();
+      const realKeys = Object.keys(data).filter(k => k !== '_savedAt');
+      if(realKeys.length === 0) { this._syncing = false; return; }   // 바뀐 것이 없다
       const res  = await fetch(`${this._dbUrl}/users/${this._uid}.json${await this._q()}`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -198,9 +226,16 @@ const FirebaseSync = {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       this._lastSaveTs = parseInt(data['_savedAt'],10);
-      console.log('[FB] 저장 완료, ts:', this._lastSaveTs);
+      if (!this._synced) this._synced = {};
+      realKeys.forEach(k => { if (data[k] === null) delete this._synced[k]; else this._synced[k] = data[k]; });
+      this._retry = 0;
+      console.log('[FB] 저장 완료,', realKeys.length + '칸, ts:', this._lastSaveTs);
     } catch(e) {
+      // 실패하면 바뀐 칸은 그대로 남아 있으니 잠시 뒤 다시 올린다(오프라인·토큰 만료 등)
       console.error('[FB] 저장 실패:', e.message);
+      this._retry = Math.min(6, this._retry + 1);
+      clearTimeout(this._saveTimer);
+      this._saveTimer = setTimeout(() => this.save(), 5000 * this._retry);
     } finally {
       this._syncing = false;
     }
@@ -234,7 +269,7 @@ const FirebaseSync = {
       const res = await fetch(`${this._dbUrl}/users/${this._uid}/_savedAt.json${await this._q()}`);
       if (!res.ok) return;
       const remoteTs = parseInt(await res.json()||'0',10);
-      if (remoteTs > this._lastSaveTs + 1000) {
+      if (remoteTs > this._lastSaveTs) {
         console.log('[FB] 원격 변경 감지, ts:', remoteTs, '→ 불러오기');
         const ok = await this.load();
         if (ok) this._refreshUI();
@@ -242,7 +277,7 @@ const FirebaseSync = {
     } catch {}
   },
 
-  _refreshUI() {
+  _refreshUI(quiet) {
     if (typeof App==='undefined') return;
     const date = App.S?.selDate || new Date();
     requestAnimationFrame(() => {
@@ -257,6 +292,6 @@ const FirebaseSync = {
       try { App._updateStatsBanner(); } catch {}
     });
     // 동기화 알림 토스트
-    try { App?.showToast('🔄 다른 기기에서 변경됨', 'success'); } catch {}
+    if (!quiet) try { App?.showToast('다른 기기에서 바뀐 내용을 불러왔습니다', 'success'); } catch {}
   },
 };

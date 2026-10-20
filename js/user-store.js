@@ -82,6 +82,15 @@ const UserStore = {
     return n;
   },
 
+  // 예전엔 할 일 별표·시간(gl_star_*, gl_task_extra_*)을 계정 밖 칸에 둬서 다른 기기로 안 갔다. 계정 칸으로 옮긴다.
+  adoptLoose() {
+    const me = this.getUser(); if (!me || me === 'offline') return 0;
+    const ks = [];
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && /^gl_(star|task_extra)_/.test(k)) ks.push(k); }
+    ks.forEach(k => { try { if (localStorage.getItem(this.key(k)) === null) localStorage.setItem(this.key(k), localStorage.getItem(k)); localStorage.removeItem(k); } catch {} });
+    return ks.length;
+  },
+
   // 현재 계정의 모든 데이터 반환
   getAllData() {
     const prefix = `u_${this.getUser()}_`;

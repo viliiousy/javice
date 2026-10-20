@@ -280,7 +280,8 @@ const Memo = {
     };
     ed.addEventListener('keyup', save);
     ed.addEventListener('mouseup', save);
-    document.addEventListener('selectionchange', save);
+    if (this._selFn) document.removeEventListener('selectionchange', this._selFn);
+    this._selFn = save; document.addEventListener('selectionchange', save);
 
     // 체크리스트 네모를 누르면 켜고 끈다. 글자 자리를 누르면 그냥 커서다.
     ed.addEventListener('click', (e) => {

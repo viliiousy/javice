@@ -140,7 +140,7 @@ const App = {
     const hDone=hList.filter(h=>hChk.includes(h.id)).length;
 
     // 식단
-    const dt=Diet.totals(Diet.getData()), ds=Diet.getSettings();
+    const dt=Diet.totals(Diet.getData(selDate)), ds=Diet.getSettings();
     const calPct=ds.calorieGoal?Math.round(dt.cal/ds.calorieGoal*100):0;
 
     // 할일 — 전체 미완료·미숨김 목록 (upcoming/urgent 계산에 사용)
@@ -171,7 +171,7 @@ const App = {
     // 기한 있는 할일
     allPending.filter(t=>t.due).forEach(t=>{
       try{
-        const d=new Date(t.due);
+        const d=_dueEnd(t);
         if(d>=now&&d<=weekEnd) upcoming.push({label:(t.title||'').slice(0,15),isTask:true,date:d});
       }catch{}
     });
@@ -182,7 +182,7 @@ const App = {
     // 설정 › 일정과 할일 › '상단에 지난 할일도 보이기' — 끄면 기한이 지난 것은 위 줄에서 뺀다
     const showOver = localStorage.getItem('gl_top_overdue')!=='0';
     const urgentTasks=[...allPending].filter(t=>showOver||!t.due||t.due.split('T')[0]>=nowDateStr).sort((a,b)=>{
-      const aO=a.due&&new Date(a.due)<now?1:0,bO=b.due&&new Date(b.due)<now?1:0;
+      const aO=a.due&&_dueEnd(a)<now?1:0,bO=b.due&&_dueEnd(b)<now?1:0;
       const aS=(a.starred?8:0)+(aO?4:0)+(a.due?2:0),bS=(b.starred?8:0)+(bO?4:0)+(b.due?2:0);
       if(bS!==aS) return bS-aS;
       if(a.due&&b.due) return new Date(a.due)-new Date(b.due);
@@ -237,7 +237,7 @@ const App = {
     const urgentHTML=urgentTasks.length?`
       <div class="stats-urgent-row">
         ${urgentTasks.map(t=>{
-          const due=t.due?new Date(t.due):null,over=due&&due<now;
+          const due=t.due?new Date(t.due):null,over=!!t.due&&_dueEnd(t)<now;
           return `<div class="stats-urgent-chip${over?' urgent-over':''}${t.starred?' urgent-star':''}" data-s="tasks">${t.starred?'⭐':''}${esc(t.title.length>15?t.title.slice(0,14)+'…':t.title)}${due?` <span class="${over?'stats-overdue':'stats-due'}">${_fmtDate(due)}</span>`:''}</div>`;
         }).join('')}
       </div>`:'';
@@ -669,7 +669,7 @@ const App = {
     const d=date||this.S.selDate;
     const base=new Date(d.getFullYear(),d.getMonth(),d.getDate(),new Date().getHours()+1,0);
     const end=new Date(base.getTime()+3600000);
-    const fmt=x=>x.toISOString().slice(0,16);
+    const fmt=x=>new Date(x.getTime()-x.getTimezoneOffset()*60000).toISOString().slice(0,16);
     const defCal=GoogleCalendar.getDefaultCalendar();
     const calOptions=GoogleCalendar._allCalendars.length
       ?GoogleCalendar._allCalendars.map(c=>`<option value="${c.id}"${c.id===defCal?' selected':''}>${esc(c.summary)}</option>`).join('')
@@ -771,8 +771,8 @@ const App = {
       task.starred=false;
       // 구글 Tasks 의 due 는 날짜만 받는다(시각은 버려진다). 시간은 세부정보 창과
       // 같은 자리에 따로 둔다 — 두 곳이 다른 데 저장하면 한쪽에서 넣은 시간이 안 보인다.
-      if(time) localStorage.setItem('gl_task_extra_'+task.id,
-        JSON.stringify({ ...(JSON.parse(localStorage.getItem('gl_task_extra_'+task.id)||'{}')), time }));
+      if(time) UserStore.set('gl_task_extra_'+task.id,
+        JSON.stringify({ ...(JSON.parse(UserStore.get('gl_task_extra_'+task.id)||'{}')), time }));
       if(!this.S.tasks[listId]) this.S.tasks[listId]=[];
       this.S.tasks[listId].unshift(task);
       this._renderTasks();
@@ -783,7 +783,7 @@ const App = {
   },
 
   _showAddChecklistForDate(date) {
-    const ds=new Date(date).toISOString().split('T')[0];
+    const _d=new Date(date); const ds=`${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
     this.openModal('@pen 체크리스트 추가',`
       <div class="modal-row"><label class="modal-lbl">항목 *</label><input id="qcTitle" type="text" class="inp"></div>
       <div class="modal-row"><label class="modal-lbl">마감</label><input id="qcDue" type="date" value="${ds}" class="inp inp-sm"></div>
@@ -968,7 +968,7 @@ const App = {
 
   _taskHTML(t) {
     const done=t.status==='completed', due=t.due?new Date(t.due):null;
-    const overdue=due&&due<new Date()&&!done, hidden=t._hidden;
+    const overdue=!!t.due&&_dueEnd(t)<new Date()&&!done, hidden=t._hidden;
     const dueStr=due?`<span class="task-due-inline${overdue?' overdue':''}">${_fmtDate(due)}</span>`:'';
     const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
     const catCol=catColors[t._lid]||'';
@@ -1003,7 +1003,7 @@ const App = {
     const t=this.S.tasks[listId]?.find(x=>x.id===taskId); if(!t) return;
     const due=t.due?t.due.split('T')[0]:'';
     // 시간/반복은 localStorage에 보조 저장
-    const extra=JSON.parse(localStorage.getItem('gl_task_extra_'+taskId)||'{}');
+    const extra=JSON.parse(UserStore.get('gl_task_extra_'+taskId)||'{}');
     const listOptions=this.S.lists.map(l=>`<option value="${l.id}"${l.id===listId?' selected':''}>${esc(l.title)}</option>`).join('');
     const repeatOpts=['없음','매일','매주','매월','매년'].map(v=>`<option${extra.repeat===v?' selected':''}>${v}</option>`).join('');
     this.openModal('@list 세부정보',`
@@ -1043,11 +1043,15 @@ const App = {
     const newListId=document.getElementById('tdList')?.value||listId;
     if(!title){ this.showToast('제목을 입력해주세요','error'); return; }
     // 시간/반복은 localStorage 보조 저장
-    localStorage.setItem('gl_task_extra_'+taskId, JSON.stringify({time,repeat}));
+    UserStore.set('gl_task_extra_'+taskId, JSON.stringify({time,repeat}));
     try{
       if(newListId!==listId){
         const created=await GoogleTasks.moveTask(listId,newListId,taskId,title,notes,due);
-        created.starred=localStorage.getItem('gl_star_'+taskId)==='1';
+        created.starred=UserStore.get('gl_star_'+taskId)==='1';
+        // 목록을 옮기면 할 일 번호가 새로 생긴다 — 시간·반복·별표도 새 번호로 옮긴다
+        UserStore.set('gl_task_extra_'+created.id, JSON.stringify({time,repeat}));
+        if(created.starred) UserStore.set('gl_star_'+created.id,'1');
+        FirebaseSync?.scheduleSave?.();
         if(!this.S.tasks[newListId]) this.S.tasks[newListId]=[];
         this.S.tasks[newListId].unshift(created);
         this.S.tasks[listId]=this.S.tasks[listId]?.filter(t=>t.id!==taskId);
@@ -1082,7 +1086,7 @@ const App = {
     const t=this.S.tasks[listId]?.find(x=>x.id===taskId); if(!t) return;
     t.starred=!t.starred;
     // 로컬 스토리지 업데이트
-    t.starred?localStorage.setItem('gl_star_'+taskId,'1'):localStorage.removeItem('gl_star_'+taskId);
+    t.starred?UserStore.set('gl_star_'+taskId,'1'):UserStore.remove('gl_star_'+taskId); FirebaseSync?.scheduleSave?.();
     // Google Tasks API notes 필드에 별표 상태 동기화 (fire-and-forget)
     if(Auth.isLoggedIn()){
       GoogleTasks.setTaskStar(listId, taskId, t.starred, t.notes||'');
@@ -1275,6 +1279,8 @@ const App = {
 };
 
 function esc(s){ if(!s)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+// 구글 할 일 기한(UTC 자정)을 그 날 끝(현지 23:59)으로 — 오늘 기한이 오전 9시부터 '지남' 으로 보이지 않게
+function _dueEnd(t){ return new Date(String(t.due).slice(0,10)+'T23:59:59'); }
 function _fmtDate(d){ return d?.toLocaleDateString('ko-KR',{month:'short',day:'numeric',weekday:'short'})||''; }
 function _fmtTime(d){ return d?.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false})||''; }
 function _fmtFull(d){ return d?.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'})||''; }

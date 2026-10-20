@@ -167,7 +167,7 @@ const JARVIS = {
     if(hour>=10 && !this._sentReminders.has('overdue')){
       const overdue=[];
       Object.values(App.S.tasks||{}).forEach(list=>{
-        list.filter(t=>t.status==='needsAction'&&t.due&&new Date(t.due)<now).forEach(t=>{
+        list.filter(t=>t.status==='needsAction'&&t.due&&new Date(String(t.due).slice(0,10)+'T23:59:59')<now).forEach(t=>{
           overdue.push(t.title);
         });
       });
