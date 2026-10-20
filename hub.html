@@ -203,8 +203,9 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" defer></script>
+  <!-- 허브 모드 표시는 hub.js 보다 먼저 — boot() 가 이 값을 보고 가로로 돌린다 -->
+  <script>try{ if(localStorage.getItem('gl_hub_mode')==='1' || /[?&]from=app/.test(location.search)) document.body.classList.add('hub-mode'); }catch(e){}</script>
   <script src="js/hub-icons.js"></script>
   <script src="js/hub.js"></script>
-  <script>try{ if(localStorage.getItem('gl_hub_mode')==='1' || /[?&]from=app/.test(location.search)) document.body.classList.add('hub-mode'); }catch(e){}</script>
 </body>
 </html>

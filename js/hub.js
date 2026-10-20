@@ -1801,7 +1801,8 @@ function nativeSetup() {
   const b = $('backApp'); if (b) b.addEventListener('click', backToApp);
   if (!Native.on) return;
   // 휴대폰에서 허브를 열면 가로로 돌린다(태블릿은 원래 가로)
-  if (document.body.classList.contains('hub-mode')) {
+  const hubMode = document.body.classList.contains('hub-mode') || /[?&]from=app/.test(location.search);
+  if (hubMode) {
     setOrient('landscape');
     setTimeout(() => setOrient('landscape'), 800);   // 처음 한 번이 화면 준비 전에 가면 무시될 때가 있다
   }

@@ -43,7 +43,12 @@ enum BashyLock {
         ctx.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Bashy 를 엽니다") { ok, _ in
             DispatchQueue.main.async {
                 checking = false
-                if ok { cover?.isHidden = true; cover = nil }
+                if ok {
+                    let scene = cover?.windowScene
+                    cover?.isHidden = true; cover = nil
+                    // 가림막을 걷은 뒤 앱 화면을 다시 주 창으로 — 화면 방향·키보드가 앱 화면을 따르게
+                    scene?.windows.first(where: { $0.rootViewController is UIViewController && $0.windowLevel == .normal })?.makeKeyAndVisible()
+                }
             }
         }
     }
