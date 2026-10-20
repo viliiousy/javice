@@ -549,3 +549,14 @@ html[data-ui="v2"] .stats-row .sg-l{ order:0; }
 html[data-ui="v2"] .sg-r .ti-grp{ display:flex; align-items:center; gap:inherit; margin-left:auto; }
 html[data-ui="v2"] .stats-row.dense .sg-r{ justify-content:flex-start !important; }
 html[data-ui="v2"] .stats-row.dense .sg-r .ti-grp{ gap:8px; }
+
+/* 토스트(하단 짧은 알림) — v2: 잉크색 알약, 성공·오류는 앞의 작은 점으로만 구분 */
+html[data-ui="v2"] .toast{ background:#17181B; color:#ECEDEE; border-radius:12px; padding:10px 16px; font-size:13px; font-weight:500;
+  font-family:var(--v2-ff); box-shadow:0 8px 24px rgba(0,0,0,.18); letter-spacing:-.005em; display:flex; align-items:center; gap:8px; }
+html[data-ui="v2"].dark .toast, html.dark[data-ui="v2"] .toast{ background:#ECEDEE; color:#101113; box-shadow:0 8px 24px rgba(0,0,0,.45); }
+html[data-ui="v2"] .toast.success, html[data-ui="v2"] .toast.error{ background:#17181B; color:#ECEDEE; }
+html.dark[data-ui="v2"] .toast.success, html.dark[data-ui="v2"] .toast.error{ background:#ECEDEE; color:#101113; }
+html[data-ui="v2"] .toast::before{ content:''; flex:none; width:6px; height:6px; border-radius:50%; background:#8B8F97; }
+html[data-ui="v2"] .toast.success::before{ background:#FF6A2B; }
+html[data-ui="v2"] .toast.error::before{ background:#E5484D; }
+html[data-ui="v2"] .toast.hidden{ display:none; }

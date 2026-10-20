@@ -161,7 +161,9 @@ const RowUI = {
   // 예전 방식(줄을 position:fixed 로 떼고 점선 빈칸을 끼우기)은 줄이 튀고 글씨가 선택되어 파랗게 칠해졌다.
   _drag: null,
   _dragStart(wrap, root, y) {
-    const items = [...root.querySelectorAll(':scope > .rw')];
+    // 접혀서 숨은 줄(fold-hide)·안 보이는 줄은 빼고 계산한다 — 넣으면 높이 0 인 줄들 때문에
+    // 조금만 내려도 목록 맨 끝('n개 더 보기'·'접기' 단추 아래)으로 떨어졌다.
+    const items = [...root.querySelectorAll(':scope > .rw')].filter(el => el === wrap || (!el.classList.contains('fold-hide') && el.getClientRects().length));
     const idx = items.indexOf(wrap); if (idx < 0) return;
     const sy = window.scrollY;
     const rs = items.map(el => el.getBoundingClientRect());
