@@ -33,6 +33,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
     }
 
+    // 화면 방향: 앱 화면(Capacitor)이 정한 방향을 따른다 — 허브 모드는 가로, 나머지는 세로.
+    // (UIScene 방식이라 self.window 는 nil. 넘어온 window 에서 화면을 찾는다)
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        guard let vc = window?.rootViewController as? CAPBridgeViewController else { return .all }
+        return vc.supportedInterfaceOrientations
+    }
+
     // ── 알림(APNs) → Firebase Messaging 플러그인으로 넘긴다 ──
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)

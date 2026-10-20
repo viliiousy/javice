@@ -15,7 +15,30 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setAppLock", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getAppLock", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setWidget", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setOrientation", returnType: CAPPluginReturnPromise),
     ]
+
+    // 허브 모드: 가로(양쪽 다 허용) / 그 밖: 세로. 휴대폰을 옆으로 눕힌 방향 그대로 돌아가게 둘 다 연다.
+    @objc func setOrientation(_ call: CAPPluginCall) {
+        let land = call.getString("mode") == "landscape"
+        DispatchQueue.main.async {
+            guard let vc = self.bridge?.viewController as? CAPBridgeViewController else { call.reject("no view"); return }
+            vc.supportedOrientations = land
+                ? [UIInterfaceOrientation.landscapeRight.rawValue, UIInterfaceOrientation.landscapeLeft.rawValue]
+                : [UIInterfaceOrientation.portrait.rawValue]
+            let mask: UIInterfaceOrientationMask = land ? .landscape : .portrait
+            if #available(iOS 16.0, *) {
+                vc.setNeedsUpdateOfSupportedInterfaceOrientations()
+                if let scene = vc.view.window?.windowScene ?? (UIApplication.shared.connectedScenes.first as? UIWindowScene) {
+                    scene.requestGeometryUpdate(.iOS(interfaceOrientations: mask)) { _ in }
+                }
+            } else {
+                UIDevice.current.setValue((land ? UIInterfaceOrientation.landscapeRight : .portrait).rawValue, forKey: "orientation")
+                UINavigationController.attemptRotationToDeviceOrientation()
+            }
+            call.resolve(["mode": land ? "landscape" : "portrait"])
+        }
+    }
 
     // 홈 화면 위젯이 읽을 '오늘 요약'(JSON). 앱과 위젯이 같이 쓰는 App Group 저장소에 둔다.
     @objc func setWidget(_ call: CAPPluginCall) {

@@ -71,7 +71,7 @@ const App = {
     else if(localStorage.getItem('gl_hub_mode')==='1') Settings.hubLink().catch(()=>{});
     try{ Settings.hubMenu(); }catch(e){}
     // 휴대폰 앱은 세로로 쓴다(허브에서 가로로 돌렸다가 돌아온 경우 포함). 태블릿은 자유
-    try{ const SO=Platform.native&&window.Capacitor.Plugins.ScreenOrientation; if(SO&&Math.min(screen.width,screen.height)<600) SO.lock({orientation:'portrait'}).catch(()=>{}); }catch(e){}
+    try{ if(Platform.native&&Math.min(screen.width,screen.height)<600){ const P=window.Capacitor.Plugins, SO=P.ScreenOrientation; const so=()=>SO&&SO.lock({orientation:'portrait'}).catch(()=>{}); (P.BashyNative&&P.BashyNative.setOrientation)?P.BashyNative.setOrientation({mode:'portrait'}).catch(so):so(); } }catch(e){}
     try { Diet.render(new Date()); } catch(e){ console.warn('Diet render',e); }
     try { Fitness.render(new Date()); } catch(e){ console.warn('Fitness render',e); }
     try { Checklist.render(); }     catch(e){ console.warn('Checklist render',e); }

@@ -1749,9 +1749,16 @@ async function backToApp() {
   try { Voice.webStop(); } catch (e) {}
   const J = Native.plugin('JarvisListener');
   if (J) { try { await Promise.race([J.stop(), new Promise(r => setTimeout(r, 400))]); } catch (e) {} }
-  const SO = Native.plugin('ScreenOrientation');
-  if (SO) { try { await SO.lock({ orientation: 'portrait' }); } catch (e) {} }
+  await setOrient('portrait');
   location.href = 'index.html?nohub=1';
+}
+
+// 화면 방향 바꾸기: 우리 앱 플러그인(가로 양쪽 허용)을 먼저, 없으면 Capacitor 방향 플러그인
+async function setOrient(mode) {
+  const B = Native.plugin('BashyNative');
+  if (B && B.setOrientation) { try { await B.setOrientation({ mode }); return; } catch (e) {} }
+  const SO = Native.plugin('ScreenOrientation');
+  if (SO) { try { await SO.lock({ orientation: mode }); } catch (e) {} }
 }
 
 function nativeSetup() {
@@ -1759,8 +1766,8 @@ function nativeSetup() {
   if (!Native.on) return;
   // 휴대폰에서 허브를 열면 가로로 돌린다(태블릿은 원래 가로)
   if (document.body.classList.contains('hub-mode')) {
-    const SO = Native.plugin('ScreenOrientation');
-    if (SO) SO.lock({ orientation: 'landscape' }).catch(() => {});
+    setOrient('landscape');
+    setTimeout(() => setOrient('landscape'), 800);   // 처음 한 번이 화면 준비 전에 가면 무시될 때가 있다
   }
   const KA = Native.plugin('KeepAwake');
   if (KA) KA.keepAwake().catch(() => {});
