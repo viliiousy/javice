@@ -611,3 +611,35 @@ html[data-ui="v2"] .econ-login, html[data-ui="v2"] .ec-login-need{ color:var(--t
 .dp-seg button + button{ border-left:1px solid var(--border); }
 .dp-seg button:disabled{ color:var(--text3); opacity:.6; cursor:default; }
 .dp-seg button.on{ background:var(--text); color:var(--card); font-weight:600; }
+
+/* 메모 서식 줄 — 상자 없이 선 하나 위에 44px 단추. 묶음 사이만 띄우고, 켜진 서식은 먹색 */
+html[data-ui="v2"] .mm-form .mm-bar{ display:flex; align-items:center; gap:16px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none;
+  border:0; border-top:1px solid var(--v2-line); border-radius:0; background:none; padding:8px 0 0; margin:0; }
+html[data-ui="v2"] .mm-form .mm-bar::-webkit-scrollbar{ display:none; }
+html[data-ui="v2"] .mm-g{ display:flex; gap:2px; flex:none; }
+html[data-ui="v2"] .mm-form .mm-b{ flex:none; width:40px; min-width:40px; height:40px; padding:0; border-radius:10px; display:flex; align-items:center; justify-content:center;
+  color:var(--text2); background:none; transition:background .12s, color .12s; }
+html[data-ui="v2"] .mm-form .mm-b:hover{ background:var(--card2); color:var(--text); }
+html[data-ui="v2"] .mm-form .mm-b:active{ transform:scale(.94); }
+html[data-ui="v2"] .mm-form .mm-b.on{ background:var(--text); color:var(--card); }
+html[data-ui="v2"] .mm-b svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+html[data-ui="v2"] .mm-b svg circle{ fill:currentColor; stroke:none; }
+html[data-ui="v2"] .mm-t{ font-family:var(--v2-num); font-size:17px; line-height:1; }
+html[data-ui="v2"] .mm-tb{ font-weight:700; }
+html[data-ui="v2"] .mm-tu{ text-decoration:underline; text-underline-offset:3px; }
+html[data-ui="v2"] .mm-ts{ text-decoration:line-through; }
+html[data-ui="v2"] .mm-form .mm-b.wide{ width:auto; padding:0 12px 0 10px; gap:6px; font-size:13px; font-weight:500; margin-left:auto; border:1px solid var(--border); }
+html[data-ui="v2"] .mm-form .mm-b.wide svg{ width:16px; height:16px; }
+html[data-ui="v2"] .mm-bar-sep{ display:none; }
+html[data-ui="v2"] .mm-hint{ font-size:12px; color:var(--text3); margin-top:4px; }
+@media (max-width:520px){
+  html[data-ui="v2"] .mm-form .mm-bar{ gap:6px; }
+  html[data-ui="v2"] .mm-form .mm-b{ width:34px; min-width:34px; height:40px; }
+  html[data-ui="v2"] .mm-form .mm-b.wide{ width:40px; padding:0; }
+  html[data-ui="v2"] .mm-form .mm-b.wide span{ display:none; }
+}
+html[data-ui="v2"] .mm-foot{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:16px; }
+html[data-ui="v2"] .mm-foot-r{ display:flex; gap:8px; flex:1; justify-content:flex-end; }
+html[data-ui="v2"] .mm-foot-r .btn-sm{ height:44px; min-width:88px; border-radius:12px; font-size:15px; }
+html[data-ui="v2"] .mm-del{ height:44px; display:inline-flex; align-items:center; gap:6px; background:none; border:0; color:var(--text3); font:inherit; font-size:14px; cursor:pointer; }
+html[data-ui="v2"] .mm-del .ic{ width:16px; height:16px; }

@@ -1,4 +1,5 @@
 import WidgetKit
+import ActivityKit
 import SwiftUI
 
 // Bashy 홈 화면 위젯 — 앱이 넘겨 준 '오늘 요약'(BashyNativePlugin.setWidget)만 그린다.
@@ -138,12 +139,99 @@ extension View {
     }
 }
 
-@main
 struct BashyWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "BashyToday", provider: Provider()) { e in TodayView(e: e) }
             .configurationDisplayName("Bashy 오늘")
             .description("습관·할 일·다음 일정을 한눈에")
             .supportedFamilies([.systemSmall, .systemMedium])
+    }
+}
+
+// ── 운동 라이브 액티비티 (잠금 화면 · 다이내믹 아일랜드) ─────────────
+// 앱(BashyNativePlugin.swift)의 정의와 똑같아야 한다.
+struct WorkoutAttributes: ActivityAttributes {
+    public struct ContentState: Codable, Hashable {
+        var title: String
+        var sub: String
+        var restEnd: Date?
+        var step: String
+    }
+    var startedAt: Date
+}
+
+private let accent = Color(red: 1.0, green: 0.416, blue: 0.169)   // #FF6A2B
+
+struct WorkoutLiveView: View {
+    let ctx: ActivityViewContext<WorkoutAttributes>
+    var body: some View {
+        let s = ctx.state
+        HStack(alignment: .center, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(s.step.isEmpty ? "운동 중" : s.step).font(.system(size: 12, weight: .semibold)).foregroundColor(accent)
+                Text(s.title).font(.system(size: 20, weight: .semibold)).foregroundColor(.white).lineLimit(1)
+                Text(s.sub).font(.system(size: 13)).foregroundColor(Color.white.opacity(0.6)).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 2) {
+                if let end = s.restEnd, end > Date() {
+                    Text("쉬는 시간").font(.system(size: 11, weight: .medium)).foregroundColor(Color.white.opacity(0.6))
+                    Text(timerInterval: Date()...end, countsDown: true).font(.system(size: 30, weight: .semibold).monospacedDigit())
+                        .foregroundColor(accent).multilineTextAlignment(.trailing).frame(width: 96, alignment: .trailing)
+                } else {
+                    Text("운동 시간").font(.system(size: 11, weight: .medium)).foregroundColor(Color.white.opacity(0.6))
+                    Text(ctx.attributes.startedAt, style: .timer).font(.system(size: 26, weight: .semibold).monospacedDigit())
+                        .foregroundColor(.white).multilineTextAlignment(.trailing).frame(width: 110, alignment: .trailing)
+                }
+            }
+        }
+        .padding(16)
+        .activityBackgroundTint(Color(red: 0.063, green: 0.067, blue: 0.075))
+        .activitySystemActionForegroundColor(.white)
+    }
+}
+
+struct WorkoutLiveActivity: Widget {
+    var body: some WidgetConfiguration {
+        ActivityConfiguration(for: WorkoutAttributes.self) { ctx in
+            WorkoutLiveView(ctx: ctx)
+        } dynamicIsland: { ctx in
+            DynamicIsland {
+                DynamicIslandExpandedRegion(.leading) {
+                    Text(ctx.state.step.isEmpty ? "운동 중" : ctx.state.step).font(.system(size: 12, weight: .semibold)).foregroundColor(accent)
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    if let end = ctx.state.restEnd, end > Date() {
+                        Text(timerInterval: Date()...end, countsDown: true).font(.system(size: 18, weight: .semibold).monospacedDigit()).foregroundColor(accent).frame(width: 64, alignment: .trailing)
+                    } else {
+                        Text(ctx.attributes.startedAt, style: .timer).font(.system(size: 16, weight: .semibold).monospacedDigit()).frame(width: 72, alignment: .trailing)
+                    }
+                }
+                DynamicIslandExpandedRegion(.bottom) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(ctx.state.title).font(.system(size: 17, weight: .semibold)).lineLimit(1)
+                        Text(ctx.state.sub).font(.system(size: 12)).foregroundColor(.secondary).lineLimit(1)
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } compactLeading: {
+                Image(systemName: "dumbbell.fill").foregroundColor(accent)
+            } compactTrailing: {
+                if let end = ctx.state.restEnd, end > Date() {
+                    Text(timerInterval: Date()...end, countsDown: true).monospacedDigit().foregroundColor(accent).frame(width: 44)
+                } else {
+                    Text(ctx.attributes.startedAt, style: .timer).monospacedDigit().frame(width: 48)
+                }
+            } minimal: {
+                Image(systemName: "dumbbell.fill").foregroundColor(accent)
+            }
+        }
+    }
+}
+
+@main
+struct BashyWidgets: WidgetBundle {
+    var body: some Widget {
+        BashyWidget()
+        WorkoutLiveActivity()
     }
 }

@@ -344,8 +344,23 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
   _lgRow(i, s) {
     s = s || {};
     return `<div class="lg-row"><span class="lg-n">${i + 1}</span>
-      <input class="inp inp-sm lg-w" type="number" inputmode="decimal" step="0.5" placeholder="kg" value="${s.w ?? ''}">
-      <span>kg ×</span><input class="inp inp-sm lg-r" type="number" inputmode="numeric" placeholder="회" value="${s.r ?? ''}"><span>회</span></div>`;
+      <input class="inp inp-sm lg-w" readonly inputmode="none" placeholder="kg" value="${s.w ?? ''}" onclick="PlanGen._lgPick(this,'w')">
+      <span>kg ×</span><input class="inp inp-sm lg-r" readonly inputmode="none" placeholder="회" value="${s.r ?? ''}" onclick="PlanGen._lgPick(this,'r')"><span>회</span></div>`;
+  },
+  // 기록 창의 무게·횟수도 운동 모드처럼 숫자 휠로. 고른 값은 아래 줄(빈 칸·같은 값)에도 채운다.
+  _lgPick(el, f) {
+    const rows = [...document.querySelectorAll('#lgRows .lg-row')], k = rows.indexOf(el.closest('.lg-row'));
+    const cur = Number(el.value) || 0, cls = f === 'w' ? '.lg-w' : '.lg-r';
+    const html = document.getElementById('modalBody').innerHTML, title = document.getElementById('modalTitle').textContent;
+    const back = (v) => {
+      App.openModal('@dumbbell ' + title.trim(), html);
+      const rs = [...document.querySelectorAll('#lgRows .lg-row')];
+      for (let j = k; j < rs.length; j++) { const inp = rs[j].querySelector(cls); if (j === k || !inp.value || inp.value === el.value) { inp.value = v; inp.setAttribute('value', v); } }
+    };
+    const cancel = () => App.openModal('@dumbbell ' + title.trim(), html);
+    const W = typeof Wheel !== 'undefined' ? Wheel : null; if (!W) return;
+    if (f === 'w') W.open({ title: `${k + 1}세트 무게`, unit: 'kg', cols: [{ vals: Array.from({ length: 301 }, (_, i) => i), cur: Math.floor(cur) }, { vals: [0, 0.5], cur: cur % 1 >= 0.5 ? 0.5 : 0, fmt: v => v ? '.5' : '.0' }], done: ([a, b]) => back(a + b), cancel });
+    else W.open({ title: `${k + 1}세트 횟수`, unit: '회', cols: [{ vals: Array.from({ length: 61 }, (_, i) => i), cur: cur || 10 }], done: ([a]) => back(a), cancel });
   },
   _lgAdd() { const b = document.getElementById('lgRows'); if (b) b.insertAdjacentHTML('beforeend', this._lgRow(b.children.length)); },
   _lgSave() {

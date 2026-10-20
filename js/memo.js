@@ -216,23 +216,44 @@ const Memo = {
   },
 
   // ── 편집창 ────────────────────────────
+  // 서식 줄: 글자 모양 · 목록 · 들여쓰기 · 복사 링크. 지금 커서 자리에 켜져 있는 서식은 먹색으로 칠한다.
+  _ICON: {
+    ul: '<svg viewBox="0 0 20 20"><circle cx="4" cy="6" r="1.3"/><circle cx="4" cy="10" r="1.3"/><circle cx="4" cy="14" r="1.3"/><path d="M8 6h9M8 10h9M8 14h9"/></svg>',
+    ol: '<svg viewBox="0 0 20 20"><path d="M3.2 4.6l1.3-.8v4.4M8 6h9M8 10h9M8 14h9M3 12.3c.3-.6 1.9-.8 1.9.3 0 .9-1.9 1.6-1.9 2.7h2"/></svg>',
+    check: '<svg viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="5" height="5" rx="1.2"/><path d="M3.8 6l1 1 1.6-1.9M10 6h7.5M10 14h7.5"/><rect x="2.5" y="11.5" width="5" height="5" rx="1.2"/></svg>',
+    out: '<svg viewBox="0 0 20 20"><path d="M9 5h8.5M9 10h8.5M9 15h8.5M5.5 7.5L3 10l2.5 2.5"/></svg>',
+    ind: '<svg viewBox="0 0 20 20"><path d="M9 5h8.5M9 10h8.5M9 15h8.5M2.5 7.5L5 10l-2.5 2.5"/></svg>',
+    link: '<svg viewBox="0 0 20 20"><rect x="6.5" y="6.5" width="9.5" height="10" rx="2"/><path d="M4 13.5V5.5a2 2 0 012-2h7"/></svg>',
+  },
   _bar(){
-    const b = (cmd,label,title,cls) =>
-      `<button type="button" class="mm-b${cls?' '+cls:''}" data-cmd="${cmd}" title="${title}">${label}</button>`;
-    return `<div class="mm-bar">
-      ${b('bold','<b>B</b>','굵게 (Ctrl+B)')}
-      ${b('underline','<u>U</u>','밑줄 (Ctrl+U)')}
-      ${b('strikeThrough','<s>S</s>','취소선')}
-      <span class="mm-bar-sep"></span>
-      ${b('insertUnorderedList','•','글머리 기호')}
-      ${b('insertOrderedList','1.','번호 매기기')}
-      ${b('checklist', (typeof Icons!=='undefined'?Icons.svg('checkbox'):'☑'), '체크리스트')}
-      <span class="mm-bar-sep"></span>
-      ${b('outdent','⇤','내어쓰기')}
-      ${b('indent','⇥','들여쓰기')}
-      <span class="mm-bar-sep"></span>
-      ${b('link','복사 링크','고른 문구에 밑줄 — 누르면 복사된다 (한 번 더 누르면 해제)','wide')}
+    const I = this._ICON;
+    const b = (cmd, label, title, cls) =>
+      `<button type="button" class="mm-b${cls?' '+cls:''}" data-cmd="${cmd}" title="${title}" aria-label="${title}">${label}</button>`;
+    return `<div class="mm-bar" role="toolbar" aria-label="서식">
+      <div class="mm-g">
+        ${b('bold','<span class="mm-t mm-tb">B</span>','굵게')}
+        ${b('underline','<span class="mm-t mm-tu">U</span>','밑줄')}
+        ${b('strikeThrough','<span class="mm-t mm-ts">S</span>','취소선')}
+      </div>
+      <div class="mm-g">
+        ${b('insertUnorderedList', I.ul, '글머리 기호')}
+        ${b('insertOrderedList', I.ol, '번호 매기기')}
+        ${b('checklist', I.check, '체크리스트')}
+      </div>
+      <div class="mm-g">
+        ${b('outdent', I.out, '내어쓰기')}
+        ${b('indent', I.ind, '들여쓰기')}
+      </div>
+      ${b('link', I.link + '<span>복사 링크</span>', '고른 문구를 눌러서 복사할 수 있게 (한 번 더 누르면 해제)', 'wide')}
     </div>`;
+  },
+  // 커서 자리의 서식 상태를 단추에 반영
+  _paintBar(){
+    const st = c => { try { return document.queryCommandState(c); } catch { return false; } };
+    document.querySelectorAll('.mm-bar .mm-b').forEach(b => {
+      const c = b.dataset.cmd;
+      if (['bold','underline','strikeThrough','insertUnorderedList','insertOrderedList'].includes(c)) b.classList.toggle('on', st(c));
+    });
   },
 
   // 편집 화면: 제목은 크게, 본문은 테두리 없는 넓은 칸, 서식 단추는 한 줄 — 메모 앱처럼 간결하게
@@ -241,7 +262,7 @@ const Memo = {
       <input id="mTitle" type="text" placeholder="제목" class="mm-title" value="${m?esc(m.title):''}" aria-label="제목">
       <div id="mBody" class="mm-ed" contenteditable="true" spellcheck="false" data-ph="내용을 입력하세요"></div>
       ${this._bar()}
-      <div class="mm-hint">문구를 골라 <b>복사 링크</b>를 누르면, 카드에서 그 글씨를 눌러 바로 복사할 수 있습니다.</div>
+      <div class="mm-hint">문구를 고르고 <b>복사 링크</b>(오른쪽 끝 단추)를 누르면, 카드에서 그 글씨를 눌러 바로 복사할 수 있습니다.</div>
     </div>`;
   },
 
@@ -276,7 +297,7 @@ const Memo = {
     // 그때 selection 을 읽으면 이미 비어 있다.
     const save = () => {
       const s = window.getSelection();
-      if (s && s.rangeCount && ed.contains(s.anchorNode)) this._sel = s.getRangeAt(0).cloneRange();
+      if (s && s.rangeCount && ed.contains(s.anchorNode)) { this._sel = s.getRangeAt(0).cloneRange(); this._paintBar(); }
     };
     ed.addEventListener('keyup', save);
     ed.addEventListener('mouseup', save);
@@ -340,7 +361,7 @@ const Memo = {
     document.querySelectorAll('.mm-bar .mm-b').forEach(b => {
       // mousedown 에서 막지 않으면 단추를 누르는 순간 고른 자리가 풀린다.
       b.addEventListener('mousedown', e => e.preventDefault());
-      b.addEventListener('click', () => this._cmd(b.dataset.cmd, ed));
+      b.addEventListener('click', () => { this._cmd(b.dataset.cmd, ed); try { Haptic.select(); } catch {} setTimeout(() => this._paintBar(), 0); });
     });
   },
 

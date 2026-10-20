@@ -17,7 +17,7 @@ rmSync(www, { recursive: true, force: true });
 mkdirSync(www, { recursive: true });
 
 const FILES = ['index.html', 'privacy.html', 'terms.html', 'delete-account.html', 'manifest.json', 'hub.html', 'hub-classic.html', 'hub.webmanifest'];   // 허브 모드(설정 › 기기·허브)용으로 허브도 넣는다
-const DIRS  = ['css', 'js', 'icons', 'img'];
+const DIRS  = ['css', 'js', 'icons', 'img', 'sounds'];
 const SKIP  = /^$/;   // 예전엔 허브 파일을 뺐다 — 이제 앱 안에서 허브 모드로 쓴다
 
 for (const f of FILES) if (existsSync(join(root, f))) cpSync(join(root, f), join(www, f));

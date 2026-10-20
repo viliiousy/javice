@@ -3868,3 +3868,22 @@ body.wk-on{ overflow:hidden; }
 .wk-list.wk-before{ margin:0 0 16px; border-top:0; border-bottom:1px solid #1E2024; }
 .wk-list.wk-before .wk-li{ padding:8px 0; }
 .wk-list.wk-before .wk-li:last-child{ border-bottom:0; }
+
+/* ── 숫자 휠 (굴려서 고르기) ── */
+.whl{ position:relative; isolation:isolate; display:flex; justify-content:center; gap:8px; height:200px; margin:8px 0 16px; }
+.whl-col{ flex:1; max-width:132px; position:relative; z-index:1; }
+.whl-sc{ height:200px; overflow-y:auto; scroll-snap-type:y mandatory; scrollbar-width:none; perspective:420px; overscroll-behavior:contain;
+  -webkit-mask-image:linear-gradient(transparent, #000 30%, #000 70%, transparent); mask-image:linear-gradient(transparent, #000 30%, #000 70%, transparent); }
+.whl-sc::-webkit-scrollbar{ display:none; }
+.whl-pad{ height:80px; }
+.whl-it{ height:40px; line-height:40px; text-align:center; scroll-snap-align:center; scroll-snap-stop:always; font-family:'Space Grotesk','IBM Plex Sans KR',sans-serif;
+  font-size:22px; color:var(--text2); font-variant-numeric:tabular-nums; transform-origin:50% 50%; backface-visibility:hidden; will-change:transform,opacity; user-select:none; }
+.whl-it.on{ color:var(--text); font-weight:600; }
+.whl-sel{ position:absolute; left:0; right:0; top:80px; height:40px; border-radius:10px; background:var(--card2); border:1px solid var(--border); z-index:0; pointer-events:none; }
+.whl-unit{ position:absolute; right:16px; top:80px; line-height:40px; font-size:14px; color:var(--text3); z-index:2; pointer-events:none; }
+.whl-note{ margin-top:-8px; }
+/* 운동 모드 무게·횟수 칸(눌러서 휠) */
+.wk-set .wk-num{ height:44px; width:100%; text-align:center; font-family:'Space Grotesk',sans-serif; font-size:17px; background:#17181B; border:1px solid #26282D; color:#ECEDEE; border-radius:10px; cursor:pointer; padding:0; }
+.wk-set .wk-num:active{ border-color:#FF6A2B; }
+.wk-set.ok .wk-num{ color:#8B8F97; }
+.lg-row .inp[readonly]{ cursor:pointer; text-align:center; }

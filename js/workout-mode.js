@@ -260,6 +260,8 @@ const WorkoutMode = {
     try { navigator.wakeLock?.request('screen').then(l => { this._lock = l; }).catch(() => {}); } catch (e) {}
     try { Haptic.medium(); } catch (e) {}
     this._audio();
+    try { if (typeof LocalNotify !== 'undefined' && LocalNotify.P) LocalNotify.permission(true); } catch (e) {}
+    try { const P = LocalNotify.P; if (P && P.createChannel && window.Capacitor?.getPlatform?.() === 'android') P.createChannel({ id: 'workout', name: '운동 중', importance: 2, visibility: 1 }).catch(() => {}); } catch (e) {}
   },
   _mount() {
     let el = document.getElementById('wkMode');
@@ -303,8 +305,8 @@ const WorkoutMode = {
           <div class="wk-sh"><span>세트</span><span>kg</span><span>회</span><span></span></div>
           ${x.rows.map((r, k) => `<div class="wk-sw" data-k="${k}"><div class="wk-set${r.ok ? ' ok' : ''}${k === nowK ? ' now' : ''}">
             <span class="wk-k">${k + 1}</span>
-            <input class="inp" type="number" inputmode="decimal" step="0.5" value="${r.w ?? ''}" placeholder="—" oninput="WorkoutMode.setVal(${k},'w',this.value)">
-            <input class="inp" type="number" inputmode="numeric" value="${r.r ?? ''}" placeholder="—" oninput="WorkoutMode.setVal(${k},'r',this.value)">
+            <button type="button" class="inp wk-num" onclick="WorkoutMode.pickVal(${k},'w')">${r.w !== '' && r.w != null ? r.w : '—'}</button>
+            <button type="button" class="inp wk-num" onclick="WorkoutMode.pickVal(${k},'r')">${r.r !== '' && r.r != null ? r.r : '—'}</button>
             <button class="wk-ck" onclick="WorkoutMode.setDone(${k})" aria-label="${k + 1}세트 완료">${r.ok ? '✓' : ''}</button>
           </div><button class="wk-sdel" onclick="WorkoutMode.delSet(${k})">삭제</button></div>`).join('')}
           <div class="wk-row-btns"><button class="btn-sm" onclick="WorkoutMode.addSet()">+ 세트</button><span class="wk-hint">세트를 왼쪽으로 밀면 삭제</span></div>
@@ -319,6 +321,7 @@ const WorkoutMode = {
       <div id="wkRest" class="wk-rest" hidden></div>`;
     this._bindSwipe(el);
     this._time();
+    clearTimeout(this._lt); this._lt = setTimeout(() => this.live(), 300);
   },
 
   // 세트 줄을 왼쪽으로 밀면 그 세트를 지운다(마지막 세트가 아니라 민 세트)
@@ -347,6 +350,7 @@ const WorkoutMode = {
     const left = (S.restEnd - Date.now()) / 1000;
     if (left <= 0) { S.restEnd = 0; r.hidden = true; r.innerHTML = ''; this._end(); return; }
     const sec = Math.ceil(left);
+    if (left < 1.5 && !document.hidden && !this._nc) { this._nc = 1; this._cancelNotify(); }   // 화면이 켜져 있으면 앱이 직접 울린다(두 번 울리지 않게)
     if (sec <= 5 && sec !== this._lastTick) { this._lastTick = sec; this._tickSound(); }
     r.hidden = false;
     const pct = Math.max(0, Math.min(1, left / (S.restTot || 1)));
@@ -370,19 +374,27 @@ const WorkoutMode = {
   setVal(k, f, v) {
     const x = this.st.ex[this.st.cur], val = v === '' ? '' : Number(v);
     x.rows[k][f] = val;
-    const inputs = document.querySelectorAll('#wkMode .wk-set');
-    for (let j = k + 1; j < x.rows.length; j++) {
-      if (x.rows[j].ok) continue;
-      x.rows[j][f] = val;
-      const inp = inputs[j] && inputs[j].querySelectorAll('input')[f === 'w' ? 0 : 1];
-      if (inp) inp.value = v;
+    for (let j = k + 1; j < x.rows.length; j++) { if (!x.rows[j].ok) x.rows[j][f] = val; }
+    this.paint(); this._persist();
+  },
+  // 무게·횟수는 숫자 휠로 고른다 (무게: 정수 + 0.5 단위 두 줄, 횟수: 한 줄)
+  pickVal(k, f) {
+    const x = this.st.ex[this.st.cur], cur = Number(x.rows[k][f]) || 0;
+    if (f === 'w') {
+      Wheel.open({ title: `${k + 1}세트 무게`, unit: 'kg',
+        cols: [{ vals: Array.from({ length: 301 }, (_, i) => i), cur: Math.floor(cur) },
+               { vals: [0, 0.5], cur: cur % 1 >= 0.5 ? 0.5 : 0, fmt: v => v ? '.5' : '.0' }],
+        note: '아래 세트도 같은 무게로 바뀝니다 (위 세트는 그대로)',
+        done: ([a, b]) => this.setVal(k, 'w', a + b) });
+    } else {
+      Wheel.open({ title: `${k + 1}세트 횟수`, unit: '회',
+        cols: [{ vals: Array.from({ length: 61 }, (_, i) => i), cur: cur || this._reps(x.sets) }],
+        note: '아래 세트도 같은 횟수로 바뀝니다 (위 세트는 그대로)',
+        done: ([a]) => this.setVal(k, 'r', a) });
     }
-    clearTimeout(this._pt); this._pt = setTimeout(() => this._persist(), 600);
   },
   setDone(k) {
     const S = this.st, x = S.ex[S.cur], r = x.rows[k]; if (!r) return;
-    const row = document.querySelectorAll('#wkMode .wk-set')[k];
-    if (row) { const [w, rr] = row.querySelectorAll('input'); if (w.value !== '') r.w = Number(w.value); if (rr.value !== '') r.r = Number(rr.value); }
     r.ok = !r.ok;
     try { Haptic.success(); } catch (e) {}
     this._saveLog();
@@ -405,40 +417,21 @@ const WorkoutMode = {
   _rest() {
     const S = this.st, pf = this.prefs();
     if (!pf.timer || !pf.rest) return;
-    S.restEnd = Date.now() + pf.rest * 1000; S.restTot = pf.rest; this._lastTick = null;
+    S.restEnd = Date.now() + pf.rest * 1000; S.restTot = pf.rest; this._lastTick = null; this._nc = 0;
     this._notify(pf.rest);
   },
   addRest(d) { const S = this.st; if (!S.restEnd) return; S.restEnd += d * 1000; S.restTot = Math.max(S.restTot + d, 1); this._notify((S.restEnd - Date.now()) / 1000); },
-  skipRest() { const S = this.st; if (!S) return; S.restEnd = 0; const r = document.getElementById('wkRest'); if (r) { r.hidden = true; r.innerHTML = ''; } this._cancelNotify(); },
+  skipRest() { const S = this.st; if (!S) return; S.restEnd = 0; const r = document.getElementById('wkRest'); if (r) { r.hidden = true; r.innerHTML = ''; } this._cancelNotify(); this.live(); },
 
-  // 쉬는 시간 설정: 스크롤로 고르는 휠 + 타이머·소리 켜고 끄기 (계정에 저장)
-  WHEEL: [0, 15, 30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 240, 300, 360, 420, 480, 600],
+  // 쉬는 시간 설정: 분 · 초(10초 단위) 두 줄 휠 + 타이머·소리 켜고 끄기 (계정에 저장)
   restSetting() {
     const pf = this.prefs();
-    const vals = this.WHEEL.filter(v => v > 0);
-    App.openModal('@clock 쉬는 시간', `
-      <div class="wk-wheel-wrap"><div class="wk-wheel" id="wkWheel">
-        <div class="wk-wpad"></div>${vals.map(v => `<div class="wk-wv${v === pf.rest ? ' on' : ''}" data-v="${v}">${this._fmt(v)}</div>`).join('')}<div class="wk-wpad"></div>
-      </div><div class="wk-wsel"></div></div>
-      <div class="set-item"><span class="set-tx"><b>쉬는 시간 타이머</b><small>세트를 끝내면 바로 카운트다운</small></span>${Settings._sw(pf.timer, "WorkoutMode._pref('timer')")}</div>
-      <div class="set-item"><span class="set-tx"><b>타이머 소리</b><small>5초 전부터 째깍, 끝나면 2초 알림음 · 끄면 진동만</small></span>${Settings._sw(pf.sound, "WorkoutMode._pref('sound')")}</div>
-      <div class="modal-btns"><button class="btn-sm accent" onclick="WorkoutMode._saveWheel()">저장</button><button class="btn-sm" onclick="App.closeModal()">닫기</button></div>`);
-    const w = document.getElementById('wkWheel'), it = w.querySelector('.wk-wv.on') || w.querySelector('.wk-wv');
-    requestAnimationFrame(() => { w.scrollTop = it.offsetTop - w.clientHeight / 2 + it.offsetHeight / 2; });
-    w.addEventListener('scroll', () => { clearTimeout(this._ws); this._ws = setTimeout(() => this._wheelPick(), 80); });
-  },
-  _wheelPick() {
-    const w = document.getElementById('wkWheel'); if (!w) return;
-    const mid = w.scrollTop + w.clientHeight / 2;
-    let best = null, bd = 1e9;
-    w.querySelectorAll('.wk-wv').forEach(el => { const d = Math.abs(el.offsetTop + el.offsetHeight / 2 - mid); if (d < bd) { bd = d; best = el; } });
-    w.querySelectorAll('.wk-wv').forEach(el => el.classList.toggle('on', el === best));
-    if (best && best.dataset.v !== this._wsLast) { this._wsLast = best.dataset.v; try { Haptic.select(); } catch (e) {} }
-  },
-  _saveWheel() {
-    this._wheelPick();
-    const v = Number(document.querySelector('#wkWheel .wk-wv.on')?.dataset.v || this.prefs().rest);
-    this.setPrefs({ rest: v }); App.closeModal(); this.paint();
+    Wheel.open({ title: '쉬는 시간', unit: '',
+      cols: [{ vals: Array.from({ length: 11 }, (_, i) => i), cur: Math.floor(pf.rest / 60), fmt: v => v + '분' },
+             { vals: [0, 10, 20, 30, 40, 50], cur: Math.round((pf.rest % 60) / 10) * 10, fmt: v => String(v).padStart(2, '0') + '초' }],
+      extra: `<div class="set-item"><span class="set-tx"><b>쉬는 시간 타이머</b><small>세트를 끝내면 바로 카운트다운</small></span>${Settings._sw(pf.timer, "WorkoutMode._pref('timer')")}</div>
+        <div class="set-item"><span class="set-tx"><b>타이머 소리</b><small>5초 전 째깍 · 끝나면 2초 알림음 (앱을 내려 둬도)</small></span>${Settings._sw(pf.sound, "WorkoutMode._pref('sound')")}</div>`,
+      done: ([m, sec]) => { this.setPrefs({ rest: Math.max(10, m * 60 + sec) }); this.paint(); } });
   },
   _pref(k) {
     this.setPrefs({ [k]: !this.prefs()[k] });
@@ -469,12 +462,51 @@ const WorkoutMode = {
       for (let i = 0; i < 4; i++) { this._beep(880, 0.18, 0.35, i * 0.5); this._beep(1318, 0.22, 0.35, i * 0.5 + 0.2); }
     }
   },
-  _notify(sec) {
+  // 앱을 내려 둬도 쉬는 시간이 끝나면 울리게 기기 알림을 예약한다 (2초 알림음 · 무음이면 소리 없이)
+  async _notify(sec) {
     this._cancelNotify();
     const P = typeof LocalNotify !== 'undefined' && LocalNotify.P; if (!P) return;
-    P.schedule({ notifications: [{ id: 7997, title: '쉬는 시간 끝', body: this._nextLabel(), schedule: { at: new Date(Date.now() + sec * 1000), allowWhileIdle: true } }] }).catch(() => {});
+    const snd = this.prefs().sound;
+    try {
+      if (!this._chan && P.createChannel) { this._chan = 1; await P.createChannel({ id: 'rest', name: '쉬는 시간', importance: 5, sound: 'rest_end.wav', vibration: true, visibility: 1 }).catch(() => {}); }
+      await P.schedule({ notifications: [{ id: 7997, title: '쉬는 시간 끝', body: this._nextLabel(), channelId: 'rest',
+        sound: snd ? 'rest_end.wav' : undefined, schedule: { at: new Date(Date.now() + sec * 1000), allowWhileIdle: true } }] });
+    } catch (e) {}
+    this.live();
   },
   _cancelNotify() { const P = typeof LocalNotify !== 'undefined' && LocalNotify.P; if (P) P.cancel({ notifications: [{ id: 7997 }] }).catch(() => {}); },
+
+  // ── 잠금 화면 표시 ───────────────────────────
+  // 아이폰: 라이브 액티비티(잠금 화면·다이내믹 아일랜드에 지금 운동 + 쉬는 시간 카운트다운)
+  // 안드로이드: 상단 알림을 고정해 두고 운동이 바뀔 때마다 고쳐 쓴다
+  _liveInfo() {
+    const S = this.st; if (!S) return null;
+    const x = S.ex[S.cur], k = x.rows.findIndex(r => !r.ok), r = x.rows[k >= 0 ? k : x.rows.length - 1] || {};
+    const doneN = S.ex.filter(e => e.done).length;
+    return { title: x.name, step: k >= 0 ? `${k + 1} / ${x.rows.length}세트` : '이 운동 끝',
+      sub: `${r.w ? r.w + 'kg × ' : ''}${r.r || '—'}회 · ${doneN + 1}/${S.ex.length} 종목`,
+      restEnd: S.restEnd || 0, startedAt: S.t0 };
+  },
+  live() {
+    const info = this._liveInfo(); if (!info) return;
+    const B = window.Capacitor?.Plugins?.BashyNative;
+    if (B && B.liveStart && window.Capacitor?.getPlatform?.() === 'ios') {
+      (this._liveOn ? B.liveUpdate(info) : B.liveStart(info).then(r => { this._liveOn = !!(r && r.ok); })).catch(() => {});
+      return;
+    }
+    const P = typeof LocalNotify !== 'undefined' && LocalNotify.P;
+    if (P && window.Capacitor?.getPlatform?.() === 'android') {
+      const left = info.restEnd > Date.now() ? ` · 쉬는 시간 ${this._fmt((info.restEnd - Date.now()) / 1000)} 남음` : '';
+      P.schedule({ notifications: [{ id: 7996, title: `${info.title} · ${info.step}`, body: info.sub + left, ongoing: true, autoCancel: false, channelId: 'workout', silent: true }] }).catch(() => {});
+    }
+  },
+  liveEnd() {
+    this._liveOn = false;
+    const B = window.Capacitor?.Plugins?.BashyNative;
+    if (B && B.liveEnd) B.liveEnd().catch(() => {});
+    const P = typeof LocalNotify !== 'undefined' && LocalNotify.P;
+    if (P) P.cancel({ notifications: [{ id: 7996 }] }).catch(() => {});
+  },
 
   // ── 이동 · 교체 ─────────────────────────────
   go(i) { this.st.cur = i; this.skipRest(); this.paint(); this._persist(); },
@@ -547,7 +579,7 @@ const WorkoutMode = {
       <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">계속하기</button></div>`);
   },
   pause() { this._persist(); this._stop(); this.close(); App.showToast('운동을 남겨 두었습니다 — ‘운동 시작’ 으로 이어 하기'); try { Fitness.render(new Date(this._lastDs + 'T00:00:00')); } catch (e) {} },
-  _stop() { clearInterval(this._tick); this._cancelNotify(); try { this._lock?.release(); } catch (e) {} this._lastDs = this.st && this.st.ds; },
+  _stop() { clearInterval(this._tick); this._cancelNotify(); this.liveEnd(); try { this._lock?.release(); } catch (e) {} this._lastDs = this.st && this.st.ds; },
   _finishDiscard() {
     const S = this.st; if (!S) return;
     PlanGen.saveLog(S.ds, S.snapLog || {});
@@ -582,3 +614,68 @@ const WorkoutMode = {
 };
 
 document.addEventListener('visibilitychange', () => { if (!document.hidden && WorkoutMode.st) WorkoutMode._time(); });
+
+
+// ── 숫자 휠 (아이폰 시간 고르기처럼 굴려서 고르기) ─────────────────
+// 칸마다 따로 굴린다. 가운데 줄이 고른 값. 한 칸 넘어갈 때마다 '틱' 진동과 짧은 소리.
+// 위아래로 갈수록 원통에 감긴 것처럼 기울고 흐려진다(rotateX).
+const Wheel = {
+  H: 40,   // 한 줄 높이
+  open(o) {
+    this.o = o;
+    const cols = o.cols.map((c, ci) => `<div class="whl-col" data-c="${ci}"><div class="whl-sc">
+        <div class="whl-pad"></div>${c.vals.map((v, i) => `<div class="whl-it" data-i="${i}">${esc(c.fmt ? c.fmt(v) : String(v))}</div>`).join('')}<div class="whl-pad"></div>
+      </div></div>`).join('');
+    App.openModal('@clock ' + o.title, `
+      <div class="whl">${cols}${o.unit ? `<div class="whl-unit">${esc(o.unit)}</div>` : ''}<div class="whl-sel" aria-hidden="true"></div></div>
+      ${o.note ? `<p class="pg-note whl-note">${esc(o.note)}</p>` : ''}
+      ${o.extra || ''}
+      <div class="modal-btns"><button class="btn-sm" onclick="Wheel.cancel()">취소</button><button class="btn-sm accent" onclick="Wheel.ok()">확인</button></div>`);
+    requestAnimationFrame(() => {
+      document.querySelectorAll('.whl-col').forEach((col, ci) => {
+        const c = o.cols[ci], sc = col.querySelector('.whl-sc');
+        let idx = Math.max(0, c.vals.indexOf(c.cur)); if (idx < 0) idx = 0;
+        sc.scrollTop = idx * this.H; col._i = idx; this.paint(col);
+        sc.addEventListener('scroll', () => this.onScroll(col), { passive: true });
+      });
+    });
+  },
+  onScroll(col) {
+    const sc = col.querySelector('.whl-sc');
+    const i = Math.round(sc.scrollTop / this.H);
+    if (i !== col._i) { col._i = i; this.tick(); }
+    if (!col._raf) col._raf = requestAnimationFrame(() => { col._raf = 0; this.paint(col); });
+  },
+  // 가운데에서 멀수록 기울이고 흐리게 — 원통(드럼)이 도는 느낌
+  paint(col) {
+    const sc = col.querySelector('.whl-sc'), pos = sc.scrollTop / this.H;
+    col.querySelectorAll('.whl-it').forEach(el => {
+      const d = Number(el.dataset.i) - pos, ad = Math.min(Math.abs(d), 3);
+      el.style.transform = `rotateX(${Math.max(-75, Math.min(75, -d * 22))}deg) scale(${1 - ad * 0.06})`;
+      el.style.opacity = String(Math.max(0.12, 1 - ad * 0.32));
+      el.classList.toggle('on', Math.abs(d) < 0.5);
+    });
+  },
+  tick() {
+    try { Haptic.select(); } catch (e) {}
+    try {
+      const W = WorkoutMode; if (!W.prefs().sound) return;
+      W._audio(); const ctx = W._ac; if (!ctx) return;
+      // 짧은 딸깍: 아주 짧은 잡음 + 높은 음
+      const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'square'; o.frequency.value = 2400;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.06, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.025);
+      o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.03);
+    } catch (e) {}
+  },
+  cancel() { App.closeModal(); if (this.o && this.o.cancel) this.o.cancel(); },
+  ok() {
+    const vals = [...document.querySelectorAll('.whl-col')].map((col, ci) => {
+      const c = this.o.cols[ci], i = Math.max(0, Math.min(c.vals.length - 1, Math.round(col.querySelector('.whl-sc').scrollTop / this.H)));
+      return c.vals[i];
+    });
+    try { Haptic.light(); } catch (e) {}
+    App.closeModal();
+    try { this.o.done(vals); } catch (e) { console.warn(e); }
+  },
+};
