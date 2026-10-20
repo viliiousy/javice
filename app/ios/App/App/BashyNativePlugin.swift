@@ -3,6 +3,7 @@ import Capacitor
 import LocalAuthentication
 import WidgetKit
 import AVFoundation
+import HealthKit
 #if canImport(ActivityKit)
 import ActivityKit
 #endif
@@ -26,6 +27,7 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "playSound", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "restSchedule", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "restCancel", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "healthRead", returnType: CAPPluginReturnPromise),
     ]
 
     // ── 효과음 (쉬는 시간 째깍·끝 알림) ─────────────
@@ -48,6 +50,46 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
             p.currentTime = 0
             p.play()
             call.resolve()
+        }
+    }
+
+    // ── 애플 건강(읽기만) ─────────────
+    // 인바디 앱 등이 건강 앱에 넣은 키·체중·체지방률·제지방량·BMI 를 읽어 인바디 기록으로 채운다.
+    // 쓰기는 하지 않는다. 처음 부를 때 iOS 가 항목별 허락 창을 띄운다.
+    private lazy var health = HKHealthStore()
+    @objc func healthRead(_ call: CAPPluginCall) {
+        guard HKHealthStore.isHealthDataAvailable() else { call.resolve(["ok": false, "error": "unavailable"]); return }
+        let days = call.getDouble("days") ?? 365
+        let kinds: [(String, HKQuantityTypeIdentifier, HKUnit, Double)] = [
+            ("wt", .bodyMass, .gramUnit(with: .kilo), 1),
+            ("bf", .bodyFatPercentage, .percent(), 100),
+            ("lbm", .leanBodyMass, .gramUnit(with: .kilo), 1),
+            ("bmi", .bodyMassIndex, .count(), 1),
+            ("ht", .height, .meterUnit(with: .centi), 1),
+        ]
+        let types = Set(kinds.compactMap { HKObjectType.quantityType(forIdentifier: $0.1) })
+        health.requestAuthorization(toShare: nil, read: types) { ok, err in
+            guard ok else { call.resolve(["ok": false, "error": err?.localizedDescription ?? "denied"]); return }
+            let since = Date().addingTimeInterval(-days * 86400)
+            let group = DispatchGroup()
+            var out: [String: Any] = [:]
+            let lock = NSLock()
+            for (key, id, unit, mul) in kinds {
+                guard let t = HKQuantityType.quantityType(forIdentifier: id) else { continue }
+                group.enter()
+                // 키는 기간과 상관없이 가장 최근 한 건, 나머지는 기간 안의 전부
+                let pred = key == "ht" ? nil : HKQuery.predicateForSamples(withStart: since, end: nil)
+                let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: key != "ht")
+                let q = HKSampleQuery(sampleType: t, predicate: pred, limit: key == "ht" ? 1 : 2000, sortDescriptors: [sort]) { _, samples, _ in
+                    let rows: [[String: Any]] = (samples as? [HKQuantitySample] ?? []).map {
+                        ["t": $0.startDate.timeIntervalSince1970 * 1000, "v": $0.quantity.doubleValue(for: unit) * mul, "src": $0.sourceRevision.source.name]
+                    }
+                    lock.lock(); out[key] = rows; lock.unlock()
+                    group.leave()
+                }
+                self.health.execute(q)
+            }
+            group.notify(queue: .main) { call.resolve(["ok": true, "data": out]) }
         }
     }
 

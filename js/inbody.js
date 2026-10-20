@@ -92,7 +92,100 @@ const InBody = {
   },
 
   // ── 렌더 ───────────────────────────────
-  init() { this._migratePeriod(); this.render(); },
+  init() {
+    this._migratePeriod(); this.render();
+    // 아이폰 앱: 애플 건강을 켜 두었으면 열 때마다(10분에 한 번) 새 측정을 가져온다
+    if (this.healthOn()) setTimeout(() => this.healthSync(false), 1500);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && this.healthOn()) this.healthSync(false); });
+  },
+
+  // ── 애플 건강 연동 (아이폰 앱) ─────────────
+  // 인바디 앱 → 건강 앱 → Bashy. 체중·체지방률·제지방량·BMI 는 날짜별 마지막 측정값, 키는 프로필로.
+  // 골격근량은 건강 앱에 없어 실측 기록으로 추정(msEst)하고, 기초대사량은 손으로 넣은 값을 그대로 둔다.
+  HEALTH_KEY: 'gl_health_on',
+  healthAvail() { const B = window.Capacitor?.Plugins?.BashyNative; return !!(B && B.healthRead && window.Capacitor?.getPlatform?.() === 'ios'); },
+  healthOn() { return this.healthAvail() && localStorage.getItem(this.HEALTH_KEY) === '1'; },
+  async healthConnect() {
+    localStorage.setItem(this.HEALTH_KEY, '1');
+    const n = await this.healthSync(true, 3650);
+    if (n == null) return;
+    App.closeModal?.();
+    App.showToast(n ? `건강 앱에서 ${n}일치 기록을 가져왔습니다` : '건강 앱에 새 체성분 기록이 없습니다', 'success');
+  },
+  healthOff() { localStorage.removeItem(this.HEALTH_KEY); this.render(); App.showToast('건강 앱 자동 가져오기를 껐습니다'); },
+  async healthSync(manual, days) {
+    if (!this.healthAvail()) return null;
+    if (!manual && Date.now() - (this._hsAt || 0) < 10 * 60000) return 0;
+    this._hsAt = Date.now();
+    let res;
+    try { res = await window.Capacitor.Plugins.BashyNative.healthRead({ days: days || 60 }); } catch (e) { res = { ok: false, error: e.message }; }
+    if (!res || !res.ok) {
+      if (manual) App.showToast('건강 앱을 읽지 못했습니다 — 설정 › 건강 › 데이터 접근 › Bashy 에서 항목을 허용해 주세요', 'error');
+      return null;
+    }
+    const D = res.data || {};
+    const day = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+    const r1 = v => Math.round(Number(v) * 10) / 10;
+    const byDay = {};
+    for (const k of ['wt', 'bf', 'lbm', 'bmi']) for (const x of (D[k] || [])) {   // 오래된 것 → 최근 순이라 그날 마지막 값이 남는다
+      const v = r1(x.v); if (!(v > 0)) continue;
+      (byDay[day(x.t)] ||= {})[k] = v;
+    }
+    const all = this.getRecords(), map = Object.fromEntries(all.map(r => [r.dt, { ...r }]));
+    let changed = 0;
+    for (const [dt, v] of Object.entries(byDay)) {
+      if (!v.wt && !map[dt]) continue;            // 체중 없는 날은 새로 만들지 않는다
+      const r = map[dt] || { dt };
+      let ch = false;
+      for (const k of ['wt', 'bf', 'lbm', 'bmi']) if (v[k] && Number(r[k]) !== v[k]) { r[k] = v[k]; ch = true; }
+      if (ch) { r.src = 'health'; map[dt] = r; changed++; }
+    }
+    // 골격근량 추정: 실측(msEst 아님)이 있는 기록으로 회귀를 세워, 비어 있는 날만 채운다
+    const list = Object.values(map).sort((a, b) => a.dt.localeCompare(b.dt));
+    for (const r of list) if (!(Number(r.ms) > 0) || r.msEst) {
+      const e = this._estMs(list.filter(x => x.dt < r.dt), r);
+      if (e && Number(r.ms) !== e) { r.ms = e; r.msEst = true; }
+    }
+    // 키 → 프로필
+    const ht = (D.ht || [])[0];
+    if (ht && ht.v > 100 && ht.v < 250) {
+      let pf = {}; try { pf = JSON.parse(UserStore.get('gl_profile') || '{}') || {}; } catch {}
+      if (Math.round(pf.ht) !== Math.round(ht.v)) { pf.ht = Math.round(ht.v * 10) / 10; UserStore.set('gl_profile', JSON.stringify(pf)); FirebaseSync?.scheduleSave(); }
+    }
+    if (changed) {
+      this.saveRecords(list); this.render();
+      try { App._updateStatsBanner(); } catch (e) {}
+    }
+    return changed;
+  },
+  // 골격근량 ≈ a + b·제지방량 + c·체지방률 — 이 사람의 실측 기록(최근 40건)으로 계수를 구한다 (api/inbody.js 와 같은 식)
+  _estMs(prev, r) {
+    const lbm = Number(r.lbm), bf = Number(r.bf); if (!(lbm > 0) || !(bf > 0)) return null;
+    const rows = prev.filter(x => !x.msEst && Number(x.ms) > 0 && Number(x.lbm) > 0 && Number(x.bf) > 0).slice(-40);
+    let c = [-2.4377, 0.61375, -0.016172];
+    if (rows.length >= 12) {
+      const A = [[0,0,0],[0,0,0],[0,0,0]], b = [0,0,0];
+      for (const x of rows) { const v = [1, Number(x.lbm), Number(x.bf)]; for (let i = 0; i < 3; i++) { for (let j = 0; j < 3; j++) A[i][j] += v[i]*v[j]; b[i] += v[i]*Number(x.ms); } }
+      const m = A.map((row, i) => [...row, b[i]]);
+      let okFit = true;
+      for (let i = 0; i < 3 && okFit; i++) {
+        let p = i; for (let k = i+1; k < 3; k++) if (Math.abs(m[k][i]) > Math.abs(m[p][i])) p = k;
+        if (Math.abs(m[p][i]) < 1e-9) { okFit = false; break; }
+        [m[i], m[p]] = [m[p], m[i]];
+        for (let k = 0; k < 3; k++) if (k !== i) { const f = m[k][i] / m[i][i]; for (let j = i; j < 4; j++) m[k][j] -= f * m[i][j]; }
+      }
+      if (okFit) { const x = [m[0][3]/m[0][0], m[1][3]/m[1][1], m[2][3]/m[2][2]]; if (x.every(isFinite)) c = x; }
+    }
+    let ms = c[0] + c[1]*lbm + c[2]*bf;
+    if (!isFinite(ms) || ms < 10 || ms > lbm) ms = 0.5691 * lbm;
+    return isFinite(ms) && ms >= 10 && ms <= lbm ? Math.round(ms * 10) / 10 : null;
+  },
+  _healthLink() {
+    if (!this.healthAvail()) return '';
+    return this.healthOn()
+      ? `<div class="ib-import-link" onclick="InBody.healthSync(true,365).then(n=>{ if(n!=null) App.showToast(n?n+'일치 새 기록을 가져왔습니다':'새 기록이 없습니다','success'); })">애플 건강에서 지금 가져오기</div><div class="ib-import-link" onclick="InBody.healthOff()">자동 가져오기 끄기</div>`
+      : `<div class="ib-import-link" onclick="InBody.healthConnect()">애플 건강 연결 — 인바디 측정이 자동으로 들어옵니다</div>`;
+  },
 
   // 예전 기본값은 '일주일'이었다. 인바디를 매일 재는 게 아니라 그 안에 기록이
   // 1건뿐인 날이 많았고, 그러면 추이가 아예 안 그려졌다.
@@ -119,7 +212,8 @@ const InBody = {
     if (!recs.length) {
       wrap.innerHTML = `
         <p class="empty">${Icons.big('chart')}아직 기록이 없습니다<br><span style="font-size:11px">체중만 입력해도 추이를 볼 수 있어요</span></p>
-        <div class="habit-add-btn" onclick="InBody.showAdd()">+ 인바디 기록</div>`;
+        <div class="habit-add-btn" onclick="InBody.showAdd()">+ 인바디 기록</div>
+        ${this.healthAvail() && !this.healthOn() ? `<div class="habit-add-btn" onclick="InBody.healthConnect()">애플 건강 연결</div>` : ''}`;
       this._renderBadge(null);
       return;
     }
@@ -495,6 +589,7 @@ const InBody = {
         <button onclick="InBody._save(null)" class="btn-sm accent">저장</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
       </div>
+      ${this._healthLink()}
       <div class="ib-import-link" onclick="InBody.showImport()">갓생일지에서 가져오기</div>`);
     setTimeout(() => document.getElementById('ibWt')?.focus(), 50);
   },
