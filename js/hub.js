@@ -1661,20 +1661,56 @@ const Settings = {
   init() {
     $('gear').addEventListener('click', () => this.open());
     const dlg = $('settings');
-    dlg.addEventListener('close', () => { Cloud.stopPair(); if (dlg.returnValue === 'save') this.save(); });
+    // 닫으면(닫기·바깥 누르기·뒤로) 항상 저장한다 — 바뀐 게 있을 때만
+    dlg.addEventListener('close', () => { Cloud.stopPair(); this.saveIfChanged(); });
     $('setTest').addEventListener('click', () => this.test());
+    $('provSel').addEventListener('change', () => this.showProv());
+    $('stLink').addEventListener('click', () => this.stLink());
   },
   open() {
     this.fill();
     Cloud.renderAcct();
     $('setStatus').textContent = '';
+    this.showProv();
     $('settings').showModal();
+  },
+  // 고른 연결 방식에 필요한 칸만 보인다
+  showProv() {
+    const p = $('provSel').value;
+    document.querySelectorAll('#setForm .prov').forEach(d => { d.hidden = d.dataset.prov !== p; });
+    if (p === 'st') this.stState();
+  },
+  async stState() {
+    const el = $('stState'), btn = $('stLink');
+    if (!Cfg.get().code && !$('setForm').elements.code.value.trim()) { el.textContent = '먼저 위에서 bashy 계정으로 연결해 주세요'; btn.hidden = true; return; }
+    btn.hidden = false; el.textContent = '확인 중…';
+    try {
+      const j = await hubCall({ act: 'stDevices' });
+      el.innerHTML = `<b>연결됨</b> · 방 ${Object.keys(j.rooms || {}).length}개 · 기기 ${(j.devices || []).length}개`;
+      btn.textContent = '다시 연결';
+    } catch (e) {
+      el.textContent = /연결되어 있지 않습니다/.test(e.message) ? '아직 연결하지 않았습니다' : /준비 중/.test(e.message) ? 'SmartThings 연동 준비 중입니다 (서버 설정 대기)' : '확인 실패: ' + e.message;
+      btn.textContent = 'SmartThings 연결하기';
+    }
+  },
+  async stLink() {
+    try {
+      const j = await hubCall({ act: 'stStart' });
+      const B = Native.plugin('Browser');
+      if (B) await B.open({ url: j.url }); else window.open(j.url, '_blank');
+      $('stState').textContent = '삼성 계정에서 허용한 뒤 이 화면으로 돌아오세요';
+      clearTimeout(this._stT); this._stT = setTimeout(() => this.stState(), 20000);
+    } catch (e) { $('stState').textContent = e.message; }
+  },
+  saveIfChanged() {
+    const prev = Cfg.get(), v = this.read();
+    const changed = Object.keys(v).some(k => (v[k] ?? '') !== (k === 'wakeOn' ? prev[k] !== false : (prev[k] ?? (typeof v[k] === 'boolean' ? false : ''))));
+    if (changed) this.save();
   },
   fill() {
     const c = Cfg.get(), f = $('setForm');
     for (const k of ['code', 'haUrl', 'haUrlExt', 'haToken', 'aiUrl', 'aiToken', 'aiModel']) f.elements[k].value = c[k] || '';
-    if (f.elements.provider) f.elements.provider.value = c.provider === 'apple' ? 'apple' : HA.useST(c) ? 'st' : 'ha';
-    const ap = f.querySelector('option[value="apple"]'); if (ap) ap.disabled = !Native.plugin('BashyHome');
+    if (f.elements.provider) f.elements.provider.value = HA.useST(c) ? 'st' : 'ha';
     f.elements.night.checked = !!c.night;
     f.elements.wakeOn.checked = c.wakeOn !== false;
     f.elements.wakeWord.value = c.wakeWord || '';
@@ -1682,7 +1718,7 @@ const Settings = {
   read() {
     const f = $('setForm'), v = {};
     for (const k of ['code', 'haUrl', 'haUrlExt', 'haToken', 'aiUrl', 'aiToken', 'aiModel']) v[k] = f.elements[k].value.trim();
-    if (f.elements.provider) v.provider = f.elements.provider.value;
+    if (f.elements.provider) v.provider = f.elements.provider.value === 'google' ? 'st' : f.elements.provider.value;
     v.night = f.elements.night.checked;
     v.wakeOn = f.elements.wakeOn.checked;
     v.wakeWord = f.elements.wakeWord.value.trim();
@@ -1696,7 +1732,7 @@ const Settings = {
     if (v.provider !== prev.provider || v.haUrl !== prev.haUrl || v.haUrlExt !== prev.haUrlExt || v.haToken !== prev.haToken) { HA._retry = 0; HA._ui = 0; HA.connect(); }
     if (v.wakeOn !== (prev.wakeOn !== false) || v.wakeWord !== (prev.wakeWord || '')) Voice.applyWake();
     Clock.tick();
-    toast('저장했습니다');
+    toast('설정을 저장했습니다');
   },
   async test() {
     const v = this.read(), out = [];

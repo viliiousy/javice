@@ -145,3 +145,4 @@ body.hub-mode .back-app{ display:inline-flex; }
   .u-card{ border-left:1px solid var(--line); border-top:0; padding:0 12px; }
   .u-card:first-child{ border-left:0; padding-left:0; }
 }
+html[data-ui="v2"] .s-steps li::marker{ color:var(--on); font-family:"Space Grotesk",sans-serif; }

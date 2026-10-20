@@ -336,9 +336,13 @@ const stReady = () => !!(process.env.ST_CLIENT_ID && process.env.ST_CLIENT_SECRE
 const stBasic = () => 'Basic ' + Buffer.from(`${process.env.ST_CLIENT_ID}:${process.env.ST_CLIENT_SECRET}`).toString('base64');
 
 async function stStart(idToken) {
-  if (!stReady()) return { status: 503, error: 'SmartThings 연동 준비 중입니다(서버 설정 필요)' };
   const uid = await uidFromIdToken(idToken);
   if (!uid) return { status: 401, error: '로그인이 필요합니다' };
+  return stStartUid(uid);
+}
+// 허브(연결 코드로 인증)에서 바로 연결을 시작할 때
+async function stStartUid(uid) {
+  if (!stReady()) return { status: 503, error: 'SmartThings 연동 준비 중입니다(서버 설정 필요)' };
   const nonce = crypto.randomBytes(18).toString('base64url');
   await fbFetch(`/st_state/${nonce}.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid, exp: Date.now() + 10 * 60 * 1000 }) });
   const q = new URLSearchParams({ client_id: process.env.ST_CLIENT_ID, response_type: 'code', redirect_uri: ST_REDIRECT, scope: ST_SCOPE, state: nonce });
@@ -652,6 +656,7 @@ module.exports = async (req, res) => {
     if (body.act === 'taskDone') { res.status(200).json({ ok: true, ...(await taskDone(uid, body.list, body.id, !!body.undo)) }); return; }
     if (body.act === 'ping')  { res.status(200).json({ ok: true }); return; }
     if (body.act === 'stDevices') { try { res.status(200).json({ ok: true, ...(await stDevices(uid)) }); } catch (e) { res.status(e.code === 'NOLINK' ? 409 : 502).json({ error: e.message, nolink: e.code === 'NOLINK' }); } return; }
+    if (body.act === 'stStart')   { send(res, await stStartUid(uid)); return; }
     if (body.act === 'stCmd')     { try { res.status(200).json(await stCmd(uid, body)); } catch (e) { res.status(502).json({ error: e.message }); } return; }
     if (body.act === 'cfgGet') { res.status(200).json({ ok: true, cfg: await cfgGet(uid) }); return; }
     if (body.act === 'cfgPut') { res.status(200).json({ ok: true, ...(await cfgPut(uid, body.cfg)) }); return; }
