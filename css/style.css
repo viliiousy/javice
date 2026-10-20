@@ -3887,3 +3887,5 @@ body.wk-on{ overflow:hidden; }
 .wk-set .wk-num:active{ border-color:#FF6A2B; }
 .wk-set.ok .wk-num{ color:#8B8F97; }
 .lg-row .inp[readonly]{ cursor:pointer; text-align:center; }
+/* 쉬는 시간 화면은 세트 줄(밀어서 삭제용으로 겹쳐 둔 층)보다 위에 */
+.wk-rest{ z-index:20; }

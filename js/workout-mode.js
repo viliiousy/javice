@@ -451,13 +451,22 @@ const WorkoutMode = {
       o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + dur + 0.02);
     } catch (e) {}
   },
+  // 아이폰은 앱이 직접 소리를 낸다(무음 스위치를 켜도 들리고, 듣던 음악과 같이 나온다). 그 밖은 웹 소리.
+  _native(name) {
+    const B = window.Capacitor?.Plugins?.BashyNative;
+    if (!B || !B.playSound || window.Capacitor?.getPlatform?.() !== 'ios') return false;
+    B.playSound({ name }).catch(() => {});
+    return true;
+  },
   _tickSound() {
     try { Haptic.light(); } catch (e) {}
-    if (this.prefs().sound) { this._audio(); this._beep(1046, 0.08, 0.25); }
+    if (!this.prefs().sound) return;
+    if (this._native('tick')) return;
+    this._audio(); this._beep(1046, 0.08, 0.25);
   },
   _end() {
     try { Haptic.warn(); navigator.vibrate?.([300, 150, 300, 150, 300]); } catch (e) {}
-    if (this.prefs().sound) {   // 약 2초: 두 음을 네 번
+    if (this.prefs().sound && !this._native('rest_end')) {   // 약 2초: 두 음을 네 번
       this._audio();
       for (let i = 0; i < 4; i++) { this._beep(880, 0.18, 0.35, i * 0.5); this._beep(1318, 0.22, 0.35, i * 0.5 + 0.2); }
     }

@@ -2,6 +2,7 @@ import Foundation
 import Capacitor
 import LocalAuthentication
 import WidgetKit
+import AVFoundation
 #if canImport(ActivityKit)
 import ActivityKit
 #endif
@@ -22,7 +23,31 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "liveStart", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "liveUpdate", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "liveEnd", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "playSound", returnType: CAPPluginReturnPromise),
     ]
+
+    // ── 효과음 (쉬는 시간 째깍·끝 알림) ─────────────
+    // 웹 소리(Web Audio)는 아이폰 무음 스위치를 켜 두면 안 들린다. 앱이 직접 재생하고,
+    // 듣고 있던 음악은 끊지 않고 같이 들리게(mixWithOthers) 한다.
+    private var players: [String: AVAudioPlayer] = [:]
+    @objc func playSound(_ call: CAPPluginCall) {
+        let name = call.getString("name") ?? "tick"
+        guard ["tick", "rest_end"].contains(name) else { call.reject("unknown sound"); return }
+        DispatchQueue.main.async {
+            let ses = AVAudioSession.sharedInstance()
+            try? ses.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try? ses.setActive(true)
+            if self.players[name] == nil, let url = Bundle.main.url(forResource: name, withExtension: "wav", subdirectory: "public/sounds") {
+                self.players[name] = try? AVAudioPlayer(contentsOf: url)
+                self.players[name]?.prepareToPlay()
+            }
+            guard let p = self.players[name] else { call.reject("no sound file"); return }
+            p.volume = Float(call.getDouble("volume") ?? 1.0)
+            p.currentTime = 0
+            p.play()
+            call.resolve()
+        }
+    }
 
     // ── 운동 중 잠금 화면 표시(라이브 액티비티) ─────────────
     // 앱이 백그라운드여도 잠금 화면·다이내믹 아일랜드에 지금 운동과 쉬는 시간 카운트다운이 보인다.
