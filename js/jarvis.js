@@ -544,7 +544,7 @@ const JARVIS = {
   // 키가 없을 때: 무료 키 안내 + 구독(ChatGPT Plus·Claude Pro)만 있는 사람은 그 앱으로 같은 질문을 넘긴다.
   // 구독은 API 키가 아니어서 이 앱이 대신 부를 수 없다 — 대신 질문을 채운 채로 그 앱을 연다.
   _noKey(q) {
-    this._addMsg('ai','AI 키가 아직 없습니다. 열쇠 단추에서 무료 키(Gemini·Groq)를 넣으면 여기서 바로 답합니다.\nChatGPT·Claude 구독만 있다면 설정 › AI › ‘ChatGPT · Claude 에 Bashy 연결’ 을 해 두세요 — 그 앱에서 말하면 Bashy 에 바로 기록됩니다. 아래 단추는 이 질문만 그 앱으로 넘깁니다.');
+    this._addMsg('ai','AI 키가 아직 없습니다. 열쇠 단추에서 무료 키(Groq·Gemini)를 넣으면 여기서 바로 답합니다.\nChatGPT·Claude 구독만 있다면 설정 › AI › ‘ChatGPT · Claude 에 Bashy 연결’ 을 해 두세요 — 그 앱에서 말하면 Bashy 에 바로 기록됩니다. 아래 단추는 이 질문만 그 앱으로 넘깁니다.');
     const wrap=document.getElementById('jMsgs'); if(!wrap) return;
     const d=document.createElement('div'); d.className='j-msg j-ai j-handoff';
     const e=encodeURIComponent(q);
@@ -597,8 +597,8 @@ const JARVIS = {
                  pref:{ text:[/grok.*(mini|fast)/,/grok/], vision:[/grok.*vision/,/grok-4/,/grok/] } },
   },
   // 따로 고르지 않았으면 키를 넣어 둔 AI 를 쓴다(무료 → 유료 순). 아무 키도 없으면 Gemini 를 권한다.
-  FREE_FIRST: ['gemini','groq','openai','anthropic','xai'],
-  get prov(){ const p=localStorage.getItem('gl_ai_prov'); if(this.PROVIDERS[p]) return p; return this.FREE_FIRST.find(x=>this._keyOf(x)) || 'gemini'; },
+  FREE_FIRST: ['groq','gemini','openai','anthropic','xai'],
+  get prov(){ const p=localStorage.getItem('gl_ai_prov'); if(this.PROVIDERS[p]) return p; return this.FREE_FIRST.find(x=>this._keyOf(x)) || 'groq'; },
   _keyOf(p){ return localStorage.getItem(this.PROVIDERS[p].key)||''; },
   // 고른 제공자의 키. 그 키가 비어 있으면 키가 있는 다른 제공자로 넘어간다 — 아무 키라도 있으면 비서는 동작한다.
   _active(){
@@ -743,7 +743,7 @@ const JARVIS = {
   setupHtml() {
     const cur=this.prov;
     return `<div class="ai-setup">
-      <p class="ai-note">AI 비서가 어떤 AI 로 답할지 고릅니다. 처음이라면 <b>Gemini</b>(구글 계정으로 1분, 무료 사용량) 나 <b>Groq</b>(무료) 키를 권합니다.
+      <p class="ai-note">AI 비서가 어떤 AI 로 답할지 고릅니다. 처음이라면 <b>Groq</b>(무료 · 하루 약 1,000회, 사진 분석 포함) 키를 권합니다. <b>Gemini</b> 무료 키는 하루 사용량이 적어(빠른 모델 약 20회) 예비로 두기 좋습니다.
         ChatGPT·Claude·Grok 은 각 회사 개발자 사이트의 <b>API 키</b>가 필요하고 쓴 만큼 요금이 붙습니다.</p>
       <p class="ai-note">ChatGPT Plus·Claude Pro 같은 <b>월 구독</b>은 API 키가 아니라서 여기에 넣을 수 없습니다. 대신 설정 › AI › <b>ChatGPT · Claude 에 Bashy 연결</b>을 하면, 그 앱에서 말하는 것으로 식단·습관·할 일·몸무게를 기록할 수 있습니다(구독 요금 안에서).</p>
       <p class="ai-note">키를 넣은 AI 가 여러 개면 고른 AI 를 먼저 쓰고, 그 키가 없으면 키가 있는 다른 AI 로 자동으로 넘어갑니다.</p>

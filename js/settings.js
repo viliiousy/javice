@@ -91,7 +91,7 @@ const Settings = {
       h = `<div class="set-h">월 구독으로 쓰기 (API 키 없이)</div>
         ${this._link('ChatGPT · Claude 에 Bashy 연결', "Settings.go('connector')", 'ChatGPT Plus·Claude 구독(무료 플랜 포함)에서 “점심 김치찌개 먹었어” 하면 Bashy 에 기록됩니다')}
         <div class="set-h">앱 안 AI 비서 (API 키)</div>
-        ${this._link('기본 AI · 키 설정', 'JARVIS.showKeySetup()', '무료: Gemini·Groq / 유료: ChatGPT·Claude·Grok API 키')}
+        ${this._link('기본 AI · 키 설정', 'JARVIS.showKeySetup()', '무료: Groq·Gemini / 유료: ChatGPT·Claude·Grok API 키')}
         ${this._link('AI 사용량', 'AIUsage.open()', '남은 한도와 초기화 시각 · 위쪽 고리는 디자인 › 상단바 정보에서')}`;
     } else if (cat === 'connector') {
       h = `<div id="mcpBox" class="set-loading">주소를 준비하는 중…</div>`;
