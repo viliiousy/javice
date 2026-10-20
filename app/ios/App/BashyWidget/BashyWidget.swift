@@ -160,7 +160,6 @@ struct WorkoutAttributes: ActivityAttributes {
     var startedAt: Date
 }
 
-private let accent = Color(red: 1.0, green: 0.416, blue: 0.169)   // #FF6A2B
 
 struct WorkoutLiveView: View {
     let ctx: ActivityViewContext<WorkoutAttributes>
