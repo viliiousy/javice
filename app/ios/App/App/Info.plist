@@ -24,6 +24,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>인바디 앱 등이 건강 앱에 기록한 키·체중·체지방률·제지방량·BMI 를 읽어 Bashy 인바디 기록과 상단바 수치를 자동으로 채웁니다. 건강 데이터는 쓰거나 광고에 쓰지 않습니다.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Bashy 는 건강 앱에 데이터를 쓰지 않습니다. 인바디 기록을 채우려고 키·체중·체지방률·제지방량·BMI 를 읽기만 합니다.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Bashy 잠금을 켰을 때 본인 확인에 Face ID 를 씁니다.</string>
 	<key>NSCameraUsageDescription</key>
