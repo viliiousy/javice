@@ -374,6 +374,8 @@ module.exports = async (req, res) => {
     res.status(401).json({ error:'Unauthorized', accepts: have });
     return;
   }
+  // 식단 검색 함수를 데워 둔다 — 저장해 둔 식약처 DB(30MB)를 처음 읽는 데 3초쯤 걸려서, 10분마다 한 번 불러 놓는다
+  try { fetch('https://bashy.app/api/food?q=%EB%B0%A5&rows=1').catch(() => {}); } catch (e) {}
 
   // ?devices=1 — 아무것도 보내지 않고 '등록 상태' 를 그대로 보여 준다.
   //
