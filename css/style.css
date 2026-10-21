@@ -3567,3 +3567,11 @@ html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto;
 .dq-tabs.dq-dim{ opacity:.5; }
 .dq-list .rw{ border-radius:0; }
 .diet-rec-hd i{ font-style:normal; font-weight:400; color:var(--text3); margin-left:8px; font-size:12px; }
+/* 끝까지 밀어 지우기: 오른쪽에서부터 빨갛게 차오른다. 반을 넘으면 더 진하게 */
+.rw-full > .rw-del{ display:none; }
+.rw-full::after{ content:'삭제'; position:absolute; top:0; right:0; bottom:0; width:var(--rw-fill, 0px); background:rgba(229,72,77,.55);
+  color:#fff; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:flex-end; padding-right:16px; box-sizing:border-box; overflow:hidden; white-space:nowrap; z-index:0; transition:background .12s; }
+.rw-full.rw-arm::after{ background:#E5484D; }
+.rw-full > .rw-slide{ background:var(--card); }
+.rw-full > .rw-slide.rw-drag{ transition:none; }
+.rw-full:not(.rw-act)::after{ display:none; }

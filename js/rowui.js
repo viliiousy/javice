@@ -37,7 +37,7 @@ const RowUI = {
 
       // 줄을 감싸고, 뒤에 삭제 버튼을 깐다
       const wrap = document.createElement('div');
-      wrap.className = 'rw';
+      wrap.className = 'rw' + (h.full ? ' rw-full' : '');
       row.parentNode.insertBefore(wrap, row);
       wrap.appendChild(row);
       row.classList.add('rw-slide');
@@ -96,6 +96,18 @@ const RowUI = {
         if (!sliding) return;
         e.preventDefault();
         row.classList.add('rw-drag');
+        // 끝까지 밀어 지우기(h.full): 오른쪽에서부터 빨갛게 차오르고, 줄 너비의 절반을 넘으면 진동 한 번 — 놓으면 지워진다
+        if (h.full) {
+          const w = wrap.offsetWidth || 1, x3 = Math.min(0, dx);
+          row.style.transform = `translateX(${x3}px)`;
+          wrap.classList.add('rw-act'); wrap.style.setProperty('--rw-fill', `${-x3}px`);
+          const arm = -x3 > w * 0.5;
+          if (arm !== wrap.classList.contains('rw-arm')) {
+            wrap.classList.toggle('rw-arm', arm);
+            try { arm ? Haptic.medium() : Haptic.light(); } catch {}
+          }
+          return;
+        }
         const base = startedOpen() ? -this.SNAP : 0;
         // 오른쪽으로는 제자리까지만, 왼쪽으로는 버튼 너비보다 조금 더까지
         const x2 = Math.max(-this.SNAP - 20, Math.min(0, base + dx));
@@ -106,6 +118,19 @@ const RowUI = {
         clearTimeout(lp);
         if (dragging) { dragging = false; this._dragEnd(h.reorder); return; }
         if (!sliding) return;
+        if (h.full) {
+          const armed = wrap.classList.contains('rw-arm');
+          row.classList.remove('rw-drag');
+          if (armed) {
+            try { Haptic.success(); } catch {}
+            row.style.transition = 'transform .18s ease-in'; row.style.transform = 'translateX(-110%)';
+            wrap.style.setProperty('--rw-fill', '100%');
+            setTimeout(() => h.del(id), 170);
+          } else {
+            row.style.transform = ''; wrap.style.setProperty('--rw-fill', '0px'); wrap.classList.remove('rw-arm', 'rw-act');
+          }
+          return;
+        }
         const dx = (e.changedTouches ? e.changedTouches[0].clientX : sx) - sx;
         const base = startedOpen() ? -this.SNAP : 0;
         const x2 = base + dx;
