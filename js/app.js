@@ -192,6 +192,27 @@ const App = {
 
   // ── 스탯 배너 (즉각 반영 + 반짝임 + 긴급 할일) ──
   _statsPrev: '{}',
+  _chipNum: {},
+  _rollAt: {},
+  _rollChips(el) {
+    const prev = this._chipNum, next = {}, now = Date.now();
+    const num = v => Number(String(v).split('/')[0].replace(/[^0-9.-]/g, '')) || 0;
+    el.querySelectorAll('.stats-row .stat-chip[data-s] b').forEach(b => {
+      const k = b.closest('[data-s]').dataset.s, txt = b.textContent;
+      next[k] = txt;
+      const old = prev[k];
+      let R = this._rollAt[k];
+      if (old != null && old !== txt) R = this._rollAt[k] = { from: old, to: txt, t0: now };
+      // 굴러가는 중에 칸이 다시 그려지면(다른 카드가 바뀌어서) 이어서 굴린다
+      if (!R || R.to !== txt || now - R.t0 > 800) return;
+      const el2 = now - R.t0, up = num(R.to) >= num(R.from);
+      const L = Math.max(R.to.length, R.from.length), a = R.from.padStart(L, ' '), c = R.to.padStart(L, ' ');
+      b.innerHTML = [...c].map((ch, i) => ch === a[i] ? (ch === ' ' ? '' : esc(ch))
+        : `<span class="rl ${up ? 'rl-up' : 'rl-dn'}" style="animation-delay:${(L - i) * 30 - el2}ms"><i>${a[i] === ' ' ? '&nbsp;' : esc(a[i])}</i><i>${ch === ' ' ? '' : esc(ch)}</i></span>`).join('');
+      clearTimeout(b._rl); b._rl = setTimeout(() => { if (b.isConnected) b.textContent = txt; }, 900 - el2);
+    });
+    this._chipNum = next;
+  },
   _updateStatsBanner() {
     try { if(typeof Widgets!=='undefined') Widgets.push(); } catch(e){}
     const el=document.getElementById('statsBanner'); if(!el) return;
@@ -236,7 +257,7 @@ const App = {
     allPending.filter(t=>t.due).forEach(t=>{
       try{
         const d=_dueEnd(t);
-        if(d>=now&&d<=weekEnd) upcoming.push({label:(t.title||'').slice(0,15),isTask:true,date:d});
+        if(d>=now&&d<=weekEnd) upcoming.push({label:(t.title||'').slice(0,15),isTask:true,date:d,id:t.id});
       }catch{}
     });
     upcoming.sort((a,b)=>a.date-b.date);
@@ -251,7 +272,7 @@ const App = {
       if(bS!==aS) return bS-aS;
       if(a.due&&b.due) return new Date(a.due)-new Date(b.due);
       return 0;
-    }).slice(0,3);
+    }).filter(t=>!upcoming.some(u=>u.id===t.id)).slice(0,3);
 
     // 변경 감지 (긴급할일 id+status 포함)
     const curStr=JSON.stringify({hDone,cal:dt.cal,pending,cl:clItems.length,uIds:urgentTasks.map(t=>t.id+t.status).join()});
@@ -268,7 +289,10 @@ const App = {
     // 어차피 행동을 정하는 숫자는 먹은 양이 아니라 더 먹어도 되는 양이다.
     // 한 줄에 다 들어가게 짧게 쓴다: 습관 2/4 · 2,800kcal · 할일 5 · 체크 3/7 (한 것/전체)
     const calGoal = Number(ds.calorieGoal) || 0;
-    const calLeft = calGoal - dt.cal;
+    // 운동으로 쓴 열량도 식단 카드와 같은 규칙(절반·전부·안 함)으로 더한다
+    let calBonus = 0;
+    try { if (typeof Fitness!=='undefined' && Fitness.burn) { const bk = Fitness.burn(selDate).kcal, bm = ds.burnMode||'half'; calBonus = bm==='off'?0:bm==='full'?bk:Math.round(bk/2/10)*10; } } catch(e){}
+    const calLeft = calGoal + calBonus - dt.cal;
     const won = v => Math.round(v).toLocaleString('ko-KR');
     const calTxt = !calGoal      ? `<b>${won(dt.cal)}</b>kcal`
                  : calLeft >= 0  ? `<span class="kc-pre">남은 </span><b>${won(calLeft)}</b>kcal`
@@ -310,13 +334,16 @@ const App = {
 
     // 폰: 일정·할일 칩을 한 줄로 합쳐 옆으로 밀어 보게 — 두 줄이면 상단바가 너무 두꺼워진다
     let listHTML=upcomingHTML+urgentHTML;
-    if (window.innerWidth<=900 && upcomingHTML && urgentHTML) {
+    if (upcomingHTML && urgentHTML) {
       const inner=h=>h.replace(/^\s*<div[^>]*>/,'').replace(/<\/div>\s*$/,'');
       listHTML=`<div class="stats-upcoming stats-merged">${inner(upcomingHTML)}${inner(urgentHTML)}</div>`;
     }
     el.innerHTML=`<div class="stats-row">${chipsHTML}</div>${listHTML}${jarvisHTML}`;
     // 칩 개수에 따라 글씨를 한 단계씩 줄인다(폰에서 한 줄을 지키려고) — 넘치면 줄 안에서만 옆으로 민다
     try { const row=el.querySelector('.stats-row'); const n=row.querySelectorAll('.stat-chip').length; row.dataset.n=n; row.classList.toggle('dense', n>=5); row.classList.toggle('denser', n>=7); } catch(e){}
+
+    // 숫자가 바뀐 칸은 자리마다 굴러간다(늘면 아래에서 올라오고, 줄면 위에서 내려온다)
+    try { this._rollChips(el); } catch(e){}
 
     // 칩별 반짝임
     if(changed){

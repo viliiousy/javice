@@ -449,11 +449,12 @@ html[data-ui="v2"] .jarvis-btn-glyph svg{ width:22px; height:22px; }
   html[data-ui="v2"] .stats-banner .stats-row{ height:auto; }
 }
 
-/* PC 상단을 다시 한 줄로: 다가오는 일정·급한 할일·AI 한마디 줄은 헤더에서 뺀다(카드에 이미 있다) */
+/* PC 상단: 칩 줄 아래에 다가오는 일정·할일을 한 줄로(옆으로 밀어 보기). AI 한마디 줄만 뺀다 */
 @media (min-width:901px){
-  html[data-ui="v2"] .header-sticky-group .stats-upcoming,
-  html[data-ui="v2"] .header-sticky-group .stats-urgent-row,
   html[data-ui="v2"] .header-sticky-group .stats-jarvis{ display:none !important; }
+  html[data-ui="v2"] .header-sticky-group .stats-banner{ min-width:0; }
+  html[data-ui="v2"] .header-sticky-group .stats-upcoming,
+  html[data-ui="v2"] .header-sticky-group .stats-urgent-row{ display:flex !important; flex-wrap:nowrap; overflow-x:auto; padding-top:6px; }
   html[data-ui="v2"] .header-sticky-group{ padding-top:8px; padding-bottom:8px; }
   html[data-ui="v2"] .header-sticky-group .stats-row{ flex-wrap:nowrap; }
 }
@@ -687,3 +688,14 @@ html[data-ui="v2"] .cal-ics-btns .btn-sm:not(.accent){ height:40px; padding:0 16
 .nt-fix{ padding:4px 0 8px; border-bottom:1px solid var(--border); }
 .nt-fix .ez-steps{ margin:8px 0 0; }
 .aiu-btns{ display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
+
+/* 상단 칩 숫자 굴리기 — 바뀐 자리만 위아래로 */
+.stat-chip b .rl{ display:inline-flex; flex-direction:column; height:1.2em; line-height:1.2em; overflow:hidden; vertical-align:bottom; }
+.stat-chip b .rl i{ display:block; font-style:normal; height:1.2em; }
+.stat-chip b .rl-up i{ animation:rlUp .55s cubic-bezier(.2,.9,.25,1.15) both; animation-delay:inherit; }
+.stat-chip b .rl-dn{ flex-direction:column-reverse; }
+.stat-chip b .rl-dn i{ animation:rlDn .55s cubic-bezier(.2,.9,.25,1.15) both; animation-delay:inherit; }
+@keyframes rlUp{ from{ transform:translateY(0); } to{ transform:translateY(-100%); } }
+@keyframes rlDn{ from{ transform:translateY(-100%); } to{ transform:translateY(0); } }
+.stat-chip.chip-roll{ animation:chipPop .5s ease-out; }
+@media (prefers-reduced-motion:reduce){ .stat-chip b .rl i{ animation:none; } }
