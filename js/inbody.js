@@ -576,11 +576,6 @@ const InBody = {
           <div class="ib-src-b"><button class="btn-sm" onclick="InBody.healthOff();App.closeModal()">자동 가져오기 끄기</button><button class="btn-sm accent" onclick="InBody._loadNow()">지금 가져오기</button></div>`
         : ios ? `<button class="ib-go" onclick="InBody.healthConnect()">애플 건강 연결</button>`
         : `<p class="ib-src-m">아이폰의 Bashy 앱에서 연결하면, 같은 계정의 웹·태블릿에도 함께 보입니다.</p>`}
-      </div>
-      <div class="ib-src">
-        <div class="ib-src-h"><b>갓생일지</b><span>한 번만</span></div>
-        <p>예전 갓생일지 앱에 남긴 인바디 기록을 그대로 옮깁니다. 같은 날짜 기록은 건드리지 않습니다.</p>
-        <button class="btn-sm" onclick="InBody.showImport()">갓생일지 기록 붙여넣기</button>
       </div>`);
   },
   async _loadNow() {
@@ -592,47 +587,84 @@ const InBody = {
 
   // ── 직접 입력 ────────────────────────────
   // 체중이 주인공(크게), 나머지 다섯 칸은 2열로 조용하게. 단위는 칸 안 오른쪽에.
-  _formHtml(r) {
-    const v = k => (r && r[k]) ? r[k] : '';
-    const ht = (() => { try { return Number(JSON.parse(UserStore.get('gl_profile') || '{}').ht) || 0; } catch { return 0; } })();
-    const f = (id, lbl, k, unit, step = '0.1', extra = '') => `<label class="ib-f"><span>${lbl}${extra}</span>
-      <span class="ib-in"><input id="${id}" type="number" step="${step}" inputmode="decimal" class="num" value="${v(k)}" placeholder="—"><i>${unit}</i></span></label>`;
+  // ── 직접 입력 — 숫자는 키패드 대신 휠(아이폰 알람처럼 굴려서 고르기) ─────────
+  // 휠은 창을 하나 더 띄우므로, 입력 중인 값은 this._dr 에 두고 휠을 닫으면 입력 창을 다시 그린다.
+  IB_FIELDS: {
+    wt:  { lbl:'체중',       unit:'kg',   lo:30,  hi:200,  dec:true },
+    ms:  { lbl:'골격근량',   unit:'kg',   lo:10,  hi:80,   dec:true },
+    bf:  { lbl:'체지방률',   unit:'%',    lo:3,   hi:60,   dec:true },
+    lbm: { lbl:'제지방량',   unit:'kg',   lo:20,  hi:130,  dec:true },
+    bmi: { lbl:'BMI',        unit:'',     lo:10,  hi:50,   dec:true },
+    bmr: { lbl:'기초대사량', unit:'kcal', lo:800, hi:3500, step:10 },
+  },
+  _ht() { try { return Number(JSON.parse(UserStore.get('gl_profile') || '{}').ht) || 0; } catch { return 0; } },
+  _formHtml() {
+    const d = this._dr, ht = this._ht();
+    const val = k => d[k] ? d[k] : '';
+    const f = (k, extra = '') => { const F = this.IB_FIELDS[k];
+      return `<div class="ib-f"><span>${F.lbl}${extra}</span>
+        <button type="button" class="ib-in ib-pick" onclick="InBody._pick('${k}')"><b class="num${val(k) ? '' : ' empty'}">${val(k) || '—'}</b><i>${F.unit}</i></button>
+        <input type="hidden" id="ib${k[0].toUpperCase() + k.slice(1)}" value="${val(k)}"></div>`; };
     return `
-      <div class="ib-form" data-ht="${ht}">
-        <label class="ib-date"><span>측정한 날</span><input id="ibDt" type="date" value="${r ? r.dt : this._todayStr()}"></label>
-        <label class="ib-hero"><span>체중</span>
-          <span class="ib-hin"><input id="ibWt" type="number" step="0.1" inputmode="decimal" class="num" value="${v('wt')}" placeholder="0.0" oninput="InBody._autoBmi();InBody._fit(this)"><i>kg</i></span></label>
+      <div class="ib-form">
+        <label class="ib-date"><span>측정한 날</span><input id="ibDt" type="date" value="${d.dt}" onchange="InBody._dr.dt=this.value"></label>
+        <div class="ib-hero"><span>체중</span>
+          <button type="button" class="ib-hin" onclick="InBody._pick('wt')"><b class="num${val('wt') ? '' : ' empty'}">${val('wt') || '0.0'}</b><i>kg</i></button>
+          <input type="hidden" id="ibWt" value="${val('wt')}"></div>
         <div class="ib-grid">
-          ${f('ibMs', '골격근량', 'ms', 'kg', '0.1', r && r.msEst ? '<em>추정</em>' : '')}
-          ${f('ibBf', '체지방률', 'bf', '%')}
-          ${f('ibLbm', '제지방량', 'lbm', 'kg')}
-          ${f('ibBmi', 'BMI', 'bmi', '', '0.1', ht ? '<em>키로 자동</em>' : '')}
-          ${f('ibBmr', '기초대사량', 'bmr', 'kcal', '1')}
+          ${f('ms', d.msEst ? '<em>추정</em>' : '')}
+          ${f('bf')}
+          ${f('lbm')}
+          ${f('bmi', ht && !d._bmiTouched ? '<em>키로 자동</em>' : '')}
+          ${f('bmr')}
         </div>
       </div>`;
   },
-  // 키를 알면 체중을 넣는 대로 BMI 를 채운다(직접 고친 값은 건드리지 않는다)
-  _fit(el) { if (el) el.style.width = (Math.max(3, String(el.value || el.placeholder).length) * 0.6 + 0.1) + 'em'; },
-  _autoBmi() {
-    const box = document.querySelector('.ib-form'), ht = Number(box?.dataset.ht) / 100;
-    const w = parseFloat(document.getElementById('ibWt')?.value), b = document.getElementById('ibBmi');
-    if (!ht || !b || !(w > 0) || b.dataset.touched) return;
-    b.value = Math.round(w / (ht * ht) * 10) / 10;
+  _pick(k) {
+    const F = this.IB_FIELDS[k], d = this._dr;
+    const last = (this.getRecords().filter(r => Number(r[k]) > 0).slice(-1)[0] || {})[k];
+    const cur = Number(d[k]) || Number(last) || (k === 'wt' ? 70 : k === 'bmr' ? 1600 : (F.lo + F.hi) / 2);
+    const back = () => this._reopen();
+    if (F.dec) {
+      const ints = []; for (let i = F.lo; i <= F.hi; i++) ints.push(i);
+      Wheel.open({ title: F.lbl, unit: F.unit, cols: [
+        { vals: ints, cur: Math.floor(cur), fmt: v => String(v) },
+        { vals: [0,1,2,3,4,5,6,7,8,9], cur: Math.round((cur - Math.floor(cur)) * 10) % 10, fmt: v => '.' + v },
+      ], extra: d[k] ? `<button class="ib-clr" onclick="InBody._clr('${k}')">값 지우기</button>` : '',
+        done: ([i, f]) => { this._set(k, Math.round((i + f / 10) * 10) / 10); back(); }, cancel: back });
+    } else {
+      const vals = []; for (let v = F.lo; v <= F.hi; v += F.step) vals.push(v);
+      Wheel.open({ title: F.lbl, unit: F.unit, cols: [{ vals, cur: Math.round(cur / F.step) * F.step, fmt: v => String(v) }],
+        extra: d[k] ? `<button class="ib-clr" onclick="InBody._clr('${k}')">값 지우기</button>` : '',
+        done: ([v]) => { this._set(k, v); back(); }, cancel: back });
+    }
+  },
+  _clr(k) { delete this._dr[k]; if (k === 'bmi') this._dr._bmiTouched = true; App.closeModal(); this._reopen(); },
+  _set(k, v) {
+    const d = this._dr; d[k] = v;
+    if (k === 'bmi') d._bmiTouched = true;
+    if (k === 'ms') delete d.msEst;
+    // 키를 알면 체중을 고르는 대로 BMI 를 채운다(직접 고친 BMI 는 건드리지 않는다)
+    const ht = this._ht() / 100;
+    if (k === 'wt' && ht && !d._bmiTouched) d.bmi = Math.round(v / (ht * ht) * 10) / 10;
+  },
+  _reopen() {
+    const m = this._drMode;
+    App.openModal(m ? '@pen 인바디 기록 고치기' : '@pen 인바디 직접 입력', this._formHtml() + `
+      <button class="ib-go" onclick="InBody._save(${m ? `'${m}'` : 'null'})">저장</button>
+      ${m ? `<button class="ib-del" onclick="InBody.remove('${m}')">이 기록 삭제</button>` : ''}`);
   },
 
   showAdd() {
-    App.openModal('@pen 인바디 직접 입력', this._formHtml(null) + `
-      <button class="ib-go" onclick="InBody._save(null)">저장</button>`);
-    setTimeout(() => { document.getElementById('ibBmi')?.addEventListener('input', e => { e.target.dataset.touched = '1'; }); InBody._fit(document.getElementById('ibWt')); document.getElementById('ibWt')?.focus(); }, 50);
+    this._dr = { dt: this._todayStr() }; this._drMode = null;
+    this._reopen();
   },
 
   showEdit(dt) {
     const r = this.getRecords().find(x => x.dt === dt);
     if (!r) return;
-    App.openModal('@pen 인바디 기록 고치기', this._formHtml(r) + `
-      <button class="ib-go" onclick="InBody._save('${dt}')">저장</button>
-      <button class="ib-del" onclick="InBody.remove('${dt}')">이 기록 삭제</button>`);
-    setTimeout(() => { const b = document.getElementById('ibBmi'); if (b) b.dataset.touched = '1'; InBody._fit(document.getElementById('ibWt')); }, 50);
+    this._dr = { ...r, _bmiTouched: true }; this._drMode = dt;
+    this._reopen();
   },
 
   _save(origDt) {
