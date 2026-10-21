@@ -201,6 +201,7 @@ const Fitness = {
       ${plan.from ? `<p class="fit-from">${plan.from.slice(5).replace('-','/')} 계획을 오늘 하는 중 · <a href="javascript:Fitness.undoFrom('${dsx}')">되돌리기</a></p>` : ''}
       ${(()=>{ const b=this.burn(d); return b.kcal ? `<div class="fit-burn"><span>운동으로 쓴 열량</span><b class="num">약 ${b.kcal.toLocaleString('ko-KR')}</b><i>kcal</i></div>` : ''; })()}
       <div class="fit-foot">
+        <button class="habit-add-btn" onclick="Fitness.partSheet('${dsx}')">오늘 부위 바꾸기</button>
         <button class="habit-add-btn" onclick="WorkoutHistory.openAll()">기록 보기</button>
       </div>`;
     // 운동 체크가 바뀌면 식단 카드의 '더 먹어도 되는 열량' 도 같이 바뀐다
@@ -912,6 +913,40 @@ const Fitness = {
       items.push({ name:x.name, kcal:Math.round(kcal), info });
     });
     return { kcal:items.reduce((t,x)=>t+x.kcal,0), items, kg };
+  },
+
+  // ── 오늘 부위 바꾸기: 부위를 고르면 그날 운동을 그 부위로 다시 짠다(오늘만 / 앞으로 이 요일도) ──
+  partSheet(ds) {
+    this._pt = { ds, parts: [] };
+    const P = ['가슴', '등', '하체', '어깨', '팔', '복근'];
+    App.openModal('@dumbbell 오늘 부위 바꾸기', `<div class="fz fz-pt">
+      <p class="fz-note">할 부위를 고르세요. 여러 개 고르면 번갈아 섞습니다. 기구·아픈 곳 설정은 맞춤 플랜과 같습니다.</p>
+      <div class="pt-chips">${P.map(x => `<button type="button" class="pt-chip" data-p="${x}" onclick="Fitness._ptToggle('${x}')">${x}</button>`).join('')}</div>
+      <div id="ptPrev" class="pt-prev"><p class="pg-note">부위를 고르면 미리 보기가 나옵니다.</p></div>
+      <div class="modal-btns pt-btns">
+        <button class="btn-sm" onclick="Fitness._ptApply('plan')" id="ptPlan" disabled>앞으로 이 요일도</button>
+        <button class="btn-sm accent" onclick="Fitness._ptApply('day')" id="ptDay" disabled>오늘만 바꾸기</button>
+      </div></div>`);
+  },
+  _ptToggle(x) {
+    const t = this._pt; if (!t) return;
+    t.parts = t.parts.includes(x) ? t.parts.filter(y => y !== x) : [...t.parts, x];
+    document.querySelectorAll('.pt-chip').forEach(b => b.classList.toggle('on', t.parts.includes(b.dataset.p)));
+    t.list = t.parts.length ? PlanGen.dayFor(t.parts) : [];
+    const box = document.getElementById('ptPrev');
+    if (box) box.innerHTML = t.list.length ? `<div class="pt-h">${esc(t.parts.join(' + '))} · <span class="num">${t.list.length}</span>종목</div>` + t.list.map(e => {
+      const th = typeof ExMedia !== 'undefined' ? ExMedia.thumbFor(e.name) : '';
+      return `<div class="pt-row"><span class="ex-th${th ? '' : ' none'}">${th ? ExMedia.poseHtml(th) : ''}</span><span class="pt-nm">${esc(e.name)}</span><span class="pt-s num">${esc(e.sets)}</span></div>`;
+    }).join('') : '<p class="pg-note">부위를 고르면 미리 보기가 나옵니다.</p>';
+    ['ptDay', 'ptPlan'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = !t.list.length; });
+    try { Haptic.light(); } catch (e) {}
+  },
+  _ptApply(scope) {
+    const t = this._pt; if (!t || !t.list?.length) return;
+    const msg = this.applyList(t.ds, t.list, scope);
+    App.closeModal(); this._pt = null;
+    this.render(new Date(t.ds + 'T00:00:00'));
+    App.showToast(scope === 'day' ? `오늘은 ${t.parts.join(' + ')} 운동으로 바꿨습니다` : msg, 'success');
   },
 
   _delCustom(customIdx, dateStr=null) {

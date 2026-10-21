@@ -168,6 +168,37 @@ const PlanGen = {
     return { routines, weekdays: this.WEEKDAYS[days] || this.WEEKDAYS[3] };
   },
 
+  // ── 오늘 부위 바꾸기 ─────────────────────
+  // 자동 플랜이 '하체' 인 날에 가슴을 하고 싶을 때, 루틴을 통째로 다시 만들지 않고 그날만 부위로 다시 뽑는다.
+  // 고른 부위들의 동작 칸을 번갈아 채우고, 기구·아픈 곳·뺀 운동 규칙은 맞춤 플랜과 같다.
+  PART_SLOTS: {
+    '가슴': ['hpush', 'incline', 'fly', 'hpush', 'incline'],
+    '등':   ['vpull', 'hrow', 'row2', 'rear'],
+    '하체': ['squat', 'hinge', 'lunge', 'quad', 'ham', 'calf'],
+    '어깨': ['vpush', 'lateral', 'rear', 'lateral'],
+    '팔':   ['biceps', 'triceps', 'hammer', 'triceps'],
+    '복근': ['core', 'core', 'core'],
+  },
+  dayFor(parts, n) {
+    const p = this.profile() || { goal: 'muscle', level: 'beg', mins: 60 };
+    n = n || Math.max(4, (this.COUNT[p.mins] || 5) - (p.level === 'new' ? 1 : 0));
+    const [mainSet, accSet] = this.SETS[p.goal] || this.SETS.muscle;
+    const banSlots = new Set((p.injury || []).flatMap(k => (this.INJURY[k] || {}).slots || []));
+    const lists = parts.map(pt => (this.PART_SLOTS[pt] || []).filter(sl => !banSlots.has(sl)));
+    const order = [];   // 부위를 번갈아: 가슴1, 삼두1, 가슴2 …
+    for (let i = 0; order.length < 40 && lists.some(l => l[i]); i++) lists.forEach(l => { if (l[i]) order.push(l[i]); });
+    const used = new Set(), out = [];
+    for (const sl of order) {
+      if (out.length >= n) break;
+      const pool = (this.POOL[sl] || []).filter(x => !used.has(x));
+      const name = pool.find(x => this.allowed(x, p)) || pool.find(x => this.pickerOk(x));
+      if (!name) continue;
+      used.add(name);
+      out.push({ name, sets: out.length < 2 && p.goal !== 'lose' ? mainSet : accSet });
+    }
+    return out;
+  },
+
   apply(plan, p) {
     const R = Fitness.routines();
     // 예전에 만든 자동 플랜은 지운다(직접 만든 루틴은 그대로)

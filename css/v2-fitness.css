@@ -329,3 +329,18 @@ html[data-ui="v2"] .fit-burn{ display:flex; align-items:baseline; gap:6px; paddi
 html[data-ui="v2"] .fit-burn span{ flex:1; }
 html[data-ui="v2"] .fit-burn b{ font-size:17px; font-weight:600; color:var(--text); }
 html[data-ui="v2"] .fit-burn i{ font-style:normal; }
+
+/* 오늘 부위 바꾸기 */
+html[data-ui="v2"] .fit-foot{ display:flex; gap:8px; }
+html[data-ui="v2"] .fit-foot .habit-add-btn{ flex:1; }
+.pt-chips{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:16px 0; }
+.pt-chip{ height:44px; border:1px solid var(--border); border-radius:12px; background:none; color:var(--text); font:inherit; font-size:15px; cursor:pointer; }
+.pt-chip.on{ background:var(--text); border-color:var(--text); color:var(--card); font-weight:600; }
+.pt-prev{ border-top:1px solid var(--v2-line, var(--border)); }
+.pt-h{ padding:12px 0 8px; font-size:13px; color:var(--text3); }
+.pt-row{ display:flex; align-items:center; gap:12px; min-height:52px; border-bottom:1px solid var(--v2-line, var(--border)); }
+.pt-row .ex-th{ position:relative; flex:none; width:44px; height:44px; border-radius:8px; overflow:hidden; background:var(--card2); }
+.pt-nm{ flex:1; min-width:0; font-size:15px; color:var(--text); }
+.pt-s{ font-size:13px; color:var(--text3); }
+.pt-btns{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:16px; }
+.pt-btns button:disabled{ opacity:.4; }

@@ -443,6 +443,17 @@ const JarvisActions = {
       if (!list.length) return { ok: true, show: `${this._md(d)} 운동: ${plan.name || '계획 없음'} — 운동이 없습니다` };
       return { ok: true, show: `${this._md(d)} ${plan.name}\n` + list.map((x, i) => `${i + 1}. ${x.name} ${this._setsTxt(x)}${chk.includes(i) ? ' (완료)' : ''}${L[x.name]?.length ? ` · 기록 ${L[x.name].map(s => s.w ? `${s.w}kg×${s.r}` : `${s.r}회`).join(', ')}` : ''}`).join('\n') };
     },
+    // 그날 운동을 부위로 다시 짜기 — '오늘 하체 말고 가슴' (parts: ['가슴','팔'])
+    ex_parts(a) {
+      const d = this._date(a.date), ok = ['가슴', '등', '하체', '어깨', '팔', '복근'];
+      const parts = [].concat(a.parts || a.part || []).map(x => String(x).replace(/이두|삼두|팔뚝/, '팔').replace(/다리|하체운동/, '하체').replace(/복부|코어/, '복근')).filter(x => ok.includes(x));
+      if (!parts.length) return { ok: false, msg: '어느 부위로 바꿀지 알려 주세요 (가슴·등·하체·어깨·팔·복근)' };
+      const list = PlanGen.dayFor(parts);
+      if (!list.length) return { ok: false, msg: '고른 부위로 짤 수 있는 운동이 없습니다 — 맞춤 플랜의 기구 설정을 확인해 주세요' };
+      Fitness.applyList(this._ds(d), list, a.scope === 'plan' ? 'plan' : 'day');
+      try { Fitness.render(d); } catch (e) {}
+      return { ok: true, msg: `${this._md(d)} 운동을 ${parts.join(' + ')}(으)로 바꿨습니다: ${list.map(x => x.name).join(', ')}` };
+    },
     ex_swap(a) {
       const d = this._date(a.date), list = this._wList(d), f = this._wFind(list, a.from || a.name);
       if (f.miss) return { ok: false, msg: f.miss };
@@ -1035,7 +1046,7 @@ const JarvisActions = {
 
 JSON 하나만 출력: {"response":"","actions":[{"type":"…",…}]}
 actions (괄호 안 필드, ?는 생략 가능):
-[운동] ex_list(date?) ex_swap(from,to,sets?,w?,scope?,date?) ex_add(name,sets?,w?,pos?,scope?,date?) ex_remove(name,scope?,date?) ex_set(name,sets?,w?,scope?,date?) ex_move(name,pos) ex_done(name|"전체",done) ex_log(name,sets:[{w,r}],date?) workout_start(date?) routine_save(name,exercises:[{name,sets}],days?,mode?:"add|replace") day_assign(dow,routines:["루틴 이름|휴식|유산소"],mode?:"set|add")
+[운동] ex_list(date?) ex_parts(parts:["가슴|등|하체|어깨|팔|복근"],scope?,date?) ex_swap(from,to,sets?,w?,scope?,date?) ex_add(name,sets?,w?,pos?,scope?,date?) ex_remove(name,scope?,date?) ex_set(name,sets?,w?,scope?,date?) ex_move(name,pos) ex_done(name|"전체",done) ex_log(name,sets:[{w,r}],date?) workout_start(date?) routine_save(name,exercises:[{name,sets}],days?,mode?:"add|replace") day_assign(dow,routines:["루틴 이름|휴식|유산소"],mode?:"set|add")
 [습관] habit_check(name,done,date?) habit_add(name,days?,time?) habit_edit(name,newName?,days?,time?:"HH:MM|off") habit_del(name) habit_stats(name?,days?)
 [식단] log_food(meal:"아침|점심|저녁|간식",name,cal,protein,carb,fat,date?) delete_food(name,meal?,date?) diet_goal(cal?,protein?,carb?,fat?) diet_status(date?)
 [인바디] inbody_add(wt?,ms?,bf?,bmr?,date?) inbody_trend(n?)
