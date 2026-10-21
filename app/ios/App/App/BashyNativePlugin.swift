@@ -21,6 +21,7 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "consumePending", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAppLock", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "bioAuth", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getAppLock", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setWidget", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setOrientation", returnType: CAPPluginReturnPromise),
@@ -438,6 +439,19 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
             "available": can,
             "kind": ctx.biometryType == .faceID ? "faceid" : (ctx.biometryType == .touchID ? "touchid" : "passcode"),
         ])
+    }
+
+    // 메모 잠금 등: Face ID(안 되면 기기 암호)로 본인 확인만 한다 — 결과는 ok 참/거짓
+    @objc func bioAuth(_ call: CAPPluginCall) {
+        let reason = call.getString("reason") ?? "본인 확인"
+        let ctx = LAContext()
+        var err: NSError?
+        guard ctx.canEvaluatePolicy(.deviceOwnerAuthentication, error: &err) else {
+            call.resolve(["ok": false, "available": false]); return
+        }
+        ctx.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { ok, _ in
+            DispatchQueue.main.async { call.resolve(["ok": ok, "available": true, "kind": ctx.biometryType == .faceID ? "faceid" : (ctx.biometryType == .touchID ? "touchid" : "passcode")]) }
+        }
     }
 
     // 켤 때는 본인 확인을 한 번 받는다 — 남이 몰래 켜서 주인을 잠가 버리지 않게.

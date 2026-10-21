@@ -350,11 +350,13 @@ const JARVIS = {
         case 'edit_memo': {
           const items=Memo.getItems();
           const m=items.find(i=>i.id===action.id||(action.searchTitle&&i.title.includes(action.searchTitle)));
+          if(m && m.locked && !(typeof MemoLock!=='undefined' && MemoLock.isOpen())){ App.showToast('잠긴 메모는 먼저 열어야 고칠 수 있습니다','error'); break; }
           if(m){ if(action.title) m.title=action.title; if(action.content!==undefined) m.content=action.content; m.updatedAt=new Date().toISOString(); Memo.saveItems(items); Memo.render(); App.showToast('메모 수정됨','success'); } break;
         }
         case 'delete_memo': {
           const before=Memo.getItems();
-          const after=before.filter(m=>!(m.id===action.id||(action.title&&m.title.includes(action.title))));
+          const open=typeof MemoLock!=='undefined' && MemoLock.isOpen();
+          const after=before.filter(m=>!((m.id===action.id||(action.title&&m.title.includes(action.title))) && (!m.locked||open)));
           if(after.length<before.length){ Memo.saveItems(after); Memo.render(); App.showToast('메모 삭제됨','success'); } break;
         }
         case 'log_food': {

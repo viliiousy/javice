@@ -733,8 +733,8 @@ const Fitness = {
   // 수정(카드)이나 운동 모드에서 목록을 바꾸면 '오늘만' 또는 '앞으로 이 플랜에도' 중 하나로 저장한다.
   _dayKey(ds){ return 'gl_fit_day_'+ds; },
   dayOverride(ds){ try{ const v=JSON.parse(UserStore.get(this._dayKey(ds))||'null'); return Array.isArray(v)?v:null; }catch{ return null; } },
-  _clean(list){ return list.map(x=>{ const o={ name:x.name, sets:x.sets||this.defSets(x.name) }; if(x.w!==''&&x.w!=null) o.w=x.w; if(x.sess!=null) o.sess=x.sess; return o; }); },
-  _noSess(list){ return list.map(({ sess, ...o })=>o); },
+  _clean(list){ return list.map(x=>{ const o={ name:x.name, sets:x.sets||this.defSets(x.name) }; if(x.w!==''&&x.w!=null) o.w=x.w; if(x.sess!=null) o.sess=x.sess; if(x.hp!=null) o.hp=x.hp; return o; }); },
+  _noSess(list){ return list.map(({ sess, hp, ...o })=>o); },
   applyList(ds, list, scope) {
     const d=new Date(ds+'T00:00:00'), before=this.exercisesFor(d).list;
     const doneNames=new Set(this._checked(d).map(i=>before[i]?.name).filter(Boolean));
@@ -796,7 +796,7 @@ const Fitness = {
     const ds=this._dateStr(App?.S?.selDate||new Date());
     if(!this._ed){
       const { list }=this.exercisesFor(new Date(ds+'T00:00:00'));
-      this._ed={ ds, list:list.map(x=>({ name:x.name, sets:x.sets||this.defSets(x.name), w:x.w??'', sess:x.sess })), dirty:false };
+      this._ed={ ds, list:list.map(x=>({ name:x.name, sets:x.sets||this.defSets(x.name), w:x.w??'', sess:x.sess, ...(x.hp!=null?{hp:x.hp}:{}) })), dirty:false };
       this.render(new Date(ds+'T00:00:00')); return;
     }
     const ed=this._ed;
@@ -841,7 +841,7 @@ const Fitness = {
       head: orig ? `<p class="pg-note">원래 추천 운동은 <b>${esc(orig)}</b> 입니다. 맨 위에서 되돌릴 수 있습니다.</p>` : '',
       recommend: [...(orig?[{ n:orig, small:'원래 추천 운동 · 되돌리기' }]:[]), ...alts.map(a=>({ n:a.n, small:a.need?eqn(a):'' }))],
       exclude:[x.name],
-      onPick:n=>{ if(!x.orig) x.orig=x.name; if(n===x.orig) delete x.orig; if(PlanGen.timed(n)!==PlanGen.timed(x.name)) { x.sets=this.defSets(n); x.w=''; } x.name=n; this._ed.dirty=true; this._edPaint(); } });
+      onPick:n=>{ if(!x.orig) { x.orig=x.name; x.hp0=x.hp; } if(n===x.orig) { delete x.orig; if(x.hp0!=null) x.hp=x.hp0; } else delete x.hp; if(PlanGen.timed(n)!==PlanGen.timed(x.name)) { x.sets=this.defSets(n); x.w=''; } x.name=n; this._ed.dirty=true; this._edPaint(); } });
   },
   edDel(i){ if(!this._ed) return; this._ed.list.splice(i,1); this._ed.dirty=true; this._edPaint(); },
   edAdd(){

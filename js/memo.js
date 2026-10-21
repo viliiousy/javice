@@ -128,8 +128,11 @@ const Memo = {
     this.applyFs();
     const items = this.getItems();
 
+    const lk = typeof MemoLock !== 'undefined';
     wrap.innerHTML = items.map(m => {
-      const html = this.htmlOf(m);
+      // 잠긴 메모는 열어 둔 동안만 내용이 보인다
+      const hide = m.locked && !(lk && MemoLock.isOpen());
+      const html = hide ? '' : this.htmlOf(m);
       const lines = this.textOf(html).split('\n').filter(l => l.trim() !== '');
       const long = lines.length > 3;
       const open = !!this._open[m.id];
@@ -139,10 +142,10 @@ const Memo = {
         ${Memo._reorderMode?'<div class="memo-drag-hint">⠿</div>':''}
         <div class="memo-content-wrap">
           <div class="memo-head">
-            <div class="memo-title" data-edit title="${esc(m.title)}">${esc(m.title)}</div>
+            <div class="memo-title" data-edit title="${esc(m.title)}">${m.locked?`<span class="mm-lock${hide?'':' open'}" aria-label="${hide?'잠김':'열림'}">${typeof Icons!=='undefined'?Icons.svg('lock'):''}</span>`:''}${esc(m.title)}</div>
             <div class="memo-date">${_fmtMemoDate(m.updatedAt)}</div>
           </div>
-          ${html?`<div class="memo-preview${open?'':' clamp'}" data-edit>${html}</div>`:''}
+          ${hide?`<div class="memo-preview mm-hidden" data-edit>잠긴 메모입니다 · 눌러서 열기</div>`:html?`<div class="memo-preview${open?'':' clamp'}" data-edit>${html}</div>`:''}
           ${long?`<button type="button" class="memo-toggle">${open?'접기':'더보기'}</button>`:''}
         </div>
         ${Memo._reorderMode?`<button class="cl-del-btn edit-del-btn" onclick="event.stopPropagation();Memo.remove('${m.id}')" title="삭제">✕</button>`:''}
@@ -178,6 +181,8 @@ const Memo = {
         const chip = e.target.closest('.mm-cp');
         if (chip) { e.stopPropagation(); Memo.copy(chip.dataset.cp, chip); return; }
         if (e.target.closest('.rw-x, .rw-del, .cl-del-btn')) return;
+        const rid = row.dataset.i || row.dataset.reorderable, rm = Memo.getItems().find(x => x.id === rid);
+        if (rm && rm.locked && typeof MemoLock !== 'undefined' && !MemoLock.isOpen()) { e.stopPropagation(); MemoLock.ensure(); return; }
         // 글씨를 누르면 수정, 그 밖의 빈 곳을 누르면 펼친다.
         if (e.target.closest('.memo-toggle') || !e.target.closest('[data-edit]')) {
           e.stopPropagation();
@@ -268,7 +273,10 @@ const Memo = {
 
   _btns(saveFn, id){
     return `<div class="mm-foot">
-      ${id?`<button type="button" class="mm-del" onclick="Memo.remove('${id}');App.closeModal();" aria-label="메모 삭제">${typeof Icons!=='undefined'?Icons.svg('trash'):''}삭제</button>`:'<span></span>'}
+      <div class="mm-foot-l">
+      ${id?`<button type="button" class="mm-del" onclick="Memo.remove('${id}');App.closeModal();" aria-label="메모 삭제">${typeof Icons!=='undefined'?Icons.svg('trash'):''}삭제</button>`:''}
+      <button type="button" id="mmLockBtn" class="mm-lockbtn${this._lockDraft?' on':''}" onclick="Memo._toggleLockDraft()" aria-pressed="${!!this._lockDraft}">${typeof Icons!=='undefined'?Icons.svg('lock'):''}<span>${this._lockDraft?'잠금 켜짐':'잠그기'}</span></button>
+      </div>
       <div class="mm-foot-r">
         <button type="button" onclick="App.closeModal()" class="btn-sm">취소</button>
         <button type="button" onclick="${saveFn}" class="btn-sm accent">저장</button>
@@ -277,12 +285,15 @@ const Memo = {
   },
 
   showAdd(){
+    this._lockDraft = false;
     App.openModal('@memo 새 메모', this._form(null) + this._btns('Memo._saveNew()'),
       () => { this._wire(''); document.getElementById('mTitle')?.focus(); });
   },
 
   showEdit(id){
     const m = this.getItems().find(x => x.id === id); if(!m) return;
+    if (m.locked && typeof MemoLock !== 'undefined' && !MemoLock.isOpen()) { MemoLock.ensure(() => this.showEdit(id)); return; }
+    this._lockDraft = !!m.locked;
     App.openModal('@memo 메모', this._form(m) + this._btns(`Memo._saveEdit('${id}')`, id),
       () => { this._wire(this.htmlOf(m)); if(!matchMedia('(pointer:coarse)').matches) document.getElementById('mBody')?.focus(); });
   },
@@ -543,6 +554,12 @@ const Memo = {
     return out;
   },
 
+  _toggleLockDraft(){
+    this._lockDraft = !this._lockDraft;
+    const b = document.getElementById('mmLockBtn');
+    if (b) { b.classList.toggle('on', this._lockDraft); b.setAttribute('aria-pressed', this._lockDraft); b.querySelector('span').textContent = this._lockDraft ? '잠금 켜짐' : '잠그기'; }
+    try { Haptic.light(); } catch(e) {}
+  },
   _read(){
     const ed = document.getElementById('mBody');
     const html = this.clean(ed ? ed.innerHTML : '');
@@ -554,8 +571,9 @@ const Memo = {
     if(!title){ App.showToast('제목을 입력해주세요','error'); return; }
     const { html, content } = this._read();
     const items = this.getItems();
-    items.unshift({ id:'memo_'+Date.now(), title, html, content,
+    items.unshift({ id:'memo_'+Date.now(), title, html, content, ...(this._lockDraft?{locked:true}:{}),
       createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() });
+    if (this._lockDraft && typeof MemoLock !== 'undefined') MemoLock._opened();
     this.saveItems(items); this.render(); App.closeModal(); App.showToast('메모 저장됨','success');
   },
 
@@ -565,11 +583,13 @@ const Memo = {
     const { html, content } = this._read();
     const items = this.getItems();
     const m = items.find(x => x.id === id);
-    if(m){ m.title=title; m.html=html; m.content=content; m.updatedAt=new Date().toISOString(); }
+    if(m){ m.title=title; m.html=html; m.content=content; m.updatedAt=new Date().toISOString(); if(this._lockDraft) m.locked=true; else delete m.locked; }
     this.saveItems(items); this.render(); App.closeModal(); App.showToast('수정됨','success');
   },
 
   remove(id){
+    const lm = this.getItems().find(x => x.id === id);
+    if (lm && lm.locked && typeof MemoLock !== 'undefined' && !MemoLock.isOpen()) { MemoLock.ensure(() => this.remove(id)); return; }
     if(!confirm('메모를 삭제하시겠습니까?')) return;
     Sounds?.delete();
     delete this._open[id];
