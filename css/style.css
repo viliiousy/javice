@@ -721,7 +721,7 @@ html.dark .btn-danger:hover{ background:rgba(220,38,38,0.24); }
 .toast.success{ background:var(--green); color:#fff; }
 .toast.error{ background:var(--red); color:#fff; }
 /* 폰에서는 하단 탭 위로 띄운다 */
-@media (max-width:900px){ .toast{ bottom:calc(var(--tabbar-h, 46px) + env(safe-area-inset-bottom, 0px) + 12px); max-width:calc(100vw - 32px); white-space:normal; text-align:center; } }
+@media (max-width:640px){ .toast{ bottom:calc(var(--tabbar-h, 46px) + env(safe-area-inset-bottom, 0px) + 12px); max-width:calc(100vw - 32px); white-space:normal; text-align:center; } }
 @keyframes slideUp{ from{transform:translateX(-50%) translateY(8px);opacity:0} to{transform:translateX(-50%) translateY(0);opacity:1} }
 
 /* ── JARVIS ──────────────────────────── */
@@ -2055,7 +2055,7 @@ html.dark .ec-fav.on, html.dark .diet-food-fav.on { color:#fbbf24; }
 /* 넓은 화면에서는 존재하지 않는다. 카드 열 개가 3열로 다 보이니 나눌 이유가 없다. */
 .tabbar{ display:none; }
 
-@media (max-width:900px){
+@media (max-width:640px){
   .tabbar{
     display:flex; position:fixed; left:0; right:0; bottom:0; z-index:150;
     background:var(--card); border-top:1px solid var(--border);
@@ -2110,7 +2110,7 @@ html.dark .ec-fav.on, html.dark .diet-food-fav.on { color:#fbbf24; }
 }
 
 /* 태블릿 세로(641~900px)에서는 2열 유지 + 탭. 한 탭에 카드 두세 개면 딱 맞는다. */
-@media (max-width:900px) and (min-width:641px){
+@media (min-width:641px) and (max-width:900px){
   .dash-top{ grid-template-columns:1fr 1fr; }
 }
 
@@ -2187,7 +2187,7 @@ html.dark .cardset-row{ background:var(--card2); border-color:var(--border); }
 
 /* 하단 탭 — grayscale/opacity 는 이모지 색을 죽이려고 뒀던 것이라 이제 필요 없다.
    강조색은 지금 눌러둔 탭 하나에만 남는다. */
-@media (max-width:900px){
+@media (max-width:640px){
   .tab-ic{ width:21px; height:21px; filter:none; opacity:1; color:var(--text3); }
   .tab-btn.on .tab-ic{ color:var(--accent); opacity:1; }
 }
@@ -2272,7 +2272,7 @@ html[data-icons="color"] .card-title .ic{ color:var(--i, var(--text3)); }
 
 /* 하단 탭도 제 색을 입는다. 다만 지금 눌러둔 탭은 강조색이 이긴다 —
    어디에 있는지가 무슨 탭인지보다 먼저다. */
-@media (max-width:900px){
+@media (max-width:640px){
   html[data-icons="color"] .tab-ic{ color:var(--i, var(--text3)); opacity:1; }
   html[data-icons="color"] .tab-btn.on .tab-ic{ color:var(--accent); }
 }
@@ -2697,7 +2697,7 @@ body, .empty, .card-title, .modal-lbl, .habit-name, .task-text,
   .h-date{ min-width:0; flex-shrink:1; }
   .h-ai{ flex-shrink:0; }
 }
-@media (max-width:900px){
+@media (max-width:640px){
   :root{ --tabbar-h:44px; --tabbar-pb:max(calc(env(safe-area-inset-bottom, 0px) - 14px), 3px); }
   .tab-btn{ gap:2px; padding:5px 0 3px; }
   .tab-ic{ width:20px !important; height:20px !important; font-size:20px !important; }
@@ -3009,8 +3009,8 @@ html.dark .exm-media{ background:#eeeff1; }
 .j-grab, .j-chips{ display:none; }
 .j-sub{ display:flex; align-items:center; }
 .j-prov:empty{ display:none; }
-@media (max-width:900px){ .j-scrim{ bottom:calc(var(--tabbar-h, 50px) + var(--tabbar-pb, 0px)); } }
-@media (min-width:901px){ .j-scrim{ display:none !important; } }
+@media (max-width:640px){ .j-scrim{ bottom:calc(var(--tabbar-h, 50px) + var(--tabbar-pb, 0px)); } }
+@media (min-width:641px){ .j-scrim{ display:none !important; } }
 
 /* ── 메모 편집 (간결형) ─────────────────── */
 .mm-form{ display:flex; flex-direction:column; gap:8px; }
@@ -3449,16 +3449,16 @@ body.wk-on{ overflow:hidden; }
    기본 순서인 사람은 이 규칙을 안 탄다(원래 배치 그대로). */
 html.card-ordered .dash-top, html.card-ordered .dash-rest, html.card-ordered .dash-col{ display:contents; }
 html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto; margin:0; min-width:0; }
-@media (max-width:900px){
+@media (max-width:640px){
   html.card-ordered .dashboard{ display:flex !important; flex-direction:column; }
 }
-@media (min-width:901px){
+@media (min-width:641px){
   html.card-ordered .dashboard{ display:grid !important; grid-template-columns:repeat(3, minmax(0,1fr)); grid-template-areas:none !important; grid-auto-flow:row dense; gap:16px; align-items:start; }
   html.card-ordered .dashboard .card-calendar{ grid-row:span 2 !important; }
   html.card-ordered .dashboard .card-inbody{ grid-column:span 2 !important; }
   html.card-ordered .dashboard .card-econ{ grid-column:1 / -1 !important; }
 }
-@media (min-width:901px) and (max-width:1080px){
+@media (min-width:641px) and (max-width:1080px){
   html.card-ordered .dashboard{ grid-template-columns:repeat(2, minmax(0,1fr)); }
 }
 /* 설정 줄의 ↑↓ */

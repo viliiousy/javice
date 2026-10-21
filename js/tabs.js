@@ -38,13 +38,16 @@ const Tabs = {
   ],
 
   OFF_KEY: 'gl_cards_off',
-  ORDER_KEY: 'gl_cards_order',     // 카드 순서(사람마다) — 예: 식단보다 운동을 위로
+  // 카드·카테고리 순서는 휴대폰과 넓은 화면(PC·태블릿)을 따로 둔다 — 폰은 탭마다 한 줄, 넓은 화면은 한 판에 다 놓여서 원하는 순서가 다르다.
+  // 휴대폰은 예전 키를 그대로 쓴다(이미 정해 둔 순서가 유지되게).
+  _wide() { try { return matchMedia('(min-width:641px)').matches; } catch (e) { return false; } },
+  get ORDER_KEY() { return this._wide() ? 'gl_cards_order_w' : 'gl_cards_order'; },     // 카드 순서(사람마다) — 예: 식단보다 운동을 위로
   order() {
     let o = []; try { o = JSON.parse(UserStore.get(this.ORDER_KEY) || '[]') || []; } catch {}
     const all = this.CARDS.map(c => c.cls);
     return o.filter(x => all.includes(x)).concat(all.filter(x => !o.includes(x)));
   },
-  TABS_ORDER_KEY: 'gl_tabs_order',  // 카테고리(아래 탭) 순서
+  get TABS_ORDER_KEY() { return this._wide() ? 'gl_tabs_order_w' : 'gl_tabs_order'; },  // 카테고리(아래 탭) 순서
   tabsSorted() {
     let o = []; try { o = JSON.parse(UserStore.get(this.TABS_ORDER_KEY) || '[]') || []; } catch {}
     const ids = this.DEF.map(t => t.id), ord = o.filter(x => ids.includes(x)).concat(ids.filter(x => !o.includes(x)));
@@ -103,7 +106,7 @@ const Tabs = {
         <ul><li><b>카테고리 순서</b> — 카테고리 이름 옆 ↑↓ 로 아래 탭의 순서를 바꿉니다. 맨 위 카테고리가 앱을 열면 처음 보이는 화면입니다.</li>
           <li><b>카드 순서</b> — 카드 이름 옆 ↑↓ 로 그 카테고리 안에서 위아래를 바꿉니다. 예: 식단보다 운동을 위로.</li>
           <li><b>켜고 끄기</b> — 스위치를 끄면 그 카드(또는 카테고리 전체)가 화면에서만 빠집니다. 기록은 그대로 남고 다시 켜면 돌아옵니다.</li></ul>
-        <p class="co-sub">순서와 켜고 끄기는 계정에 저장되어 휴대폰·PC 모두 같게 보입니다. PC 는 탭 없이 이 순서대로 한 화면에 놓입니다.</p></div>`
+        <p class="co-sub">지금 바꾸는 순서: <b>${this._wide() ? 'PC·태블릿' : '휴대폰'}</b>. 순서는 휴대폰과 PC·태블릿을 따로 저장합니다(켜고 끄기는 함께). ${this._wide() ? 'PC·태블릿은 탭 없이 이 순서대로 한 화면에 놓입니다.' : '휴대폰은 카테고리 탭마다 이 순서로 보입니다.'}</p></div>`
       + T.map((t, ti) => {
       const on = this.tabOn(t.id);
       return `<div class="set-h co-h">${t.label}</div>
@@ -129,6 +132,8 @@ const Tabs = {
     this._paintBar();
     this.applyOff();
     this.applyOrder();
+    // 화면 폭이 휴대폰 ↔ 넓은 화면으로 바뀌면(태블릿 돌리기 등) 그쪽 순서로 다시 놓는다
+    try { matchMedia('(min-width:641px)').addEventListener('change', () => { this._paintBar(); this.applyOrder(); this.set(this._cur, true); }); } catch (e) {}
     // 매일 여는 앱의 기본 상태는 언제나 '오늘'이다. 마지막 탭을 복원하지 않는다.
     this.set(this._onTabs()[0]?.id || 'today', true);   // 맨 위 카테고리부터
   },
