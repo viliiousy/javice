@@ -28,6 +28,7 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "restSchedule", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "restCancel", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "healthRead", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "healthWatch", returnType: CAPPluginReturnPromise),
     ]
 
     // ── 효과음 (쉬는 시간 째깍·끝 알림) ─────────────
@@ -91,6 +92,13 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
             }
             group.notify(queue: .main) { call.resolve(["ok": true, "data": out]) }
         }
+    }
+
+    // 건강 앱에 새 체성분이 들어오면 앱이 꺼져 있어도 알림 (BashyHealthWatch)
+    @objc func healthWatch(_ call: CAPPluginCall) {
+        if call.getBool("on") ?? true { BashyHealthWatch.enabled = true; BashyHealthWatch.startIfEnabled() }
+        else { BashyHealthWatch.stop() }
+        call.resolve(["ok": true])
     }
 
     // ── 쉬는 시간 타이머(앱을 내려 둬도) ─────────────

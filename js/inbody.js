@@ -95,7 +95,7 @@ const InBody = {
   init() {
     this._migratePeriod(); this.render();
     // 아이폰 앱: 애플 건강을 켜 두었으면 열 때마다(10분에 한 번) 새 측정을 가져온다
-    if (this.healthOn()) setTimeout(() => this.healthSync(false), 1500);
+    if (this.healthOn()) { this._watch(true); setTimeout(() => this.healthSync(false), 1500); }
     document.addEventListener('visibilitychange', () => { if (!document.hidden && this.healthOn()) this.healthSync(false); });
   },
 
@@ -105,14 +105,16 @@ const InBody = {
   HEALTH_KEY: 'gl_health_on',
   healthAvail() { const B = window.Capacitor?.Plugins?.BashyNative; return !!(B && B.healthRead && window.Capacitor?.getPlatform?.() === 'ios'); },
   healthOn() { return this.healthAvail() && localStorage.getItem(this.HEALTH_KEY) === '1'; },
+  _watch(on) { const B = window.Capacitor?.Plugins?.BashyNative; if (B && B.healthWatch) B.healthWatch({ on }).catch(() => {}); },
   async healthConnect() {
     localStorage.setItem(this.HEALTH_KEY, '1');
+    this._watch(true);   // 앱이 꺼져 있어도 새 측정이 들어오면 알림
     const n = await this.healthSync(true, 3650);
     if (n == null) return;
     App.closeModal?.();
     App.showToast(n ? `건강 앱에서 ${n}일치 기록을 가져왔습니다` : '건강 앱에 새 체성분 기록이 없습니다', 'success');
   },
-  healthOff() { localStorage.removeItem(this.HEALTH_KEY); this.render(); App.showToast('건강 앱 자동 가져오기를 껐습니다'); },
+  healthOff() { localStorage.removeItem(this.HEALTH_KEY); this._watch(false); this.render(); App.showToast('건강 앱 자동 가져오기를 껐습니다'); },
   async healthSync(manual, days) {
     if (!this.healthAvail()) return null;
     if (!manual && Date.now() - (this._hsAt || 0) < 10 * 60000) return 0;
@@ -157,6 +159,9 @@ const InBody = {
     }
     if (changed) {
       this.saveRecords(list); this.render();
+      // 새로 들어온 날짜를 알려 준다: "인바디 10월 21일 기록이 업데이트되었습니다"
+      const newest = Object.keys(byDay).sort().filter(d => map[d] && map[d].src === 'health').slice(-1)[0];
+      if (newest && !manual) { const [, m, d] = newest.split('-').map(Number); App.showToast(`인바디 ${m}월 ${d}일 기록이 업데이트되었습니다`, 'success'); }
       try { App._updateStatsBanner(); } catch (e) {}
     }
     return changed;

@@ -20,6 +20,7 @@
 		68352EF773C80DAE09E16A80 /* BashyNativePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1AC8D7E79C77F9C76C2F536 /* BashyNativePlugin.swift */; };
 		5D8BDC77E6431ECD01432C21 /* BashyIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DD31D4B02D7C274604EF2C /* BashyIntents.swift */; };
 		7625BA565FA6257DC3FC476A /* BashyLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = D384FF964BA9C55C47EB3B9E /* BashyLock.swift */; };
+		A1B2C3D4E5F60718293A4B5C /* BashyHealthWatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* BashyHealthWatch.swift */; };
 		B69926B2989B5B3DD9C14AE0 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 85CCDB3732489B8EDB267EF7 /* PrivacyInfo.xcprivacy */; };
 		C33D19416D882FBBAD17A5B9 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = F23A0199A859B87512D3D21E /* GoogleService-Info.plist */; };
 		B5A1E0010000000000000001 /* BashyWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A1E0010000000000000002 /* BashyWidget.swift */; };
@@ -42,6 +43,7 @@
 		F1AC8D7E79C77F9C76C2F536 /* BashyNativePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BashyNativePlugin.swift; sourceTree = "<group>"; };
 		C1DD31D4B02D7C274604EF2C /* BashyIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BashyIntents.swift; sourceTree = "<group>"; };
 		D384FF964BA9C55C47EB3B9E /* BashyLock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BashyLock.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B5D /* BashyHealthWatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BashyHealthWatch.swift; sourceTree = "<group>"; };
 		C5ECB9C96059C305DE12559E /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		85CCDB3732489B8EDB267EF7 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		F23A0199A859B87512D3D21E /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
@@ -125,6 +127,7 @@
 				F1AC8D7E79C77F9C76C2F536 /* BashyNativePlugin.swift */,
 				C1DD31D4B02D7C274604EF2C /* BashyIntents.swift */,
 				D384FF964BA9C55C47EB3B9E /* BashyLock.swift */,
+				A1B2C3D4E5F60718293A4B5D /* BashyHealthWatch.swift */,
 				C5ECB9C96059C305DE12559E /* App.entitlements */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
@@ -265,6 +268,7 @@
 				68352EF773C80DAE09E16A80 /* BashyNativePlugin.swift in Sources */,
 				5D8BDC77E6431ECD01432C21 /* BashyIntents.swift in Sources */,
 				7625BA565FA6257DC3FC476A /* BashyLock.swift in Sources */,
+				A1B2C3D4E5F60718293A4B5C /* BashyHealthWatch.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

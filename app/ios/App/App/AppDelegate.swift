@@ -7,7 +7,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // 인바디(건강 앱) 새 측정 알림 — 켜 둔 경우에만
+        BashyHealthWatch.startIfEnabled()
         return true
     }
 
