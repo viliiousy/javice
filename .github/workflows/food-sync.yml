@@ -1,0 +1,42 @@
+# 식약처 식품영양성분DB를 일주일에 한 번 새벽에 통째로 받아 data/food-db.json 에 저장한다.
+# 식약처는 '실시간' 갱신이라고 하지만 실제 데이터는 몇 주~몇 달에 한 번 바뀐다(공공데이터포털 수정일 기준).
+# 식단 검색은 이 파일에서 바로 찾고(수십 ms), 여기 없을 때만 식약처에 직접 묻는다.
+name: food-sync
+on:
+  schedule:
+    - cron: '17 18 * * 0'   # 매주 월요일 03:17 (한국 시각)
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/food-sync.yml', 'scripts/food-sync.mjs']
+permissions:
+  contents: write
+  actions: write
+concurrency: { group: food-sync, cancel-in-progress: false }
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: 배포가 끝날 때까지 잠깐 (dump 문이 올라온 뒤에)
+        if: github.event_name == 'push'
+        run: sleep 150
+      - name: 식약처 DB 받기
+        env: { CRON_SECRET: '${{ secrets.CRON_SECRET }}' }
+        run: node scripts/food-sync.mjs
+      - name: 바뀌었으면 저장
+        run: |
+          git config user.name "bashy-bot"
+          git config user.email "bot@bashy.app"
+          git add data/food-db.json
+          if git diff --cached --quiet; then echo "바뀐 것 없음"; exit 0; fi
+          git commit -m "식약처 식품영양성분DB 동기화 ($(date -u +%F))"
+          for i in 1 2 3; do git pull --rebase -q origin main && git push -q origin HEAD:main && break; sleep 5; done
+      - name: 사이트에 올리기 (봇 커밋은 배포를 부르지 않으므로 직접)
+        if: success()
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          if git log -1 --format=%s | grep -q '식약처 식품영양성분DB 동기화'; then gh workflow run deploy.yml --ref main; fi
