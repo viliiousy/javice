@@ -172,7 +172,8 @@ const Fitness = {
         ${Icons.big('moon')}
         <p>휴식일입니다.<br><span style="color:var(--text3);font-size:12px">다른 요일을 눌러 계획을 볼 수 있어요</span></p>
       </div>`}
-      <button class="habit-add-btn" onclick="WorkoutHistory.openAll()">기록 보기</button>`;
+      ${this._totHtml(d)}
+      <button class="habit-add-btn" onclick="WorkoutHistory.openAll()">기록 · 추이 보기</button>`;
       return;
     }
 
@@ -205,10 +206,10 @@ const Fitness = {
         </div>`;}).join(''); })()}
       </div>
       ${plan.from ? `<p class="fit-from">${plan.from.slice(5).replace('-','/')} 계획을 오늘 하는 중 · <a href="javascript:Fitness.undoFrom('${dsx}')">되돌리기</a></p>` : ''}
-      ${(()=>{ const b=this.burn(d); return b.kcal ? `<div class="fit-burn"><span>운동으로 쓴 열량</span><b class="num">약 ${b.kcal.toLocaleString('ko-KR')}</b><i>kcal</i></div>` : ''; })()}
+      ${this._totHtml(d)}
       <div class="fit-foot">
         <button class="habit-add-btn" onclick="Fitness.partSheet('${dsx}')">오늘 부위 바꾸기</button>
-        <button class="habit-add-btn" onclick="WorkoutHistory.openAll()">기록 보기</button>
+        <button class="habit-add-btn" onclick="WorkoutHistory.openAll()">기록 · 추이 보기</button>
       </div>`;
     // 운동 체크가 바뀌면 식단 카드의 '더 먹어도 되는 열량' 도 같이 바뀐다
     try { if (typeof Diet!=='undefined' && document.getElementById('dietWrap')) Diet.render(d); } catch(e) {}
@@ -932,6 +933,13 @@ const Fitness = {
     }
   },
 
+  // 그날 총 볼륨 · 세트 · 소모 열량 (누르면 추이)
+  _totHtml(d){ try{ const b=this.burn(d), t=WorkoutHistory.day(this._dateStr(d)); return (b.kcal||t.sets) ? `<button type="button" class="fit-burn fit-tot" onclick="WorkoutHistory.openAll()">
+        <span class="ft-c"><b class="num">${Math.round(t.vol).toLocaleString('ko-KR')}</b><i>kg</i><small>총 볼륨</small></span>
+        <span class="ft-c"><b class="num">${t.sets}</b><i>세트</i><small>${t.reps}회</small></span>
+        <span class="ft-c"><b class="num">${b.kcal.toLocaleString('ko-KR')}</b><i>kcal</i><small>소모 열량(추정)</small></span>
+        <span class="ft-go">추이</span></button>` : ''; }catch(e){ return ''; } },
+
   // ── 운동 소모 열량(추정) ─────────────────
   // 그날 한 운동만 센다: 체크했거나 무게 기록이 있는 종목.
   //   시간 운동(스포츠·유산소): (MET−1) × 몸무게 × 시간.  분은 기록 → 계획(‘60분’) 순.
@@ -945,7 +953,9 @@ const Fitness = {
     const d=new Date(date), ds=this._dateStr(d);
     let list=[]; try { list=this.exercisesFor(d).list; } catch(e) { return { kcal:0, items:[], kg:this.weightKg() }; }
     const chk=this._checked(d), log=typeof PlanGen!=='undefined' ? PlanGen.log(ds) : {}, kg=this.weightKg();
-    const items=[];
+    const items=[], seen=new Set(list.map(x=>x.name));
+    // 목록에 없는데 기록만 있는 운동(운동 모드에서 추가·교체한 것)도 센다
+    Object.keys(log).forEach(n=>{ if(!seen.has(n)&&(log[n]||[]).length) list=list.concat([{ name:n, sets:'' }]); });
     list.forEach((x,i)=>{
       const L=log[x.name]||[], done=chk.includes(i);
       if(!done && !L.length) return;

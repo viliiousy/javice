@@ -3490,3 +3490,41 @@ html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto;
 .ni-lab.w4 span{ max-width:80px; }
 .ni-note{ margin:0 0 8px; }
 .fit-ed-saved{ font-size:13px; color:var(--text3); margin-right:auto; align-self:center; }
+
+/* 운동 추이 (이번 주 vs 지난주 · 주별/일별 그래프 · 부위별 · 종목별) */
+.wt{ margin-bottom:16px; }
+.wt-h{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:16px 0 8px; }
+.wt-h b{ font-size:15px; font-weight:600; color:var(--text); }
+.wt-h span{ font-size:12px; color:var(--text3); display:inline-flex; align-items:center; gap:4px; }
+.wt > .wt-h:first-child{ margin-top:0; }
+.wt-stats b small{ font-size:11px; font-weight:500; color:var(--text3); margin-left:2px; }
+.wt-stats div{ display:flex; flex-direction:column; }
+.wt-d{ font-style:normal; font-size:11px; font-weight:600; color:var(--text3); font-family:'Space Grotesk','IBM Plex Sans KR',sans-serif; margin-top:2px; }
+.wt-d.up{ color:var(--accent); } .wt-d.down{ color:#3B82F6; }
+.wt-seg{ display:flex; gap:4px; padding:4px; border-radius:10px; background:var(--card2); border:1px solid var(--border); margin:0 0 8px; }
+.wt-seg button{ flex:1; height:32px; border:0; border-radius:8px; background:none; color:var(--text3); font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+.wt-seg button.on{ background:var(--card); color:var(--text); box-shadow:0 0 0 1px var(--border); }
+.wt-b{ fill:var(--border2, #3a3c41); } .wt-b.now{ fill:var(--accent); }
+.wt-kl{ fill:none; stroke:var(--text); stroke-width:1.5; stroke-dasharray:3 3; opacity:.7; }
+.wt-kd{ fill:var(--text); }
+.wt-now{ fill:var(--accent); font-weight:600; }
+.wt-key{ display:inline-block; width:8px; height:8px; border-radius:2px; margin-left:6px; }
+.wt-key.cur, .wt-bars i.cur{ background:var(--accent); } .wt-key.prev, .wt-bars i.prev{ background:var(--border2, #3a3c41); }
+.wt-parts{ display:flex; flex-direction:column; gap:8px; }
+.wt-pr{ display:grid; grid-template-columns:40px 1fr 64px 40px; align-items:center; gap:8px; font-size:13px; }
+.wt-pr > span{ color:var(--text2, var(--text)); }
+.wt-pr b{ text-align:right; font-weight:600; font-size:13px; }
+.wt-pr .wt-d{ margin:0; text-align:right; }
+.wt-bars{ display:flex; flex-direction:column; gap:2px; }
+.wt-bars i{ display:block; height:6px; border-radius:3px; min-width:2px; }
+.wt-ex{ display:flex; flex-direction:column; border-top:1px solid var(--border); }
+.wt-er{ display:grid; grid-template-columns:1fr auto 48px; gap:8px; align-items:center; padding:10px 0; border:0; border-bottom:1px solid var(--border); background:none; color:var(--text); font:inherit; font-size:14px; text-align:left; cursor:pointer; }
+.wt-er em{ font-style:normal; font-size:13px; color:var(--text3); } .wt-er em b{ color:var(--text); font-weight:600; }
+.wt-er .wt-d{ font-size:13px; text-align:right; margin:0; }
+/* 오늘의 운동 카드: 총 볼륨 · 세트 · 열량 */
+.fit-tot{ display:flex !important; align-items:flex-end; gap:16px; width:100%; border:0; border-top:1px solid var(--border); background:none; padding:12px 0 0 !important; margin-top:8px; font:inherit; color:var(--text3); text-align:left; cursor:pointer; }
+.fit-tot .ft-c{ display:grid; grid-template-columns:auto auto; column-gap:3px; align-items:baseline; flex:none !important; }
+.fit-tot .ft-c b{ font-size:17px; font-weight:600; color:var(--text); }
+.fit-tot .ft-c i{ font-style:normal; font-size:12px; color:var(--text3); }
+.fit-tot .ft-c small{ grid-column:1 / -1; font-size:11px; color:var(--text3); }
+.fit-tot .ft-go{ margin-left:auto; flex:none !important; font-size:12px; font-weight:600; color:var(--accent); align-self:center; }
