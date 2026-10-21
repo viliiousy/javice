@@ -3575,3 +3575,10 @@ html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto;
 .rw-full > .rw-slide{ background:var(--card); }
 .rw-full > .rw-slide.rw-drag{ transition:none; }
 .rw-full:not(.rw-act)::after{ display:none; }
+/* 운동 고르기: 30일 횟수 · 즐겨찾기 별 */
+.po-row{ cursor:pointer; }
+.po-cnt{ flex:none; font-size:15px; font-weight:600; color:var(--text); margin-left:auto; padding-left:8px; }
+.po-cnt i{ font-style:normal; font-size:11px; font-weight:500; color:var(--text3); margin-left:1px; }
+.po-star{ flex:none; width:36px; height:36px; border:0; background:none; font-size:18px; color:var(--text3); cursor:pointer; margin-left:4px; }
+.po-star.on{ color:var(--accent); }
+.po-row .fz-ic-end{ display:none; }

@@ -727,32 +727,71 @@ const Fitness = {
   // ── 운동 하나 고르기(교체·추가 공용) ─────────────
   // 검색어가 없으면 추천(o.recommend), 있으면 전체 종목에서 찾는다(띄어쓰기·초성 상관없이). 목록에 없으면 직접 입력.
   pickOne(o) {
-    this._po = o;
+    this._po = o; this._f30 = null;
+    // 즐겨찾기만 넘어오던 '추천' 은 이제 즐겨찾기 칸이 따로 있으니 뺀다
+    if (o.recLabel === '즐겨찾기') { o.recommend = []; o.recLabel = ''; }
+    const chips = [ ...((o.recommend||[]).length ? [['__rec','추천']] : []), ['__freq','자주 한'], ['__fav','즐겨찾기'], ['__all','전체'], ...this._parts().map(p=>[p,p]) ];
     App.openModal('@dumbbell ' + o.title, `<div class="fz fz-po">${o.head||''}
       <input id="poQ" class="inp" type="search" autocomplete="off" placeholder="운동 검색 · 초성 가능" oninput="Fitness._poPaint()">
-      <div class="ex-parts po-parts">${[...((o.recommend||[]).length?[['__rec', o.recLabel?.split(' ')[0]==='즐겨찾기'?'즐겨찾기':'추천']]:[]), ['__all','전체'], ...this._parts().map(p=>[p,p])].map(([k,l])=>`<button type="button" class="ex-part" data-pp="${esc(k)}" onclick="Fitness._poCat('${esc(k)}')">${esc(l)}</button>`).join('')}</div>
+      <div class="ex-parts po-parts">${chips.map(([k,l])=>`<button type="button" class="ex-part" data-pp="${esc(k)}" onclick="Fitness._poCat('${esc(k)}')">${esc(l)}</button>`).join('')}</div>
       <button type="button" class="ex-make" onclick="Fitness._poMake('')">${this._ic('plus')}<span>목록에 없는 운동 직접 만들기</span></button>
       <div id="poList" class="sw-list po-list"></div>
       <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div></div>`);
-    this._poC = (o.recommend||[]).length ? '__rec' : '__all';
+    // 교체는 '추천(같은 동작)' 부터, 추가는 지난번에 고른 칸(자주 한 / 즐겨찾기)부터
+    const last = UserStore.get(this.PO_KEY);
+    this._poC = (o.recommend||[]).length ? '__rec' : (['__freq','__fav'].includes(last) ? last : '__freq');
     setTimeout(()=>this._poPaint(), 0);
   },
-  // 검색어가 없을 때 무엇을 보여 줄지: 추천 / 전체 / 부위별 — 부위 상관없이 아무 운동이나 넣고 뺄 수 있게
-  _poCat(k){ this._poC=k; const q=document.getElementById('poQ'); if(q) q.value=''; this._poPaint(); },
+  PO_KEY: 'gl_fit_po_tab',
+  // 최근 30일 동안 몇 번(며칠) 했는지 — 체크했거나 무게를 기록한 날
+  freq30() {
+    if (this._f30 && Date.now() - this._f30.t < 60000) return this._f30.m;
+    const m = new Map();
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const ds = this._dateStr(d), names = new Set();
+      try { const L = PlanGen.log(ds); Object.keys(L).forEach(n => { if ((L[n]||[]).length) names.add(n); }); } catch (e) {}
+      try { const chk = this._checked(d); if (chk.length) { const { list } = this.exercisesFor(d); chk.forEach(k => list[k] && names.add(list[k].name)); } } catch (e) {}
+      names.forEach(n => { const r = m.get(n) || { n: 0, last: i }; r.n++; r.last = Math.min(r.last, i); m.set(n, r); });
+    }
+    this._f30 = { t: Date.now(), m };
+    return m;
+  },
+  // 자주 한 순(30일 횟수 많은 순 → 최근에 한 순), 같으면 즐겨찾기 먼저
+  _byFreq(names) {
+    const f = this.freq30(), favs = this.getFavs();
+    return names.slice().sort((a, b) => ((f.get(b)?.n||0) - (f.get(a)?.n||0)) || ((f.get(a)?.last ?? 99) - (f.get(b)?.last ?? 99)) || (favs.includes(b) - favs.includes(a)));
+  },
+  _poCat(k){ this._poC=k; if(k==='__freq'||k==='__fav'){ UserStore.set(this.PO_KEY, k); FirebaseSync?.scheduleSave(); } const q=document.getElementById('poQ'); if(q) q.value=''; this._poPaint(); },
+  _poFav(i, ev){ ev?.stopPropagation(); const n=(this._poNames||[])[i]; if(!n) return; const f=this.getFavs(), k=f.indexOf(n); if(k<0) f.push(n); else f.splice(k,1);
+    UserStore.set(this._favKey(), JSON.stringify(f)); FirebaseSync?.scheduleSave(); try{ Haptic.light(); }catch(e){} this._poPaint(); },
   _poRow(n, i, small='') {
     const th = typeof ExMedia!=='undefined' ? ExMedia.thumbFor(n) : '';
-    return `<button class="sw-row" onclick="Fitness._poPick(${i})">${th?`<span class="ex-th">${ExMedia.poseHtml(th)}</span>`:`<span class="ex-th none">${typeof Icons!=='undefined'?Icons.svg('dumbbell'):''}</span>`}<span class="sw-nm">${esc(n)}${small?`<small>${small}</small>`:''}</span>${this._ic('chev','fz-ic-end')}</button>`;
+    const fq = this.freq30().get(n), fv = this.getFavs().includes(n);
+    const cnt = fq ? `<span class="po-cnt num" title="최근 30일 동안 한 날 수">${fq.n}<i>회</i></span>` : '';
+    return `<div class="sw-row po-row" role="button" tabindex="0" onclick="Fitness._poPick(${i})">${th?`<span class="ex-th">${ExMedia.poseHtml(th)}</span>`:`<span class="ex-th none">${typeof Icons!=='undefined'?Icons.svg('dumbbell'):''}</span>`}<span class="sw-nm">${esc(n)}${small?`<small>${small}</small>`:''}</span>${cnt}<button type="button" class="po-star${fv?' on':''}" aria-label="즐겨찾기" aria-pressed="${fv}" onclick="Fitness._poFav(${i}, event)">${fv?'★':'☆'}</button></div>`;
   },
   _poPaint() {
     const o=this._po, box=document.getElementById('poList'); if(!o||!box) return;
     const q=(document.getElementById('poQ')?.value||'').trim();
+    const ok = n => !(o.exclude||[]).includes(n) && (typeof PlanGen==='undefined' || PlanGen.pickerOk(n) || this.freq30().has(n));
     document.querySelectorAll('.po-parts .ex-part').forEach(b=>b.classList.toggle('on', !q && b.dataset.pp===this._poC));
+    const part30 = n => { const p = typeof PlanGen!=='undefined' ? PlanGen.partOf(n) : ''; return p ? esc(p) : ''; };
+    if(!q && (this._poC==='__freq' || this._poC==='__fav')){
+      const favs=this.getFavs();
+      const names = this._poC==='__fav' ? this._byFreq(favs.filter(ok)) : this._byFreq([...this.freq30().keys()].filter(ok)).slice(0, 60);
+      this._poOwn=-1; this._poNames=names;
+      box.innerHTML = names.length
+        ? `<div class="sw-h">${this._poC==='__fav'?'즐겨찾기 · 최근 30일에 많이 한 순':'최근 30일 동안 많이 한 순 · 오른쪽 숫자는 한 날 수'}</div>` + names.map((n,i)=>this._poRow(n,i,part30(n))).join('')
+        : `<p class="pg-note">${this._poC==='__fav'?'즐겨찾기한 운동이 없습니다. 운동 오른쪽 ☆ 를 누르면 여기에 모입니다.':'최근 30일 동안 기록한 운동이 없습니다. 운동을 체크하거나 무게를 기록하면 여기에 모입니다.'}</p>`;
+      return;
+    }
     if(!q && this._poC && this._poC!=='__rec'){
       const part = this._poC==='__all' ? null : this._poC;
       const src = part && EX_DB[part] ? EX_DB[part].map(n=>[part,n]) : Object.entries(EX_DB).flatMap(([p,ns])=>ns.map(n=>[p,n]));
-      const favs=this.getFavs();
-      const list = src.filter(([,n])=>!(o.exclude||[]).includes(n) && (typeof PlanGen==='undefined' || PlanGen.pickerOk(n)))
-        .sort((a,b)=>(favs.includes(b[1])-favs.includes(a[1])) || a[1].localeCompare(b[1],'ko')).slice(0, part ? 400 : 120);
+      const favs=this.getFavs(), f=this.freq30();
+      const list = src.filter(([,n])=>ok(n))
+        .sort((a,b)=>(favs.includes(b[1])-favs.includes(a[1])) || ((f.get(b[1])?.n||0)-(f.get(a[1])?.n||0)) || a[1].localeCompare(b[1],'ko')).slice(0, part ? 400 : 120);
       this._poOwn=-1; this._poNames=list.map(h=>h[1]);
       box.innerHTML = list.map(([p,n],i)=>this._poRow(n,i,part?'':esc(p))).join('') + (!part ? '<p class="pg-note">전체 중 앞쪽만 보입니다 — 부위를 고르거나 이름으로 찾아 주세요.</p>' : '');
       return;
