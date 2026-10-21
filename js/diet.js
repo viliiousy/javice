@@ -560,19 +560,32 @@ JSON 만 출력해. 다른 말은 붙이지 마.
   //
   // 값은 100g 기준으로 온다. 제품 한 개의 중량을 알면 그 단위로 환산해서 담는다 —
   // 비요뜨를 100g 씩 먹지는 않으니까. 모르면 기준량(100g) 그대로 둔다.
+  // 한 개 무게(가식부 기준 대략) — 식약처 '음식' 줄의 식품중량은 1인분·기준량이라 '1개' 로 쓰면 틀린다(달걀 1개가 100g 으로 보이던 것).
+  // 이름이 이걸로 시작하는 기본 음식은 1개 단위로 바꿔 담는다.
+  PIECE: [[/^(달걀|계란)(?!.*(말이|찜|국|탕|덮밥|샐러드|빵|볶음|장조림|조림|지단|밥|죽|라면|토스트|샌드위치))/, 50, '1개'], [/^메추리알/, 10, '1개'],
+    [/^바나나/, 120, '1개'], [/^사과/, 200, '1개'], [/^배(_|$)/, 300, '1개'], [/^귤/, 80, '1개'], [/^오렌지/, 180, '1개'], [/^키위/, 90, '1개'],
+    [/^고구마/, 150, '1개'], [/^감자/, 150, '1개'], [/^토마토(_|$)/, 150, '1개'], [/^방울토마토/, 15, '1개'], [/^딸기/, 15, '1개'],
+    [/^(쌀밥|흰밥|밥_쌀|현미밥|잡곡밥)/, 210, '1공기'], [/^두부(_|$)/, 300, '1모'], [/^식빵/, 35, '1장'], [/^김밥(_|$)/, 230, '1줄']],
   _fromDb(x){
-    const base = Number(x.per) || 100;
-    const k    = x.pack ? x.pack / base : 1;
-    const r1   = v => Math.round((Number(v)||0) * k * 10) / 10;
-    return {
-      e: x.e || '🥗', n: x.name,
-      u:  x.pack ? `1개(${x.pack}${x.unit||'g'})` : `${base}${x.unit||'g'}`,
-      c:  Math.round((Number(x.kcal)||0) * k),
-      p:  r1(x.protein), cb: r1(x.carb), ft: r1(x.fat),
+    const base = Number(x.per) || 100, unit = x.unit || 'g';
+    const r1 = (v, k) => Math.round((Number(v)||0) * k * 10) / 10;
+    const mk = (u, grams) => { const k = grams / base; return {
+      e: x.e || '🥗', n: x.name, u,
+      c: Math.round((Number(x.kcal)||0) * k), p: r1(x.protein, k), cb: r1(x.carb, k), ft: r1(x.fat, k),
       grp: x.maker || x.group || '',
       // 환산했으면 원래 기준을 같이 보여 준다. 숫자를 확인할 길이 있어야 한다.
-      note: x.pack ? `${base}${x.unit||'g'}당 ${Math.round(x.kcal||0)}kcal` : '',
-    };
+      note: grams !== base ? `${base}${unit}당 ${Math.round(x.kcal||0)}kcal` : '',
+    }; };
+    const generic = x.cls === '품목대표' || x.group === '음식';
+    if (generic) {
+      const pc = this.PIECE.find(([re]) => re.test(String(x.name)));
+      if (pc && unit === 'g') return mk(`${pc[2]}(${pc[1]}g)`, pc[1]);
+      // 음식 줄의 식품중량은 '1인분' 기준량이다 — 1개가 아니다
+      if (x.pack && Math.abs(x.pack - base) > 0.5) return mk(`1인분(${x.pack}${unit})`, x.pack);
+      return mk(`${base}${unit}`, base);
+    }
+    // 가공식품(상용제품)은 식품중량이 제품 한 개(한 봉지)의 중량이다
+    return x.pack ? mk(`1개(${x.pack}${unit})`, x.pack) : mk(`${base}${unit}`, base);
   },
   // 쪽마다 15개. 같은 검색어의 쪽은 잠시 기억해 둔다(지웠다 다시 쳐도 바로 나오게).
   _dbCache: {},

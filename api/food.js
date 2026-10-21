@@ -80,8 +80,8 @@ module.exports = async function handler(req, res) {
     if (!sec || req.headers.authorization !== `Bearer ${sec}`) { res.status(401).json({ error: 'Unauthorized' }); return; }
     try {
       const pg = Math.max(1, Number(qy.page) || 1), rows = Math.min(1000, Math.max(10, Number(qy.rows) || 100));
-      const { total, items } = await dumpPage(pg, rows);
-      res.status(200).json({ ok: true, page: pg, rows, total, items: items.map(normalize) });
+      const { total, items, head } = await dumpPage(pg, rows);
+      res.status(200).json({ ok: true, page: pg, rows, total, items: items.map(normalize), ...(head ? { head } : {}) });
     } catch (e) { res.status(502).json({ error: e.message }); }
     return;
   }

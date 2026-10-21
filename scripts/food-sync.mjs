@@ -6,7 +6,7 @@ import fs from 'node:fs';
 const BASE = process.env.BASE || 'https://bashy.app';
 const SEC = process.env.CRON_SECRET;
 if (!SEC) { console.error('CRON_SECRET 없음'); process.exit(1); }
-const ROWS = Number(process.env.ROWS || 1000), PAR = 4;
+const ROWS = Number(process.env.ROWS || 100), PAR = 4;
 
 async function page(n, tries = 4) {
   for (let t = 1; t <= tries; t++) {
@@ -24,7 +24,7 @@ async function page(n, tries = 4) {
 const first = await page(1);
 const total = first.total, pages = Math.ceil(total / ROWS);
 console.log('total', total, 'pages', pages, 'rows/page', first.items.length);
-if (!total || !first.items.length) { console.error('비어 있음 — 기존 파일 유지'); process.exit(1); }
+if (!total || !first.items.length) { console.error('비어 있음 — 기존 파일 유지', JSON.stringify(first).slice(0, 400)); process.exit(1); }
 const all = [...first.items];
 for (let p = 2; p <= pages; p += PAR) {
   const batch = await Promise.all(Array.from({ length: Math.min(PAR, pages - p + 1) }, (_, k) => page(p + k)));
