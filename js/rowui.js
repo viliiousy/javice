@@ -5,7 +5,7 @@
 // 스와이프·길게누르기 코드는 두 파일에 있었지만 DOM 에 한 번도 붙은 적이 없는 죽은 코드였다.
 //
 // 여기서 한 벌로 정한다.
-//   손가락 — 길게 누르면 수정, 왼쪽으로 밀면 삭제 버튼이 나온다
+//   손가락 — 길게 누르면 수정, 왼쪽으로 밀면 오른쪽부터 빨갛게 차오르고 35% 를 넘겨 놓으면 삭제(진동). 확인이 필요한 목록은 그 뒤 확인 창
 //   마우스 — 글씨를 누르면 수정, 줄에 올리면 ✕ 가 나온다
 //
 // 미는 즉시 지우지 않는다. 버튼이 나오고, 그걸 한 번 더 눌러야 지워진다 —
@@ -37,7 +37,7 @@ const RowUI = {
 
       // 줄을 감싸고, 뒤에 삭제 버튼을 깐다
       const wrap = document.createElement('div');
-      wrap.className = 'rw' + (h.full ? ' rw-full' : '');
+      wrap.className = 'rw' + (h.full !== false ? ' rw-full' : '');
       row.parentNode.insertBefore(wrap, row);
       wrap.appendChild(row);
       row.classList.add('rw-slide');
@@ -97,7 +97,7 @@ const RowUI = {
         e.preventDefault();
         row.classList.add('rw-drag');
         // 끝까지 밀어 지우기(h.full): 오른쪽에서부터 빨갛게 차오르고, 줄 너비의 35% 를 넘으면 진동 한 번 — 놓으면 지워진다
-        if (h.full) {
+        if (h.full !== false) {
           const w = wrap.offsetWidth || 1, x3 = Math.min(0, dx);
           row.style.transform = `translateX(${x3}px)`;
           wrap.classList.add('rw-act'); wrap.style.setProperty('--rw-fill', `${-x3}px`);
@@ -118,14 +118,18 @@ const RowUI = {
         clearTimeout(lp);
         if (dragging) { dragging = false; this._dragEnd(h.reorder); return; }
         if (!sliding) return;
-        if (h.full) {
+        if (h.full !== false) {
           const armed = wrap.classList.contains('rw-arm');
           row.classList.remove('rw-drag');
           if (armed) {
             try { Haptic.success(); } catch {}
             row.style.transition = 'transform .18s ease-in'; row.style.transform = 'translateX(-110%)';
             wrap.style.setProperty('--rw-fill', '100%');
-            setTimeout(() => h.del(id), 170);
+            setTimeout(() => {
+              h.del(id);
+              // 확인 창에서 '취소' 하면 줄이 그대로 남는다 — 제자리로 돌려 놓는다
+              setTimeout(() => { if (row.isConnected) { row.style.transition = ''; row.style.transform = ''; wrap.classList.remove('rw-arm', 'rw-act'); wrap.style.setProperty('--rw-fill', '0px'); } }, 60);
+            }, 170);
           } else {
             row.style.transform = ''; wrap.style.setProperty('--rw-fill', '0px'); wrap.classList.remove('rw-arm', 'rw-act');
           }

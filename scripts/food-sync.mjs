@@ -6,7 +6,8 @@ import fs from 'node:fs';
 const BASE = process.env.BASE || 'https://bashy.app';
 const SEC = process.env.CRON_SECRET;
 if (!SEC) { console.error('CRON_SECRET 없음'); process.exit(1); }
-let ROWS = Number(process.env.ROWS || 1000); const PAR = Number(process.env.PAR || 10);   // 34만 줄 — 쪽을 크게, 여러 개를 함께
+let ROWS = Number(process.env.ROWS || 500);   // 식약처 한 쪽 최대 500
+const PAR = Number(process.env.PAR || 10);   // 34만 줄 — 쪽을 크게, 여러 개를 함께
 
 async function page(n, tries = 4) {
   for (let t = 1; t <= tries; t++) {
