@@ -113,16 +113,6 @@ const Icons = {
 
   applyMode() { document.documentElement.dataset.icons = this.mode; },
 
-  toggleMode() {
-    const i = this.MODES.indexOf(this.mode);
-    this.mode = this.MODES[(i + 1) % this.MODES.length];
-    this.applyMode();
-    this.updateModeLabel();
-    document.getElementById('profileMenu')?.classList.add('hidden');
-    if (typeof App !== 'undefined') App.showToast(this.MODE_LBL[this.mode], 'success');
-    if (typeof Sounds !== 'undefined') Sounds.click?.();
-  },
-
   updateModeLabel() {
     const el = document.getElementById('iconModeLabel');
     if (!el) return;

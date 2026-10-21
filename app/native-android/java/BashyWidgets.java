@@ -31,6 +31,7 @@ public class BashyWidgets {
 
     static void refreshAll(Context c) {
         AppWidgetManager m = AppWidgetManager.getInstance(c);
+        if (m == null) return;   // 위젯 기능이 없는 기기
         for (int id : m.getAppWidgetIds(new ComponentName(c, Today.class))) m.updateAppWidget(id, today(c));
         for (int id : m.getAppWidgetIds(new ComponentName(c, Habit.class))) m.updateAppWidget(id, habit(c));
     }

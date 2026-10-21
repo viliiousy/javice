@@ -30,8 +30,9 @@ const Diet = {
   _histKey()           { return 'gl_diet_history'; },
 
   getSettings(){
-    return JSON.parse(UserStore.get(this._setKey())||JSON.stringify(
-      {calorieGoal:2200,proteinGoal:160,carbGoal:220,fatGoal:60}));
+    // 저장값이 깨져 있어도 카드가 비지 않게 기본 목표로 돌아간다
+    const v=UserStore.parse(this._setKey(), null);
+    return (v && typeof v==='object') ? v : {calorieGoal:2200,proteinGoal:160,carbGoal:220,fatGoal:60};
   },
   getGoalsForDate(date=new Date()) {
     const s   = this.getSettings();
@@ -52,13 +53,13 @@ const Diet = {
   },
 
   getData(date=new Date()){
-    return JSON.parse(UserStore.get(this._key(date))||JSON.stringify(
-      {아침:[],점심:[],저녁:[],간식:[]}));
+    const v=UserStore.parse(this._key(date), null);
+    return (v && typeof v==='object') ? v : {아침:[],점심:[],저녁:[],간식:[]};
   },
   saveData(d,date=new Date()){ UserStore.set(this._key(date),JSON.stringify(d)); FirebaseSync?.scheduleSave(); },
 
   // ── 즐겨찾기 ──────────────────────────
-  getFavs(){ return JSON.parse(UserStore.get(this._favKey())||'[]'); },
+  getFavs(){ const v=UserStore.parse(this._favKey(), []); return Array.isArray(v)?v:[]; },
   saveFavs(v){ UserStore.set(this._favKey(),JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
   toggleFav(name){
     const favs=this.getFavs();
@@ -66,10 +67,11 @@ const Diet = {
     if(idx===-1) favs.push(name); else favs.splice(idx,1);
     this.saveFavs(favs);
   },
-  isFav(name){ return this.getFavs().includes(name); },
+  // 끼니 줄마다 부른다 — 읽기만 하므로 파싱해 둔 값을 쓴다
+  isFav(name){ const v=UserStore.json(this._favKey(), null); return Array.isArray(v) && v.includes(name); },
 
   // ── 음식 히스토리 (최근 10개 + 빈도) ──
-  getHistory(){ return JSON.parse(UserStore.get(this._histKey())||'[]'); },
+  getHistory(){ const v=UserStore.parse(this._histKey(), []); return Array.isArray(v)?v:[]; },
   saveHistory(v){ UserStore.set(this._histKey(),JSON.stringify(v.slice(0,200))); FirebaseSync?.scheduleSave(); },
   addToHistory(food){
     const h=this.getHistory();
@@ -156,7 +158,7 @@ const Diet = {
 
     // 배지 하나에 '얼마나 먹었고 목표 대비 몇 퍼센트인지' 를 다 적는다.
     // 아래 요약에 같은 말을 또 쓰면 카드가 한 줄을 공짜로 잃는다.
-    document.getElementById('dietBadge').textContent=`${t.cal.toLocaleString()} / ${s.calorieGoal.toLocaleString()} kcal · ${pct}%`;
+    { const bd=document.getElementById('dietBadge'); if(bd) bd.textContent=`${t.cal.toLocaleString()} / ${Number(s.calorieGoal||0).toLocaleString()} kcal · ${pct}%`; }
 
     // ── 시안 05: 남은 열량을 크게, 단·탄·지는 세 칸 막대, 끼니는 한 줄씩 ──
     const won=v=>Math.round(v).toLocaleString('ko-KR');

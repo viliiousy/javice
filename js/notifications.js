@@ -219,6 +219,7 @@ const Notifications = {
     const settings = this.getSettings();
     const body     = { uid, token, settings, deviceId: this.deviceId(), ua: navigator.userAgent };
     if (prev && prev !== uid) body.prevUid = prev;   // 구경로 등록분 삭제 요청
+    try { if (FirebaseSync?._authed) { const t = await Auth._firebaseIdToken?.(); if (t) body.idToken = t; } } catch (e) {}   // 서버가 본인인지 확인한다
     try {
       const res  = await fetch(Platform.api('/api/subscribe'), {
         method:  'POST',

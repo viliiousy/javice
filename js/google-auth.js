@@ -544,29 +544,8 @@ const Auth = {
     if (ap) ap.style.display = 'none';
   },
 
-  // 부족한 권한을 다시 요청 (동의 화면 강제 표시)
-  reconsent() {
-    if (!this.tokenClient) return;
-    this._refreshing = false;
-    this.tokenClient.requestAccessToken({ prompt: 'consent' });
-  },
-
   isLoggedIn() {
     return !!(this.accessToken && this.tokenExpiry && Date.now() < this.tokenExpiry);
-  },
-
-  // 토큰 유효성 확인 후 필요시 즉시 갱신
-  async ensureToken() {
-    if (this.isLoggedIn()) return true;
-    // 서버에 리프레시 토큰이 있으면 팝업 없이 끝난다
-    if (await this.serverRefresh()) return true;
-    if (this.tokenClient) {
-      this._refreshing = true;
-      this.tokenClient.requestAccessToken({ prompt: '' });
-      await new Promise(r => setTimeout(r, 3000));   // 콜백이 반영될 시간
-      return this.isLoggedIn();
-    }
-    return false;
   },
 
   async _fetchUserInfo(silent = false) {

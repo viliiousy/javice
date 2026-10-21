@@ -52,8 +52,8 @@ const App = {
     return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
   },
   async onAuthSuccess(userInfo) {
-    document.getElementById('loginScreen').style.display='none';
-    document.getElementById('app').style.display='block';
+    { const ls=document.getElementById('loginScreen'); if(ls) ls.style.display='none'; }
+    { const ap=document.getElementById('app'); if(ap) ap.style.display='block'; }
     if(userInfo?.name){
       const hName = document.getElementById('hName');
       if(hName) hName.textContent=userInfo.name;
@@ -95,7 +95,7 @@ const App = {
     this._updateStatsBanner();
     // 처음 쓰는 계정이면 설정 도우미 (클라우드 기록을 받은 뒤에 판단해야 기존 사용자를 새로 보지 않는다)
     setTimeout(()=>{ try { Onboard.maybeStart(); } catch(e){ console.warn('Onboard',e); } }, 900);
-    await this.sync();
+    try { await this.sync(); } catch(e){ console.warn('[Sync]',e); }   // 동기화가 실패해도 시작 화면은 그대로 쓴다
   },
 
   // 오프라인 모드는 없앴다.
@@ -175,7 +175,7 @@ const App = {
     })().catch(e=>{ errs.push(e); }):Promise.resolve();
     const pDev=DeviceCal.on()?DeviceCal.fetch(tMin,tMax).then(v=>{ this._srcEv.device=v; }).catch(e=>{ console.warn('[Sync] 아이폰 캘린더',e); errs.push(e); })
       :Promise.resolve(this._srcEv.device=[]);
-    const pIcs=IcsCal.sources().length?IcsCal.fetch(tMin,tMax).then(v=>{ this._srcEv.ics=v; })
+    const pIcs=IcsCal.sources().length?IcsCal.fetch(tMin,tMax).then(v=>{ this._srcEv.ics=v; }).catch(e=>{ console.warn('[Sync] 구독 캘린더',e); })
       :Promise.resolve(this._srcEv.ics=[]);
     if(!google) this._srcEv.google=[];
     await Promise.all([pGoogle,pDev,pIcs]);
@@ -287,7 +287,22 @@ const App = {
       an.onfinish = () => { if (--left === 0 && b.isConnected) b.textContent = to; };
     });
   },
+  // 상단바는 습관 한 번 누를 때도 습관·식단·운동 카드가 저마다 다시 그리라고 부른다(한 동작에 3~4번).
+  // 부를 때마다 그리지 않고, 한 화면(프레임) 안의 요청을 모아 한 번만 그린다.
+  // 숫자 움직임(_animStats)은 지난번 값과 비교하므로 모아서 그려도 그대로 움직인다.
+  // 화면이 가려져 rAF 가 멈춘 때(앱이 뒤에 있을 때)를 위해 짧은 타이머도 같이 건다 — 먼저 오는 쪽이 그린다.
+  _sbRaf: 0, _sbTo: 0,
   _updateStatsBanner() {
+    if (this._sbRaf || this._sbTo) return;
+    const run = () => {
+      if (this._sbRaf) { try { cancelAnimationFrame(this._sbRaf); } catch(e){} }
+      clearTimeout(this._sbTo); this._sbRaf = 0; this._sbTo = 0;
+      try { this._paintStatsBanner(); } catch(e) { console.warn('[StatsBanner]', e); }
+    };
+    try { this._sbRaf = requestAnimationFrame(run); } catch(e) {}
+    this._sbTo = setTimeout(run, 120);
+  },
+  _paintStatsBanner() {
     try { if(typeof Widgets!=='undefined') Widgets.push(); } catch(e){}
     const el=document.getElementById('statsBanner'); if(!el) return;
     const now=new Date();
@@ -313,9 +328,10 @@ const App = {
     const nowDateStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
     const isSelToday=selDateStr===nowDateStr;
     const pending=allPending.filter(t=>t.due?t.due.split('T')[0]===selDateStr:isSelToday).length;
-    const clItems=Checklist.getItems().filter(i=>!i.done);
-    const lastMsg=typeof JARVIS!=='undefined'&&JARVIS.history.length
-      ?JARVIS.history.filter(m=>m.role==='assistant').slice(-1)[0]?.content.replace(/[{][\s\S]*[}]/g,'').trim():'';
+    let clAllItems=[]; try { clAllItems=Checklist.getItems()||[]; } catch(e){}
+    const clItems=clAllItems.filter(i=>!i.done);
+    let lastMsg='';
+    try { if(typeof JARVIS!=='undefined'&&JARVIS.history&&JARVIS.history.length){ const H=JARVIS.history; for(let i=H.length-1;i>=0;i--){ if(H[i]&&H[i].role==='assistant'){ lastMsg=String(H[i].content||'').replace(/[{][\s\S]*[}]/g,'').trim(); break; } } } } catch(e){}
 
     // 이번주 일정 + 기한 있는 할일 (오늘~7일)
     const weekEnd=new Date(now); weekEnd.setDate(now.getDate()+7); weekEnd.setHours(23,59,59,999);
@@ -350,8 +366,6 @@ const App = {
 
     // 변경 감지 (긴급할일 id+status 포함)
     const curStr=JSON.stringify({hDone,cal:dt.cal,pending,cl:clItems.length,uIds:urgentTasks.map(t=>t.id+t.status).join()});
-    const changed=curStr!==this._statsPrev;
-    const prevObj=this._statsPrev&&this._statsPrev!=='{}'?JSON.parse(this._statsPrev):{};
     this._statsPrev=curStr;
 
     // HTML 조립
@@ -374,7 +388,7 @@ const App = {
     // 새 디자인의 폰 화면은 헤더 오른쪽 두 줄(인바디·자산)을 접는다 — 몸무게만 이 줄 끝으로 옮긴다.
     let kgTxt = '';
     try { const r = (typeof InBody!=='undefined' && InBody.getRecords()) || []; const la = r[r.length-1]; if (la && la.wt) kgTxt = `<div class="stat-chip stat-kg" data-s="inbody" title="최근 체중"><b>${la.wt}</b>kg</div>`; } catch(e){}
-    const clAll = Checklist.getItems().length, clDone = clAll - clItems.length;
+    const clAll = clAllItems.length, clDone = clAll - clItems.length;
 
     // 왼쪽 묶음: 오늘 할 것(습관·할일·체크) / 오른쪽 묶음: 몸(칼로리·몸무게)
     const habC = hList.length?`<div class="stat-chip ${hDone===hList.length?'stat-green':''}" data-s="habits" title="오늘 습관">${ic('check')}습관 <b>${hDone}/${hList.length}</b></div>`:'';
@@ -423,9 +437,12 @@ const App = {
     // (예전 칩 반짝임은 숫자 움직임으로 바꿨다 — _animStats)
 
     // 칩 클릭 → 섹션 스크롤
-    setTimeout(()=>{
-      el.querySelectorAll('[data-s]').forEach(chip=>{
-        chip.onclick=()=>{
+    // 예전엔 그릴 때마다 칩 하나하나에 onclick 을 다시 달았다(타이머까지 걸어서). 상단바에 한 번만 건다.
+    if(!el._chipBound){
+      el._chipBound=true;
+      el.addEventListener('click',e=>{
+        const chip=e.target.closest&&e.target.closest('[data-s]'); if(!chip||!el.contains(chip)) return;
+        {
           const sec=chip.dataset.s;
           if(sec==='inbody'){ try{ TopStrip.go('card-inbody'); }catch(e){} return; }
           if(sec==='econ'){ try{ TopStrip.go('card-econ'); }catch(e){} return; }
@@ -435,9 +452,9 @@ const App = {
             const sH=(document.querySelector('.header-sticky-group')?.offsetHeight||100)+8;
             window.scrollTo({top:target.getBoundingClientRect().top+window.scrollY-sH,behavior:'smooth'});
           }
-        };
+        }
       });
-    },50);
+    }
   },
 
   // ── 날짜 선택 ────────────────────────
@@ -689,10 +706,18 @@ const App = {
 
   // 일정 한 줄. 출처가 여럿이면 캘린더 이름과 색 점으로 어디 것인지 보인다.
   // 구글 일정은 예전 그대로 — '주요 일정'(기본 캘린더)이 아닐 때만 이름을 적는다.
+  // 일정이 여러 캘린더에서 왔는지 — 예전엔 줄마다 전체 일정을 다시 훑었다(일정 n개면 n×n). 목록이 같으면 한 번만 센다.
+  _multiCal() {
+    const evs=this.S.events||[];
+    if(this._mcC && this._mcC.a===evs && this._mcC.n===evs.length) return this._mcC.v;
+    const v=new Set(evs.map(x=>x._calId||'primary')).size>1;
+    this._mcC={ a:evs, n:evs.length, v };
+    return v;
+  },
   _evRow(e, full) {
     const allDay=!e.start?.dateTime; const s=allDay?null:new Date(e.start.dateTime);
     const col=e._calColor||_evColor(e.colorId);
-    const multi=new Set((this.S.events||[]).map(x=>x._calId||'primary')).size>1;
+    const multi=this._multiCal();
     const showCal=e._calName && (e._src&&e._src!=='google' ? multi : e._calName!=='주요 일정');
     const dot=e._src&&e._src!=='google'?`<i class="ev-dot" style="background:${col}"></i>`:'';
     if(!full) return `<div class="event-item" style="border-color:${col}" onclick="App._showEvDetail('${e.id}')"><div class="event-time" style="color:${col}">${allDay?'종일':_fmtTime(s)}</div><div class="event-title">${dot}${esc(e.summary||'(제목 없음)')}</div></div>`;
@@ -955,7 +980,7 @@ const App = {
       // 구글 Tasks 의 due 는 날짜만 받는다(시각은 버려진다). 시간은 세부정보 창과
       // 같은 자리에 따로 둔다 — 두 곳이 다른 데 저장하면 한쪽에서 넣은 시간이 안 보인다.
       if(time) UserStore.set('gl_task_extra_'+task.id,
-        JSON.stringify({ ...(JSON.parse(UserStore.get('gl_task_extra_'+task.id)||'{}')), time }));
+        JSON.stringify({ ...(UserStore.parse('gl_task_extra_'+task.id, {})), time }));
       if(!this.S.tasks[listId]) this.S.tasks[listId]=[];
       this.S.tasks[listId].unshift(task);
       this._buildTaskFilters(); this._renderTasks();
@@ -1048,11 +1073,19 @@ const App = {
     return n;
   },
 
+  // 할일 목록 색(기기 공용 칸). 줄마다 다시 파싱하지 않게 문자열이 같으면 지난 값을 쓴다. 깨져 있으면 빈 표.
+  _catColors() {
+    let raw=null; try { raw=localStorage.getItem('gl_cat_colors'); } catch(e){}
+    if(this._ccC && this._ccC.raw===raw) return this._ccC.v;
+    let v={}; try { v=JSON.parse(raw||'{}')||{}; } catch(e){ v={}; }
+    this._ccC={ raw, v };
+    return v;
+  },
   _buildTaskFilters() {
     const wrap=document.getElementById('taskFilters'); if(!wrap) return;
     // 별표는 손대도 아무 일이 안 일어나던 필터라 뺐다. 안 되는 버튼은 없는 버튼보다 나쁘다.
     const tabs=[{id:'all',label:'전체'},...this.S.lists.filter(l=>l.id!==BashyCal.LIST_ID||!Auth.isLoggedIn()||(this.S.tasks[l.id]||[]).length).map(l=>({id:l.id,label:l.title}))];
-    const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
+    const catColors=this._catColors();
     const on=this.showOverdue(), n=this._overdueCount();
     const ic=(typeof Icons!=='undefined')?Icons.svg('clock','tf-ic'):'';
     wrap.innerHTML=`<button class="fit-tab tf-over${on?' active':''}"
@@ -1093,6 +1126,7 @@ const App = {
   _setFilter(id){ this.S.taskFilter=id; this._buildTaskFilters(); this._renderTasks(); },
 
   _renderTasks() {
+    if(!document.getElementById('tasksContainer')) return;
     const today=new Date().toDateString(), filter=this.S.taskFilter;
     let all=[];
     for(const list of this.S.lists){
@@ -1136,7 +1170,7 @@ const App = {
     } else {
       all.forEach(t=>{ if(!groups[t._lname])groups[t._lname]=[]; groups[t._lname].push(t); });
     }
-    const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
+    const catColors=this._catColors();
     document.getElementById('tasksContainer').innerHTML=Object.entries(groups).map(([k,v])=>{
       if(k==='_all_') return `<div class="task-group">${v.map(t=>this._taskHTML(t)).join('')}</div>`;
       // 카테고리 그룹 border-left 색상
@@ -1161,7 +1195,7 @@ const App = {
     const done=t.status==='completed', due=t.due?new Date(t.due):null;
     const overdue=!!t.due&&_dueEnd(t)<new Date()&&!done, hidden=t._hidden;
     const dueStr=due?`<span class="task-due-inline${overdue?' overdue':''}">${_fmtDate(due)}</span>`:'';
-    const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
+    const catColors=this._catColors();
     const catCol=catColors[t._lid]||'';
     const colorBar=catCol?`<div class="task-cat-bar" style="background:${catCol}"></div>`:'';
     return `<div class="task-item${done?' done':''}${hidden?' task-hidden':''}"
@@ -1194,7 +1228,7 @@ const App = {
     const t=this.S.tasks[listId]?.find(x=>x.id===taskId); if(!t) return;
     const due=t.due?t.due.split('T')[0]:'';
     // 시간/반복은 localStorage에 보조 저장
-    const extra=JSON.parse(UserStore.get('gl_task_extra_'+taskId)||'{}');
+    const extra=UserStore.parse('gl_task_extra_'+taskId, {});
     const listOptions=this.S.lists.map(l=>`<option value="${l.id}"${l.id===listId?' selected':''}>${esc(l.title)}</option>`).join('');
     const repeatOpts=['없음','매일','매주','매월','매년'].map(v=>`<option${extra.repeat===v?' selected':''}>${v}</option>`).join('');
     this.openModal('@list 세부정보',`
@@ -1326,8 +1360,12 @@ const App = {
         menu.style.left='auto';
       }
     }
-    setTimeout(()=>{
-      const close=(e)=>{ if(!e.target.closest('#hUser')&&!e.target.closest('#profileMenu')){ menu.classList.add('hidden'); document.removeEventListener('click',close); } };
+    // 바깥을 누르면 닫는다. 열고 닫을 때마다 새로 걸던 것이 쌓이지 않게 지난 것을 먼저 뗀다.
+    if(this._pmClose){ document.removeEventListener('click',this._pmClose); this._pmClose=null; }
+    if(!menu.classList.contains('hidden')) setTimeout(()=>{
+      if(this._pmClose) document.removeEventListener('click',this._pmClose);
+      const close=(e)=>{ if(!e.target.closest('#hUser')&&!e.target.closest('#profileMenu')){ menu.classList.add('hidden'); document.removeEventListener('click',close); if(this._pmClose===close) this._pmClose=null; } };
+      this._pmClose=close;
       document.addEventListener('click',close);
     },0);
   },
@@ -1430,7 +1468,7 @@ const App = {
   },
 
   _showCatColorPicker(listId, listName) {
-    const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
+    const catColors=this._catColors();
     const cur=catColors[listId]||'';
     const colors=['#4f46e5','#0891b2','#059669','#d97706','#dc2626','#7c3aed','#db2777','#64748b',''];
     App.openModal(`@palette "${listName}" 색상`,`
@@ -1445,7 +1483,7 @@ const App = {
   },
 
   _saveCatColor(listId, color) {
-    const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
+    const catColors={ ...this._catColors() };
     if(color) catColors[listId]=color; else delete catColors[listId];
     localStorage.setItem('gl_cat_colors',JSON.stringify(catColors));
     this._buildTaskFilters();
@@ -1470,7 +1508,7 @@ const App = {
   // act = { label, fn } 를 주면 토스트 안에 그 일을 바로 하는 단추가 붙는다.
   // '설정 › AI 에서 키를 넣어 주세요' 처럼 길을 알려 주는 대신, 누르면 그 화면이 바로 열린다.
   showToast(msg,type='',act){
-    const t=document.getElementById('toast');
+    const t=document.getElementById('toast'); if(!t) return;
     t.textContent=msg; t.className=`toast${type?' '+type:''}${act?' has-act':''}`;
     if(act&&act.label&&typeof act.fn==='function'){
       const b=document.createElement('button'); b.type='button'; b.className='toast-act'; b.textContent=act.label;

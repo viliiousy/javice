@@ -12,6 +12,9 @@ enum BashyLock {
 
     private static var cover: UIWindow?
     private static var checking = false
+    // 본인 확인 창을 취소하면 앱이 다시 '활성' 이 되면서 곧바로 또 묻는 일이 생길 수 있다.
+    // 실패 직후 잠깐은 자동으로 다시 묻지 않고, 가림막을 누를 때(retry) 다시 묻는다.
+    private static var lastFail: Date?
 
     // 앱이 뒤로 갈 때: 가림막부터 덮는다(앱 전환 화면 미리보기에도 내용이 안 보이게).
     static func coverIfNeeded(_ scene: UIWindowScene) {
@@ -36,13 +39,15 @@ enum BashyLock {
     }
 
     // 앱이 앞으로 왔을 때: 본인 확인 → 통과하면 가림막을 걷는다. 실패하면 가림막을 두고, 누르면 다시 시도.
-    static func unlockIfNeeded() {
+    static func unlockIfNeeded(force: Bool = false) {
         guard enabled, cover != nil, !checking else { return }
+        if !force, let f = lastFail, Date().timeIntervalSince(f) < 1.5 { return }
         checking = true
         let ctx = LAContext()
         ctx.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Bashy 를 엽니다") { ok, _ in
             DispatchQueue.main.async {
                 checking = false
+                lastFail = ok ? nil : Date()
                 if ok {
                     let scene = cover?.windowScene
                     cover?.isHidden = true; cover = nil
@@ -56,5 +61,5 @@ enum BashyLock {
 
 final class LockTap: NSObject {
     static let shared = LockTap()
-    @objc func retry() { BashyLock.unlockIfNeeded() }
+    @objc func retry() { BashyLock.unlockIfNeeded(force: true) }
 }

@@ -122,17 +122,20 @@ const PlanGen = {
     const ex = p.exclude || [];
     return ['body', ...set.filter(e => !ex.includes(e))];
   },
+  // 읽기 전용(고치지 말 것) — 종목 검색은 글자 하나 칠 때마다 수백 종목을 거른다
+  _profRO() { return UserStore.json(this.PROFILE_KEY, null); },
+  _bansRO() { const v = UserStore.json(this.BAN_KEY, null); return Array.isArray(v) ? v : []; },
   allowed(name, p) {
-    p = p || this.profile() || {};
-    if (this.bans().includes(name)) return false;
+    p = p || this._profRO() || {};
+    if (this._bansRO().includes(name)) return false;
     if (!this.have(p).includes(this.equipOf(name))) return false;
     for (const k of p.injury || []) { const r = this.INJURY[k]; if (r && r.re.test(name)) return false; }
     return true;
   },
   // 고르기 창에서 쓰는 거름: 뺀 기구(exclude)와 다시 추천 안 함만 거른다(장소는 따지지 않는다)
   pickerOk(name) {
-    const p = this.profile() || {};
-    return !this.bans().includes(name) && !(p.exclude || []).includes(this.equipOf(name));
+    const p = this._profRO() || {};
+    return !this._bansRO().includes(name) && !(p.exclude || []).includes(this.equipOf(name));
   },
 
   // ── 플랜 만들기 ─────────────────────────
@@ -301,10 +304,11 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
   log(ds) { try { return JSON.parse(UserStore.get(this.LOG_PREFIX + ds) || '{}') || {}; } catch { return {}; } },
   saveLog(ds, L) { UserStore.set(this.LOG_PREFIX + ds, JSON.stringify(L)); window.FirebaseSync?.scheduleSave?.(); },
   // 이 운동의 가장 최근 기록(오늘 이전)
+  // 120일을 거슬러 찾는다 — 운동 줄마다 불리므로 날짜별 기록은 읽기 전용 캐시로 읽는다
   last(name, beforeDs) {
     for (let i = 1; i <= 120; i++) {
       const d = new Date(beforeDs + 'T00:00:00'); d.setDate(d.getDate() - i);
-      const L = this.log(Fitness._dateStr(d));
+      const L = UserStore.json(this.LOG_PREFIX + Fitness._dateStr(d), null) || {};
       if (L[name] && L[name].length) return { ds: Fitness._dateStr(d), sets: L[name] };
     }
     return null;
@@ -415,7 +419,8 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
       const pool = Object.values(this.POOL).flat().filter(n => this.partOf(n) === part);
       cands.push(...pool, ...EX_DB[part]);
     }
-    const uniq = [...new Set(cands)].filter(n => n !== name && !this.bans().includes(n));
+    const bans = this.bans();
+    const uniq = [...new Set(cands)].filter(n => n !== name && !bans.includes(n));
     const ok = uniq.filter(n => this.allowed(n, p)).map(n => ({ n, need: false }));
     const more = ok.length >= 6 ? [] : uniq.filter(n => !this.allowed(n, p)).slice(0, 8 - ok.length).map(n => ({ n, need: true }));
     return ok.slice(0, 12).concat(more);

@@ -235,24 +235,30 @@ const FirebaseSync = {
       console.error('[FB] 저장 실패:', e.message);
       this._retry = Math.min(6, this._retry + 1);
       clearTimeout(this._saveTimer);
-      this._saveTimer = setTimeout(() => this.save(), 5000 * this._retry);
+      this._saveTimer = setTimeout(() => { this._saveTimer = null; this.save(); }, 5000 * this._retry);
     } finally {
       this._syncing = false;
     }
   },
 
   // 각 모듈에서 데이터 변경 시 직접 호출
+  // 1초 동안 더 바뀌는 게 없으면 올린다. 쉬지 않고 계속 바뀌어도(글 쓰는 중 등) 8초를 넘겨 미루지는 않는다.
+  _firstEditTs: 0,
   scheduleSave() {
-    this._lastEditTs = Date.now();
+    const now = Date.now();
+    this._lastEditTs = now;
+    if (!this._saveTimer) this._firstEditTs = now;
     clearTimeout(this._saveTimer);
-    this._saveTimer = setTimeout(() => this.save(), 1000);
+    const wait = Math.max(0, Math.min(1000, this._firstEditTs + 8000 - now));
+    this._saveTimer = setTimeout(() => { this._saveTimer = null; this.save(); }, wait);
   },
 
   startPolling() {
     if (this._pollTimer) return;
     // 20초마다 다른 기기 변경 확인
-    this._pollTimer = setInterval(() => this._poll(), 20000);
+    this._pollTimer = setInterval(() => { if (!document.hidden) this._poll(); }, 20000);   // 화면이 가려져 있으면 쉬고, 돌아오면 바로 확인한다(아래)
     // 앱 포커스 시 즉시 확인
+    if (!this._visBound) this._visBound = true; else return;
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState==='visible') {
         setTimeout(() => this._poll(), 500);

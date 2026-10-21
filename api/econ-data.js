@@ -14,6 +14,7 @@
 // 서비스 계정만 읽고 쓴다. (/google_refresh 와 같은 방식)
 
 const { cors } = require('../lib/cors');
+const { tfetch } = require('../lib/http');   // 바깥 호출 시간 제한 (lib/http.js)
 const { fbFetch, fbGet } = require('../lib/fb-admin');
 
 const FIREBASE_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyBWrrQLSK-krXQMwuueI_dw893bK5-hmPY';
@@ -23,7 +24,7 @@ const UID_RE = /^[A-Za-z0-9]{20,64}$/;      // 경로 조작 방지. Firebase UI
 // RS256 검증을 직접 구현하지 않고 Identity Toolkit 에 맡긴다 (lib/google-oauth.js 와 같은 이유).
 async function uidFromIdToken(idToken) {
   if (!idToken || typeof idToken !== 'string') return null;
-  const res = await fetch(
+  const res = await tfetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_KEY}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ idToken }) });

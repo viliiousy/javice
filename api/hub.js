@@ -21,6 +21,7 @@
 //   ics      : 캘린더 구독 주소(.ics)를 대신 받아 원문을 돌려준다 (Firebase ID 토큰 필요, 연결 코드 아님).
 
 const crypto = require('crypto');
+const { tfetch } = require('../lib/http');   // 바깥 호출 시간 제한 (lib/http.js)
 const dns = require('dns').promises;
 const net = require('net');
 const { fbFetch, fbGet } = require('../lib/fb-admin');
@@ -161,7 +162,7 @@ async function googleSub(uid) {
 }
 
 async function gget(tok, url) {
-  const r = await fetch(url, { headers: { Authorization: `Bearer ${tok}` } });
+  const r = await tfetch(url, { headers: { Authorization: `Bearer ${tok}` } });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(`Tasks API ${r.status}: ${(j.error && j.error.message) || ''}`);
   return j;
@@ -217,7 +218,7 @@ async function taskAdd(uid, title) {
   if (title.length < 2) throw new Error('할일 내용이 비었습니다');
   const g = await googleTok(uid);
   if (g.needConsent) return g;
-  const r = await fetch('https://tasks.googleapis.com/tasks/v1/lists/%40default/tasks', {
+  const r = await tfetch('https://tasks.googleapis.com/tasks/v1/lists/%40default/tasks', {
     method: 'POST', headers: { Authorization: `Bearer ${g.tok}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ title }),
   });
   const j = await r.json().catch(() => ({}));
@@ -232,7 +233,7 @@ async function taskDone(uid, list, id, undo) {
   if (g.needConsent) return g;
   const url = `https://tasks.googleapis.com/tasks/v1/lists/${encodeURIComponent(list)}/tasks/${encodeURIComponent(id)}`;
   const body = undo ? { status: 'needsAction', completed: null } : { status: 'completed' };
-  const r = await fetch(url, { method: 'PATCH', headers: { Authorization: `Bearer ${g.tok}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const r = await tfetch(url, { method: 'PATCH', headers: { Authorization: `Bearer ${g.tok}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(`Tasks API ${r.status}: ${(j.error && j.error.message) || ''}`);
   return { status: j.status };
@@ -252,7 +253,7 @@ const CFG_FLAGS  = ['wakeOn', 'night'];
 
 async function uidFromIdToken(idToken) {
   if (!idToken || typeof idToken !== 'string') return null;
-  const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_KEY}`,
+  const r = await tfetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_KEY}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }) });
   if (!r.ok) return null;
   const u = ((await r.json().catch(() => ({}))).users || [])[0];
@@ -361,7 +362,7 @@ async function stSaveTok(uid, j) {
   return v;
 }
 async function stTokReq(params) {
-  const r = await fetch(ST_TOKEN, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: stBasic() }, body: new URLSearchParams(params) });
+  const r = await tfetch(ST_TOKEN, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: stBasic() }, body: new URLSearchParams(params) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.access_token) throw new Error(j.error_description || j.error || `SmartThings 토큰 실패(HTTP ${r.status})`);
   return j;
@@ -387,7 +388,7 @@ async function stToken(uid) {
   return (await stSaveTok(uid, j)).at;
 }
 async function stGet(tok, path) {
-  const r = await fetch(ST_API + path, { headers: { Authorization: 'Bearer ' + tok } });
+  const r = await tfetch(ST_API + path, { headers: { Authorization: 'Bearer ' + tok } });
   if (!r.ok) throw new Error(`SmartThings ${path.split('?')[0]} HTTP ${r.status}`);
   return r.json();
 }
@@ -430,7 +431,7 @@ async function stCmd(uid, b) {
   const tok = await stToken(uid);
   if (b.scene) {
     if (!/^[0-9a-f-]{20,64}$/i.test(String(b.scene))) throw new Error('잘못된 장면');
-    const r = await fetch(`${ST_API}/scenes/${b.scene}/execute`, { method: 'POST', headers: { Authorization: 'Bearer ' + tok } });
+    const r = await tfetch(`${ST_API}/scenes/${b.scene}/execute`, { method: 'POST', headers: { Authorization: 'Bearer ' + tok } });
     if (!r.ok) throw new Error('장면 실행 실패 HTTP ' + r.status);
     return { ok: true };
   }
@@ -440,7 +441,7 @@ async function stCmd(uid, b) {
     .filter(c => c && ST_CMD_OK.test(c.capability) && ST_CMD_OK.test(c.command))
     .map(c => ({ component: 'main', capability: c.capability, command: c.command, arguments: Array.isArray(c.arguments) ? c.arguments.slice(0, 3) : [] }));
   if (!cmds.length) throw new Error('명령이 없습니다');
-  const r = await fetch(`${ST_API}/devices/${id}/commands`, { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify({ commands: cmds }) });
+  const r = await tfetch(`${ST_API}/devices/${id}/commands`, { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify({ commands: cmds }) });
   if (!r.ok) throw new Error('명령 실패 HTTP ' + r.status);
   return { ok: true };
 }
@@ -676,7 +677,7 @@ async function icsFetch(idToken, raw) {
       if (!/^https?:$/.test(url.protocol) || url.username || url.password) return { status: 400, error: 'http(s)·webcal 주소만 쓸 수 있습니다' };
       if (url.port && !['80', '443', '8080', '8443'].includes(url.port)) return { status: 400, error: '쓸 수 없는 포트입니다' };
       if (!(await publicHost(url.hostname))) return { status: 400, error: '공개된 인터넷 주소만 쓸 수 있습니다' };
-      const r = await fetch(url, { redirect: 'manual', signal: ctl.signal,
+      const r = await tfetch(url, { redirect: 'manual', signal: ctl.signal,
         headers: { 'User-Agent': 'BashyCalendar/1.0 (+https://bashy.app)', Accept: 'text/calendar, text/plain;q=0.9, */*;q=0.5' } });
       if (r.status >= 300 && r.status < 400 && r.headers.get('location')) { url = new URL(r.headers.get('location'), url); continue; }
       if (!r.ok) return { status: 502, error: `캘린더 주소가 응답하지 않습니다(HTTP ${r.status})` };

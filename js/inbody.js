@@ -38,12 +38,20 @@ const InBody = {
   },
 
   // ── 데이터 ─────────────────────────────
+  // 상단바·운동 열량·헤더가 한 번 그릴 때마다 여러 번 부른다. 기록이 수백 개(건강 앱 연동은 몇 년치)라
+  // 파싱 + 정렬을 매번 하면 무겁다 — 저장 문자열이 같으면 정렬해 둔 것을 쓰고, 고쳐 써도 되게 줄마다 복사해 준다.
   getRecords() {
-    let v;
-    try { v = JSON.parse(UserStore.get(this.KEY) || '[]'); }
-    catch { v = []; }
-    if (!Array.isArray(v)) v = [];
-    return v.slice().sort((a,b) => String(a.dt).localeCompare(String(b.dt)));
+    const raw = UserStore.get(this.KEY) || '[]', k = UserStore.key(this.KEY);
+    let c = this._recC;
+    if (!c || c.raw !== raw || c.k !== k) {
+      let v;
+      try { v = JSON.parse(raw); }
+      catch { v = []; }
+      if (!Array.isArray(v)) v = [];
+      v = v.filter(r => r && typeof r === 'object').sort((a,b) => String(a.dt).localeCompare(String(b.dt)));
+      c = this._recC = { raw, k, v };
+    }
+    return c.v.map(r => ({ ...r }));
   },
 
   saveRecords(v) {
@@ -96,7 +104,8 @@ const InBody = {
     this._migratePeriod(); this.render();
     // 아이폰 앱: 애플 건강을 켜 두었으면 열 때마다(10분에 한 번) 새 측정을 가져온다
     if (this.healthOn()) { this._watch(true); setTimeout(() => this.healthSync(false), 1500); }
-    document.addEventListener('visibilitychange', () => { if (!document.hidden && this.healthOn()) this.healthSync(false); });
+    if (!this._visBound) { this._visBound = true;   // init 이 다시 불려도 같은 리스너가 쌓이지 않게
+      document.addEventListener('visibilitychange', () => { if (!document.hidden && this.healthOn()) this.healthSync(false); }); }
   },
 
   // ── 애플 건강 연동 (아이폰 앱) ─────────────

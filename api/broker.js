@@ -10,6 +10,7 @@
 // POST { idToken, act:'holdings' } → { rows:[{ name, ticker, qty, avg, market:'kr'|'us' }] }
 
 const { cors } = require('../lib/cors');
+const { tfetch } = require('../lib/http');   // 바깥 호출 시간 제한 (lib/http.js)
 const { fbFetch, fbGet } = require('../lib/fb-admin');
 
 const FIREBASE_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyBWrrQLSK-krXQMwuueI_dw893bK5-hmPY';
@@ -26,7 +27,7 @@ async function readBody(req) {
 
 async function uidOf(idToken) {
   if (!idToken) return null;
-  const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_KEY}`,
+  const r = await tfetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_KEY}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }) });
   if (!r.ok) return null;
   const u = ((await r.json().catch(() => ({}))).users || [])[0];
@@ -37,7 +38,7 @@ async function uidOf(idToken) {
 async function kisToken(uid, k, base) {
   const saved = await fbGet(`/users/${uid}/_link/kisTok.json`).catch(() => null);
   if (saved && saved.t && saved.base === base && saved.key === k.appkey.slice(0, 8) && saved.exp - Date.now() > 3600e3) return saved.t;
-  const r = await fetch(base + '/oauth2/tokenP', {
+  const r = await tfetch(base + '/oauth2/tokenP', {
     method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' },
     body: JSON.stringify({ grant_type: 'client_credentials', appkey: k.appkey, appsecret: k.appsecret }),
   });
@@ -51,7 +52,7 @@ async function kisToken(uid, k, base) {
 async function kisGet(base, path, tr, tok, k, params) {
   const u = new URL(base + path);
   Object.entries(params).forEach(([a, b]) => u.searchParams.set(a, b));
-  const r = await fetch(u, { headers: {
+  const r = await tfetch(u, { headers: {
     'content-type': 'application/json; charset=utf-8', authorization: `Bearer ${tok}`,
     appkey: k.appkey, appsecret: k.appsecret, tr_id: tr, custtype: 'P', tr_cont: '',
   } });

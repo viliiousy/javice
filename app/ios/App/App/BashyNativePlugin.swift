@@ -273,6 +273,10 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
             let eng = AVAudioEngine(), node = AVAudioPlayerNode()
             guard let url = Bundle.main.url(forResource: "rest_count", withExtension: "wav", subdirectory: "public/sounds"),
                   let file = try? AVAudioFile(forReading: url) else { call.resolve(["ok": false]); return }
+            // 통화 중·오디오 경로가 바뀌는 순간에는 출력 형식이 0Hz/0채널일 수 있다. 그대로 connect 하면
+            // AVAudioEngine 이 Objective-C 예외로 앱을 죽인다 — 그때는 소리 예약을 건너뛴다(화면 카운트다운은 그대로).
+            let out = eng.outputNode.outputFormat(forBus: 0)
+            guard out.sampleRate > 0, out.channelCount > 0, file.processingFormat.sampleRate > 0, file.length > 0 else { call.resolve(["ok": false]); return }
             eng.attach(node)
             eng.connect(node, to: eng.mainMixerNode, format: file.processingFormat)
             do { try eng.start() } catch { call.resolve(["ok": false, "error": error.localizedDescription]); return }
@@ -281,7 +285,7 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
                 let at = AVAudioTime(hostTime: mach_absolute_time() + AVAudioTime.hostTime(forSeconds: delay - lead))
                 node.scheduleFile(file, at: at, completionHandler: nil)
             } else {
-                let skip = AVAudioFramePosition((lead - delay) * rate)
+                let skip = min(AVAudioFramePosition((lead - delay) * rate), max(0, file.length - 1))
                 node.scheduleSegment(file, startingFrame: skip, frameCount: AVAudioFrameCount(max(0, file.length - skip)), at: nil, completionHandler: nil)
             }
             node.volume = sound ? 1 : 0
@@ -362,6 +366,8 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
         for name in ["rest_end", "rest_count"] {
             guard let src = Bundle.main.url(forResource: name, withExtension: "wav", subdirectory: "public/sounds") else { continue }
             let dst = dir.appendingPathComponent(name + ".wav")
+            // 매번 지우고 복사하지 않는다 — 같은 파일이면 그대로 둔다
+            if fm.fileExists(atPath: dst.path), fm.contentsEqual(atPath: src.path, andPath: dst.path) { continue }
             try? fm.removeItem(at: dst)
             try? fm.copyItem(at: src, to: dst)
         }
@@ -398,7 +404,8 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     override public func load() {
-        installSounds()
+        // 파일 복사는 앱 시작(메인 스레드)을 붙잡지 않게 뒤에서 한다
+        DispatchQueue.global(qos: .utility).async { [weak self] in self?.installSounds() }
         NotificationCenter.default.addObserver(self, selector: #selector(onIntent), name: BashyIntentStore.didChange, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(onWorkoutAction(_:)), name: Notification.Name("BashyWorkoutAction"), object: nil)
     }

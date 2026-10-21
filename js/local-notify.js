@@ -50,7 +50,14 @@ const LocalNotify = {
   _t: null,
   reschedule(delay = 800) { clearTimeout(this._t); this._t = setTimeout(() => this._run(), delay); },
 
+  // 한 번 짜는 데 기기와 몇 번 오간다. 그사이 또 불리면 겹쳐 돌지 않고, 끝난 뒤 한 번 더 짠다.
   async _run() {
+    if (this._busy) { this._again = true; return; }
+    this._busy = true;
+    try { await this._run0(); } catch (e) { console.warn('[LocalNotify] run', e); }
+    finally { this._busy = false; if (this._again) { this._again = false; this.reschedule(300); } }
+  },
+  async _run0() {
     const P = this.P; if (!P) return;
     const s = Notifications.getSettings();
     await this.cancelAll();
@@ -120,6 +127,8 @@ const LocalNotify = {
   init() {
     if (!this.ok) return;
     this.reschedule(2500);
+    if (this._inited) return;   // 다시 로그인해 init 이 또 불려도 리스너가 쌓이지 않게
+    this._inited = true;
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.reschedule(1500); });
     // 알림을 누르면 앱이 열린다 — 식단 알림이면 건강 탭으로
     try {

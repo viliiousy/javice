@@ -432,7 +432,7 @@ const WorkoutMode = {
   _time() {
     const S = this.st; if (!S) return;
     if (!this._ic || Date.now() - this._ic > 5000) { this._ic = Date.now(); this._idleCheck(); if (!this.st) return; }
-    const e = document.getElementById('wkEl'); if (e) e.textContent = this._fmt((Date.now() - S.t0) / 1000);
+    const e = document.getElementById('wkEl'); if (e) { const t = this._fmt((Date.now() - S.t0) / 1000); if (e.textContent !== t) e.textContent = t; }   // 0.25초마다 돈다 — 바뀐 때만 쓴다
     const r = document.getElementById('wkRest');
     if (!r || !S.restEnd) return;
     const left = (S.restEnd - Date.now()) / 1000;
@@ -443,7 +443,7 @@ const WorkoutMode = {
     r.hidden = false;
     const pct = Math.max(0, Math.min(1, left / (S.restTot || 1)));
     const big = r.querySelector('.wk-rb');
-    if (big) { big.textContent = this._fmt(left); big.classList.toggle('last', sec <= this.COUNT); r.querySelector('.wk-rp').style.width = (pct * 100) + '%'; return; }
+    if (big) { const t = this._fmt(left); if (big.textContent !== t) big.textContent = t; big.classList.toggle('last', sec <= this.COUNT); r.querySelector('.wk-rp').style.width = (pct * 100) + '%'; return; }
     r.innerHTML = `<div class="wk-rt">쉬는 시간</div><div class="wk-rb num">${this._fmt(left)}</div>
       <div class="wk-rtrack"><i class="wk-rp" style="width:${pct * 100}%"></i></div>
       <div class="wk-rnext">다음: ${esc(this._nextLabel())}</div>

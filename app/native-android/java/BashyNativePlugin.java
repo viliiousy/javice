@@ -28,7 +28,8 @@ public class BashyNativePlugin extends Plugin {
         String json = call.getString("json", "{}");
         Context ctx = getContext();
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("today", json).apply();
-        BashyWidgets.refreshAll(ctx);
+        // 위젯 갱신이 실패해도(위젯 서비스가 없는 기기 등) 앱이 죽지 않게 — 저장은 이미 끝났다
+        try { BashyWidgets.refreshAll(ctx); } catch (Exception ignored) {}
         call.resolve();
     }
 
@@ -81,7 +82,9 @@ public class BashyNativePlugin extends Plugin {
         AppWidgetManager m = ctx.getSystemService(AppWidgetManager.class);
         if (m == null || !m.isRequestPinAppWidgetSupported()) { r.put("ok", false); r.put("error", "이 홈 화면 앱은 위젯 바로 놓기를 지원하지 않습니다"); call.resolve(r); return; }
         Class<?> cls = "habit".equals(call.getString("kind", "today")) ? BashyWidgets.Habit.class : BashyWidgets.Today.class;
-        boolean ok = m.requestPinAppWidget(new ComponentName(ctx, cls), null, null);
+        boolean ok;
+        try { ok = m.requestPinAppWidget(new ComponentName(ctx, cls), null, null); }
+        catch (Exception e) { ok = false; }   // 앱이 앞에 있지 않을 때 등 IllegalStateException
         r.put("ok", ok); if (!ok) r.put("error", "위젯을 놓지 못했습니다");
         call.resolve(r);
     }

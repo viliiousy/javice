@@ -8,7 +8,7 @@ const Fitness = {
   },
   _customKey(date){ return `gl_fitness_custom_${this._dateStr(date)}`; },
   getCustomExercises(date=new Date()){
-    return JSON.parse(UserStore.get(this._customKey(date))||'[]');
+    const v=UserStore.parse(this._customKey(date), []); return Array.isArray(v)?v:[];
   },
   saveCustomExercises(v,date=new Date()){
     UserStore.set(this._customKey(date),JSON.stringify(v));
@@ -16,7 +16,7 @@ const Fitness = {
   },
 
   _checkKey(date){ return `gl_fitness_${this._dateStr(date)}`; },
-  _checked(date=new Date()){ return JSON.parse(UserStore.get(this._checkKey(date))||'[]'); },
+  _checked(date=new Date()){ const v=UserStore.parse(this._checkKey(date), []); return Array.isArray(v)?v:[]; },
   _save(v,date=new Date()){ UserStore.set(this._checkKey(date),JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
 
   // ── 요일별 계획 ─────────────────────────
@@ -60,8 +60,11 @@ const Fitness = {
   _defaultFor(dow) { return UserStore.get('gl_fit_blank') === '1' ? 'none' : this.DEFAULT_DAY[dow]; },
 
   // 하루에 여러 번: 요일 값이 문자열이면 한 번, 배열이면 여러 번(예: ['r_웨이트','r_주짓수']).
+  // 읽기 전용(고치지 말 것) — 카드 한 번 그릴 때 요일 7개 × 여러 번 부른다
+  _dpRO() { const v = UserStore.json(this.DAYPLAN_KEY, null); return (v && typeof v === 'object') ? v : {}; },
+  _rtRO() { const v = UserStore.json(this.ROUTINE_KEY, null); return (v && typeof v === 'object') ? v : {}; },
   picks(dow) {
-    const v = this.dayPlan()[dow], R = this.routines();
+    const v = this._dpRO()[dow], R = this._rtRO();
     const ok = p => ['A','B','C','cardio','rest','none'].includes(p) || R[p];   // 예전 Hevy 루틴 id 는 무시
     let a = (Array.isArray(v) ? v : [v]).filter(p => p && ok(p));
     if (a.length > 1) a = a.filter(p => p !== 'rest' && p !== 'none');
@@ -83,7 +86,7 @@ const Fitness = {
   },
   // 한 회차의 계획
   _planOne(pick, dow) {
-    const R = this.routines();
+    const R = this._rtRO();
     if (!['A','B','C','cardio','rest','none'].includes(pick) && !R[pick]) pick = this._defaultFor(dow);
     const P = this._planOne0(pick, R); P.pick = pick; return P;
   },
@@ -580,7 +583,8 @@ const Fitness = {
   // 목록에 없는 운동을 이름 + 종류(근력 부위 / 유산소 / 스포츠)로 저장해 두고, 다음부터 검색·교체·추가에 같이 나온다.
   MYEX_KEY: 'gl_fit_myex',   // [{ n:'주짓수 드릴', p:'스포츠' }]
   myEx(){ try{ const v=JSON.parse(UserStore.get(this.MYEX_KEY)||'[]'); return Array.isArray(v)?v.filter(x=>x&&x.n):[]; }catch{ return []; } },
-  myPart(n){ const x=this.myEx().find(e=>e.n===n); return x ? x.p : null; },
+  // 운동 이름마다 부위를 물을 때 쓴다(카드 한 번에 수십 번) — 읽기만 하므로 파싱해 둔 값으로 찾는다
+  myPart(n){ const v=UserStore.json(this.MYEX_KEY, null); const x=Array.isArray(v)?v.find(e=>e&&e.n===n):null; return x ? x.p : null; },
   _syncMyEx(){
     if(typeof EX_DB==='undefined') return;
     const l=this.myEx(); if(l.length) EX_DB['내 운동']=l.map(x=>x.n); else delete EX_DB['내 운동'];

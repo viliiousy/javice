@@ -63,9 +63,4 @@ const EconKo = {
     }
     return [...best.values()].sort((a, b) => a.score - b.score);
   },
-  // 티커 → 한글 이름 (목록에 표시)
-  nameOf(tk) {
-    for (const [names, t] of Object.entries(this.RAW)) if (t === tk) return names.split('|')[0];
-    return '';
-  },
 };

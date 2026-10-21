@@ -50,7 +50,7 @@ const Checklist = {
   },
 
   // ── 터치 제스처 ───────────────────────
-  _touchSX:0, _swiping:false, _lpTimer:null,
+  _touchSX:0, _swiping:false,
   _touchStart(e,id){ this._touchSX=e.touches[0].clientX; this._swiping=false; },
   _touchMove(e){
     const dx=Math.abs(e.touches[0].clientX-this._touchSX);
@@ -62,8 +62,6 @@ const Checklist = {
       if(dx < -60){ this.remove(id); return; } // 왼쪽 스와이프 → 삭제
     }
   },
-  _lpStart(e,id){ this._lpTimer=setTimeout(()=>Checklist.showEdit(id),600); },
-  _lpEnd(){ clearTimeout(this._lpTimer); },
 
   // 글씨를 누르면 수정, 네모를 누르면 체크 — 폰과 PC 가 같다.
   // 예전엔 폰에서 글씨를 눌러도 체크가 됐고, 길게 눌러 수정도 이 함수를 거쳐

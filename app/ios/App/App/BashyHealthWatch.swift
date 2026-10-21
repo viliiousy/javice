@@ -10,6 +10,7 @@ enum BashyHealthWatch {
     private static let lastKey = "bashy.healthWatch.last"
     private static let store = HKHealthStore()
     private static var started = false
+    private static var query: HKObserverQuery?
 
     static var enabled: Bool {
         get { UserDefaults.standard.bool(forKey: onKey) }
@@ -22,15 +23,20 @@ enum BashyHealthWatch {
               let t = HKQuantityType.quantityType(forIdentifier: .bodyMass) else { return }
         started = true
         let q = HKObserverQuery(sampleType: t, predicate: nil) { _, done, err in
-            if err == nil { checkNew(t) }
+            // 끈 뒤에도 이미 걸어 둔 질의가 남아 알림이 오던 문제 — 꺼져 있으면 아무것도 하지 않는다
+            if err == nil, enabled { checkNew(t) }
             done()
         }
+        query = q
         store.execute(q)
         store.enableBackgroundDelivery(for: t, frequency: .immediate) { _, _ in }
     }
 
+    // 끄면 질의도 멈추고 started 를 되돌린다 — 안 그러면 다시 켤 때 startIfEnabled 가 '이미 시작함' 으로 건너뛴다
     static func stop() {
         enabled = false
+        if let q = query { store.stop(q); query = nil }
+        started = false
         if let t = HKQuantityType.quantityType(forIdentifier: .bodyMass) { store.disableBackgroundDelivery(for: t) { _, _ in } }
     }
 

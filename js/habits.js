@@ -32,9 +32,14 @@ const Habits = {
     return list;
   },
   _saveCats(list) { UserStore.set('gl_habit_cats', JSON.stringify(list)); FirebaseSync?.scheduleSave(); },
+  // 줄마다 _catOf → CATS 를 부른다(트래커·연속 계산에서는 수백 번). 저장 문자열이 같으면 지난번 표를 쓴다.
   get CATS() {
+    let raw = null; try { raw = UserStore.get('gl_habit_cats'); } catch {}
+    const c = this._catsC;
+    if (c && c.raw === raw && c.u === UserStore.getUser()) return c.o;
     const o = {};
     this._catList().forEach(c => { o[c.id] = { label:c.label, ic:c.ic || 'list' }; });
+    this._catsC = { raw, u: UserStore.getUser(), o };
     return o;
   },
   addCat(btn) {
@@ -84,8 +89,13 @@ const Habits = {
   _lk(k) { return UserStore.key(k); },
 
   getList() {
-    const v = UserStore.get('gl_habits_list');
-    return JSON.parse(v || JSON.stringify(this.DEFAULTS));
+    const v = UserStore.parse('gl_habits_list', null);
+    return Array.isArray(v) ? v : JSON.parse(JSON.stringify(this.DEFAULTS));
+  },
+  // 읽기 전용 목록(고치지 말 것) — 같은 저장 문자열이면 다시 파싱하지 않는다
+  _listRO() {
+    const v = UserStore.json('gl_habits_list', null);
+    return Array.isArray(v) ? v : this.DEFAULTS;
   },
   saveList(v) { UserStore.set('gl_habits_list', JSON.stringify(v)); FirebaseSync?.scheduleSave(); },
 
@@ -94,12 +104,14 @@ const Habits = {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   },
   _dateKey(date) { return `gl_habits_${this._dateStr(date)}`; },
-  getChecked(date=new Date()) { return JSON.parse(UserStore.get(this._dateKey(date))||'[]'); },
+  getChecked(date=new Date()) { return this._chkRO(date).slice(); },
+  // 읽기 전용 체크 목록 — 연속·트래커·달력처럼 날마다 읽는 곳에서 쓴다
+  _chkRO(date=new Date()) { const v = UserStore.json(this._dateKey(date), null); return Array.isArray(v) ? v : []; },
   setChecked(v,date=new Date()) { UserStore.set(this._dateKey(date), JSON.stringify(v)); FirebaseSync?.scheduleSave(); try{ LocalNotify?.reschedule(); }catch(e){} },
 
   // cat 을 넘기지 않으면 전체 카테고리를 반환한다 (스탯 배너 등 기존 호출 호환)
   getHabitsForDate(date=new Date(), cat=null) {
-    return this._forDate(this.getList(), date, cat);
+    return this._forDate(this._listRO(), date, cat);
   },
   // 목록을 밖에서 넘길 수 있게 갈라 뒀다. 히트맵이 35일치를 도는데
   // 날마다 getList() 를 부르면 JSON 을 35번 파싱한다.
@@ -129,7 +141,7 @@ const Habits = {
 
   // 달력이 한 달치를 한 번에 받아 간다. 날마다 getList() 를 부르면 JSON 을 31번 파싱한다.
   monthLevels(year, month) {               // month 는 0부터
-    const all = this.getList();
+    const all = this._listRO();
     const end = new Date(); end.setHours(0,0,0,0);
     const n = new Date(year, month+1, 0).getDate();
     const out = {};
@@ -138,7 +150,7 @@ const Habits = {
       if (dt > end) continue;              // 아직 오지 않은 날은 칠할 것이 없다
       const hs = this._forDate(all, dt, null);
       if (!hs.length) continue;
-      const chk  = this.getChecked(dt);
+      const chk  = this._chkRO(dt);
       const done = hs.filter(h => chk.includes(h.id)).length;
       out[d] = { lv: this._level(done, hs.length), done, total: hs.length };
     }
@@ -169,7 +181,7 @@ const Habits = {
   },
   _trkPaint() {
     const box = document.getElementById('trkBox'), t = this._trk; if (!box || !t) return;
-    const all = this.getList(), today = new Date(); today.setHours(0,0,0,0);
+    const all = this._listRO(), today = new Date(); today.setHours(0,0,0,0);
     const name = h => `${h.emoji ? esc(h.emoji)+' ' : ''}${esc(h.name)}`;
     const D31 = Array.from({ length:31 }, (_, i) => i+1);
     const seg = `<div class="trk-seg" role="tablist">
@@ -177,7 +189,7 @@ const Habits = {
         <button type="button" class="${t.mode==='y'?'on':''}" onclick="Habits._trkGo('mode','y')">연간</button></div>`;
     // 하루치 요약 — 칸 농도(0~4)와 '다 했음'
     const dayInfo = d => {
-      const hs = this._forDate(all, d), ck = this.getChecked(d);
+      const hs = this._forDate(all, d), ck = this._chkRO(d);
       const dn = hs.filter(h => ck.includes(h.id)).length, tot = hs.length;
       const r = tot ? dn/tot : -1;
       return { dn, tot, lv: r < 0 ? 'x' : r===0 ? 0 : r<.34 ? 1 : r<.67 ? 2 : r<1 ? 3 : 4, full: tot>0 && dn===tot };
@@ -194,7 +206,7 @@ const Habits = {
       for (let i = 1; i <= n; i++) {
         const d = new Date(t.y, t.m, i), ds = this._dateStr(d), isT = ds === this._dateStr(today);
         if (d > today) { cells.push(`<i class="cd fut"><span class="num">${i}</span></i>`); continue; }
-        const k = dayInfo(d), ck = this.getChecked(d);
+        const k = dayInfo(d), ck = this._chkRO(d);
         per.forEach(p => { if (this._forDate([p.h], d).length) { p.due++; if (ck.includes(p.h.id)) p.dn++; } });
         tDone += k.dn; tDue += k.tot;
         cells.push(`<i class="c cd lv${k.lv}${k.full?' full':''}${isT?' now':''}" data-d="${ds}"><span class="num">${i}</span></i>`);
@@ -255,7 +267,7 @@ const Habits = {
     const show = cell => {
       const ds = cell?.dataset?.d; let tip = document.getElementById('trkTip');
       if (!ds) { tip?.remove(); return; }
-      const d = new Date(ds+'T00:00:00'), hs = this._forDate(this.getList(), d), ck = this.getChecked(d);
+      const d = new Date(ds+'T00:00:00'), hs = this._forDate(this._listRO(), d), ck = this._chkRO(d);
       const dn = hs.filter(h => ck.includes(h.id)).length;
       if (!tip) { tip = document.createElement('div'); tip.id = 'trkTip'; tip.className = 'trk-tip'; document.body.appendChild(tip); }
       tip.innerHTML = `<div class="trk-tip-h"><b>${d.getMonth()+1}월 ${d.getDate()}일 (${DOW[d.getDay()]})</b><span class="num">${dn}/${hs.length}</span></div>`
@@ -273,13 +285,16 @@ const Habits = {
     if (!this._trkTipOff) { this._trkTipOff = true; document.addEventListener('pointerdown', e => { if (!e.target.closest('.trk-sheet .c')) document.getElementById('trkTip')?.remove(); }, true); }
   },
 
-  streak(id) {
+  // 예전엔 365일을 도는 동안 날마다 목록 전체를 다시 파싱했다(습관 8개면 한 번 그릴 때 3천 번).
+  // 목록은 한 번만 읽고, 날짜별 체크는 _days(같은 그리기 안에서 습관끼리 나눠 쓰는 표)에 담아 둔다.
+  streak(id, _days) {
     let n=0; const today=new Date();
+    const h=this._listRO().find(x=>x.id===id);
+    const days=_days||new Map();
     for(let i=0;i<=365;i++){
       const d=new Date(today); d.setDate(today.getDate()-i);
-      const h=this.getList().find(x=>x.id===id);
       if(h&&h.days&&!h.days.includes(d.getDay())) continue;
-      const chk=this.getChecked(d);
+      let chk=days.get(i); if(!chk){ chk=this._chkRO(d); days.set(i,chk); }
       if(!chk.includes(id)) break;
       n++;
     }
@@ -293,10 +308,11 @@ const Habits = {
   _renderCard(date=new Date()) {
     const wrap=document.getElementById('habitsWrap'); if(!wrap) return;
     const list=this.getHabitsForDate(date);
-    const chk=this.getChecked(date);
+    const chk=this._chkRO(date);
     const isToday=this._dateStr(date)===this._dateStr(new Date());
     const done=list.filter(h=>chk.includes(h.id)).length;
     const reorder=false;
+    const stDays=new Map(), CATS=this.CATS, ds2=this._dateStr(date);
 
     const titleEl=document.querySelector('.card-habits .card-title');
     if(titleEl){
@@ -307,15 +323,14 @@ const Habits = {
 
     wrap.innerHTML=list.map(h=>{
       const isDone=chk.includes(h.id);
-      const st=this.streak(h.id);
+      const st=this.streak(h.id, stDays);
       const _d = h.days||[];
       let daysLabel = '';
       if(_d.length===7 || _d.length===0) daysLabel='<span class="habit-days">매일</span>';
       else if(_d.length===5&&[1,2,3,4,5].every(x=>_d.includes(x))) daysLabel='<span class="habit-days">평일</span>';
       else if(_d.length===2&&[0,6].every(x=>_d.includes(x))) daysLabel='<span class="habit-days">주말</span>';
       else daysLabel=`<span class="habit-days">${_d.map(d=>this.DAYS_KO[d]).join('')}</span>`;
-      const ds2=Habits._dateStr(date);
-      const cat=this._catOf(h), C=this.CATS[cat];
+      const cat=this._catOf(h), C=CATS[cat]||CATS.etc||{ic:'list'};
       // 약은 '몇 시에' 가 이름만큼 중요하다. 그것만 줄에 붙인다.
       const timeLabel = (h.time && (cat==='med' || h.notify===true))
         ? `<span class="habit-time">${esc(h.time)}${h.notify===false?'':' · 알림'}</span>` : '';
@@ -349,11 +364,11 @@ const Habits = {
     if(foot){
       if(!list.length){ foot.innerHTML=''; }
       else {
-        const all=this.getList(), base=new Date(date); base.setHours(0,0,0,0);
+        const all=this._listRO(), base=new Date(date); base.setHours(0,0,0,0);
         const cells=[];
         for(let i=6;i>=0;i--){
           const d=new Date(base); d.setDate(base.getDate()-i);
-          const hs=this._forDate(all,d,null), ck=this.getChecked(d);
+          const hs=this._forDate(all,d,null), ck=this._chkRO(d);
           const dn=hs.filter(h=>ck.includes(h.id)).length, tot=hs.length;
           const r=tot?dn/tot:0, lv=!tot?0:r===0?0:r<.34?1:r<.67?2:r<1?3:4;
           const lbl=i===0?(isToday?'오늘':this.DAYS_KO[d.getDay()]):this.DAYS_KO[d.getDay()];
@@ -400,9 +415,8 @@ const Habits = {
     if(willBeChecked){
       Sounds?.check();
       // 퍼펙트 달성 체크
-      const newChk=this.getChecked(date);
       const todayList=this.getHabitsForDate(date);
-      const all=todayList.length>0&&todayList.every(h=>newChk.includes(h.id));
+      const all=todayList.length>0&&todayList.every(h=>chk.includes(h.id));
       this._fx(id, all, todayList.length);
       if(all) { setTimeout(()=>Sounds?.achieve(),200); setTimeout(()=>{ try{ Haptic.success(); }catch(e){} },120); }
     } else { Sounds?.uncheck(); }

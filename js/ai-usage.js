@@ -216,36 +216,4 @@ const AIUsage = {
     const code = typeof Settings !== 'undefined' ? await Settings.hubLink(0) : null;
     if (code) window.postMessage({ type: 'bashy-ext-code', code }, location.origin);
   },
-
-  _code: null,
-  async _loadCode() {
-    const box = document.getElementById('aiuCodeBox');
-    const show = t => { if (box) box.textContent = t; };
-    if (!this._authed()) { this._code = null; show('로그인하면 연결 코드를 만들 수 있습니다.'); return; }
-    const link = await FirebaseSync.getLink();
-    if (link && link.hubKey) {
-      this._code = `${FirebaseSync._uid}.${link.hubKey}`;
-      show(this._code);
-    } else {
-      this._code = null;
-      show('아직 연결 코드가 없습니다 — "새 코드 만들기" 를 눌러 주세요.');
-    }
-  },
-
-  async newCode() {
-    if (!this._authed()) { App.showToast('로그인이 필요합니다', 'error'); return; }
-    const b = new Uint8Array(24);
-    crypto.getRandomValues(b);
-    const key = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    const ok = await FirebaseSync.setLink({ hubKey: key });
-    if (!ok) { App.showToast('저장 실패 — 잠시 뒤 다시 시도해 주세요', 'error'); return; }
-    await this._loadCode();
-    App.showToast('새 연결 코드를 만들었습니다', 'success');
-  },
-
-  async copyCode() {
-    if (!this._code) { App.showToast('먼저 코드를 만들어 주세요', 'error'); return; }
-    try { await navigator.clipboard.writeText(this._code); App.showToast('복사했습니다', 'success'); }
-    catch { App.showToast('복사 실패 — 코드를 길게 눌러 복사해 주세요', 'error'); }
-  },
 };

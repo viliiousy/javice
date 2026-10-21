@@ -10,6 +10,7 @@
 // 지우지 않는 것: 사용자 본인의 구글 캘린더·구글 할 일(구글 계정에 있는 사용자 소유 데이터)
 
 const { cors } = require('../lib/cors');
+const { tfetch } = require('../lib/http');   // 바깥 호출 시간 제한 (lib/http.js)
 const { fbFetch, fbGet } = require('../lib/fb-admin');
 
 const FIREBASE_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyBWrrQLSK-krXQMwuueI_dw893bK5-hmPY';
@@ -24,7 +25,7 @@ async function readBody(req) {
 }
 
 async function lookup(idToken) {
-  const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_KEY}`,
+  const r = await tfetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_KEY}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }) });
   if (!r.ok) return null;
   const u = ((await r.json().catch(() => ({}))).users || [])[0];
@@ -53,7 +54,7 @@ module.exports = async (req, res) => {
   if (who.sub && SUB_RE.test(who.sub)) {
     try {
       const v = await fbGet(`/google_refresh/${who.sub}.json`);
-      if (v && v.rt) await fetch('https://oauth2.googleapis.com/revoke', {
+      if (v && v.rt) await tfetch('https://oauth2.googleapis.com/revoke', {
         method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token: v.rt }) });
     } catch (e) {}
     await del(`/google_refresh/${who.sub}.json`);
@@ -62,7 +63,7 @@ module.exports = async (req, res) => {
   // 마지막으로 로그인 계정 자체 (본인 토큰으로 지운다)
   let authDeleted = false;
   try {
-    const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${FIREBASE_KEY}`,
+    const r = await tfetch(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${FIREBASE_KEY}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }) });
     authDeleted = r.ok;
   } catch (e) {}

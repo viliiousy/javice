@@ -58,7 +58,7 @@ struct Provider: TimelineProvider {
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> Void) {
         // 앱이 기록을 바꿀 때마다 새로 그리게 한다(reloadAllTimelines). 자정이 지나면 '앱을 열어 새로 고침' 으로 바뀌도록 한 번 더.
         let cal = Calendar.current
-        let midnight = cal.startOfDay(for: cal.date(byAdding: .day, value: 1, to: Date())!)
+        let midnight = cal.startOfDay(for: cal.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86400))
         completion(Timeline(entries: [Entry(date: Date(), snap: Snap.load()), Entry(date: midnight.addingTimeInterval(5), snap: Snap.load())], policy: .never))
     }
 }

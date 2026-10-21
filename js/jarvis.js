@@ -918,5 +918,4 @@ const JARVIS = {
     App.showToast(this._keyOf(p) ? `기본 AI: ${this.PROVIDERS[p].short}` : `${this.PROVIDERS[p].short} 키가 없어 ${this._keyOf(this._active())?this.PROVIDERS[this._active()].short+' 로 답합니다':'AI 비서는 키를 넣은 뒤 동작합니다'}`, 'success');
     return true;
   },
-  _saveKey() { this.saveSetup(); },
 };

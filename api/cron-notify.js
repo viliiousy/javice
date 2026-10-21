@@ -1,92 +1,13 @@
 // api/cron-notify.js — Web Push 알림 크론
 
-const https = require('https');
-const crypto = require('crypto');
-
 // Firebase DB — 서비스 계정으로 인증해서 읽는다 (규칙을 잠근 뒤에도 동작)
 const { fbGet, fbFetch } = require('../lib/fb-admin');
 
 // 오늘 일정 조회 (서버에 보관된 리프레시 토큰 사용 — 앱을 열 필요가 없다)
 const { todayEvents } = require('../lib/gcal');
 
-// VAPID 서명
-function urlBase64ToBuffer(base64) {
-  const padding = '='.repeat((4 - base64.length%4)%4);
-  const b64 = (base64+padding).replace(/-/g,'+').replace(/_/g,'/');
-  return Buffer.from(b64,'base64');
-}
-
-async function getVapidHeaders(subscription, subject, publicKey, privateKey, payload) {
-  const endpoint  = new URL(subscription.endpoint);
-  const audience  = `${endpoint.protocol}//${endpoint.host}`;
-  const now       = Math.floor(Date.now()/1000);
-  const exp       = now + 43200;
-  const header    = Buffer.from(JSON.stringify({typ:'JWT',alg:'ES256'})).toString('base64url');
-  const claims    = Buffer.from(JSON.stringify({aud:audience,exp,sub:subject})).toString('base64url');
-  const unsigned  = `${header}.${claims}`;
-  const sign      = crypto.createSign('SHA256');
-  sign.update(unsigned);
-  const sig       = sign.sign({key:privateKey,dsaEncoding:'ieee-p1363'},'base64url');
-  const jwt       = `${unsigned}.${sig}`;
-
-  return {
-    Authorization: `vapid t=${jwt},k=${publicKey}`,
-    'Content-Type': 'application/octet-stream',
-    'Content-Encoding': 'aes128gcm',
-    TTL: '86400',
-  };
-}
-
-// ⚠️ 현재 어디서도 호출하지 않는다. 애플(web.push.apple.com) 엔드포인트로 보내려면
-// VAPID 서명 + aes128gcm 암호화가 필요한데 아래 구현은 그렇지 않다. 되살릴 땐 새로 써야 한다.
-async function sendWebPush(subscriptionStr, title, body) {
-  let sub;
-  try { sub = JSON.parse(subscriptionStr); } catch { return null; }
-  if(!sub.endpoint || sub.endpoint.includes('fcm.googleapis.com')) {
-    // FCM endpoint는 별도 처리 필요 - 스킵
-    return null;
-  }
-
-  const payload = JSON.stringify({ notification: { title, body, icon:'/icons/icon-192.png' } });
-  const url     = new URL(sub.endpoint);
-
-  return new Promise((resolve) => {
-    const req = https.request({
-      hostname: url.hostname,
-      path:     url.pathname,
-      method:   'POST',
-      headers:  {
-        Authorization: `key=${process.env.FCM_SERVER_KEY}`,
-        'Content-Type': 'application/json',
-      }
-    }, res => {
-      let d=''; res.on('data',c=>d+=c);
-      res.on('end',()=>resolve({ status:res.statusCode, body:d }));
-    });
-    req.on('error', e => resolve({ error:e.message }));
-    req.write(JSON.stringify({ endpoint:sub.endpoint, keys:sub.keys, notification:{title,body} }));
-    req.end();
-  });
-}
-
-// FCM V1으로 발송 (FCM endpoint인 경우)
-async function getAccessToken() {
-  const sa  = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  const now = Math.floor(Date.now()/1000);
-  const claim = { iss:sa.client_email, scope:'https://www.googleapis.com/auth/firebase.messaging', aud:'https://oauth2.googleapis.com/token', iat:now, exp:now+3600 };
-  const header  = Buffer.from(JSON.stringify({alg:'RS256',typ:'JWT'})).toString('base64url');
-  const payload = Buffer.from(JSON.stringify(claim)).toString('base64url');
-  const sign    = crypto.createSign('RSA-SHA256');
-  sign.update(`${header}.${payload}`);
-  const jwt = `${header}.${payload}.${sign.sign(sa.private_key,'base64url')}`;
-  const body = `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`;
-  return new Promise((resolve,reject)=>{
-    const req=https.request({hostname:'oauth2.googleapis.com',path:'/token',method:'POST',
-      headers:{'Content-Type':'application/x-www-form-urlencoded','Content-Length':Buffer.byteLength(body)}
-    },res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>resolve(JSON.parse(d).access_token));});
-    req.on('error',reject); req.write(body); req.end();
-  });
-}
+// FCM v1 발송 — 토큰 캐시·시간 제한은 lib/fcm.js 에 있다 (api/test-push.js 와 같이 쓴다)
+const fcm = require('../lib/fcm');
 
 // notification 블록을 빼고 data 로만 보낸다.
 // notification 이 들어 있으면 브라우저·SDK 가 그것만으로도 알림을 띄울 수 있고,
@@ -96,33 +17,19 @@ async function getAccessToken() {
 // slot 을 같이 실어 보낸다. sw.js 가 이걸 알림 tag 로 써서,
 // 같은 알림이 두 번 와도 하나로 합쳐지고 다른 알림끼리는 서로 안 덮는다.
 async function sendFCM(fcmToken, title, body, slot) {
-  const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  const accessToken = await getAccessToken();
-  const payload = JSON.stringify({ message:{ token:fcmToken,
+  const r = await fcm.send({ token:fcmToken,
     data:{ title:String(title), body:String(body), slot:String(slot||'') },
     webpush:{ fcm_options:{ link:'/' } },
     // 아이폰 앱: data 만 있는 메시지는 화면에 뜨지 않는다. APNs 알림 내용을 같이 싣는다(웹 푸시에는 영향 없음).
     apns:{ headers:{ 'apns-collapse-id':String(slot||'bashy').slice(0,64) },
-      payload:{ aps:{ alert:{ title:String(title), body:String(body) }, sound:'default' } } } } });
-  return new Promise((resolve)=>{
-    const opts={hostname:'fcm.googleapis.com',path:`/v1/projects/${sa.project_id}/messages:send`,method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':`Bearer ${accessToken}`,'Content-Length':Buffer.byteLength(payload)}};
-    const r=https.request(opts,resp=>{
-      let d='';
-      resp.on('data',c=>d+=c);
-      resp.on('end',()=>{
-        let body=null; try{ body=JSON.parse(d); }catch{}
-        const err = body?.error;
-        resolve({
-          ok:     resp.statusCode>=200 && resp.statusCode<300,
-          status: resp.statusCode,
-          // FCM은 죽은 토큰에 404 UNREGISTERED, 형식이 틀리면 400 INVALID_ARGUMENT 를 준다
-          reason: err ? (err.details?.find(x=>x.errorCode)?.errorCode || err.status || err.message) : null,
-        });
-      });
-    });
-    r.on('error',e=>resolve({ok:false,status:0,reason:e.message})); r.write(payload); r.end();
-  });
+      payload:{ aps:{ alert:{ title:String(title), body:String(body) }, sound:'default' } } } });
+  const err = r.body?.error;
+  return {
+    ok:     r.status>=200 && r.status<300,
+    status: r.status,
+    // FCM은 죽은 토큰에 404 UNREGISTERED, 형식이 틀리면 400 INVALID_ARGUMENT 를 준다
+    reason: err ? (err.details?.find(x=>x.errorCode)?.errorCode || err.status || err.message) : (r.error || null),
+  };
 }
 
 // 앱은 localStorage 키를 `u_<구글ID>_<키>` 로 저장하고 그대로 Firebase에 올린다.
@@ -218,12 +125,14 @@ async function processUser(uid, tokenData) {
   const now    = new Date(Date.now() + 9*3600000);
   const nowMin = now.getUTCHours()*60 + now.getUTCMinutes();
   const today  = dateStr();
-  const userData = await fbGet(`/users/${uid}.json`);
-  if(!userData) return { sent:0, failed:0, detail:[`${tag} 사용자 데이터 없음`] };
+  // 사용자 데이터 전체(인바디·메모·운동 기록…)를 10분마다 통째로 받지 않는다.
+  // 키 이름만(shallow) 받아 접두사를 찾고, 필요한 칸만 따로 읽는다 (api/econ-config.js 와 같은 방식).
+  const userKeys = await fbGet(`/users/${uid}.json?shallow=true`);
+  if(!userKeys || typeof userKeys !== 'object') return { sent:0, failed:0, detail:[`${tag} 사용자 데이터 없음`] };
 
-  const prefix = findPrefix(userData);
+  const prefix = findPrefix(userKeys);
   if(!prefix) {
-    console.error('[cron] 키 접두사를 찾지 못함, uid:', uid, '키샘플:', Object.keys(userData).slice(0,3));
+    console.error('[cron] 키 접두사를 찾지 못함, uid:', uid, '키샘플:', Object.keys(userKeys).slice(0,3));
     return { sent:0, failed:1, detail:[`${tag} 키 접두사 못 찾음`] };
   }
 
@@ -269,8 +178,17 @@ async function processUser(uid, tokenData) {
   const msgs  = [];
   const notes = [];        // 발송과 별개로 로그에 남길 설명 (조용히 사라지지 않게)
   let   quiet = 0;         // 알림은 못 만들었지만 "고장"인 경우의 수
-  const habitList    = JSON.parse(userData[`${prefix}gl_habits_list`]||'[]');
-  const habitChecked = JSON.parse(userData[`${prefix}gl_habits_${today}`]||'[]');
+  // 한 칸 읽기. 앱은 값을 JSON 문자열로 올린다 — 없으면 null.
+  const readKey = async (k) => {
+    if (!Object.prototype.hasOwnProperty.call(userKeys, k)) return null;
+    return fbGet(`/users/${uid}/${encodeURIComponent(k)}.json`);
+  };
+  const parse = (v, def) => v == null ? def : (typeof v === 'string' ? JSON.parse(v || 'null') ?? def : v);
+  const [rawHabits, rawChecked] = await Promise.all([
+    readKey(`${prefix}gl_habits_list`), readKey(`${prefix}gl_habits_${today}`),
+  ]);
+  const habitList    = parse(rawHabits, []);
+  const habitChecked = parse(rawChecked, []);
 
   // ── 약 ──────────────────────────────────────────────────────
   // 다른 습관과 달리 하나씩 따로 본다. '2개 남았어요' 는 어느 약인지 모르는 알림이라
@@ -336,13 +254,15 @@ async function processUser(uid, tokenData) {
     for(const [meal,t] of Object.entries({아침:settings.diet.아침||'09:00',점심:settings.diet.점심||'13:00',저녁:settings.diet.저녁||'19:00'})) {
       const slot = `diet_${meal}`;
       if(!due(slot, t)) continue;
-      const diet=JSON.parse(userData[`${prefix}gl_diet_${today}`]||'{}');
+      const diet=parse(await readKey(`${prefix}gl_diet_${today}`), {});
       if(!(diet[meal]?.length)) msgs.push({slot, title:`🥗 ${meal} 식단 기록`, body:`${meal}을 아직 기록하지 않으셨어요!`});
       else settle(slot);                         // 이미 먹은 걸 적었으면 끝
     }
   }
   if(settings.tasks?.enabled && due('tasks', settings.tasks.time)) {
     const dueTasks=[];
+    // 할일은 어느 키에 들었는지 정해져 있지 않아 전부 훑어야 한다 — 이 칸이 due 일 때(하루 한 번)만 통째로 받는다.
+    const userData = (await fbGet(`/users/${uid}.json`)) || {};
     Object.entries(userData).forEach(([k,v])=>{
       if(!k.startsWith(prefix)) return;
       try { const arr=JSON.parse(v); if(Array.isArray(arr)) arr.filter(t=>t.status==='needsAction'&&t.due?.startsWith(today)).forEach(t=>dueTasks.push(t.title)); } catch {}

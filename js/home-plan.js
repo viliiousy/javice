@@ -169,12 +169,6 @@ const HomePlan = {
     this._render();
   },
 
-  _tagClass(c) {
-    if (c === 'm') return 'hp-tag-muscle';
-    if (c === 's') return 'hp-tag-sets';
-    return 'hp-tag-rest';
-  },
-
   _ic(n, c) { return typeof ExMedia !== 'undefined' && ExMedia.ic ? ExMedia.ic(n, c) : ''; },
 
   _exCard(x, dayIdx, exIdx) {

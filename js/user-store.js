@@ -17,7 +17,8 @@ const UserStore = {
   },
 
   getUser() {
-    return this._uid || localStorage.getItem('gl_current_uid') || 'offline';
+    if (this._uid) return this._uid;
+    try { return localStorage.getItem('gl_current_uid') || 'offline'; } catch { return 'offline'; }
   },
 
   key(rawKey) {
@@ -26,10 +27,11 @@ const UserStore = {
 
   get(rawKey) {
     const prefixedKey = this.key(rawKey);
-    const val = localStorage.getItem(prefixedKey);
+    let val = null, old = null;
+    try { val = localStorage.getItem(prefixedKey); } catch { return null; }   // 저장소가 막힌 환경(사생활 보호 모드 등)
     if (val !== null) return val;
     // 기존 키 마이그레이션 (prefix 없는 구버전)
-    const old = localStorage.getItem(rawKey);
+    try { old = localStorage.getItem(rawKey); } catch {}
     if (old !== null) {
       try { localStorage.setItem(prefixedKey, old); } catch {}
       try { localStorage.removeItem(rawKey); } catch {}
@@ -47,6 +49,29 @@ const UserStore = {
 
   remove(rawKey) {
     try { localStorage.removeItem(this.key(rawKey)); } catch {}
+  },
+
+  // ── JSON 읽기 도우미 ───────────────────────
+  // parse(): 매번 새로 푼 값(고쳐 써도 되는 값). 저장값이 깨져 있으면 fallback — 앱이 통째로 멈추지 않게.
+  // json():  같은 문자열이면 지난번에 푼 값을 그대로 돌려준다(읽기 전용!). 습관 연속·트래커처럼
+  //          같은 칸을 수백 번 읽는 곳에서 JSON.parse 를 반복하지 않으려고 둔다.
+  //          저장된 문자열과 비교해서 쓰므로 다른 곳에서 값을 바꿔도 낡은 값이 나오지 않는다.
+  parse(rawKey, fallback = null) {
+    const v = this.get(rawKey);
+    if (v == null || v === '') return fallback;
+    try { const o = JSON.parse(v); return o == null ? fallback : o; } catch { return fallback; }
+  },
+  _jc: new Map(),
+  json(rawKey, fallback = null) {
+    const k = this.key(rawKey), v = this.get(rawKey);
+    if (v == null || v === '') return fallback;
+    const c = this._jc.get(k);
+    if (c && c.raw === v) return c.val;
+    let o; try { o = JSON.parse(v); } catch { o = undefined; }
+    if (o == null) return fallback;
+    if (this._jc.size > 800) this._jc.clear();   // 끝없이 커지지 않게
+    this._jc.set(k, { raw: v, val: o });
+    return o;
   },
 
   // ── 오프라인 모드에 갇혀 있던 기록 승계 ──────────────────
