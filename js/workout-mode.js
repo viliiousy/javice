@@ -129,7 +129,13 @@ const WorkoutHistory = {
   },
   // ── 하루 · 주 단위 합계 (볼륨 · 세트 · 열량 · 부위) ──
   _part(n) { const p = PlanGen.partOf(n) || ''; return /이두|삼두|전완/.test(p) ? '팔' : (p || '기타'); },
-  day(ds) {
+  // 추이 창 하나를 그리는 동안 같은 날을 여러 번 계산하지 않게 잠깐 기억해 둔다(창을 열 때마다 비운다)
+  _dc: null,
+  day(ds, fresh) {
+    if (!fresh && this._dc && this._dc[ds]) return this._dc[ds];
+    const o = this._day(ds); if (this._dc) this._dc[ds] = o; return o;
+  },
+  _day(ds) {
     const L = PlanGen.log(ds), o = { ds, vol: 0, sets: 0, reps: 0, kcal: 0, parts: {}, top: {} };
     Object.entries(L).forEach(([n, ss]) => (ss || []).forEach(x => {
       const v = (Number(x.w) || 0) * (Number(x.r) || 0);
@@ -156,7 +162,7 @@ const WorkoutHistory = {
     return w;
   },
   _delta(a, b, unit = '') {
-    if (!b) return a ? '<em class="wt-d up">새 기록</em>' : '<em class="wt-d">—</em>';
+    if (!b) return a ? '<em class="wt-d up">지난주 0</em>' : '<em class="wt-d">—</em>';
     const p = Math.round((a - b) / b * 100);
     return `<em class="wt-d ${p > 0 ? 'up' : p < 0 ? 'down' : ''}">${p > 0 ? '▲' : p < 0 ? '▼' : ''}${Math.abs(p)}%</em>`;
   },
@@ -206,7 +212,7 @@ const WorkoutHistory = {
     const dots = pts.map((p, i) => `<circle cx="${cx(i)}" cy="${base - p.kcal / mk * ht}" r="2.5" class="wt-kd"/>`).join('');
     const xs = pts.map((p, i) => (pts.length <= 8 || i % 2 === pts.length % 2 - 1 + 1 || i === pts.length - 1) ? `<text x="${cx(i)}" y="${H - 6}" text-anchor="middle" class="wh-t${i === pts.length - 1 ? ' wt-now' : ''}">${lbl(p)}</text>` : '').join('');
     return `<svg viewBox="0 0 ${W} ${H}" class="wh-svg" role="img" aria-label="볼륨과 소모 열량 추이">${bars}<path d="${line}" class="wt-kl"/>${dots}${xs}
-      <text x="${P}" y="12" class="wh-t">최대 ${Math.round(mv).toLocaleString('ko-KR')}kg</text><text x="${W - P}" y="12" text-anchor="end" class="wh-t"><tspan class="wt-kt">선</tspan> 열량 최대 ${Math.round(mk)}kcal</text></svg>`;
+      <text x="${P}" y="12" class="wh-t">최대 ${Math.round(mv).toLocaleString('ko-KR')}kg</text><text x="${W - P}" y="12" text-anchor="end" class="wh-t">점선 열량 · 최대 ${Math.round(mk)}kcal</text></svg>`;
   },
   _chartWeeks() {
     const mon = this._monday(new Date()), pts = [];
@@ -222,6 +228,7 @@ const WorkoutHistory = {
   },
   // 기록 보기(카드 아래): 추이 + 운동한 날들을 최근부터 — 종목을 누르면 그 운동의 그래프
   openAll() {
+    this._dc = {}; clearTimeout(this._dct); this._dct = setTimeout(() => { this._dc = null; }, 60000);
     const days = [];
     for (let i = 0; i <= 120 && days.length < 30; i++) {
       const d = new Date(); d.setDate(d.getDate() - i);
@@ -240,7 +247,7 @@ const WorkoutHistory = {
         <div><b class="num">${k(m30.reduce((t, x) => t + vol(x.L), 0))}</b><span>30일 볼륨 kg</span></div>
         <div><b class="num">${days[0].ds.slice(5).replace('-', '/')}</b><span>마지막</span></div></div>
       <div class="wh-days">${days.map(x => `<div class="wh-day">
-        <div class="wh-dh"><b class="num">${x.ds.slice(5).replace('-', '/')}</b><span>${DOW[x.d.getDay()]}</span><i class="num">${k(vol(x.L))}kg · ${(() => { try { return k(Fitness.burn(x.d).kcal); } catch (e) { return 0; } })()}kcal</i></div>
+        <div class="wh-dh"><b class="num">${x.ds.slice(5).replace('-', '/')}</b><span>${DOW[x.d.getDay()]}${(() => { const l = PlanGen.dayLabel(x.names); return l ? ' · <em class="wh-pt">' + esc(l) + '</em>' : ''; })()}</span><i class="num">${k(vol(x.L))}kg · ${k(this.day(x.ds).kcal)}kcal</i></div>
         ${x.names.map(n => `<button class="wh-ex" onclick="WorkoutHistory.open('${A(n)}')"><span>${esc(n)}</span><em class="num">${x.L[n].map(s => s.w ? `${s.w}×${s.r}` : `${s.r}회`).join(' · ')}</em></button>`).join('')}
       </div>`).join('')}</div>
       <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div>`

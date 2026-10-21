@@ -20,7 +20,7 @@ const Settings = {
   ],
   VERSION: 'v26.10.20',
   // 갈래 안의 하위 화면(뒤로 가면 그 갈래로)
-  SUB: { topinfo: ['상단바 정보', 'design'], cats: ['보일 카테고리', 'design'], connector: ['ChatGPT · Claude 연결', 'ai'] },
+  SUB: { topinfo: ['상단바 정보', 'design'], cats: ['카테고리 · 카드 순서와 켜고 끄기', 'design'], connector: ['ChatGPT · Claude 연결', 'ai'] },
   _title(cat){ return cat ? (this.SUB[cat]?.[0] || this.CATS.find(c => c.id === cat)?.name || '설정') : '설정'; },
 
   _on(v){ return v ? '켜짐' : '꺼짐'; },
@@ -70,13 +70,14 @@ const Settings = {
     const ui = document.documentElement.dataset.ui === 'v1' ? 'v1' : 'v2';
     let h = '';
     if (cat === 'design') {
-      h = `<div class="set-h">화면</div>
-        ${this._item('디자인', this._seg(ui, [['v2','새 디자인'],['v1','예전']], 'Settings.setUI'))}
-        ${this._item('테마', this._seg(App._theme, [['system','시스템'],['light','밝게'],['dark','어둡게']], 'Settings.setTheme'))}
-        ${this._item('아이콘', this._seg(Icons.mode, [['simple','심플'],['color','컬러']], 'Settings.setIcons'))}
+      h = `<p class="set-lead">앱의 생김새와 메인 화면 구성을 바꿉니다. 누르면 바로 적용됩니다. 디자인·테마·아이콘·상단바 정보는 이 기기에만, 카테고리·카드 순서와 켜고 끄기는 계정에 저장되어 다른 기기에서도 같게 보입니다.</p>
+        <div class="set-h">화면</div>
+        ${this._item('디자인', this._seg(ui, [['v2','새 디자인'],['v1','예전']], 'Settings.setUI'), '새 디자인: 여백을 넓히고 카드 테두리를 줄인 지금 화면 · 예전: 이전 화면 배치')}
+        ${this._item('테마', this._seg(App._theme, [['system','시스템'],['light','밝게'],['dark','어둡게']], 'Settings.setTheme'), '시스템은 휴대폰 설정(다크 모드)을 따라 낮·밤에 맞춰 바뀝니다')}
+        ${this._item('아이콘', this._seg(Icons.mode, [['simple','심플'],['color','컬러']], 'Settings.setIcons'), '심플: 한 가지 색 선 아이콘 · 컬러: 카드마다 색이 들어간 아이콘')}
         <div class="set-h">메인 화면</div>
-        ${this._link('상단바 정보', "Settings.go('topinfo')", '몸무게·체지방·BMI·근육량·추세·주식 등락·AI 사용량')}
-        ${this._link('보일 카테고리', "Settings.go('cats')", `${Tabs.DEF.filter(t => Tabs.tabOn(t.id)).map(t => t.label).join(' · ')} — 카테고리와 그 안의 카드를 켜고 끕니다`)}`;
+        ${this._link('상단바 정보', "Settings.go('topinfo')", '맨 위 줄에 보일 숫자 고르기 — 몸무게·체지방·BMI·근육량·추세·주식 등락·AI 사용량')}
+        ${this._link('카테고리 · 카드 순서와 켜고 끄기', "Settings.go('cats')", `지금 ${Tabs._onTabs().map(t => t.label).join(' → ')} — 탭 순서, 카드 위아래 순서(예: 운동을 식단 위로), 안 쓰는 카드 숨기기`)}`;
     } else if (cat === 'topinfo') {
       h = TopInfo.pageHtml();
     } else if (cat === 'cats') {

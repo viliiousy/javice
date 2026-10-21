@@ -3528,3 +3528,15 @@ html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto;
 .fit-tot .ft-c i{ font-style:normal; font-size:12px; color:var(--text3); }
 .fit-tot .ft-c small{ grid-column:1 / -1; font-size:11px; color:var(--text3); }
 .fit-tot .ft-go{ margin-left:auto; flex:none !important; font-size:12px; font-weight:600; color:var(--accent); align-self:center; }
+/* 설정: 안내 문단 */
+.set-lead{ font-size:13px; line-height:1.6; color:var(--text3); margin:0 0 8px; }
+.co-intro{ font-size:13px; line-height:1.6; color:var(--text3); margin:0 0 8px; }
+.co-intro p{ margin:0 0 8px; }
+.co-intro ul{ margin:0 0 8px; padding:0; list-style:none; display:flex; flex-direction:column; gap:8px; }
+.co-intro li{ padding-left:12px; position:relative; }
+.co-intro li::before{ content:''; position:absolute; left:0; top:9px; width:4px; height:4px; border-radius:2px; background:var(--accent); }
+.co-intro b{ color:var(--text); font-weight:600; }
+.co-intro .co-sub{ font-size:12px; }
+.wh-pt{ font-style:normal; color:var(--accent); font-weight:600; }
+.set-page .set-item .set-tx small{ white-space:normal; line-height:1.45; }
+.set-page .set-item{ gap:12px; }

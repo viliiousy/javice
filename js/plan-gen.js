@@ -188,8 +188,38 @@ const PlanGen = {
     '어깨': ['vpush', 'lateral', 'rear', 'lateral'],
     '팔':   ['biceps', 'triceps', 'hammer', 'triceps'],
     '복근': ['core', 'core', 'core'],
+    '전신': ['squat', 'hpush', 'hrow', 'vpush', 'hinge', 'core'],   // 큰 동작을 부위마다 하나씩
+  },
+  CARDIO: ['트레드밀 러닝', '인클라인 트레드밀 러닝', '싸이클', '로잉 머신', '엘립티컬 머신', '스텝 밀', '걷기', '줄넘기'],
+  // 운동 이름들 → 그날 한 부위 이름. 고른 운동만 보고 판단한다(유산소·스포츠는 따로 붙인다).
+  //   예: 벤치·인클라인·푸쉬다운 → '가슴·팔' · 스쿼트·벤치·로우·프레스 → '전신' · 러닝 → '유산소'
+  dayLabel(names) {
+    const cnt = {}; let cardio = 0, sport = 0;
+    (names || []).forEach(n => {
+      let pt = this.partOf(n); if (!pt) return;
+      if (pt === '유산소') { cardio++; return; }
+      if (pt === '스포츠') { sport++; return; }
+      if (/이두|삼두|전완근/.test(pt)) pt = '팔';
+      cnt[pt] = (cnt[pt] || 0) + 1;
+    });
+    const order = Object.keys(cnt).filter(x => x !== '전신').sort((a, b) => cnt[b] - cnt[a]);
+    const upper = order.filter(x => ['가슴', '등', '어깨'].includes(x)).length;
+    let main = (cnt['전신'] >= 2 || (order.length >= 4 && order.includes('하체') && upper >= 2)) ? ['전신'] : order.slice(0, 3);
+    if (!main.length && cnt['전신']) main = ['전신'];
+    if (sport) main.push('스포츠');
+    if (cardio) main.push('유산소');
+    return main.join('·');
   },
   dayFor(parts, n) {
+    // 유산소는 시간 운동이라 따로: 유산소만 고르면 유산소 두 가지, 다른 부위와 함께면 끝에 하나
+    if (parts.includes('유산소')) {
+      const rest = parts.filter(x => x !== '유산소');
+      const cardio = this.CARDIO.filter(x => this.pickerOk ? this.pickerOk(x) : true);
+      const pick = (cardio.length ? cardio : this.CARDIO);
+      if (!rest.length) return [{ name: pick[0], sets: '30분' }, { name: pick.find(x => x.split(' ').pop() !== pick[0].split(' ').pop()) || pick[1] || pick[0], sets: '15분' }];
+      const base = this.dayFor(rest, n ? n - 1 : undefined);
+      return base.concat([{ name: pick[0], sets: '20분' }]);
+    }
     const p = this.profile() || { goal: 'muscle', level: 'beg', mins: 60 };
     n = n || Math.max(4, (this.COUNT[p.mins] || 5) - (p.level === 'new' ? 1 : 0));
     const [mainSet, accSet] = this.SETS[p.goal] || this.SETS.muscle;

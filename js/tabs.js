@@ -44,13 +44,30 @@ const Tabs = {
     const all = this.CARDS.map(c => c.cls);
     return o.filter(x => all.includes(x)).concat(all.filter(x => !o.includes(x)));
   },
+  TABS_ORDER_KEY: 'gl_tabs_order',  // 카테고리(아래 탭) 순서
+  tabsSorted() {
+    let o = []; try { o = JSON.parse(UserStore.get(this.TABS_ORDER_KEY) || '[]') || []; } catch {}
+    const ids = this.DEF.map(t => t.id), ord = o.filter(x => ids.includes(x)).concat(ids.filter(x => !o.includes(x)));
+    return ord.map(id => this.DEF.find(t => t.id === id));
+  },
+  hasTabOrder() { return this.tabsSorted().map(t => t.id).join() !== this.DEF.map(t => t.id).join(); },
+  moveTab(id, dir) {
+    const o = this.tabsSorted().map(t => t.id), i = o.indexOf(id), j = i + dir;
+    if (j < 0 || j >= o.length) return;
+    [o[i], o[j]] = [o[j], o[i]];
+    UserStore.set(this.TABS_ORDER_KEY, JSON.stringify(o)); window.FirebaseSync?.scheduleSave?.();
+    this._paintBar(); this.set(this._cur, true); this.applyOrder();
+    try { Haptic.light(); } catch (e) {}
+    Settings._re('cats');
+  },
   hasOrder() { try { return (JSON.parse(UserStore.get(this.ORDER_KEY) || '[]') || []).length > 0; } catch { return false; } },
   // 순서를 화면에 입힌다: 카드를 한 줄 흐름으로 펴고(order 속성) — 기본 순서면 원래 배치 그대로
   applyOrder() {
-    const on = this.hasOrder();
+    const on = this.hasOrder() || this.hasTabOrder();
     document.documentElement.classList.toggle('card-ordered', on);
-    const o = this.order();
-    this.CARDS.forEach(c => { const el = document.querySelector('.' + c.cls); if (el) el.style.order = on ? String(o.indexOf(c.cls) + 1) : ''; });
+    // 카테고리 순서가 먼저, 그 안에서 카드 순서 (PC 에서는 이 순서대로 한 화면에 놓인다)
+    const rank = this.tabsSorted().map(t => t.id), o = this.order();
+    this.CARDS.forEach(c => { const el = document.querySelector('.' + c.cls); if (el) el.style.order = on ? String(rank.indexOf(c.tab) * 20 + o.indexOf(c.cls) + 1) : ''; });
   },
   moveCard(cls, dir) {
     const t = this.tabOf(cls), o = this.order();
@@ -62,11 +79,11 @@ const Tabs = {
     this.applyOrder(); try { Haptic.light(); } catch (e) {}
     (document.getElementById('cardSetBody') ? this._paintSettings() : Settings._re('cats'));
   },
-  resetOrder() { UserStore.set(this.ORDER_KEY, '[]'); window.FirebaseSync?.scheduleSave?.(); this.applyOrder(); (document.getElementById('cardSetBody') ? this._paintSettings() : Settings._re('cats')); App.showToast('카드 순서를 처음대로 돌렸습니다', 'success'); },
+  resetOrder() { UserStore.set(this.ORDER_KEY, '[]'); UserStore.set(this.TABS_ORDER_KEY, '[]'); this._paintBar(); this.set(this._cur, true); window.FirebaseSync?.scheduleSave?.(); this.applyOrder(); (document.getElementById('cardSetBody') ? this._paintSettings() : Settings._re('cats')); App.showToast('카테고리·카드 순서를 처음대로 돌렸습니다', 'success'); },
   TABS_OFF_KEY: 'gl_tabs_off',
   getTabsOff() { try { return JSON.parse(UserStore.get(this.TABS_OFF_KEY) || '[]'); } catch { return []; } },
   tabOn(id) { return !this.getTabsOff().includes(id); },
-  _onTabs() { return this.DEF.filter(t => this.tabOn(t.id)); },
+  _onTabs() { return this.tabsSorted().filter(t => this.tabOn(t.id)); },
   // 카테고리(탭) 켜고 끄기 — 하나는 남아야 한다
   toggleTab(id, on) {
     let off = this.getTabsOff();
@@ -79,15 +96,22 @@ const Tabs = {
     Settings._re('cats');
   },
   catsHtml() {
-    const off = this.getOff();
-    return this.DEF.map(t => {
+    const off = this.getOff(), T = this.tabsSorted();
+    const mv = (fn, a, b) => `<span class="co-mv"><button type="button" class="co-b" ${a ? 'disabled' : ''} onclick="${fn}(-1)" aria-label="위로">↑</button><button type="button" class="co-b" ${b ? 'disabled' : ''} onclick="${fn}(1)" aria-label="아래로">↓</button></span>`;
+    return `<div class="co-intro">
+        <p>메인 화면을 내 쓰임새대로 고칩니다.</p>
+        <ul><li><b>카테고리 순서</b> — 카테고리 이름 옆 ↑↓ 로 아래 탭의 순서를 바꿉니다. 맨 위 카테고리가 앱을 열면 처음 보이는 화면입니다.</li>
+          <li><b>카드 순서</b> — 카드 이름 옆 ↑↓ 로 그 카테고리 안에서 위아래를 바꿉니다. 예: 식단보다 운동을 위로.</li>
+          <li><b>켜고 끄기</b> — 스위치를 끄면 그 카드(또는 카테고리 전체)가 화면에서만 빠집니다. 기록은 그대로 남고 다시 켜면 돌아옵니다.</li></ul>
+        <p class="co-sub">순서와 켜고 끄기는 계정에 저장되어 휴대폰·PC 모두 같게 보입니다. PC 는 탭 없이 이 순서대로 한 화면에 놓입니다.</p></div>`
+      + T.map((t, ti) => {
       const on = this.tabOn(t.id);
-      return `<div class="set-h">${t.label}</div>
-        ${Settings._item(`${t.label} 카테고리`, Settings._sw(on, `Tabs.toggleTab('${t.id}', ${!on})`), on ? '아래 탭과 카드가 보입니다' : '탭과 카드가 모두 숨겨집니다(기록은 그대로)')}
+      return `<div class="set-h co-h">${t.label}</div>
+        ${Settings._item(`${t.label} 카테고리`, mv(`Tabs.moveTab.bind(Tabs,'${t.id}')`, ti === 0, ti === T.length - 1) + Settings._sw(on, `Tabs.toggleTab('${t.id}', ${!on})`), on ? `${ti === 0 ? '처음 보이는 화면 · ' : ''}아래 탭과 카드가 보입니다` : '탭과 카드가 모두 숨겨집니다(기록은 그대로)')}
         ${on ? (() => { const list = this.order().filter(x => this.tabOf(x) === t.id).map(x => this.CARDS.find(c => c.cls === x));
-          return list.map((c, i) => Settings._item(c.name, `<span class="co-mv"><button type="button" class="co-b" ${i === 0 ? 'disabled' : ''} onclick="Tabs.moveCard('${c.cls}',-1)" aria-label="위로">↑</button><button type="button" class="co-b" ${i === list.length - 1 ? 'disabled' : ''} onclick="Tabs.moveCard('${c.cls}',1)" aria-label="아래로">↓</button></span>`
+          return list.map((c, i) => Settings._item(c.name, mv(`Tabs.moveCard.bind(Tabs,'${c.cls}')`, i === 0, i === list.length - 1)
             + Settings._sw(!off.includes(c.cls), `Tabs.toggleCard('${c.cls}', ${off.includes(c.cls)});Settings._re('cats')`))).join(''); })() : ''}`;
-    }).join('') + `<p class="co-note">↑↓ 로 카드 순서를 바꿉니다. 폰은 카테고리 화면 안에서, PC 는 전체 화면에서 이 순서대로 놓입니다.${this.hasOrder() ? ` <button type="button" class="co-reset" onclick="Tabs.resetOrder()">처음 순서로</button>` : ''}</p>`;
+    }).join('') + (this.hasOrder() || this.hasTabOrder() ? `<p class="co-note"><button type="button" class="co-reset" onclick="Tabs.resetOrder()">순서를 처음대로 돌리기</button></p>` : '');
   },
   _cur: 'today',
   get current(){ return this._cur; },
@@ -106,7 +130,7 @@ const Tabs = {
     this.applyOff();
     this.applyOrder();
     // 매일 여는 앱의 기본 상태는 언제나 '오늘'이다. 마지막 탭을 복원하지 않는다.
-    this.set('today', true);
+    this.set(this._onTabs()[0]?.id || 'today', true);   // 맨 위 카테고리부터
   },
 
   _paintBar() {

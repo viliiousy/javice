@@ -129,7 +129,11 @@ const Fitness = {
     const badge = document.getElementById('fitBadge');
     if (badge) {
       // 배지에 있던 이모지는 뺐다. 바로 옆 머리글이 이미 선 아이콘이라 둘이 부딪혔다.
-      badge.textContent=plan.src==='multi' ? `하루 ${plan.sessions.length}회` : plan.name;
+      // 이름 대신 실제 운동으로 부위를 판단해 보여 준다 — 한 게 있으면 한 운동, 없으면 계획한 운동 기준
+      const lg=typeof PlanGen!=='undefined'?PlanGen.log(this._dateStr(d)):{}, doneNm=[...new Set(allEx.filter((_,i)=>chk.includes(i)).map(x=>x.name).concat(Object.keys(lg).filter(n=>(lg[n]||[]).length)))];
+      const auto=typeof PlanGen!=='undefined' ? PlanGen.dayLabel(doneNm.length?doneNm:allEx.map(x=>x.name)) : '';
+      badge.textContent=(plan.src==='multi' ? `하루 ${plan.sessions.length}회 · ` : '')+(auto || (plan.src==='multi' ? '' : plan.name));
+      badge.dataset.done=doneNm.length?'1':'';
       // 배지를 누르면 그날 플랜의 자세·중량 가이드가 열린다.
       badge.style.cursor='pointer'; badge.title='자세·추천 중량 가이드';
       badge.onclick=()=> plan.src==='multi' ? Fitness.showDayPlan() : plan.src==='home' ? HomePlan.open(plan.day) : plan.src==='routine' ? Fitness.showRoutineEdit(plan.rid) : Fitness.showDayPlan();
@@ -275,7 +279,7 @@ const Fitness = {
     const DOW = ['일','월','화','수','목','금','토'];
     const OPTS = [
       ...Object.entries(R).map(([id,r]) => [id, '내 루틴 · ' + r.name]),
-      ...[['가슴'],['등'],['하체'],['어깨'],['팔'],['복근'],['가슴','어깨'],['가슴','팔'],['등','팔'],['어깨','팔'],['팔','복근'],['가슴','복근'],['등','복근'],['어깨','복근'],['하체','복근']]
+      ...[['가슴'],['등'],['하체'],['어깨'],['팔'],['복근'],['가슴','어깨'],['가슴','팔'],['등','팔'],['어깨','팔'],['팔','복근'],['가슴','복근'],['등','복근'],['어깨','복근'],['하체','복근'],['전신'],['전신','유산소']]
         .map(ps => ['part:' + ps.join(','), '부위 · ' + ps.join(' + ')]),
       ['none','계획 없음'], ['rest','휴식'], ['cardio','유산소'],
       ['A','홈트 DAY A 푸시'],['B','홈트 DAY B 풀'],['C','홈트 DAY C 하체+코어'],
@@ -934,7 +938,7 @@ const Fitness = {
   },
 
   // 그날 총 볼륨 · 세트 · 소모 열량 (누르면 추이)
-  _totHtml(d){ try{ const b=this.burn(d), t=WorkoutHistory.day(this._dateStr(d)); return (b.kcal||t.sets) ? `<button type="button" class="fit-burn fit-tot" onclick="WorkoutHistory.openAll()">
+  _totHtml(d){ try{ const t=WorkoutHistory.day(this._dateStr(d), true), b={ kcal:t.kcal }; return (b.kcal||t.sets) ? `<button type="button" class="fit-burn fit-tot" onclick="WorkoutHistory.openAll()">
         <span class="ft-c"><b class="num">${Math.round(t.vol).toLocaleString('ko-KR')}</b><i>kg</i><small>총 볼륨</small></span>
         <span class="ft-c"><b class="num">${t.sets}</b><i>세트</i><small>${t.reps}회</small></span>
         <span class="ft-c"><b class="num">${b.kcal.toLocaleString('ko-KR')}</b><i>kcal</i><small>소모 열량(추정)</small></span>
@@ -977,12 +981,12 @@ const Fitness = {
   // ── 오늘 부위 바꾸기: 부위를 고르면 그날 운동을 그 부위로 다시 짠다(오늘만 / 앞으로 이 요일도) ──
   partSheet(ds) {
     this._pt = { ds, parts: [] };
-    const P = ['가슴', '등', '하체', '어깨', '팔', '복근'];
+    const P = ['가슴', '등', '하체', '어깨', '팔', '복근', '전신', '유산소'];
     App.openModal('@dumbbell 오늘 부위 바꾸기', `<div class="fz fz-pt">
-      <p class="fz-note">할 부위를 고르세요. 여러 개 고르면 번갈아 섞습니다. 기구·아픈 곳 설정은 맞춤 플랜과 같습니다.</p>
+      <p class="fz-note">할 부위를 고르세요. 여러 개 고르면 번갈아 섞고, 유산소를 같이 고르면 끝에 유산소를 붙입니다. 기구·아픈 곳 설정은 맞춤 플랜과 같습니다.</p>
       <div class="pt-chips">${P.map(x => `<button type="button" class="pt-chip" data-p="${x}" onclick="Fitness._ptToggle('${x}')">${x}</button>`).join('')}</div>
-      <button type="button" class="pt-free" onclick="Fitness.freeDay('${ds}')">${this._ic('plus')}<span>부위 상관없이 직접 고르기</span>${this._ic('chev','fz-ic-end')}</button>
       <div id="ptPrev" class="pt-prev"><p class="pg-note">부위를 고르면 미리 보기가 나옵니다.</p></div>
+      <p class="fz-note pt-auto">운동을 고르면 알아서 부위를 판단해서 그날 어떤 부위 운동을 했는지 알려 줍니다. 수정에서 운동을 바꾸거나 더해도 카드 위 이름이 그대로 따라 바뀝니다(예: 등·팔, 전신, 가슴·유산소).</p>
       <div class="modal-btns pt-btns">
         <button class="btn-sm" onclick="Fitness._ptApply('plan')" id="ptPlan" disabled>앞으로 이 요일도</button>
         <button class="btn-sm accent" onclick="Fitness._ptApply('day')" id="ptDay" disabled>오늘만 바꾸기</button>
