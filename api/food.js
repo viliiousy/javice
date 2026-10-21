@@ -33,11 +33,17 @@ module.exports = async function handler(req, res) {
   const qy   = req.query || {};
   const q    = String(qy.q || '').trim();
   const rows = Math.min(Number(qy.rows || 12) || 12, 30);
+  const page = Math.max(1, Math.min(20, Number(qy.page || 1) || 1));
   if (!q) { res.status(400).json({ error: '검색어(q)가 없습니다' }); return; }
 
-  const ck  = q + '|' + rows;
-  const hit = cache.get(ck);
-  if (hit && Date.now() - hit.t < TTL) { res.status(200).json({ ...hit.v, cached: true }); return; }
+  // 정렬한 전체 목록을 검색어별로 기억해 두고, 쪽(page)만 잘라 준다 — '더 보기' 는 다시 묻지 않는다
+  const slice = (v, cached) => {
+    const items = v.all.slice((page - 1) * rows, page * rows);
+    return { ok: items.length > 0, q, page, rows, total: v.total, count: items.length, more: v.all.length > page * rows,
+             left: Math.max(0, v.all.length - page * rows), items, source: v.source, ...(cached ? { cached: true } : {}) };
+  };
+  const hit = cache.get(q);
+  if (hit && Date.now() - hit.t < TTL) { res.status(200).json(slice(hit.v, true)); return; }
 
   try {
     // 띄어쓰기·순서·표기가 달라도 찾도록 여러 모양으로 묻는다(lib/mfds.js searchLoose)
@@ -62,18 +68,24 @@ module.exports = async function handler(req, res) {
         seen.add(k); return true;
       })
       // 질문 낱말을 다 담은 이름이 먼저(순서 무관) → 이름이 가까운 순 → 브랜드 없는 기본형 → 짧은 이름
-      .map(x => ({ x, c: cover(x.name, tk), r: rank(canon(x.name), canon(q)), b: brandRank(x) }))
+      // seg: 이름의 첫 갈래(밑줄 앞)가 질문과 같은가 — '달걀_삶은것' 은 '계란' 에 딱 맞고 '계란도시락' 은 아니다
+      // gen: 품목대표(기본 음식) → 음식 → 가공·상용제품 순
+      .map(x => { const s0 = canon(String(x.name).split(/[_(]/)[0]), cq = canon(q);
+        return { x, c: cover(x.name, tk), seg: s0 === cq ? 0 : (s0.startsWith(cq) ? 1 : 2), r: rank(canon(x.name), cq), b: brandRank(x),
+                 gen: x.cls === '품목대표' ? 0 : (x.group === '음식' ? 1 : 2) }; })
       .filter(o => coreTk.every(t => canon(o.x.name).includes(t)) || o.r <= 1)   // 본체 낱말은 다 있어야(제로 같은 수식어는 없어도 아래쪽에)
-      .sort((a, b) => b.c - a.c || a.r - b.r || a.b - b.b || a.x.name.length - b.x.name.length)
-      .slice(0, rows)
-      .map(o => o.x);
+      .sort((a, b) => b.c - a.c || a.seg - b.seg || a.gen - b.gen || a.r - b.r || a.b - b.b || a.x.name.length - b.x.name.length)
+      .map(o => o.x)
+      // 이름이 같은 줄은 하나만(달걀국이 여섯 줄 나오던 것) — 사람 눈엔 같은 음식이고, 고를 수 없는 줄은 찾기만 어렵게 한다
+      .filter((x, i, arr) => arr.findIndex(y => y.name === x.name) === i)
+      .slice(0, 300);
 
     // 찾은 게 없으면 '없다' 고 분명히 말한다. 숫자를 지어내지 않는다 —
     // 그건 앱이 사용자에게 직접 입력을 받거나 영양성분표를 찍게 할 신호다.
-    const v = { ok: out.length > 0, q, total: Math.max(total, out.length), scanned: items.length, count: out.length, items: out,
-                source: '식품의약품안전처 식품영양성분DB' };
-    cache.set(ck, { t: Date.now(), v });
-    res.status(200).json(v);
+    const v = { total: Math.max(total, out.length), all: out, source: '식품의약품안전처 식품영양성분DB' };
+    cache.set(q, { t: Date.now(), v });
+    if (cache.size > 500) cache.delete(cache.keys().next().value);
+    res.status(200).json(slice(v));
   } catch (e) {
     console.error('[food]', e);
     res.status(502).json({ error: e.message });

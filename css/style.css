@@ -3540,3 +3540,16 @@ html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto;
 .wh-pt{ font-style:normal; color:var(--accent); font-weight:600; }
 .set-page .set-item .set-tx small{ white-space:normal; line-height:1.45; }
 .set-page .set-item{ gap:12px; }
+/* 숫자 입력 시트(다른 창 위에도 뜬다) */
+.ni-ov{ z-index:10070; }
+.ni-sh{ max-height:92vh; overflow:auto; }
+.ni-hd{ display:flex; align-items:center; justify-content:center; margin:0 0 16px; }
+.ni-hd b{ font-size:16px; font-weight:600; color:var(--text); }
+.ni-sh .modal-btns{ display:flex; gap:8px; }
+.ni-sh .modal-btns .btn-sm{ flex:1; height:48px; border-radius:12px; font-size:15px; }
+.ni-sh .modal-btns .accent{ flex:1.6; }
+/* 담은 음식의 양 칸: 누르면 직접 입력 */
+.diet-qty .diet-qty-n{ border:0; background:none; padding:0 4px; min-width:44px; height:32px; color:var(--text); cursor:pointer; text-decoration:underline; text-decoration-color:var(--border); text-underline-offset:4px; font-family:'Space Grotesk','IBM Plex Sans KR',sans-serif; }
+/* 식약처 더 보기 */
+.diet-more{ display:block; width:100%; height:44px; margin:8px 0; border:1px solid var(--border); border-radius:12px; background:none; color:var(--text); font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+.diet-more span{ color:var(--accent); }

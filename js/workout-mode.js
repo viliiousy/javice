@@ -985,12 +985,18 @@ const NumIn = {
   open(o) {
     this.o = o; this.s = o.cur !== '' && o.cur != null ? String(+o.cur) : ''; this.fresh = true;
     this.mode = WorkoutMode.prefs().numIn === 'wheel' ? 'wheel' : 'pad';
-    App.openModal('@dumbbell ' + o.title, `<div class="ni">
+    // 다른 창(식단 담기 등) 위에서도 열리도록 자기 시트로 띄운다 — 아래 창은 그대로 남는다
+    document.getElementById('niOv')?.remove();
+    const ov = document.createElement('div'); ov.id = 'niOv'; ov.className = 'mx-ov ni-ov';
+    ov.innerHTML = `<div class="mx-sh ni-sh" role="dialog" aria-label="${esc(o.title)}"><div class="ni-hd"><b>${esc(o.title)}</b></div><div class="ni">
       <div class="ni-seg"><button type="button" data-m="pad">키패드</button><button type="button" data-m="wheel">스크롤</button></div>
       <div class="ni-disp"><b class="num" id="niV"></b><span>${esc(o.unit || '')}</span></div>
       <div id="niBody"></div>
       ${o.note ? `<p class="pg-note ni-note">${esc(o.note)}</p>` : ''}
-      <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">취소</button><button class="btn-sm accent" onclick="NumIn.ok()">확인</button></div></div>`);
+      <div class="modal-btns"><button class="btn-sm" onclick="NumIn.close()">취소</button><button class="btn-sm accent" onclick="NumIn.ok()">확인</button></div></div></div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e => { if (e.target === ov) this.close(); });
+    requestAnimationFrame(() => ov.classList.add('on'));
     document.querySelectorAll('.ni-seg button').forEach(b => { b.onclick = () => this.setMode(b.dataset.m); });
     this.paint();
   },
@@ -1037,10 +1043,11 @@ const NumIn = {
     this.s = s; this._show();
     try { Haptic.select(); } catch (e) {}
   },
+  close() { const ov = document.getElementById('niOv'); if (!ov) return; ov.classList.remove('on'); setTimeout(() => ov.remove(), 200); },
   ok() {
     let v = this.s.replace(/\.$/, ''); v = v === '' ? '' : Number(v);
     if (v !== '' && !(v >= 0)) v = '';
-    App.closeModal();
+    this.close();
     try { Haptic.light(); } catch (e) {}
     try { this.o.done(v); } catch (e) { console.warn(e); }
   },

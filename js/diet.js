@@ -416,7 +416,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
   },
 
   // ── 띄어쓰기·순서·표기가 달라도 찾기 (서버 lib/mfds.js 와 같은 규칙) ──
-  _VAR: [['마끼아또','마키아또','마키아토','마끼야또','마키야또','마끼아토'],['프라푸치노','프라프치노','프라푸찌노'],
+  _VAR: [['달걀','계란'],['마끼아또','마키아또','마키아토','마끼야또','마키야또','마끼아토'],['프라푸치노','프라프치노','프라푸찌노'],
     ['카라멜','캐러멜','캬라멜'],['라떼','라테'],['요거트','요구르트'],['치즈케이크','치즈케익']],
   _MODS: ['제로','라이트','무설탕','저당','디카페인','슈거프리','로우슈거'],
   _canon(s){ let t=String(s||'').toLowerCase().replace(/[\s_()\[\]·.,/-]+/g,''); for(const g of this._VAR) for(const v of g.slice(1)) t=t.split(v).join(g[0]); return t; },
@@ -434,6 +434,13 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     ['☕','돌체라떼','1잔(355mL)',300,10,38,11], ['☕','콜드브루','1잔(355mL)',5,0,1,0], ['☕','아인슈페너','1잔(355mL)',200,3,18,13],
     ['🍵','녹차라떼','1잔(355mL)',240,9,35,7], ['🍫','초코라떼','1잔(355mL)',320,11,45,11], ['🍋','레몬에이드','1잔(355mL)',150,0,38,0],
     ['🍊','자몽에이드','1잔(355mL)',160,0,40,0], ['🧋','복숭아 아이스티','1잔(355mL)',150,0,37,0],
+    // 자주 먹는 기본 음식(식약처 대표값 근처) — 검색하자마자 바로 보이게. 1개·1공기처럼 먹는 단위로.
+    ['🥚','계란(달걀) 삶은 것','1개(50g)',75,6.3,0.6,5], ['🥚','계란(달걀) 후라이','1개(50g)',90,6.3,0.4,7], ['🥚','날계란(달걀)','1개(50g)',72,6.2,0.4,4.8],
+    ['🥚','계란(달걀) 흰자','1개(33g)',17,3.6,0.2,0.1], ['🥚','계란(달걀) 스크램블','2개(100g)',170,12,1.5,13],
+    ['🍚','흰쌀밥','1공기(210g)',315,5.7,69,0.6], ['🍚','현미밥','1공기(210g)',300,6.3,64,2], ['🍠','고구마','1개(150g)',195,2.1,46,0.2],
+    ['🍗','닭가슴살(익힌 것)','100g',165,31,0,3.6], ['🍌','바나나','1개(120g)',105,1.3,27,0.4], ['🍎','사과','1개(200g)',104,0.5,28,0.3],
+    ['🥛','우유','1컵(200mL)',130,6.4,9.6,7.6], ['🥣','오트밀','40g',150,5,27,2.8], ['🥛','그릭요거트(플레인)','100g',97,9,4,5],
+    ['🧈','두부','1/2모(150g)',126,13,3,7.5], ['🥑','아보카도','1/2개(70g)',112,1.4,6,10], ['🥤','프로틴 쉐이크','1스쿱(30g)',120,24,3,1.5],
   ],
   _generic(q){
     const tk=this._tokens(q), cq=this._canon(q); if(!cq) return [];
@@ -541,7 +548,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     if(full){ if(dbBox) dbBox.innerHTML=''; return; }
     if(dbBox) dbBox.innerHTML='';
     const term = String(q).trim();
-    if(term.length >= 2) this._dbTimer = setTimeout(()=>this._dbSearch(term, meal, ds), 350);
+    if(term.length >= 2) this._dbTimer = setTimeout(()=>this._dbSearch(term, meal, ds), 250);
     else if(dbBox) dbBox.innerHTML = `<div class="diet-empty-hint">두 글자 이상 입력하면 식약처 DB 에서 찾아요</div>`;
   },
   // ── 식약처 식품영양성분DB ────────────────
@@ -567,15 +574,31 @@ JSON 만 출력해. 다른 말은 붙이지 마.
       note: x.pack ? `${base}${x.unit||'g'}당 ${Math.round(x.kcal||0)}kcal` : '',
     };
   },
+  // 쪽마다 15개. 같은 검색어의 쪽은 잠시 기억해 둔다(지웠다 다시 쳐도 바로 나오게).
+  _dbCache: {},
+  async _dbFetch(q, page){
+    const k=q+'|'+page, c=this._dbCache[k];
+    if(c && Date.now()-c.t<10*60000) return c.j;
+    const r = await fetch(Platform.api('/api/food?q=' + encodeURIComponent(q) + '&rows=15&page=' + page));
+    const j = await r.json();
+    if(j && j.ok) this._dbCache[k]={ t:Date.now(), j };
+    return j;
+  },
+  _dbRowHtml(f, i, meal, ds){
+    return `<div class="diet-food">
+          <div class="diet-food-main" onclick="Diet.selectDbFood(${i},'${meal}','${ds}')">
+            <span class="diet-food-nm">${this._em(f.e)}${esc(f.n)}</span>
+            <span class="dt-meta"><span class="diet-food-u">${esc(f.u)}</span>${f.grp?`<span class="diet-food-n">${esc(f.grp)}</span>`:''}${f.note?`<span class="diet-food-note">${esc(f.note)}</span>`:''}</span>
+          </div>
+          <span class="diet-food-cal num">${f.c}<i>kcal</i></span>
+        </div>`;
+  },
   async _dbSearch(q, meal, ds){
     const box = document.getElementById('dietDbRes');
     if(!box) return;
     box.innerHTML = `<div class="diet-rec-hd">식약처 영양성분DB 찾는 중…</div>`;
     let j = null;
-    try {
-      const r = await fetch(Platform.api('/api/food?q=' + encodeURIComponent(q) + '&rows=8'));
-      j = await r.json();
-    } catch(e) { j = null; }
+    try { j = await this._dbFetch(q, 1); } catch(e) { j = null; }
     // 오가는 사이에 검색어가 바뀌었으면 늦게 온 답은 버린다.
     const cur = (document.getElementById('dietSearch')?.value || '').trim();
     if(cur !== q) return;
@@ -583,20 +606,29 @@ JSON 만 출력해. 다른 말은 붙이지 마.
       box.innerHTML = this._labelHtml(q, meal, ds) + this._aiBtnHtml(meal, ds);
       return;
     }
+    this._dbQ = q; this._dbPage = 1;
     this._dbHits = j.items.map(x => this._fromDb(x));
-    box.innerHTML = `<div class="diet-rec-hd">식약처 영양성분DB <i>${Number(j.total||0).toLocaleString('ko-KR')}건 중</i></div>`
-      + this._dbHits.map((f,i) => `<div class="diet-food">
-          <div class="diet-food-main" onclick="Diet.selectDbFood(${i},'${meal}','${ds}')">
-            <span class="diet-food-nm">${this._em(f.e)}${esc(f.n)}</span>
-            <span class="dt-meta"><span class="diet-food-u">${esc(f.u)}</span>${f.grp?`<span class="diet-food-n">${esc(f.grp)}</span>`:''}${f.note?`<span class="diet-food-note">${esc(f.note)}</span>`:''}</span>
-          </div>
-          <span class="diet-food-cal num">${f.c}<i>kcal</i></span>
-        </div>`).join('')
-      + `<div class="diet-macro-note">${j.total > this._dbHits.length
-            ? `${Number(j.total).toLocaleString('ko-KR')}건 중 ${this._dbHits.length}개 · 제품명을 더 붙여 치면 좁혀져요 · `
-            : ''}담은 뒤 수량(−/+)으로 개수를 맞추세요</div>`
+    box.innerHTML = `<div class="diet-rec-hd">식약처 영양성분DB <i>${Number(j.total||0).toLocaleString('ko-KR')}건 중 가까운 순</i></div>
+      <div id="dietDbList">${this._dbHits.map((f,i) => this._dbRowHtml(f, i, meal, ds)).join('')}</div>
+      <div id="dietDbMore">${this._moreBtn(j, meal, ds)}</div>
+      <div class="diet-macro-note">담은 뒤 수량을 누르면 g·개수를 직접 넣을 수 있어요</div>`
       // 목록에 내 제품이 없을 수도 있다. 그때 갈 길을 여기서 같이 연다.
       + this._labelHtml(q, meal, ds);
+  },
+  _moreBtn(j, meal, ds){
+    return j && j.more ? `<button type="button" class="diet-more" onclick="Diet._dbMore('${meal}','${ds}')">더 보기 <span class="num">${Number(j.left||0).toLocaleString('ko-KR')}</span>개 남음</button>` : '';
+  },
+  // 더 보기: 다음 15개를 아래에 이어 붙인다(위에서 보던 자리는 그대로)
+  async _dbMore(meal, ds){
+    const q=this._dbQ, mb=document.getElementById('dietDbMore'); if(!q || !mb) return;
+    mb.innerHTML=`<div class="diet-rec-hd">불러오는 중…</div>`;
+    let j=null; try { j = await this._dbFetch(q, (this._dbPage||1)+1); } catch(e) {}
+    if(!j || !j.ok){ mb.innerHTML=''; return; }
+    this._dbPage++;
+    const start=this._dbHits.length, add=j.items.map(x=>this._fromDb(x));
+    this._dbHits=this._dbHits.concat(add);
+    document.getElementById('dietDbList')?.insertAdjacentHTML('beforeend', add.map((f,k)=>this._dbRowHtml(f, start+k, meal, ds)).join(''));
+    mb.innerHTML=this._moreBtn(j, meal, ds);
   },
   // ── 영양성분표 촬영 ──────────────────────
   // 식약처 DB 는 모든 제품을 담고 있지 않다. 실제로 '김단단 닭가슴살' 은 0건이었다.
@@ -697,12 +729,41 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
   // 단위에 붙은 숫자를 수량만큼 곱한다. "100g"×2 → "200g", "1인분"×2 → "2인분".
   // 숫자로 시작하지 않으면(예: "반개", "M") 곱하지 않고 ×N 을 붙인다.
   _scaleUnit(u, q){
-    if(q <= 1) return u || '';
+    q = Math.round(q*100)/100;
+    if(q === 1) return u || '';
+    // '1개(50g)' × 1.5 → '1.5개(75g)'
+    const pm = /^(\d+(?:\.\d+)?)([^(]*)\((\d+(?:\.\d+)?)(g|mL)\)$/.exec(u||'');
+    if(pm){ const f=v=>{ const n=Math.round(v*10)/10; return Number.isInteger(n)?n:n.toFixed(1); }; return `${f(Number(pm[1])*q)}${pm[2]}(${f(Number(pm[3])*q)}${pm[4]})`; }
     if(!u) return `×${q}`;
     const m = /^(\d+(?:\.\d+)?)(.*)$/.exec(u);
     if(!m) return `${u} ×${q}`;
     const n = Number(m[1]) * q;
     return `${Number.isInteger(n) ? n : n.toFixed(1)}${m[2]}`;
+  },
+  // 단위가 무게(100g, 1개(138g))면 g 으로 직접 넣을 수 있게 그 무게를 알아 둔다
+  _gBase(u){
+    const a=/^(\d+(?:\.\d+)?)\s*(g|mL)$/.exec(u||''); if(a) return { g:Number(a[1]), unit:a[2], pure:true };
+    const b=/\((\d+(?:\.\d+)?)\s*(g|mL)\)/.exec(u||''); if(b) return { g:Number(b[1]), unit:b[2], pure:false };
+    return null;
+  },
+  _qtyLabel(s){
+    const gb=this._gBase(s.u), q=Math.round(s.qty*100)/100;
+    if(gb && gb.pure) return `${Math.round(gb.g*q)}${gb.unit}`;
+    return String(q);
+  },
+  // 수량 칸을 누르면 키패드/스크롤로 직접 — 무게 단위면 g, 아니면 개수(0.5개도)
+  cartAmt(i, meal, ds){
+    const s=(this._cart||[])[i]; if(!s || typeof NumIn==='undefined') return;
+    const gb=this._gBase(s.u);
+    if(gb){
+      NumIn.open({ title:`${s.n} · 먹은 양`, unit:gb.unit, dec:true, cur:Math.round(gb.g*s.qty*10)/10,
+        note:`기준 ${s.u} = ${s.c}kcal · 넣은 양만큼 열량·영양소를 다시 계산합니다`,
+        done:v=>{ if(!(v>0)) return; s.qty=Math.round(v/gb.g*1000)/1000; this._paintCart(meal, ds); } });
+    } else {
+      NumIn.open({ title:`${s.n} · 몇 ${s.u?'번':'개'}`, unit:s.u?`× ${s.u}`:'개', dec:true, cur:s.qty,
+        note:'0.5 처럼 반만 먹은 것도 넣을 수 있습니다',
+        done:v=>{ if(!(v>0)) return; s.qty=Math.round(v*100)/100; this._paintCart(meal, ds); } });
+    }
   },
   _cartCal(){ return (this._cart||[]).reduce((a,s)=>a+Math.round(s.c*s.qty),0); },
   _paintCart(meal, ds){
@@ -721,12 +782,12 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
     return `<div class="diet-cart">
       <div class="diet-cart-hd">담은 것 <b class="num">${cart.length}</b></div>
       ${cart.map((s,i)=>{
-        const u=this._scaleUnit(s.u, s.qty);
+        const gb=this._gBase(s.u), u=gb&&gb.pure ? '' : this._scaleUnit(s.u, s.qty);   // 무게 단위는 오른쪽 양 칸에 g 으로 보인다
         return `<div class="diet-cart-row">
           <span class="diet-cart-nm">${this._em(s.e)}${esc(s.n)}${u?` <i>${esc(u)}</i>`:''}</span>
           <div class="diet-qty">
-            <button onclick="Diet.cartQty(${i},-1,'${meal}','${ds}')" ${s.qty<=1?'disabled':''} aria-label="줄이기">−</button>
-            <span class="diet-qty-n num">${s.qty}</span>
+            <button onclick="Diet.cartQty(${i},-1,'${meal}','${ds}')" ${s.qty<=this._qStep(s)+1e-9?'disabled':''} aria-label="줄이기">−</button>
+            <button type="button" class="diet-qty-n num" onclick="Diet.cartAmt(${i},'${meal}','${ds}')" aria-label="양 직접 입력">${this._qtyLabel(s)}</button>
             <button onclick="Diet.cartQty(${i},1,'${meal}','${ds}')" aria-label="늘리기">+</button>
           </div>
           <span class="diet-cart-cal num">${Math.round(s.c*s.qty)}<i>kcal</i></span>
@@ -746,9 +807,12 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
   },
   cartQty(i, d, meal, ds){
     const s=(this._cart||[])[i]; if(!s) return;
-    s.qty=Math.min(99, Math.max(1, s.qty+d));
+    const st=this._qStep(s);
+    s.qty=Math.round(Math.min(99, Math.max(st, s.qty+d*st))*1000)/1000;
     this._paintCart(meal, ds);
   },
+  // −/+ 한 번: 100g 같은 무게 단위는 10g, 나머지는 1개(1보다 작으면 0.5)
+  _qStep(s){ const gb=this._gBase(s.u); if(gb && gb.pure) return 10/gb.g; return s.qty<1 || s.qty%1 ? 0.5 : 1; },
   cartRemove(i, meal, ds){
     if(!this._cart) return;
     this._cart.splice(i,1);
