@@ -721,3 +721,29 @@ html[data-ui="v2"] .cal-ics-btns .btn-sm:not(.accent){ height:40px; padding:0 16
 .ml-sub{ height:48px; border:1px solid var(--border); border-radius:12px; background:none; color:var(--text); font:inherit; font-size:15px; cursor:pointer; }
 .ml-link{ display:block; margin:16px auto 0; padding:8px; border:0; background:none; color:var(--text3); font:inherit; font-size:13px; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
 .ml-danger{ height:48px; border:0; border-radius:12px; background:none; color:#E5484D; font:inherit; font-size:15px; font-weight:600; cursor:pointer; }
+
+/* ── 사용 도우미 · 기능 안내 (js/onboard.js GUIDE) ───────────────── */
+.ob-gtt{ flex:1; font-size:13px; font-weight:600; color:var(--text3); }
+.ob-gq{ width:100%; height:42px; font-size:15px; margin:0 0 12px; box-sizing:border-box; }
+.ob-gl{ display:grid; gap:0; }
+.ob-gc{ display:flex; align-items:center; gap:12px; width:100%; padding:12px 0; border:0; border-bottom:1px solid var(--border); background:none; color:var(--text); font:inherit; text-align:left; cursor:pointer; }
+.ob-gc:last-child{ border-bottom:0; }
+.ob-gc .ob-tic{ background:var(--card2); }
+.ob-gtx{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.ob-gtx b{ font-size:15px; }
+.ob-gtx small{ font-size:12px; color:var(--text3); }
+.ob-gch{ color:var(--text3); font-size:18px; }
+.ob-gd{ display:grid; gap:0; }
+.ob-gi{ display:block; padding:12px 0; border-bottom:1px solid var(--border); }
+.ob-gi:last-child{ border-bottom:0; }
+.ob-gi b{ display:block; font-size:14px; color:var(--text); }
+.ob-gi p{ margin:3px 0 6px; font-size:13px; line-height:1.55; color:var(--text2); }
+.ob-gi-b{ width:100%; border-left:0; border-right:0; border-top:0; background:none; font:inherit; text-align:left; cursor:pointer; }
+.ob-gcat{ display:block; font-size:11px; font-weight:600; color:var(--accent); margin-bottom:2px; }
+.ob-path{ display:inline-block; max-width:100%; padding:3px 8px; border-radius:6px; background:var(--card2); color:var(--text2); font-size:12px; font-weight:600; line-height:1.45; text-decoration:none; overflow-wrap:anywhere; }
+a.ob-path{ color:var(--accent); }
+.ob-gback{ margin:-4px 0 4px; }
+.ob-gsetup{ width:100%; margin:16px 0 4px; }
+.ob-foot .ob-btn{ min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 10px; }
+html[data-ui="v2"] .ob-gi{ border-bottom-color:var(--v2-line); }
+html[data-ui="v2"] .ob-gc{ border-bottom-color:var(--v2-line); }

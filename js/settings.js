@@ -150,7 +150,7 @@ const Settings = {
     } else if (cat === 'widget') {
       h = this._widgetHtml();
     } else if (cat === 'help') {
-      h = `${this._link('사용 도우미 다시 보기', 'App.closeModal();Onboard.open(true)', '신체정보·AI·습관·식단·운동·경제 설정')}
+      h = `${this._link('사용 도우미 다시 보기', 'App.closeModal();Onboard.open(true)', '모든 기능 안내(일정·습관·식단·운동·인바디·메모·경제·AI·스마트홈·위젯·설정)와 메뉴 위치 · 설정 도우미')}
         ${this._link('위젯 · 시리 · 홈 화면에 추가', "Settings.go('widget')", '휴대폰 홈 화면에서 바로 열기')}
         ${this._item('버전', `<span class="set-val">${this.VERSION}</span>`)}`;
     }
