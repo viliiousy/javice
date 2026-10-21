@@ -46,13 +46,19 @@ const App = {
     this._renderTasks();
   },
 
+  _initialAvatar(name) {
+    const ch=[...String(name||'').trim()][0]||'B';
+    const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#FF6A2B"/><text x="32" y="33" dominant-baseline="central" text-anchor="middle" font-family="-apple-system,'IBM Plex Sans KR',sans-serif" font-size="30" font-weight="600" fill="#17181B">${ch.replace(/[<&>]/g,'')}</text></svg>`;
+    return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+  },
   async onAuthSuccess(userInfo) {
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('app').style.display='block';
     if(userInfo?.name){
       const hName = document.getElementById('hName');
       if(hName) hName.textContent=userInfo.name;
-      if(userInfo.picture) { const av=document.getElementById('hAvatar'); if(av) av.src=userInfo.picture; }
+      // 사진이 있으면 그 사진, 없으면(Apple 로그인은 사진을 주지 않는다) 이름 첫 글자로 동그라미를 만든다
+      { const av=document.getElementById('hAvatar'); if(av) av.src=userInfo.picture || this._initialAvatar(userInfo.name); }
       const pn=document.getElementById('pmName'); if(pn) pn.textContent=userInfo.name||'';
       const pm=document.getElementById('pmMail'); if(pm) pm.textContent=userInfo.email||'';
       const hUser = document.getElementById('hUser');
