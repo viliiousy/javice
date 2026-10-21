@@ -131,6 +131,9 @@ const InBody = {
       const v = r1(x.v); if (!(v > 0)) continue;
       (byDay[day(x.t)] ||= {})[k] = v;
     }
+    // 건강 앱에서 본 가장 최근 측정일과 확인 시각을 남겨 둔다(값이 같아 바뀐 게 없어도 '연동은 됐다' 를 보여 주려고)
+    const seen = Object.keys(byDay).sort();
+    try { localStorage.setItem('gl_health_meta', JSON.stringify({ at: Date.now(), latest: seen[seen.length - 1] || '', days: seen.length })); } catch (e) {}
     const all = this.getRecords(), map = Object.fromEntries(all.map(r => [r.dt, { ...r }]));
     let changed = 0;
     for (const [dt, v] of Object.entries(byDay)) {
@@ -567,12 +570,14 @@ const InBody = {
   // ── 불러오기 ────────────────────────────
   showLoad() {
     const ios = this.healthAvail(), on = this.healthOn();
-    const last = this.getRecords().filter(r => r.src === 'health').slice(-1)[0];
+    let meta = {}; try { meta = JSON.parse(localStorage.getItem('gl_health_meta') || '{}') || {}; } catch (e) {}
+    const ymd = d => String(d).replace(/-/g, '.');
+    const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? '방금' : m < 60 ? m + '분 전' : m < 1440 ? Math.round(m / 60) + '시간 전' : Math.round(m / 1440) + '일 전'; };
     App.openModal('@download 인바디 기록 불러오기', `
       <div class="ib-src">
         <div class="ib-src-h"><b>애플 건강</b><span>${on ? '자동으로 가져오는 중' : ios ? '연결 안 됨' : '아이폰 앱에서만'}</span></div>
         <p>인바디 앱 › 설정에서 <b>건강 앱 연동</b>을 켜 두면, 인바디에서 잰 체중·체지방률·제지방량·BMI 가 건강 앱을 거쳐 여기로 들어옵니다. 골격근량은 건강 앱에 없어 지난 실측으로 추정합니다.</p>
-        ${on ? `<p class="ib-src-m">${last ? `마지막으로 가져온 기록 <b class="num">${last.dt.slice(5).replace('-','/')}</b>` : '아직 가져온 기록이 없습니다'}</p>
+        ${on ? `<p class="ib-src-m">${meta.at ? `건강 앱의 가장 최근 측정 <b class="num">${meta.latest ? ymd(meta.latest) : '없음'}</b> · 마지막 확인 ${ago(meta.at)}` : '아직 건강 앱을 확인하지 않았습니다 — 지금 가져오기를 눌러 주세요'}</p>
           <div class="ib-src-b"><button class="btn-sm" onclick="InBody.healthOff();App.closeModal()">자동 가져오기 끄기</button><button class="btn-sm accent" onclick="InBody._loadNow()">지금 가져오기</button></div>`
         : ios ? `<button class="ib-go" onclick="InBody.healthConnect()">애플 건강 연결</button>`
         : `<p class="ib-src-m">아이폰의 Bashy 앱에서 연결하면, 같은 계정의 웹·태블릿에도 함께 보입니다.</p>`}
@@ -582,7 +587,9 @@ const InBody = {
     const n = await this.healthSync(true, 365);
     if (n == null) return;
     App.closeModal();
-    App.showToast(n ? `${n}일치 새 기록을 가져왔습니다` : '새 기록이 없습니다', 'success');
+    let meta = {}; try { meta = JSON.parse(localStorage.getItem('gl_health_meta') || '{}') || {}; } catch (e) {}
+    const lt = meta.latest ? ` · 건강 앱 최근 측정 ${meta.latest.replace(/-/g, '.')}` : '';
+    App.showToast(n ? `${n}일치 새 기록을 가져왔습니다${lt}` : `이미 모두 들어와 있습니다${lt}`, 'success');
   },
 
   // ── 직접 입력 ────────────────────────────
