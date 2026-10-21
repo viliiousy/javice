@@ -693,8 +693,7 @@ html[data-ui="v2"] .cal-ics-btns .btn-sm:not(.accent){ height:40px; padding:0 16
 .stat-chip b .sl{ display:inline-block; height:1.2em; line-height:1.2em; overflow:hidden; vertical-align:-0.24em; clip-path:inset(0); }
 .stat-chip b .sl-in{ display:block; will-change:transform; }
 .stat-chip b .sl-in i{ display:block; height:1.2em; font-style:normal; text-align:center; }
-.stat-float{ position:fixed; z-index:10030; pointer-events:none; font:700 13px 'Space Grotesk','IBM Plex Sans KR',sans-serif; font-style:normal;
-  letter-spacing:-.01em; white-space:nowrap; padding:2px 8px; border-radius:10px; color:#17181B; background:var(--accent); }
-.stat-float.dn{ background:var(--card2); color:var(--text2); }
-.stat-float.eat{ background:#E5484D; color:#fff; }
-.stat-float.burn{ background:#2FA36B; color:#fff; }
+.stat-float{ position:fixed; z-index:10030; pointer-events:none; font:700 14px 'Space Grotesk','IBM Plex Sans KR',sans-serif; font-style:normal;
+  letter-spacing:-.01em; white-space:nowrap; padding:0; border:0; background:none; color:var(--text); }
+.stat-float.plus{ color:#E5484D; }
+.stat-float.minus{ color:#3B82F6; }

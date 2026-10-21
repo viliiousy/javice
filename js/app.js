@@ -230,13 +230,14 @@ const App = {
     const chip = k => el.querySelector(`.stat-chip[data-s="${k}"]`);
     const fl = (k, txt, cls) => { const c = chip(k); if (c) this._float(c, txt, cls); };
     const sl = (k, from, to) => { const c = chip(k), b = c && c.querySelector('b'); if (b) this._slot(b, from, to); };
-    if (now.h !== P.h) { const d = now.h - P.h; fl('habits', (d > 0 ? '+' : '−') + Math.abs(d), d > 0 ? 'up' : 'dn'); sl('habits', P.hTxt, now.hTxt); }
-    if (now.t !== P.t) { const d = now.t - P.t; fl('tasks', (d > 0 ? '+' : '−') + Math.abs(d), d > 0 ? 'up' : 'dn'); sl('tasks', String(P.t), String(now.t)); }
-    if (now.c !== P.c) { const d = now.c - P.c; fl('checklist', (d > 0 ? '+' : '−') + Math.abs(d), d > 0 ? 'up' : 'dn'); sl('checklist', P.cTxt, now.cTxt); }
+    if (now.h !== P.h) { const d = now.h - P.h; fl('habits', (d > 0 ? '+' : '−') + Math.abs(d), d > 0 ? 'plus' : 'minus'); sl('habits', P.hTxt, now.hTxt); }
+    if (now.t !== P.t) { const d = now.t - P.t; fl('tasks', (d > 0 ? '+' : '−') + Math.abs(d), d > 0 ? 'plus' : 'minus'); sl('tasks', String(P.t), String(now.t)); }
+    if (now.c !== P.c) { const d = now.c - P.c; fl('checklist', (d > 0 ? '+' : '−') + Math.abs(d), d > 0 ? 'plus' : 'minus'); sl('checklist', P.cTxt, now.cTxt); }
     if (now.eat !== P.eat || now.bonus !== P.bonus) {
       const de = now.eat - P.eat, db = now.bonus - P.bonus;
-      if (de) fl('diet', (de > 0 ? '+' : '−') + Math.abs(de).toLocaleString('ko-KR') + ' kcal', de > 0 ? 'eat' : 'dn');
-      if (db) setTimeout(() => fl('diet', (db > 0 ? '운동 +' : '운동 −') + Math.abs(db).toLocaleString('ko-KR'), 'burn'), de ? 260 : 0);
+      // 식단은 🍔, 운동은 🏋️ — 더해지면 빨강, 빠지면 파랑
+      if (de) fl('diet', '🍔 ' + (de > 0 ? '+' : '−') + Math.abs(de).toLocaleString('ko-KR'), de > 0 ? 'plus' : 'minus');
+      if (db) setTimeout(() => fl('diet', '🏋️ ' + (db > 0 ? '+' : '−') + Math.abs(db).toLocaleString('ko-KR'), db > 0 ? 'plus' : 'minus'), de ? 260 : 0);
       sl('diet', P.calTxt, now.calTxt);
     }
   },
