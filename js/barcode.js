@@ -18,15 +18,16 @@ const Scan = {
     const el = document.createElement('div');
     el.id = 'scanWrap'; el.className = 'scan-wrap';
     el.innerHTML = `
-      <div class="scan-hd">바코드 스캔<button class="scan-x" onclick="Scan.close()">✕</button></div>
+      <div class="scan-hd">바코드 스캔<button class="scan-x" onclick="Scan.close()" aria-label="닫기">✕</button></div>
       <div class="scan-view">
         <video id="scanVid" playsinline muted autoplay></video>
         <div class="scan-frame"></div>
       </div>
       <div class="scan-msg" id="scanMsg">카메라를 켜는 중…</div>
       <div class="scan-foot">
-        <input id="scanNum" class="inp inp-sm" inputmode="numeric" autocomplete="off"
-               placeholder="안 읽히면 바코드 숫자를 직접">
+        <input id="scanNum" class="inp inp-sm" inputmode="numeric" autocomplete="off" enterkeyhint="search"
+               placeholder="안 읽히면 숫자를 직접 입력"
+               onkeydown="if(event.key==='Enter')Scan.manual()">
         <button class="btn-sm" onclick="Scan.manual()">조회</button>
       </div>
       <div id="scanRes"></div>`;
@@ -193,14 +194,12 @@ const Scan = {
     box.innerHTML = head
       + this._hits.map((f, i) => `<div class="diet-food">
           <div class="diet-food-main" onclick="Scan.add(${i})">
-            <span class="diet-food-nm">${f.e} ${esc(f.n)}</span>
-            <span class="diet-food-u">${esc(f.u)}</span>
-            ${f.grp ? `<span class="diet-food-n">${esc(f.grp)}</span>` : ''}
-            ${f.note ? `<span class="diet-food-note">${esc(f.note)}</span>` : ''}
+            <span class="diet-food-nm">${Diet._em(f.e)}${esc(f.n)}</span>
+            <span class="dt-meta"><span class="diet-food-u">${esc(f.u)}</span>${Diet._srcTag(f.e)}${f.grp ? `<span class="diet-food-n">${esc(f.grp)}</span>` : ''}${f.note ? `<span class="diet-food-note">${esc(f.note)}</span>` : ''}</span>
           </div>
-          <span class="diet-food-cal">${f.c}<i>kcal</i></span>
+          <span class="diet-food-cal num">${f.c}<i>kcal</i></span>
         </div>`).join('')
-      + `<div class="diet-macro-note">🥗 식약처 실측 · 🌍 Open Food Facts${this._fskNote(j)}</div>`
+      + `<div class="diet-macro-note"><span class="dt-em">🥗 식약처 실측 · 🌍 Open Food Facts</span><span class="dt-src-legend">식약처 = 실측값 · OFF = Open Food Facts</span>${this._fskNote(j)}</div>`
       + this._retryHtml();
   },
 
@@ -215,8 +214,8 @@ const Scan = {
 
   _retryHtml(){
     return `<div class="scan-again">
-      <button class="btn-sm" onclick="Scan.open(Scan._meal, Scan._ds)">다시 스캔</button>
-      <button class="btn-sm" onclick="Scan.close()">닫기</button>
+      <button class="btn-sm dt-ghost" onclick="Scan.open(Scan._meal, Scan._ds)">다시 스캔</button>
+      <button class="btn-sm dt-ghost" onclick="Scan.close()">닫기</button>
     </div>`;
   },
 

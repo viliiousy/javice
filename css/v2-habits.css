@@ -1,0 +1,111 @@
+/* v2 정리 — 습관 · 체크리스트 · 알림 (2026-10-21)
+   ───────────────────────────────────────────────────────────────
+   시트 한 장에 주인공은 하나: 맨 아래 주황 단추(추가·저장).
+   나머지는 조용히 — 칸은 44px·둥근 12px, 이름표는 13px 회색, 선택은 먹색 테두리.
+   예전: 요일 일곱 개가 모두 까만 알약, 분류 칩이 주황 상자, 단추 셋이 같은 줄에서 다툼. */
+
+/* v1 에서는 묶음 껍데기가 없던 것처럼 — 단추가 예전처럼 한 줄에 선다 */
+.hb-acts-sub{ display:contents; }
+.hb-opt{ font-weight:400; }
+.hb-meta{ margin-top:8px; font-size:12px; color:var(--text3); }
+.hb-name-line{ display:flex; gap:8px; }
+.hb-name-line .inp:not(.hb-emoji){ flex:1; min-width:0; }
+.hb-emoji{ width:64px; flex:none; text-align:center; }
+.nt-cell{ display:flex; align-items:center; gap:6px; }
+
+/* ── 시트 공통 ─────────────────────────────────────────── */
+html[data-ui="v2"] .hb-sheet .modal-row{ margin-bottom:24px; }
+html[data-ui="v2"] .hb-sheet .modal-lbl{ display:block; font-size:13px; line-height:16px; color:var(--text3); font-weight:500; margin-bottom:8px; }
+html[data-ui="v2"] .hb-sheet .hb-opt{ margin-left:4px; color:var(--text4); }
+html[data-ui="v2"] .modal-box .hb-sheet .inp,
+html[data-ui="v2"] .modal-box .hb-sheet .inp.inp-sm{
+  height:44px; min-height:44px; box-sizing:border-box; border-radius:12px; border:1px solid var(--border);
+  background:var(--card2); color:var(--text); font:inherit; font-size:16px; padding:0 14px; width:100%; }
+html[data-ui="v2"].dark .modal-box .hb-sheet .inp{ background:var(--card); color-scheme:dark; }
+html[data-ui="v2"] .modal-box .hb-sheet .inp:focus{ border-color:var(--text3); outline:none; box-shadow:none; }
+html[data-ui="v2"] .modal-box .hb-sheet .inp::placeholder{ color:var(--text4); }
+html[data-ui="v2"] .hb-sheet .inp.num{ font-family:var(--v2-num); font-variant-numeric:tabular-nums; font-size:15px; }
+html[data-ui="v2"] .modal-box .hb-sheet .hb-emoji{ width:44px; padding:0; text-align:center; font-size:20px; }
+html[data-ui="v2"] .modal-box .hb-sheet .hb-date{ max-width:200px; }
+html[data-ui="v2"] .hb-meta{ margin-top:8px; font-size:12px; line-height:16px; color:var(--text3); }
+html[data-ui="v2"] .hb-meta .num{ font-family:var(--v2-num); color:var(--text2); margin-left:4px; }
+
+/* ── 분류: 먹색 테두리 하나로 고른 것을 보인다 ───────────── */
+html[data-ui="v2"] .hb-cat-row{ position:relative; }
+html[data-ui="v2"] .hb-sheet .cat-box{ display:block; }
+html[data-ui="v2"] .hb-sheet .cat-picker{ display:flex; flex-wrap:wrap; gap:8px; }
+html[data-ui="v2"] .hb-sheet .cat-pick-btn{
+  height:36px; padding:0 12px !important; gap:6px; border-radius:18px; box-sizing:border-box;
+  background:none !important; border:1px solid var(--border); color:var(--text2); font-size:14px; font-weight:500; }
+html[data-ui="v2"] .hb-sheet .cat-pick-btn .hb-cat-ic{ width:14px; height:14px; margin:0; color:var(--text3); }
+html[data-ui="v2"] .hb-sheet .cat-pick-btn.on{ border-color:var(--text); color:var(--text); font-weight:600; background:none !important; }
+html[data-ui="v2"] .hb-sheet .cat-pick-btn.on .hb-cat-ic{ color:var(--text); }
+html[data-ui="v2"] .hb-sheet .cat-pick-btn:focus-within{ outline:2px solid var(--text3); outline-offset:2px; }
+html[data-ui="v2"] .hb-sheet .cat-add{
+  height:36px; padding:0 12px; border-radius:18px; border:1px dashed var(--border2); background:none;
+  color:var(--text3); font-size:14px; }
+/* '편집' 은 이름표 줄 오른쪽 끝 — 칩 사이에 끼어 줄을 밀어내지 않게 */
+html[data-ui="v2"] .hb-sheet .cat-edit-tg{
+  position:absolute; top:-8px; right:0; height:32px; padding:0 0 0 12px; font-size:13px; color:var(--text3); }
+html[data-ui="v2"] .hb-sheet .cat-box.editing .cat-edit-tg{ color:var(--text); font-weight:600; }
+html[data-ui="v2"] .hb-sheet .cat-del{
+  top:-6px; right:-6px; width:20px; height:20px; line-height:20px; font-size:10px;
+  background:var(--text); color:var(--card); }
+html[data-ui="v2"] .hb-sheet .cat-box.editing .cat-pick-btn{ animation:none; border-style:dashed; }
+
+/* ── 반복 요일: 일곱 칸 한 줄. 켜진 날은 먹색 테두리 + 진한 글자 ── */
+html[data-ui="v2"] .hb-sheet .day-picker{ display:grid !important; grid-template-columns:repeat(7, 1fr); gap:4px; margin:0; }
+html[data-ui="v2"] .hb-sheet .day-pick-btn,
+html[data-ui="v2"] .hb-sheet .day-pick-btn:has(input:checked){
+  height:40px; padding:0 !important; border-radius:12px; justify-content:center; box-sizing:border-box;
+  font-size:14px; font-weight:500; transition:border-color .12s, color .12s; }
+html[data-ui="v2"] .hb-sheet .day-pick-btn{ background:none !important; border:1px solid var(--border) !important; color:var(--text4) !important; }
+html[data-ui="v2"] .hb-sheet .day-pick-btn:has(input:checked){
+  background:var(--bg2) !important; border-color:var(--bg2) !important; color:var(--text) !important; font-weight:600; }
+html[data-ui="v2"].dark .hb-sheet .day-pick-btn:has(input:checked){ background:var(--border2) !important; border-color:var(--border2) !important; }
+html[data-ui="v2"] .hb-sheet .day-pick-btn:focus-within{ outline:2px solid var(--text3); outline-offset:1px; }
+
+/* ── 약: 시각 칸 + 알림 받기 한 줄 ───────────────────────── */
+html[data-ui="v2"] .hb-sheet .med-line{ display:flex; align-items:center; gap:16px; }
+html[data-ui="v2"] .modal-box .hb-sheet .med-line .inp{ flex:1; width:auto; min-width:0; max-width:200px; }
+html[data-ui="v2"] .hb-sheet .med-chk{ height:44px; gap:8px; font-size:14px; color:var(--text2); white-space:nowrap; margin-left:auto; }
+html[data-ui="v2"] .hb-sheet .med-chk input{ width:18px; height:18px; margin:0; accent-color:var(--text); }
+html[data-ui="v2"] .hb-sheet .med-note{ margin-top:8px; font-size:12px; line-height:18px; color:var(--text3); }
+
+/* ── 단추: 주황 하나(꽉 찬 너비) + 아래 보조 단추 줄 ─────── */
+html[data-ui="v2"] .hb-sheet .hb-acts{ display:flex; flex-direction:column; gap:8px; margin-top:32px; }
+html[data-ui="v2"] .hb-sheet .hb-acts .hb-go{
+  order:0; flex:none; width:100%; height:48px; border-radius:12px; border:0 !important;
+  background:#FF6A2B !important; color:#17181B !important; font-size:15px; font-weight:600; }
+html[data-ui="v2"] .hb-sheet .hb-acts .hb-go:active{ background:#F25A18 !important; }
+html[data-ui="v2"] .hb-sheet .hb-acts-sub{ display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:8px; }
+html[data-ui="v2"] .hb-sheet .hb-acts .hb-ghost{
+  height:44px; padding:0 12px; border-radius:12px; border:1px solid var(--border); background:none;
+  color:var(--text2); font-size:14px; font-weight:500; }
+html[data-ui="v2"] .hb-sheet .hb-acts .hb-del{ color:var(--text3); }
+html[data-ui="v2"] .hb-sheet .hb-acts .hb-del:hover{ color:var(--red); border-color:var(--red); }
+
+/* ── 알림 설정 ─────────────────────────────────────────── */
+/* 주황은 맨 위 '알림 받기' 하나만. 갈래 스위치는 먹색 */
+html[data-ui="v2"] .nt .nt-blk .set-sw.on{ background:var(--text); }
+html[data-ui="v2"] .nt .nt-blk .set-sw.on i{ background:var(--card); box-shadow:none; }
+html[data-ui="v2"] .nt .nt-master{ min-height:64px; }
+html[data-ui="v2"] .nt .set-item{ min-height:64px; padding:12px 0; border-bottom:1px solid var(--v2-line); }
+html[data-ui="v2"] .nt .set-tx{ gap:4px; }
+html[data-ui="v2"] .nt .set-tx small{ font-size:13px; white-space:normal; line-height:18px; }
+html[data-ui="v2"] .nt .set-h{ font-size:12px; font-weight:500; color:var(--text3); letter-spacing:0; margin:24px 0 0; }
+/* 갈래 하나 = 이름 줄 + 시각 줄. 둘 사이엔 선을 긋지 않는다 */
+html[data-ui="v2"] .nt .nt-blk{ border-bottom:1px solid var(--v2-line); }
+html[data-ui="v2"] .nt .nt-blk > .set-item{ border-bottom:0 !important; }
+html[data-ui="v2"] .nt .nt-times{
+  display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; padding:0 0 16px; border:0; }
+html[data-ui="v2"] .nt .nt-cell{ display:flex; flex-direction:column; align-items:stretch; gap:4px; font-size:12px; line-height:16px; color:var(--text3); }
+html[data-ui="v2"] .nt .set-time{
+  width:100%; min-width:0; height:44px; box-sizing:border-box; border-radius:12px; border:1px solid var(--border);
+  background:var(--card2); color:var(--text); font-family:var(--v2-num); font-variant-numeric:tabular-nums; font-size:15px; padding:0 8px 0 12px; }
+html[data-ui="v2"].dark .nt .set-time{ background:var(--card); color-scheme:dark; }
+/* 시계 아이콘이 '오후 09:00' 을 잘라 먹던 것 — 칸을 누르면 어차피 시각 고르기가 열린다 */
+html[data-ui="v2"] .nt .set-time::-webkit-calendar-picker-indicator{ display:none; }
+html[data-ui="v2"] .nt .set-note{ font-size:12px; line-height:18px; margin:12px 0 0; }
+html[data-ui="v2"] .nt .set-link{ border-bottom:1px solid var(--v2-line); }
+html[data-ui="v2"] .nt .set-link:last-child{ border-bottom:0; }

@@ -130,15 +130,15 @@ const Checklist = {
   },
 
   showAdd() {
-    App.openModal('@pen 체크리스트 추가',`
-      <div class="modal-row"><label class="modal-lbl">항목 *</label>
-        <input id="clTitle" type="text" placeholder="항목 입력..." class="inp"></div>
-      <div class="modal-row"><label class="modal-lbl">마감 날짜 (선택)</label>
-        <input id="clDue" type="date" value="" class="inp inp-sm"></div>
-      <div class="modal-btns">
-        <button id="btnClSaveNew" class="btn-sm accent">추가</button>
-        <button onclick="App.closeModal()" class="btn-sm">취소</button>
-      </div>`);
+    App.openModal('@pen 체크리스트 추가',`<div class="hb-sheet">
+      <div class="modal-row"><label class="modal-lbl" for="clTitle">항목</label>
+        <input id="clTitle" type="text" placeholder="예: 서류 제출" class="inp"></div>
+      <div class="modal-row"><label class="modal-lbl" for="clDue">마감일 <span class="hb-opt">선택</span></label>
+        <input id="clDue" type="date" value="" class="inp inp-sm num hb-date"></div>
+      <div class="modal-btns hb-acts">
+        <button id="btnClSaveNew" class="btn-sm accent hb-go">추가</button>
+        <div class="hb-acts-sub"><button onclick="App.closeModal()" class="btn-sm hb-ghost">취소</button></div>
+      </div></div>`);
     setTimeout(()=>{
       document.getElementById('clTitle')?.focus();
       document.getElementById('btnClSaveNew')?.addEventListener('click',()=>Checklist._saveNew());
@@ -159,16 +159,18 @@ const Checklist = {
 
   showEdit(id) {
     const it=this.getItems().find(i=>i.id===id); if(!it) return;
-    App.openModal('@pen 항목 편집',`
-      <div class="modal-row"><label class="modal-lbl">항목 *</label>
+    App.openModal('@pen 항목 편집',`<div class="hb-sheet">
+      <div class="modal-row"><label class="modal-lbl" for="clEditTitle">항목</label>
         <input id="clEditTitle" type="text" value="${esc(it.title)}" class="inp"></div>
-      <div class="modal-row"><label class="modal-lbl">마감 날짜</label>
-        <input id="clEditDue" type="date" value="${it.dueDate||''}" class="inp inp-sm"></div>
-      <div class="modal-btns">
-        <button onclick="Checklist._saveEdit('${id}')" class="btn-sm accent">저장</button>
-        <button onclick="Checklist.remove('${id}');App.closeModal();" class="btn-danger">삭제</button>
-        <button onclick="App.closeModal()" class="btn-sm">취소</button>
-      </div>`);
+      <div class="modal-row"><label class="modal-lbl" for="clEditDue">마감일 <span class="hb-opt">선택</span></label>
+        <input id="clEditDue" type="date" value="${it.dueDate||''}" class="inp inp-sm num hb-date"></div>
+      <div class="modal-btns hb-acts">
+        <button onclick="Checklist._saveEdit('${id}')" class="btn-sm accent hb-go">저장</button>
+        <div class="hb-acts-sub">
+          <button onclick="Checklist.remove('${id}');App.closeModal();" class="btn-danger hb-ghost hb-del">삭제</button>
+          <button onclick="App.closeModal()" class="btn-sm hb-ghost">취소</button>
+        </div>
+      </div></div>`);
     setTimeout(()=>document.getElementById('clEditTitle')?.focus(),50);
   },
 

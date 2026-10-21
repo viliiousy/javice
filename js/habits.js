@@ -383,10 +383,10 @@ const Habits = {
   // 약 전용 칸 — 몇 시에 먹을지, 알림을 받을지
   _medRowHtml(cat, time, notify) {
     return `<div class="modal-row med-row"${cat==='med'?'':' hidden'}>
-      <label class="modal-lbl">복용 시각</label>
+      <label class="modal-lbl" for="hMedTime">복용 시각</label>
       <div class="med-line">
-        <input id="hMedTime" type="time" class="inp inp-sm" value="${esc(time||'09:00')}">
-        <label class="med-chk"><input id="hMedNotify" type="checkbox" ${notify===false?'':'checked'}> 알림 받기</label>
+        <input id="hMedTime" type="time" class="inp inp-sm num" value="${esc(time||'09:00')}">
+        <label class="med-chk"><input id="hMedNotify" type="checkbox" ${notify===false?'':'checked'}><span>알림 받기</span></label>
       </div>
       <div class="med-note">5분 전에 한 번 알리고, 체크가 없으면 한 시간마다 다시 알립니다. 자정이 지나면 처음으로 돌아갑니다.</div>
     </div>`;
@@ -407,18 +407,19 @@ const Habits = {
       '</label>'
     ).join('');
     App.openModal('@check 습관 추가',
-      '<div class="modal-row"><label class="modal-lbl">습관 이름 *</label>' +
+      '<div class="hb-sheet">' +
+      '<div class="modal-row"><label class="modal-lbl" for="habitName">습관 이름</label>' +
       '<input id="habitName" type="text" placeholder="예: 물 2L 마시기" class="inp"></div>' +
-      '<div class="modal-row"><label class="modal-lbl">분류</label>' +
+      '<div class="modal-row hb-cat-row"><label class="modal-lbl">분류</label>' +
       this._catPickerHtml(this._pendingAddCat, 'hAddCat') + '</div>' +
       this._medRowHtml(this._pendingAddCat, '09:00', true) +
       '<div class="modal-row"><label class="modal-lbl">반복 요일</label>' +
-      '<div class="day-picker">' + dayBtns + '</div></div>' +
-      `<div style="font-size:11px;color:var(--text3);margin-bottom:8px">시작일: ${baseDateStr}${dateLabel}</div>` +
-      '<div class="modal-btns" style="margin-top:10px">' +
-      '<button id="btnHabitAdd" class="btn-sm accent">추가</button>' +
-      '<button onclick="App.closeModal()" class="btn-sm">취소</button>' +
-      '</div>'
+      '<div class="day-picker">' + dayBtns + '</div>' +
+      `<div class="hb-meta">시작일 <span class="num">${baseDateStr}</span>${dateLabel}</div></div>` +
+      '<div class="modal-btns hb-acts">' +
+      '<button id="btnHabitAdd" class="btn-sm accent hb-go">추가</button>' +
+      '<div class="hb-acts-sub"><button onclick="App.closeModal()" class="btn-sm hb-ghost">취소</button></div>' +
+      '</div></div>'
     );
     setTimeout(()=>{
       document.getElementById('habitName')?.focus();
@@ -464,12 +465,13 @@ const Habits = {
 
   showEditHabit(id) {
     const h=this.getList().find(x=>x.id===id); if(!h) return;
-    App.openModal('@check 습관 편집',`
-      <div class="modal-row"><label class="modal-lbl">이름</label>
-        <input id="hEditName" type="text" value="${esc(h.name)}" class="inp"></div>
-      <div class="modal-row"><label class="modal-lbl">이모지</label>
-        <input id="hEditEmoji" type="text" value="${h.emoji||''}" class="inp" style="width:80px" maxlength="2"></div>
-      <div class="modal-row"><label class="modal-lbl">분류</label>
+    App.openModal('@check 습관 편집',`<div class="hb-sheet">
+      <div class="modal-row"><label class="modal-lbl" for="hEditName">이름</label>
+        <div class="hb-name-line">
+          <input id="hEditEmoji" type="text" value="${esc(h.emoji||'')}" class="inp hb-emoji" maxlength="2" placeholder="＋" aria-label="이모지">
+          <input id="hEditName" type="text" value="${esc(h.name)}" class="inp">
+        </div></div>
+      <div class="modal-row hb-cat-row"><label class="modal-lbl">분류</label>
         ${this._catPickerHtml(this._catOf(h),'hEditCat')}</div>
       ${this._medRowHtml(this._catOf(h), h.time, h.notify)}
       <div class="modal-row"><label class="modal-lbl">반복 요일</label>
@@ -477,11 +479,13 @@ const Habits = {
           ${this.DAYS_KO.map((d,i)=>`<label class="day-pick-btn"><input type="checkbox" value="${i}" ${(h.days||[]).includes(i)?'checked':''} class="day-edit-chk"><span>${d}</span></label>`).join('')}
         </div>
       </div>
-      <div class="modal-btns">
-        <button onclick="Habits._saveEdit('${id}')" class="btn-sm accent">저장</button>
-        <button onclick="Habits._delFrom('${id}','${this._dateStr(App?.S?.selDate||new Date())}');App.closeModal();" class="btn-danger">삭제</button>
-        <button onclick="App.closeModal()" class="btn-sm">취소</button>
-      </div>`);
+      <div class="modal-btns hb-acts">
+        <button onclick="Habits._saveEdit('${id}')" class="btn-sm accent hb-go">저장</button>
+        <div class="hb-acts-sub">
+          <button onclick="Habits._delFrom('${id}','${this._dateStr(App?.S?.selDate||new Date())}');App.closeModal();" class="btn-danger hb-ghost hb-del">삭제</button>
+          <button onclick="App.closeModal()" class="btn-sm hb-ghost">취소</button>
+        </div>
+      </div></div>`);
   },
 
   _saveEdit(id) {

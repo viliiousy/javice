@@ -226,29 +226,31 @@ const Fitness = {
     const rows = DOW.map((d,i) => {
       let cur = dp[i]; if (!cur || (!R[cur] && !OPTS.some(o=>o[0]===cur))) cur = this._defaultFor(i);
       const opts = OPTS.map(([v,l]) => `<option value="${v}"${cur===v?' selected':''}>${esc(l)}</option>`);
-      return `<div class="dp-row">
-        <span class="dp-d${i===0?' dp-sun':''}${i===6?' dp-sat':''}">${d}</span>
+      return `<label class="dp-row${i===new Date().getDay()?' dp-today':''}">
+        <span class="dp-d">${d}</span>
         <select class="inp inp-sm dp-sel" data-dow="${i}">${opts.join('')}</select>
-      </div>`;
+        ${this._ic('down','dp-chev')}
+      </label>`;
     }).join('');
     const rlist = Object.entries(R).map(([id,r]) => `<div class="rt-row">
-        <span class="rt-nm">${esc(r.name)}</span><span class="rt-n">${(r.exercises||[]).length}종목</span>
-        <button class="btn-sm" onclick="Fitness.showRoutineEdit('${id}')">편집</button>
+        <span class="rt-nm">${esc(r.name)}</span><span class="rt-n"><span class="num">${(r.exercises||[]).length}</span>종목</span>
+        <button class="rt-ed" onclick="Fitness.showRoutineEdit('${id}')">편집</button>
       </div>`).join('');
-    App.openModal('@dumbbell 요일별 운동', `
-      <div class="dp-note">요일마다 할 루틴을 고릅니다. 내 루틴은 아래에서 만들 수 있고, 홈트 3분할 플랜도 그대로 쓸 수 있어요.</div>
+    App.openModal('@dumbbell 요일별 운동', `<div class="fz fz-dp">
+      <p class="fz-note">요일마다 할 루틴을 고릅니다. 홈트 3분할 플랜도 고를 수 있습니다.</p>
       <div class="dp-list">${rows}</div>
       <div class="rt-box">
-        <div class="rt-hd">내 루틴</div>
+        <div class="fz-lbl">내 루틴</div>
         ${rlist || '<div class="rt-empty">아직 만든 루틴이 없습니다</div>'}
-        <button class="habit-add-btn" onclick="Fitness.showRoutineEdit()">+ 새 루틴 만들기</button>
-        <button class="habit-add-btn" onclick="PlanGen.open()">맞춤 플랜 다시 만들기 (목표·기구·요일·제외 기구)</button>
+        <button class="fz-act" onclick="Fitness.showRoutineEdit()">${this._ic('plus')}<span>새 루틴 만들기</span></button>
+        <button class="fz-act" onclick="PlanGen.open()"><span class="fz-act-tx">맞춤 플랜 다시 만들기<small>목표 · 기구 · 요일 · 제외 기구</small></span>${this._ic('chev','fz-ic-end')}</button>
       </div>
       <div class="modal-btns">
         <button onclick="Fitness._saveDayPlan()" class="btn-sm accent">저장</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
-      </div>`);
+      </div></div>`);
   },
+  _ic(n, c){ return typeof ExMedia!=='undefined' && ExMedia.ic ? ExMedia.ic(n, c) : ''; },
 
   _saveDayPlan() {
     const dp = {};
@@ -272,10 +274,11 @@ const Fitness = {
     const DOW = ['일','월','화','수','목','금','토'];
     const days = DOW.map((d,i) => `<label class="day-pick-btn"><input type="checkbox" class="rt-day" value="${i}" ${id && dp[i]===id?'checked':''}><span>${d}</span></label>`).join('');
     this._openPicker(r ? '루틴 편집' : '새 루틴', `
-      <div class="modal-row"><label class="modal-lbl">루틴 이름</label>
+      <div class="modal-row"><label class="modal-lbl" for="rtName">루틴 이름</label>
         <input id="rtName" class="inp" placeholder="예: 상체 A, 하체 데이" value="${r?esc(r.name):''}"></div>
-      <div class="modal-row"><label class="modal-lbl">이 루틴을 하는 요일</label><div class="day-picker">${days}</div></div>`,
-      r ? `<button onclick="Fitness.delRoutine('${id}')" class="btn-danger">삭제</button>` : '');
+      <div class="modal-row"><label class="modal-lbl">하는 요일</label><div class="day-picker">${days}</div></div>
+      <div class="fz-lbl fz-lbl-sec">운동</div>`,
+      r ? `<button onclick="Fitness.delRoutine('${id}')" class="btn-danger">루틴 삭제</button>` : '');
   },
   delRoutine(id) {
     if (!confirm('이 루틴을 삭제할까요? 배정된 요일은 계획 없음이 됩니다.')) return;
@@ -453,7 +456,7 @@ const Fitness = {
     if(btn){
       const n=(this._cart||[]).length;
       btn.disabled=!n;
-      btn.textContent = n ? (this._rid !== undefined ? `루틴 저장 (${n}종목)` : `추가 (${n}개)`) : '고른 운동 없음';
+      btn.textContent = n ? (this._rid !== undefined ? `루틴 저장 · ${n}종목` : `${n}개 추가`) : '운동을 골라 주세요';
     }
   },
   _pickHtml(){
@@ -462,33 +465,33 @@ const Fitness = {
     const q=String(this._q||'').trim();
     // 목록에 없는 운동도 이름만 쳐서 바로 넣을 수 있다.
     const own = q && !hits.some(h=>h[1].replace(/\s+/g,'')===q.replace(/\s+/g,''))
-      ? `<div class="ex-row ex-own" onclick="Fitness.pickOwn()"><span class="ex-row-main"><span class="ex-row-nm">＋ '${esc(q)}' 직접 추가</span><span class="ex-row-part">목록에 없는 운동</span></span></div>` : '';
+      ? `<div class="ex-row ex-own" onclick="Fitness.pickOwn()"><span class="ex-th ex-th-own">${this._ic('plus')}</span><span class="ex-row-main"><span class="ex-row-nm">'${esc(q)}' 직접 추가</span><span class="ex-row-part">목록에 없는 운동</span></span></div>` : '';
     if(!hits.length) return own || '<div class="ex-empty">결과가 없습니다</div>';
-    const favs=this.getFavs();
+    const favs=this.getFavs(), inCart=new Set((this._cart||[]).map(x=>x.name));
     return own + hits.map(([p,n],i)=>{
-      const fv=favs.includes(n);
+      const fv=favs.includes(n), got=inCart.has(n);
       const th=typeof ExMedia!=='undefined'?ExMedia.thumbFor(n):'';
-      return `<div class="ex-row${th?' has-th':''}">
-        ${th?`<span class="ex-th" onclick="Fitness.pick(${i})">${ExMedia.poseHtml(th)}</span>`:''}
-        <button class="ex-fav${fv?' on':''}" title="즐겨찾기"
-          onclick="event.stopPropagation();Fitness.toggleFav('${n.replace(/'/g,'&#39;')}')">${fv?'★':'☆'}</button>
+      return `<div class="ex-row${th?' has-th':''}${got?' got':''}">
+        <span class="ex-th${th?'':' none'}" onclick="Fitness.pick(${i})">${th?ExMedia.poseHtml(th):''}</span>
         <span class="ex-row-main" onclick="Fitness.pick(${i})">
-          <span class="ex-row-nm">${esc(n)}</span><span class="ex-row-part">${esc(p)}</span>
+          <span class="ex-row-nm">${esc(n)}</span><span class="ex-row-part">${esc(p)}${got?' · 담음':''}</span>
         </span>
+        <button class="ex-fav${fv?' on':''}" title="즐겨찾기" aria-label="즐겨찾기" aria-pressed="${fv}"
+          onclick="event.stopPropagation();Fitness.toggleFav('${n.replace(/'/g,'&#39;')}')">${this._ic('star') || (fv?'★':'☆')}</button>
         <a class="ex-yt" href="${this.ytUrl(n)}" target="_blank" rel="noopener"
-           onclick="event.stopPropagation()" title="자세 영상">▶</a>
+           onclick="event.stopPropagation()" title="자세 영상" aria-label="자세 영상">${this._ic('play') || '▶'}</a>
       </div>`;
     }).join('');
   },
   _cartHtml(){
     const c=this._cart||[];
     if(!c.length) return '';
-    return `<div class="ex-cart"><div class="ex-cart-hd">고른 운동 ${c.length}개</div>` +
+    return `<div class="ex-cart"><div class="ex-cart-hd">고른 운동 <span class="num">${c.length}</span></div>` +
       c.map((x,i)=>`<div class="ex-cart-row">
         <span class="ex-cart-nm">${esc(x.name)}</span>
-        <input class="inp inp-sm ex-cart-sets" value="${esc(x.sets)}"
+        <input class="inp inp-sm ex-cart-sets num" value="${esc(x.sets)}"
           onchange="Fitness.cartSets(${i}, this.value)" aria-label="세트">
-        <button class="ex-cart-del" onclick="Fitness.cartRemove(${i})" aria-label="빼기">✕</button>
+        <button class="ex-cart-del" onclick="Fitness.cartRemove(${i})" aria-label="빼기">${this._ic('x') || '✕'}</button>
       </div>`).join('') + '</div>';
   },
   pick(i){
@@ -522,20 +525,19 @@ const Fitness = {
     const routine = this._rid !== undefined;
     const parts=this._parts();
     const n=parts.reduce((a,p)=>a+EX_DB[p].length,0);
-    App.openModal('@dumbbell '+title, `${head}
+    App.openModal('@dumbbell '+title, `<div class="fz fz-pick">${head}
+      <input id="exSearch" class="inp" type="search" autocomplete="off"
+        placeholder="${n}개 종목에서 검색 · 초성 가능 (ㅅㅋㅌ)" oninput="Fitness.setQ(this.value)">
       <div class="ex-parts">
         ${parts.map(p=>`<button class="ex-part" data-part="${p}" onclick="Fitness.setPart('${p}')">${p}</button>`).join('')}
       </div>
-      <input id="exSearch" class="inp" autocomplete="off"
-        placeholder="운동 검색 — 초성도 됩니다 (예: ㅅㅋㅌ)" oninput="Fitness.setQ(this.value)">
       <div id="exCart"></div>
       <div id="exResults" class="ex-results"></div>
-      <p class="ex-hint">${n}개 종목 · ▶ 를 누르면 자세 영상을 찾아줍니다</p>
       <div class="modal-btns">
-        <button id="exCommit" onclick="${routine?'Fitness._commitRoutine()':'Fitness.commitCart()'}" class="btn-sm accent" disabled>고른 운동 없음</button>
+        <button id="exCommit" onclick="${routine?'Fitness._commitRoutine()':'Fitness.commitCart()'}" class="btn-sm accent" disabled>운동을 골라 주세요</button>
         ${extraBtn}
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
-      </div>`);
+      </div></div>`);
     setTimeout(()=>{ this._paintPick(); if(!routine) document.getElementById('exSearch')?.focus(); },50);
   },
 
@@ -556,15 +558,15 @@ const Fitness = {
   // 검색어가 없으면 추천(o.recommend), 있으면 전체 종목에서 찾는다(띄어쓰기·초성 상관없이). 목록에 없으면 직접 입력.
   pickOne(o) {
     this._po = o;
-    App.openModal('@dumbbell ' + o.title, `${o.head||''}
-      <input id="poQ" class="inp" autocomplete="off" placeholder="운동 검색 — 띄어쓰기·초성 상관없이" oninput="Fitness._poPaint()">
+    App.openModal('@dumbbell ' + o.title, `<div class="fz fz-po">${o.head||''}
+      <input id="poQ" class="inp" type="search" autocomplete="off" placeholder="운동 검색 · 초성 가능" oninput="Fitness._poPaint()">
       <div id="poList" class="sw-list po-list"></div>
-      <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div>`);
+      <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div></div>`);
     setTimeout(()=>this._poPaint(), 0);
   },
   _poRow(n, i, small='') {
     const th = typeof ExMedia!=='undefined' ? ExMedia.thumbFor(n) : '';
-    return `<button class="sw-row" onclick="Fitness._poPick(${i})">${th?`<span class="ex-th">${ExMedia.poseHtml(th)}</span>`:'<span class="ex-th none"></span>'}<span class="sw-nm">${esc(n)}${small?`<small>${small}</small>`:''}</span></button>`;
+    return `<button class="sw-row" onclick="Fitness._poPick(${i})">${th?`<span class="ex-th">${ExMedia.poseHtml(th)}</span>`:`<span class="ex-th none">${typeof Icons!=='undefined'?Icons.svg('dumbbell'):''}</span>`}<span class="sw-nm">${esc(n)}${small?`<small>${small}</small>`:''}</span>${this._ic('chev','fz-ic-end')}</button>`;
   },
   _poPaint() {
     const o=this._po, box=document.getElementById('poList'); if(!o||!box) return;

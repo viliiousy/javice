@@ -196,13 +196,13 @@ const Econ = {
   // ── 터미널 (모달) ───────────────────────────────────
   open(view) {
     this.view = view || 'main';
-    App.openModal('@trend 경제', `
+    App.openModal('@trend 경제', `<div class="ecv ecv-term">
       <div class="ec-nav">
         ${[['main','메인'],['hold','보유'],['watch','관심종목'],['charts','차트']].map(([v,l]) =>
           `<button class="${this.view===v?'on':''}" onclick="Econ.tab('${v}')">${l}</button>`).join('')}
         <button class="ec-gear" onclick="Econ.settings()" title="알림 설정" aria-label="알림 설정">${typeof Icons!=='undefined'?Icons.svg('gear'):'설정'}</button>
       </div>
-      <div id="ecBody"></div>`);
+      <div id="ecBody"></div></div>`);
     document.querySelector('#modal .modal-box')?.classList.add('wide');
     this._boundClose = this._boundClose || (() => { this._stopPoll(); document.querySelector('#modal .modal-box')?.classList.remove('wide'); });
     document.getElementById('btnModalClose')?.addEventListener('click', this._boundClose, { once:true });
@@ -219,26 +219,28 @@ const Econ = {
     if (this.view === 'charts') return this._drawCharts();
   },
 
+  _ic(n, alt) { return typeof Icons !== 'undefined' ? Icons.svg(n) : (alt || ''); },
+
   _card(it, ctx) {
     const q = this.PRICES[this.keyOf(it)] || {}, k = this.keyOf(it);
     return `<div class="ec-item">
       <div class="ec-item-top">
-        <div><div class="ec-nm">${esc(it.name)}<span class="ec-badge">${this.TYPE[it.type]||''}</span></div>
-             <div class="ec-meta">${esc(it.code)}</div></div>
+        <div class="ec-item-id"><div class="ec-nm">${esc(it.name)}</div>
+             <div class="ec-meta"><span class="num">${esc(it.code)}</span> · ${this.TYPE[it.type]||''}</div></div>
         <div class="ec-row-r" data-pk="${k}" data-ptype="${it.type}" data-punit="${it.unit||''}">
           <div class="ec-price">${this.fmt(it,q.price)}</div>${this.delta(q.pct)}</div>
       </div>
       <div class="ec-item-bot">
-        <label>알림가</label>
-        <input class="inp inp-sm ec-floor" type="number" placeholder="없음" value="${it.floor??''}"
+        <label class="ec-fl">알림가</label>
+        <input class="inp inp-sm ec-floor num" type="number" inputmode="decimal" placeholder="없음" value="${it.floor??''}"
           onchange="Econ.setFloor('${ctx}','${k}',this.value)">
-        <button class="btn-sm ${it.floorDir==='above'?'ec-dir-up':'ec-dir-dn'}"
+        <button class="ec-dir ${it.floorDir==='above'?'ec-dir-up':'ec-dir-dn'}"
           onclick="Econ.cycleDir('${ctx}','${k}')" title="이상/이하 전환">${it.floorDir==='above'?'이상':'이하'}</button>
-        ${ctx==='F' ? `<label class="ec-sw"><input type="checkbox" ${it.alert!==false?'checked':''}
-          onchange="Econ.favAlert('${k}',this.checked)"><span></span></label><label>알림</label>` : ''}
         <span class="ec-sp"></span>
-        <button class="btn-sm" onclick='Econ.openChart(${this.attr(it)})'>차트</button>
-        <button class="btn-sm ec-rm" onclick="Econ.remove('${ctx}','${k}')">삭제</button>
+        ${ctx==='F' ? `<span class="ec-swl">알림</span><label class="ec-sw" title="알림"><input type="checkbox" ${it.alert!==false?'checked':''}
+          onchange="Econ.favAlert('${k}',this.checked)" aria-label="알림"><span></span></label>` : ''}
+        <button class="ec-ib" onclick='Econ.openChart(${this.attr(it)})' title="차트" aria-label="차트">${this._ic('chart','차트')}</button>
+        <button class="ec-ib ec-rm" onclick="Econ.remove('${ctx}','${k}')" title="삭제" aria-label="삭제">${this._ic('trash','삭제')}</button>
       </div></div>`;
   },
 
@@ -248,11 +250,12 @@ const Econ = {
     const c = this.cfg();
     const b = this._body(); if (!b) return;
     b.innerHTML =
-      `<input class="inp ec-search" id="ecFSearch" placeholder="즐겨찾기에 추가 — 검색 (금, 삼성, 테슬라, KODEX)"
+      `<input class="inp ec-search" id="ecFSearch" placeholder="종목 검색 — 금, 삼성, 테슬라, KODEX"
          oninput="Econ.search(this.value,'F')"><div id="ecFRes"></div>` +
       (c.favorites.length
-        ? `<div class="ec-grid">${c.favorites.map(it => this._card(it,'F')).join('')}</div>`
-        : `<p class="empty">메인이 비어 있어요<br><span class="ec-hint">위에서 종목을 찾아 ★ 하면 여기에 표시되고 알림도 옵니다</span></p>`);
+        ? `<div class="ec-sec"><span>즐겨찾기</span><b class="num">${c.favorites.length}</b></div>
+           <div class="ec-grid">${c.favorites.map(it => this._card(it,'F')).join('')}</div>`
+        : `<p class="empty">메인이 비어 있어요<br><span class="ec-hint">위에서 종목을 찾아 담으면 여기에 표시되고 알림도 옵니다</span></p>`);
   },
 
   _drawWatch() {
@@ -260,16 +263,16 @@ const Econ = {
     const c = this.cfg();
     let h = `<div class="ec-lists">` +
       c.watchlists.map(w => `<button class="ec-chip ${w.id===this.activeList?'on':''}" onclick="Econ.selList('${w.id}')">${esc(w.name)}</button>`).join('') +
-      `<button class="ec-chip ec-add" onclick="Econ.newList()">＋ 새 리스트</button></div>`;
+      `<button class="ec-chip ec-add" onclick="Econ.newList()">${this._ic('plus','＋')}새 리스트</button></div>`;
     const wl = c.watchlists.find(w => w.id === this.activeList);
     if (!c.watchlists.length) {
       h += `<p class="empty">관심종목 리스트를 만들어 보세요<br><span class="ec-hint">반도체·AI·배당주처럼 주제별로 여러 개 가능합니다</span></p>`;
     } else if (wl) {
       h += `<div class="ec-lhead"><span class="ec-lt">${esc(wl.name)}</span>
-        <label class="ec-sw"><input type="checkbox" ${wl.alert?'checked':''} onchange="Econ.listAlert('${wl.id}',this.checked)"><span></span></label>
-        <span class="ec-meta">알림</span>
-        <button class="btn-sm" onclick="Econ.renameList('${wl.id}')">이름</button>
-        <button class="btn-sm ec-rm" onclick="Econ.delList('${wl.id}')">삭제</button></div>
+        <span class="ec-swl">알림</span>
+        <label class="ec-sw"><input type="checkbox" ${wl.alert?'checked':''} onchange="Econ.listAlert('${wl.id}',this.checked)" aria-label="리스트 알림"><span></span></label>
+        <button class="ec-tb" onclick="Econ.renameList('${wl.id}')">이름 변경</button>
+        <button class="ec-tb ec-rm" onclick="Econ.delList('${wl.id}')">삭제</button></div>
         <input class="inp ec-search" placeholder="이 리스트에 종목 추가 — 검색" oninput="Econ.search(this.value,'L')"><div id="ecLRes"></div>`;
       h += wl.items.length
         ? `<div class="ec-grid">${wl.items.map(it => this._card(it,'L:'+wl.id)).join('')}</div>`
@@ -309,16 +312,16 @@ const Econ = {
     }
     out.sort((a,b) => a[0]-b[0] || a[1]-b[1]);
     const code = /^[0-9A-Za-z]{6}$/.test(v) ? v.toUpperCase() : '';
-    box.innerHTML = (where === 'O' ? '' :
-      `<div class="ec-res ec-manual" onclick="Econ.manual('${where}','${code}')">
-        <div><div class="ec-nm ec-gold">＋ 코드로 직접 추가</div><div class="ec-meta">검색에 없는 ETF 등 (예: 0173Y0)</div></div></div>`) +
-      out.slice(0,8).map(x => {
+    box.innerHTML = out.slice(0,8).map(x => {
         const e = x[2];
         const it = { name:e.ko || e.n, code:e.c, type:e.t, tv:e.tv, unit:this.unitFor(e.t), floor:null };
-        return `<div class="ec-res"><div><div class="ec-nm">${esc(e.ko || e.n)}</div>
-          <div class="ec-meta">${e.ko ? esc(e.n)+' · ' : ''}${esc(e.c)} · ${this.TYPE[e.t]||''}</div></div>
-          <button class="btn-sm accent" onclick='Econ.add("${where}",${this.attr(it)})'>${where==='F'||where==='O'?'★ 담기':where==='H'?'＋ 보유':'＋ 담기'}</button></div>`;
-      }).join('');
+        return `<div class="ec-res"><div class="ec-item-id"><div class="ec-nm">${esc(e.ko || e.n)}</div>
+          <div class="ec-meta">${e.ko ? esc(e.n)+' · ' : ''}<span class="num">${esc(e.c)}</span> · ${this.TYPE[e.t]||''}</div></div>
+          <button class="btn-sm ec-add-btn" onclick='Econ.add("${where}",${this.attr(it)})'>${where==='H'?'보유 추가':'담기'}</button></div>`;
+      }).join('') +
+      (where === 'O' ? '' :
+      `<button class="ec-res ec-manual" onclick="Econ.manual('${where}','${code}')">
+        <span class="ec-item-id"><span class="ec-nm">코드로 직접 추가</span><span class="ec-meta">검색에 없는 ETF 등 · 예: 0173Y0</span></span><span class="ec-chev">›</span></button>`);
   },
   add(where, it) {
     // 설정 도우미(O)에서 담은 종목은 즐겨찾기로 들어간다.
@@ -353,16 +356,16 @@ const Econ = {
     }
   },
   manual(where, code) {
-    App.openModal('코드로 직접 추가', `
+    App.openModal('코드로 직접 추가', `<div class="ecv ecv-sheet">
       <div class="modal-row"><label class="modal-lbl">표시 이름</label>
         <input id="ecMName" class="inp" placeholder="예: KODEX 반도체"></div>
       <div class="modal-row"><label class="modal-lbl">종목 코드</label>
-        <input id="ecMCode" class="inp" placeholder="예: 0173Y0" value="${code?esc(code):''}"></div>
-      <p class="ec-hint">국내 종목·ETF용입니다. 해외주식은 검색으로 추가하세요.</p>
+        <input id="ecMCode" class="inp num" placeholder="예: 0173Y0" autocapitalize="characters" value="${code?esc(code):''}"></div>
+      <p class="ec-hint">국내 종목·ETF용입니다. 해외주식은 검색으로 추가해 주세요.</p>
       <div class="modal-btns">
         <button class="btn-sm accent" onclick="Econ.manualDo('${where}')">추가</button>
         <button class="btn-sm" onclick="Econ.open('${this.view}')">취소</button>
-      </div>`);
+      </div></div>`);
   },
   manualDo(where) {
     const name = document.getElementById('ecMName')?.value.trim();
@@ -421,25 +424,30 @@ const Econ = {
   _drawHold() {
     const b = this._body(); if (!b) return;
     const hs = this.cfg().holdings || [], s = this.holdSummary();
-    let h = `<div class="ec-hold-top">
-        <input class="inp ec-search" placeholder="보유 종목 추가 — 검색 (삼성전자, NVDA …)"
-          oninput="Econ.search(this.value,'H')">
-        <button class="btn-sm ec-scan" onclick="Econ.showHoldScan()" title="증권사 앱 캡처에서 읽어 오기">${
-          typeof Icons !== 'undefined' ? Icons.svg('camera') : '📷'}캡처로 채우기</button>
-        <button class="btn-sm ec-scan" onclick="Econ.showBroker()" title="증권사 Open API 로 보유 종목 가져오기">증권사 연동</button>
-      </div><div id="ecHRes"></div>`;
-    if (!hs.length) {
-      h += `<p class="empty">보유 종목이 없습니다<br><span class="ec-hint">한국투자증권 계좌라면 <b>증권사 연동</b>으로 보유 종목을 그대로 가져옵니다. 다른 증권사는 보유 화면을 캡처해 <b>캡처로 채우기</b>를 누르면 종목·수량·평단을 읽어 옵니다. 직접 검색해 넣어도 되고, 어느 쪽이든 현재가·평가액·수익률은 자동으로 계산됩니다.</span></p>`;
-    } else {
+    let h = '';
+    if (hs.length) {
       const cls = s.profit >= 0 ? 'ec-up' : 'ec-dn';
       h += `<div class="ec-hold-sum">
-        <div><span>평가액</span><b>${this._won(s.value)}</b></div>
-        <div><span>매입액</span><b>${this._won(s.cost)}</b></div>
-        <div class="${cls}"><span>평가손익</span><b>${(s.profit >= 0 ? '+' : '-') + this._won(Math.abs(s.profit))}</b></div>
-        <div class="${cls}"><span>수익률</span><b>${s.pct == null ? '—' : (s.pct > 0 ? '+' : '') + s.pct.toFixed(2) + '%'}</b></div>
+        <div class="ec-hs-main"><span>평가액</span><b class="num">${this._won(s.value)}</b></div>
+        <div class="${cls}"><span>평가손익</span><b class="num">${(s.profit >= 0 ? '+' : '-') + this._won(Math.abs(s.profit))}</b></div>
+        <div class="${cls}"><span>수익률</span><b class="num">${s.pct == null ? '—' : (s.pct > 0 ? '+' : '') + s.pct.toFixed(2) + '%'}</b></div>
+        <div><span>매입액</span><b class="num">${this._won(s.cost)}</b></div>
       </div>`;
-      if (s.miss) h += `<p class="ec-hint">${s.miss}종목은 아직 계산에 넣지 않았습니다 — 수량·평단이 비었거나 시세가 아직 수집되지 않았습니다.</p>`;
-      h += `<div class="ec-grid">${hs.map(it => this._holdCard(it)).join('')}</div>`;
+      if (s.miss) h += `<p class="ec-hint ec-miss-note">${s.miss}종목은 계산에서 뺐습니다 — 수량·평단이 비었거나 시세가 아직 없습니다.</p>`;
+    }
+    h += `<div class="ec-hold-top">
+        <input class="inp ec-search" placeholder="보유 종목 추가 — 삼성전자, NVDA …"
+          oninput="Econ.search(this.value,'H')">
+        <div class="ec-hold-acts">
+          <button class="btn-sm ec-scan" onclick="Econ.showHoldScan()" title="증권사 앱 캡처에서 읽어 오기">${this._ic('camera')}캡처로 채우기</button>
+          <button class="btn-sm ec-scan" onclick="Econ.showBroker()" title="증권사 Open API 로 보유 종목 가져오기">증권사 연동</button>
+        </div>
+      </div><div id="ecHRes"></div>`;
+    if (!hs.length) {
+      h += `<p class="empty">보유 종목이 없습니다<br><span class="ec-hint">한국투자증권은 <b>증권사 연동</b>, 다른 증권사는 보유 화면 <b>캡처로 채우기</b>로 가져올 수 있습니다. 직접 검색해 넣어도 됩니다. 현재가·평가액·수익률은 자동으로 계산됩니다.</span></p>`;
+    } else {
+      h += `<div class="ec-sec"><span>보유 종목</span><b class="num">${hs.length}</b></div>
+        <div class="ec-grid">${hs.map(it => this._holdCard(it)).join('')}</div>`;
     }
     b.innerHTML = h;
   },
@@ -450,25 +458,25 @@ const Econ = {
     const pf  = (cur == null || avg == null || !it.qty) ? null : (cur - avg) * it.qty;
     const pct = (pf == null || !avg) ? null : (cur - avg) / avg * 100;
     const cls = pf == null ? '' : pf >= 0 ? 'ec-up' : 'ec-dn';
-    return `<div class="ec-item">
+    return `<div class="ec-item ec-hitem">
       <div class="ec-item-top">
-        <div><div class="ec-nm">${esc(it.name)}<span class="ec-badge">${this.TYPE[it.type]||''}</span></div>
-             <div class="ec-meta">${esc(it.code)}</div></div>
+        <div class="ec-item-id"><div class="ec-nm">${esc(it.name)}</div>
+             <div class="ec-meta"><span class="num">${esc(it.code)}</span> · ${this.TYPE[it.type]||''}</div></div>
         <div class="ec-row-r" data-pk="${k}" data-ptype="${it.type}" data-punit="${it.unit||''}">
           <div class="ec-price">${this.fmt(it,q.price)}</div>${this.delta(q.pct)}</div>
       </div>
-      <div class="ec-item-bot">
-        <label>수량</label>
-        <input class="inp inp-sm" type="number" step="any" min="0" value="${it.qty ?? ''}"
-          onchange="Econ.holdSet('${k}','qty',this.value)">
-        <label>평단${it.type === 'us' ? '($)' : ''}</label>
-        <input class="inp inp-sm" type="number" step="any" min="0" value="${it.avg ?? ''}"
-          onchange="Econ.holdSet('${k}','avg',this.value)">
-        <span class="ec-sp"></span>
-        <span class="ec-meta ${cls}">${val == null ? '수량·평단 입력' : this._won(val)}${
-          pf == null ? '' : ` · ${pf >= 0 ? '+' : '-'}${this._won(Math.abs(pf))} (${pct == null ? '—' : (pct > 0 ? '+' : '') + pct.toFixed(2) + '%'})`}</span>
-        <button class="btn-sm ec-rm" onclick="Econ.holdRemove('${k}')">삭제</button>
-      </div></div>`;
+      <div class="ec-item-bot ec-hbot">
+        <label class="ec-fld"><span>수량</span>
+        <input class="inp inp-sm num" type="number" inputmode="decimal" step="any" min="0" value="${it.qty ?? ''}"
+          onchange="Econ.holdSet('${k}','qty',this.value)"></label>
+        <label class="ec-fld"><span>평단${it.type === 'us' ? ' ($)' : ''}</span>
+        <input class="inp inp-sm num" type="number" inputmode="decimal" step="any" min="0" value="${it.avg ?? ''}"
+          onchange="Econ.holdSet('${k}','avg',this.value)"></label>
+        <button class="ec-ib ec-rm" onclick="Econ.holdRemove('${k}')" title="삭제" aria-label="삭제">${this._ic('trash','삭제')}</button>
+      </div>
+      <div class="ec-hval ${cls}">${val == null ? '<span class="ec-meta">수량·평단을 넣으면 평가액이 계산됩니다</span>' : `<span class="num">${this._won(val)}</span>`}${
+          pf == null ? '' : `<span class="num">${pf >= 0 ? '+' : '-'}${this._won(Math.abs(pf))} · ${pct == null ? '—' : (pct > 0 ? '+' : '') + pct.toFixed(2) + '%'}</span>`}</div>
+      </div>`;
   },
   // ── 증권사 연동 (한국투자증권 KIS Open API) ──────────────
   // 키는 이 계정의 _link 에만 저장한다(기기에 남지 않음). 조회는 서버(api/broker)가 대신 한다 —
@@ -478,20 +486,20 @@ const Econ = {
     let k = {};
     try { const l = await FirebaseSync.getLink(); k = (l && l.kis) || {}; } catch {}
     const has = !!k.appkey;
-    App.openModal('증권사 연동', `
-      <p class="ec-hint" style="margin-top:0">지금은 <b>한국투자증권</b>을 지원합니다. KIS Developers(apiportal.koreainvestment.com)에서
-        본인 계좌로 <b>앱키·앱시크릿</b>을 발급받아 넣어 주세요. 해외 주식은 홈페이지에서 '해외주식 API 사용 동의'를 해야 함께 옵니다.
-        키움·토스증권은 '허용 IP 등록' 이 필요해 아직 연결할 수 없습니다 — 캡처로 채우기를 써 주세요.</p>
-      <div class="modal-row"><label class="modal-lbl">앱키 (App Key)</label><input id="kisKey" class="inp" autocomplete="off" placeholder="${has ? '저장됨 — 바꿀 때만 입력' : 'PS…'}"></div>
-      <div class="modal-row"><label class="modal-lbl">앱시크릿 (App Secret)</label><input id="kisSec" class="inp" type="password" autocomplete="off" placeholder="${has ? '저장됨 — 바꿀 때만 입력' : ''}"></div>
-      <div class="modal-row"><label class="modal-lbl">계좌번호</label><input id="kisAcct" class="inp" inputmode="numeric" placeholder="12345678-01" value="${k.cano ? esc(k.cano + '-' + (k.prdt || '01')) : ''}"></div>
-      <label class="ec-hint" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="kisMock" ${k.mock ? 'checked' : ''}> 모의투자 계좌</label>
-      <div id="kisRes"></div>
+    App.openModal('증권사 연동', `<div class="ecv ecv-sheet">
+      <div class="ec-lead"><span class="ec-lead-k">한국투자증권</span><span class="ec-lead-s">${has ? '연동됨' : '연동 전'}</span></div>
+      <p class="ec-hint">KIS Developers(apiportal.koreainvestment.com)에서 본인 계좌로 받은 앱키·앱시크릿을 넣어 주세요.
+        해외 주식은 홈페이지에서 '해외주식 API 사용 동의'를 해야 함께 옵니다. 키움·토스증권은 아직 연결할 수 없어 캡처로 채우기를 써 주세요.</p>
+      <div class="modal-row"><label class="modal-lbl" for="kisKey">앱키 (App Key)</label><input id="kisKey" class="inp" autocomplete="off" placeholder="${has ? '저장됨 — 바꿀 때만 입력' : 'PS…'}"></div>
+      <div class="modal-row"><label class="modal-lbl" for="kisSec">앱시크릿 (App Secret)</label><input id="kisSec" class="inp" type="password" autocomplete="off" placeholder="${has ? '저장됨 — 바꿀 때만 입력' : ''}"></div>
+      <div class="modal-row"><label class="modal-lbl" for="kisAcct">계좌번호</label><input id="kisAcct" class="inp num" inputmode="numeric" placeholder="12345678-01" value="${k.cano ? esc(k.cano + '-' + (k.prdt || '01')) : ''}"></div>
+      <label class="ec-trow"><span>모의투자 계좌</span><span class="ec-sw"><input type="checkbox" id="kisMock" ${k.mock ? 'checked' : ''}><span></span></span></label>
+      <div id="kisRes" class="ec-res-box"></div>
       <div class="modal-btns">
         <button class="btn-sm accent" id="kisGo" onclick="Econ.brokerFetch()">${has ? '보유 종목 가져오기' : '저장하고 가져오기'}</button>
-        ${has ? '<button class="btn-sm" onclick="Econ.brokerForget()">연동 해제</button>' : ''}
         <button class="btn-sm" onclick="Econ.open(\'hold\')">닫기</button>
-      </div>`);
+        ${has ? '<button class="btn-sm ec-forget" onclick="Econ.brokerForget()">연동 해제</button>' : ''}
+      </div></div>`);
   },
   async brokerFetch() {
     const box = document.getElementById('kisRes'), go = document.getElementById('kisGo');
@@ -512,9 +520,10 @@ const Econ = {
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
       if (!j.rows || !j.rows.length) throw new Error('보유 종목이 없습니다' + (j.notes?.length ? ' · ' + j.notes.join(' · ') : ''));
       this._hsRows = await this._hsMatch(j.rows);
+      go?.classList.remove('accent');
       if (box) box.innerHTML = this._hsPreview() + (j.notes?.length ? `<p class="ec-hint">${esc(j.notes.join(' · '))}</p>` : '');
     } catch (e) {
-      if (box) box.innerHTML = `<p class="ec-hint" style="color:var(--red)">${esc(e.message || e)}</p>`;
+      if (box) box.innerHTML = `<p class="ec-hint ec-err-msg">${esc(e.message || e)}</p>`;
     }
     if (go) { go.disabled = false; go.textContent = '다시 가져오기'; }
   },
@@ -537,22 +546,20 @@ const Econ = {
     if (!JARVIS._getKey()) {
       App.showToast('Bashy API 키를 먼저 설정해주세요 (설정 › AI)','error'); return;
     }
-    App.openModal('@camera 캡처로 보유 종목 채우기', `
-      <p class="ec-hint" style="margin-bottom:10px">
-        증권사 앱의 <b>보유 종목 화면</b>을 캡처해서 올리면 종목·수량·평단을 읽어 옵니다.
-        읽은 값은 바로 저장하지 않고 <b>확인 후 담기</b>입니다.
-      </p>
-      <div id="hsZone" class="photo-drop-zone" onclick="document.getElementById('hsFile').click()">
-        <div id="hsPrev"><div style="font-size:44px">📷</div>
-          <p style="color:var(--text2);font-size:13px">클릭하거나 캡처를 끌어다 놓으세요</p></div>
-        <input id="hsFile" type="file" accept="image/*" style="display:none"
+    App.openModal('@camera 캡처로 보유 종목 채우기', `<div class="ecv ecv-sheet">
+      <p class="ec-hint">증권사 앱의 보유 종목 화면을 캡처해 올리면 종목·수량·평단을 읽어 옵니다.
+        읽은 값은 확인한 뒤에 담깁니다.</p>
+      <div id="hsZone" class="photo-drop-zone hs-zone" onclick="document.getElementById('hsFile').click()">
+        <div id="hsPrev" class="hs-prev"><span class="hs-ic">${this._ic('camera')}</span>
+          <p class="hs-zt">캡처를 고르거나 끌어다 놓으세요</p><p class="hs-zs">붙여 넣기(Ctrl+V)도 됩니다</p></div>
+        <input id="hsFile" type="file" accept="image/*" hidden
           onchange="Econ._hsPick(this)">
       </div>
-      <div id="hsRes" style="margin-top:10px"></div>
-      <div class="modal-btns" style="margin-top:10px">
+      <div id="hsRes" class="ec-res-box"></div>
+      <div class="modal-btns">
         <button id="hsGo" onclick="Econ._hsScan()" class="btn-sm accent" disabled>읽기</button>
         <button onclick="App.closeModal()" class="btn-sm">닫기</button>
-      </div>`);
+      </div></div>`);
     setTimeout(() => {
       const z = document.getElementById('hsZone'); if (!z) return;
       z.addEventListener('dragover',  e => { e.preventDefault(); z.style.borderColor='var(--accent)'; });
@@ -580,7 +587,7 @@ const Econ = {
       this._hsB64 = e.target.result.split(',')[1];
       const prev = document.getElementById('hsPrev');
       if (prev) prev.innerHTML = `<img src="data:${file.type};base64,${this._hsB64}"
-        style="max-width:100%;max-height:200px;border-radius:8px;object-fit:contain">`;
+        class="hs-img" alt="캡처 미리 보기">`;
       const g = document.getElementById('hsGo'); if (g) g.disabled = false;
     };
     r.readAsDataURL(file);
@@ -613,8 +620,9 @@ JSON 만 출력. 다른 말 금지.
       if (!rows.length) throw new Error('보유 종목을 찾지 못했어요. 종목명과 수량이 보이는 화면인지 확인해 주세요');
       this._hsRows = await this._hsMatch(rows);
       if (box) box.innerHTML = this._hsPreview();
+      go?.classList.remove('accent');   // 이제 주 단추는 '고른 종목 담기' 하나
     } catch (e) {
-      if (box) box.innerHTML = `<p class="ec-hint" style="color:var(--red)">읽기 실패 · ${esc(e.message)}</p>`;
+      if (box) box.innerHTML = `<p class="ec-hint ec-err-msg">읽기 실패 · ${esc(e.message)}</p>`;
     }
     if (go) { go.disabled = false; go.textContent = '다시 읽기'; }
   },
@@ -659,14 +667,14 @@ JSON 만 출력. 다른 말 금지.
         <input type="checkbox" ${r.hit?'checked':'disabled'} data-i="${i}">
         <span class="hs-nm">${esc(r.hit ? r.hit.name : r.raw)}${
           r.hit ? '' : ' <i>못 찾음</i>'}</span>
-        <span class="hs-q">${r.qty ?? '—'}주</span>
-        <span class="hs-a">${r.avg == null ? '평단 —'
+        <span class="hs-q num">${r.qty ?? '—'}주</span>
+        <span class="hs-a num">${r.avg == null ? '평단 —'
           : (r.hit && r.hit.type === 'us') ? '$' + r.avg.toLocaleString('en-US',{maximumFractionDigits:2})
           : this._won(r.avg)}</span>
       </label>`; }).join('')}</div>
-      <p class="ec-hint">${ok}종목을 찾았습니다${dup?` · 그중 ${dup}종목은 이미 보유 목록에 있어 값만 덮어씁니다`:''}.
+      <p class="ec-hint hs-note">${ok}종목을 찾았습니다${dup?` · 그중 ${dup}종목은 이미 보유 목록에 있어 값만 덮어씁니다`:''}.
         <b>AI 가 읽은 값이라 틀릴 수 있습니다</b> — 담은 뒤 수량·평단을 한 번 확인해 주세요.</p>
-      <button class="btn-sm accent" style="width:100%;margin-top:8px" onclick="Econ._hsApply()">고른 종목 담기</button>`;
+      <button class="btn-sm accent hs-apply" onclick="Econ._hsApply()">고른 종목 담기</button>`;
   },
 
   _hsApply() {
@@ -747,26 +755,26 @@ JSON 만 출력. 다른 말 금지.
   _renderSettings() {
     const c = this.cfg(), ma = c.market_alerts;
     const rows = this._times.map((t,i) =>
-      `<div class="ec-time-row"><input type="time" class="inp inp-sm" value="${t}" onchange="Econ._times[${i}]=this.value">
-       <button class="btn-sm ec-rm" onclick="Econ._times.splice(${i},1);Econ._renderSettings()">삭제</button></div>`).join('');
-    const mk = (k,l) => `<label class="ec-toggle-row"><span>${l}</span>
+      `<div class="ec-time-row"><input type="time" class="inp inp-sm num" value="${t}" onchange="Econ._times[${i}]=this.value" aria-label="리포트 시간 ${i+1}">
+       <button class="ec-ib ec-rm" onclick="Econ._times.splice(${i},1);Econ._renderSettings()" title="삭제" aria-label="삭제">${this._ic('close','삭제')}</button></div>`).join('');
+    const mk = (k,l,t) => `<label class="ec-toggle-row ec-trow"><span>${l}<i class="num">${t}</i></span>
       <span class="ec-sw"><input type="checkbox" ${ma[k]?'checked':''} onchange="Econ.cfg().market_alerts['${k}']=this.checked"><span></span></span></label>`;
-    App.openModal('@bell 시세 알림 설정', `
-      <label class="modal-lbl">매일 리포트 받을 시간 (여러 개 가능)</label>
-      <div>${rows || '<p class="ec-hint">시간을 추가하세요</p>'}</div>
-      <button class="btn-sm" onclick="Econ._times.push('08:00');Econ._renderSettings()">＋ 시간 추가</button>
-      <label class="modal-lbl" style="margin-top:16px">장 시작·마감 시세 알림</label>
-      ${mk('kr_open','한국 장 시작 (09:00)')}
-      ${mk('kr_close','한국 장 마감 (15:30)')}
-      ${mk('us_open','미국 장 시작 (밤 22:30경)')}
-      ${mk('us_close','미국 장 마감 (새벽 05:00경)')}
-      <p class="ec-hint">켜면 그 시각에 메인 + 알림 켠 리스트 시세를 텔레그램으로 보냅니다.</p>
-      <div class="modal-row" style="margin-top:14px"><label class="modal-lbl">급변동 알림 기준 (%)</label>
-        <input id="ecMove" type="number" class="inp inp-sm" value="${c.move_pct||10}"></div>
+    App.openModal('@bell 시세 알림 설정', `<div class="ecv ecv-sheet">
+      <div class="ec-sec ec-sec-top"><span>매일 리포트 시간</span></div>
+      <div class="ec-times">${rows || '<p class="ec-hint">시간을 추가하세요</p>'}</div>
+      <button class="ec-tb ec-tb-add" onclick="Econ._times.push('08:00');Econ._renderSettings()">${this._ic('plus','＋')}시간 추가</button>
+      <div class="ec-sec"><span>장 시작·마감 알림</span></div>
+      ${mk('kr_open','한국 장 시작','09:00')}
+      ${mk('kr_close','한국 장 마감','15:30')}
+      ${mk('us_open','미국 장 시작','밤 22:30경')}
+      ${mk('us_close','미국 장 마감','새벽 05:00경')}
+      <p class="ec-hint">켜면 그 시각에 메인과 알림 켠 리스트의 시세를 텔레그램으로 보냅니다.</p>
+      <div class="ec-sec"><span>급변동 알림 기준</span></div>
+      <div class="ec-pct"><input id="ecMove" type="number" inputmode="decimal" class="inp inp-sm num" value="${c.move_pct||10}" aria-label="급변동 알림 기준"><span>%</span></div>
       <div class="modal-btns">
         <button class="btn-sm accent" onclick="Econ.saveSettings()">저장</button>
         <button class="btn-sm" onclick="Econ.open('${this.view}')">뒤로</button>
-      </div>`);
+      </div></div>`);
   },
   saveSettings() {
     const c = this.cfg();
@@ -808,7 +816,7 @@ JSON 만 출력. 다른 말 금지.
     const TF = [['1','1분'],['30','30분'],['60','1시간'],['d','일'],['w','주'],['mo','월']];
     let h = `<div class="ec-lists"><button class="ec-chip ${this.chartScope==='fav'?'on':''}" onclick="Econ.chScope('fav')">즐겨찾기</button>` +
       c.watchlists.map(w => `<button class="ec-chip ${this.chartScope===w.id?'on':''}" onclick="Econ.chScope('${w.id}')">${esc(w.name)}</button>`).join('') + `</div>
-      <div class="ec-seg">
+      <div class="ec-seg ec-mode">
         <button class="${this.chartMode==='combined'?'on':''}" onclick="Econ.chMode('combined')">함께 보기</button>
         <button class="${this.chartMode==='separate'?'on':''}" onclick="Econ.chMode('separate')">따로 보기</button></div>
       <div class="ec-seg ec-tf">${TF.map(([v,l]) => `<button class="${this.chartTF===v?'on':''}" onclick="Econ.chTF('${v}')">${l}</button>`).join('')}</div>`;
@@ -832,13 +840,17 @@ JSON 만 출력. 다른 말 금지.
 
   _opts(h) {
     const dark = document.documentElement.classList.contains('dark');
-    return { height:h, layout:{ background:{color:'transparent'}, textColor: dark?'#94a3b8':'#475569',
-             fontFamily:'inherit', attributionLogo:false },
-      grid:{ vertLines:{visible:false}, horzLines:{ color: dark?'#1e293b':'#eef1f6' } },
+    const v2 = document.documentElement.dataset.ui === 'v2';
+    return { height:h, layout:{ background:{color:'transparent'},
+             textColor: v2 ? (dark?'#8B8F97':'#7C8088') : (dark?'#94a3b8':'#475569'),
+             fontFamily: v2 ? "'Space Grotesk','IBM Plex Sans KR',sans-serif" : 'inherit', fontSize: v2 ? 11 : 12, attributionLogo:false },
+      grid:{ vertLines:{visible:false}, horzLines:{ color: v2 ? (dark?'#1E2024':'#ECECE9') : (dark?'#1e293b':'#eef1f6') } },
       rightPriceScale:{ borderVisible:false }, timeScale:{ borderVisible:false },
       crosshair:{ mode:1 }, localization:{ locale:'ko-KR' } };
   },
   UP: '#dc2626', DN: '#3b82f6',
+  get _up() { return document.documentElement.dataset.ui === 'v2' ? '#E5484D' : this.UP; },
+  get _dn() { return document.documentElement.dataset.ui === 'v2' ? '#4C8DF6' : this.DN; },
   PAL: ['#3b82f6','#dc2626','#059669','#9333ea','#d97706','#0891b2','#db2777','#65a30d','#e11d48','#4f46e5'],
   _candles(a) { return a.map(r => ({ time:r[0], open:r[1], high:r[2], low:r[3], close:r[4] })); },
 
@@ -860,8 +872,8 @@ JSON 만 출력. 다른 말 금지.
         return;
       }
       const ch = LightweightCharts.createChart(box, Object.assign(this._opts(150), { handleScroll:false, handleScale:false }));
-      ch.addCandlestickSeries({ upColor:this.UP, downColor:this.DN, borderVisible:false,
-        wickUpColor:this.UP, wickDownColor:this.DN }).setData(this._candles(ser));
+      ch.addCandlestickSeries({ upColor:this._up, downColor:this._dn, borderVisible:false,
+        wickUpColor:this._up, wickDownColor:this._dn }).setData(this._candles(ser));
       ch.timeScale().fitContent();
     });
   },
@@ -894,7 +906,7 @@ JSON 만 출력. 다른 말 금지.
   },
 
   async openChart(it) {
-    App.openModal('@trend ' + it.name, '<div id="ecOne" class="ec-one"><p class="empty">차트 불러오는 중…</p></div>');
+    App.openModal('@trend ' + it.name, `<div class="ecv ecv-chart"><div class="ec-one-h"><span class="ec-meta"><span class="num">${esc(it.code||'')}</span> · ${this.TYPE[it.type]||''}</span></div><div id="ecOne" class="ec-one"><p class="empty">차트 불러오는 중…</p></div></div>`);
     document.querySelector('#modal .modal-box')?.classList.add('wide');
     const [lw, hist] = await Promise.all([this._lw(), this._history()]);
     const box = document.getElementById('ecOne');
@@ -908,8 +920,8 @@ JSON 만 출력. 다른 말 금지.
     }
     box.innerHTML = '';
     const ch = LightweightCharts.createChart(box, Object.assign(this._opts(box.clientHeight || 360), { autoSize:true }));
-    ch.addCandlestickSeries({ upColor:this.UP, downColor:this.DN, borderVisible:false,
-      wickUpColor:this.UP, wickDownColor:this.DN }).setData(this._candles(ser));
+    ch.addCandlestickSeries({ upColor:this._up, downColor:this._dn, borderVisible:false,
+      wickUpColor:this._up, wickDownColor:this._dn }).setData(this._candles(ser));
     ch.timeScale().fitContent();
   },
 };

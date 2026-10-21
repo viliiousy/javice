@@ -1,0 +1,234 @@
+/* v2 정리 — diet (에이전트)
+   식단 시트(검색·담기·직접 입력·AI·성분표), 사진 기록, 식단 목표, 바코드 스캔.
+   새로 만든 dt-* 묶음은 v1 에서도 쓰이므로 기본 규칙은 범위 없이 두고,
+   예전부터 있던 diet-* / scan-* 를 고치는 규칙은 html[data-ui="v2"] 아래에만 둔다. */
+
+/* ── 공용: v1·v2 둘 다 ─────────────────────────────────────── */
+.dt-meta{ display:contents; }            /* v1 은 예전처럼 한 줄에 늘어선다 */
+.dt-src, .dt-src-legend{ display:none; } /* 출처 꼬리표는 v2 전용 — v1 은 이모지 */
+
+.dt-lead{ font-size:13px; color:var(--text2); line-height:1.5; margin:0 0 16px; }
+.dt-note{ font-size:12px; color:var(--text3); line-height:1.5; margin:8px 0; }
+.dt-field{ margin-bottom:16px; }
+.dt-wide{ width:100%; }
+
+/* 끼니 고르기 — 네 칸 나눔 단추 */
+.dt-seg{ display:grid; grid-template-columns:repeat(4,1fr); gap:4px; padding:4px;
+  border-radius:12px; background:var(--card2); border:1px solid var(--border); }
+.dt-seg button{ height:36px; border:0; border-radius:8px; background:none; color:var(--text3);
+  font:inherit; font-size:14px; cursor:pointer; }
+.dt-seg button.on{ background:var(--card); color:var(--text); font-weight:600; box-shadow:0 0 0 1px var(--border); }
+
+/* 사진 놓는 곳 */
+.dt-drop{ display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--text3); }
+.dt-drop .ic{ width:24px; height:24px; margin-bottom:4px; color:var(--text2); }
+.dt-drop span{ font-size:14px; color:var(--text); font-weight:500; }
+.dt-drop small{ font-size:12px; color:var(--text3); }
+
+/* 사진 분석 결과 */
+.dt-pres{ margin-top:16px; }
+.dt-pres-hd{ display:flex; align-items:baseline; justify-content:space-between; gap:8px;
+  padding-bottom:8px; border-bottom:1px solid var(--border); }
+.dt-pres-hd .modal-lbl{ margin:0; }
+.dt-pres-tot{ font-size:13px; color:var(--text3); }
+.dt-pres-tot b{ font-size:24px; font-weight:600; color:var(--text); letter-spacing:-.01em; }
+.dt-pres-row{ display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+  padding:12px 0; border-bottom:1px solid var(--v2-line, var(--border)); font-size:14px; color:var(--text); }
+.dt-pres-nm{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dt-pres-nm i, .dt-pres-c i{ font-style:normal; font-size:12px; color:var(--text3); margin-left:4px; }
+.dt-pres-c{ flex:none; font-weight:600; }
+.dt-pres-cm{ margin:12px 0 0; font-size:13px; line-height:1.5; color:var(--text2); }
+
+/* 식단 목표 */
+.dt-sec{ padding:8px 0 16px; }
+.dt-sec + .dt-sec{ border-top:1px solid var(--border); padding-top:16px; }
+.dt-sec-hd{ font-size:15px; font-weight:600; color:var(--text); margin-bottom:12px; }
+.dt-goal{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px 8px; }
+.dt-goal label{ display:flex; flex-direction:column; gap:8px; min-width:0; font-size:12px; color:var(--text3); }
+.dt-goal .dt-goal-k{ grid-column:1 / -1; }
+.dt-in{ position:relative; display:block; }
+.dt-in .inp{ width:100%; padding-right:40px; }
+.dt-in i{ position:absolute; right:12px; top:50%; transform:translateY(-50%); font-style:normal;
+  font-size:12px; color:var(--text3); pointer-events:none; }
+.dt-days{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:16px; }
+.dt-day{ height:40px; display:flex; align-items:center; justify-content:center; border-radius:20px;
+  border:1px solid var(--border); font-size:14px; color:var(--text2); cursor:pointer; user-select:none; }
+.dt-day input{ position:absolute; opacity:0; width:0; height:0; pointer-events:none; }
+.dt-day.on{ background:var(--text); border-color:var(--text); color:var(--card); font-weight:600; }
+.dt-day:focus-within{ outline:2px solid var(--text3); outline-offset:1px; }
+
+/* ═══ 여기서부터 v2 ═══════════════════════════════════════════ */
+html[data-ui="v2"] .dt-em{ display:none; }
+html[data-ui="v2"] .dt-meta{ display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 8px; min-width:0; }
+html[data-ui="v2"] .dt-src{ display:inline; font-size:12px; color:var(--text3); }
+html[data-ui="v2"] .dt-src.ai{ color:var(--accent-l); }
+html[data-ui="v2"] .dt-src-legend{ display:inline; }
+
+/* ── 주 단추: 시트의 주된 일 하나만 주황 + 먹색 글자 ── */
+html[data-ui="v2"] .dt .modal-btns .accent,
+html[data-ui="v2"] .dt .dt-go,
+html[data-ui="v2"] .dt-go{
+  background:#FF6A2B !important; border-color:#FF6A2B !important; color:#17181B !important; font-weight:600; }
+html[data-ui="v2"] .dt .modal-btns .accent:disabled{
+  background:var(--card2) !important; border-color:var(--border) !important; color:var(--text3) !important; cursor:default; }
+html[data-ui="v2"] .dt-go{ width:100%; height:48px; border-radius:12px; font-size:15px; margin-top:16px; padding:0 16px; }
+html[data-ui="v2"] .dt-ghost{
+  height:44px; padding:0 16px; border-radius:12px; border:1px solid var(--border); background:none;
+  color:var(--text); font-size:14px; font-weight:500; }
+
+/* 입력칸 44px · 12px — 시트 안 작은 칸(inp-sm)까지 맞춘다 */
+html[data-ui="v2"] .dt .inp-sm,
+html[data-ui="v2"] .diet-ai-card .inp-sm,
+html[data-ui="v2"] .scan-wrap .inp{
+  height:44px; min-height:44px; border-radius:12px; border:1px solid var(--border); background:var(--card2);
+  font-size:16px; padding:0 12px; box-shadow:none; color:var(--text); width:100%; }
+html[data-ui="v2"].dark .dt .inp-sm,
+html[data-ui="v2"].dark .diet-ai-card .inp-sm,
+html[data-ui="v2"].dark .scan-wrap .inp{ background:var(--card); }
+html[data-ui="v2"] .dt .inp-sm[type="number"]{ font-family:var(--v2-num); }
+html[data-ui="v2"] .dt .modal-grid2{ gap:12px 8px; margin-bottom:16px; }
+html[data-ui="v2"] .dt .modal-grid2 .modal-lbl{ font-size:12px; margin-bottom:8px; }
+
+/* ── 음식 담기 시트 ───────────────────────────────────── */
+html[data-ui="v2"] .dt-add .diet-search{ margin-bottom:8px; }
+html[data-ui="v2"] .dt-add .scan-btn{
+  margin:0 0 8px; height:44px; padding:0 16px; justify-content:space-between; align-items:center;
+  border-radius:12px; background:none; border:1px solid var(--border);
+  font-size:14px; font-weight:500; color:var(--text); }
+html[data-ui="v2"] .dt-add .scan-btn i{ font-size:12px; color:var(--text3); }
+html[data-ui="v2"] .dt-add .diet-quick{ display:none; }   /* '최근 먹은 것' 과 같은 목록 */
+
+/* 섹션 머리: 작고 흐리게 */
+html[data-ui="v2"] .dt .diet-rec-hd,
+html[data-ui="v2"] .scan-wrap .diet-rec-hd{
+  font-size:12px; font-weight:500; color:var(--text3); letter-spacing:0; padding:16px 0 8px; }
+html[data-ui="v2"] .dt .diet-rec-hd i{ font-style:normal; margin-left:4px; }
+
+/* 결과 목록: 상자 없이 가는 선 */
+html[data-ui="v2"] #dietSearchRes{ max-height:none; overflow:visible; margin-bottom:0; }
+html[data-ui="v2"] #dietSearchRes:not(:empty){ border:0; border-radius:0; }
+html[data-ui="v2"] .dt .diet-food,
+html[data-ui="v2"] .scan-wrap .diet-food{
+  min-height:56px; padding:8px 0; gap:8px; border-bottom:1px solid var(--v2-line); background:none; }
+html[data-ui="v2"] .dt .diet-food:last-child,
+html[data-ui="v2"] .scan-wrap .diet-food:last-child{ border-bottom:1px solid var(--v2-line); }
+html[data-ui="v2"] .dt .diet-food:hover,
+html[data-ui="v2"] .scan-wrap .diet-food:hover{ background:none; }
+html[data-ui="v2"] .dt .diet-food:active,
+html[data-ui="v2"] .scan-wrap .diet-food:active{ background:var(--card2); }
+html[data-ui="v2"] .diet-food-main{ flex-direction:column; align-items:flex-start; gap:4px; }
+html[data-ui="v2"] .diet-food-nm{ font-size:15px; color:var(--text); max-width:100%; }
+html[data-ui="v2"] .diet-food-u,
+html[data-ui="v2"] .diet-food-note{ font-size:12px; color:var(--text3); }
+html[data-ui="v2"] .diet-food-n{ background:none; padding:0; border-radius:0; font-size:12px; font-weight:400; color:var(--text3); }
+html[data-ui="v2"] .diet-food-cal{ font-size:15px; font-weight:600; color:var(--text); }
+html[data-ui="v2"] .diet-food-cal i{ font-family:var(--v2-ff); font-size:12px; font-weight:400; margin-left:2px; }
+html[data-ui="v2"] .diet-food-fav{ width:32px; height:40px; margin-left:-8px; font-size:16px; color:var(--text4); }
+html[data-ui="v2"] .diet-food-fav.on,
+html[data-ui="v2"] .diet-food-fav:hover{ color:var(--accent); }
+html[data-ui="v2"] .dt .diet-macro-note,
+html[data-ui="v2"] .scan-wrap .diet-macro-note{ font-size:12px; color:var(--text3); padding:8px 0 0; line-height:1.5; }
+html[data-ui="v2"] .dt .diet-empty-hint,
+html[data-ui="v2"] .scan-wrap .diet-empty-hint{ text-align:left; padding:16px 0 8px; font-size:13px; }
+
+/* 담은 것: 주황 상자 대신 머리줄 + 선. 합계는 주 단추가 말한다 */
+html[data-ui="v2"] .diet-cart{ border:0; border-radius:0; background:none; padding:8px 0 0; margin:0; }
+html[data-ui="v2"] .diet-cart-hd{ font-size:12px; font-weight:500; color:var(--text3); margin:0 0 4px; }
+html[data-ui="v2"] .diet-cart-hd b{ color:var(--accent); font-weight:600; margin-left:2px; }
+html[data-ui="v2"] .diet-cart-row{ min-height:56px; padding:8px 0; gap:8px; border-top:0; border-bottom:1px solid var(--v2-line); }
+html[data-ui="v2"] .diet-cart-nm{ font-size:15px; }
+html[data-ui="v2"] .diet-cart-nm i{ display:block; font-size:12px; margin-top:2px; }
+html[data-ui="v2"] .diet-cart-cal{ min-width:64px; font-size:15px; font-weight:600; color:var(--text); }
+html[data-ui="v2"] .diet-cart-cal i{ font-family:var(--v2-ff); font-size:12px; font-weight:400; margin-left:2px; }
+html[data-ui="v2"] .diet-cart-del{ width:32px; height:40px; margin-right:-8px; font-size:13px; color:var(--text3); }
+html[data-ui="v2"] .diet-cart-sum{ display:none; }
+html[data-ui="v2"] .diet-qty{ border:1px solid var(--border); border-radius:16px; background:none; gap:0; }
+html[data-ui="v2"] .diet-qty button{ width:32px; height:32px; color:var(--text); font-size:16px; font-weight:400; border-radius:16px; }
+html[data-ui="v2"] .diet-qty button:disabled{ color:var(--text4); }
+html[data-ui="v2"] .diet-qty button:not(:disabled):hover{ background:var(--card2); }
+html[data-ui="v2"] .diet-qty-n{ min-width:20px; font-size:14px; font-weight:600; }
+
+/* 직접 입력 · AI 찾기: 보조 단추 */
+html[data-ui="v2"] .diet-manual-btn,
+html[data-ui="v2"] .diet-ai-btn{
+  width:100%; height:44px; margin-top:16px; padding:0 16px; border-radius:12px;
+  border:1px solid var(--border); background:none; color:var(--text2); font-size:14px; font-weight:500; }
+html[data-ui="v2"] .diet-manual-btn:hover,
+html[data-ui="v2"] .diet-ai-btn:hover:not(:disabled){ color:var(--text); border-color:var(--border2); }
+html[data-ui="v2"] .dt-manual{ padding-top:8px; }
+html[data-ui="v2"] .dt-manual .modal-row{ margin-bottom:12px; }
+html[data-ui="v2"] .dt-manual .modal-grid2{ margin-bottom:8px; }
+
+/* 영양성분표 찍기: 상자 없이 위에 선 하나 */
+html[data-ui="v2"] .diet-label-box{ margin-top:16px; padding:0; border:0; border-top:1px solid var(--border); border-radius:0; background:none; }
+html[data-ui="v2"] .diet-label-box .diet-rec-hd{ padding-top:16px; }
+html[data-ui="v2"] .diet-label-hint{ font-size:13px; color:var(--text3); line-height:1.5; margin:0 0 12px; }
+html[data-ui="v2"] .diet-label-box > .dt-ghost{ width:100%; }
+
+/* AI·성분표 확인 카드: 주황 상자 대신 선과 여백 */
+html[data-ui="v2"] .diet-ai-card{ margin-top:16px; padding:16px 0 0; border:0; border-top:1px solid var(--border); border-radius:0; background:none; }
+html[data-ui="v2"] .diet-ai-hd{ flex-direction:column; align-items:flex-start; gap:4px; margin-bottom:12px; }
+html[data-ui="v2"] .diet-ai-nm{ font-size:17px; font-weight:600; }
+html[data-ui="v2"] .diet-ai-warn{ font-size:12px; color:var(--accent-l); }
+html[data-ui="v2"] .diet-ai-u{ font-size:12px; color:var(--text3); }
+html[data-ui="v2"] .diet-ai-parts{ margin:0 0 12px; padding:0; border:0; border-radius:0; background:none; }
+html[data-ui="v2"] .dap-row{ font-size:14px; color:var(--text2); padding:8px 0; border-bottom:1px solid var(--v2-line); }
+html[data-ui="v2"] .dap-n i{ font-size:12px; margin-left:4px; }
+html[data-ui="v2"] .dap-c{ font-weight:600; }
+html[data-ui="v2"] .dap-c i{ font-family:var(--v2-ff); font-size:12px; margin-left:2px; }
+html[data-ui="v2"] .dap-sum{ margin:0; padding:8px 0; border-top:0; border-bottom:0; }
+html[data-ui="v2"] .diet-ai-note{ margin:0 0 12px; font-size:12px; color:var(--text3); }
+html[data-ui="v2"] .diet-ai-grid{ grid-template-columns:1fr 1fr; gap:12px 8px; }
+html[data-ui="v2"] .diet-ai-grid label{ gap:8px; font-size:12px; }
+html[data-ui="v2"] .diet-ai-card .modal-grid2 label{ display:flex; flex-direction:column; gap:8px; font-size:12px; color:var(--text3); }
+html[data-ui="v2"] .diet-ai-card .modal-grid2{ gap:12px 8px; margin-bottom:0; }
+
+/* 시트 아래 단추는 따라 내려온다 — 목록이 길어도 「추가」가 손 닿는 곳에 있다 */
+html[data-ui="v2"] .dt-add .dt-foot{
+  position:sticky; bottom:-20px; z-index:2; margin:16px -16px -20px; padding:12px 16px 20px;
+  background:var(--card); border-top:1px solid var(--border); }
+html[data-ui="v2"].dark .dt-add .dt-foot{ background:var(--card2); }
+
+/* ── 사진으로 기록 ───────────────────────────────────── */
+html[data-ui="v2"] .dt-photo .photo-drop-zone{
+  min-height:160px; padding:16px; border:1px dashed var(--border2); border-radius:12px; background:var(--card2); }
+html[data-ui="v2"].dark .dt-photo .photo-drop-zone{ background:var(--card); }
+html[data-ui="v2"] .dt-photo .photo-drop-zone:hover{ background:var(--card2); border-color:var(--text3); }
+html[data-ui="v2"] .dt-photo #photoResult .dt-go{ margin-top:16px; }
+html[data-ui="v2"].dark .dt-seg{ background:var(--card); }
+html[data-ui="v2"].dark .dt-seg button.on{ background:var(--border); box-shadow:none; }
+
+/* ── 식단 목표 ───────────────────────────────────────── */
+html[data-ui="v2"] .dt-set .modal-lbl{ font-size:12px; }
+html[data-ui="v2"] .dt-set .dt-day.sun:not(.on){ color:#EF4444; }
+html[data-ui="v2"] .dt-set .dt-day.sat:not(.on){ color:#3B82F6; }
+html[data-ui="v2"] .dt-set .modal-btns{ margin-top:8px; }
+
+/* ── 바코드 스캔 (전체 화면) ─────────────────────────── */
+html[data-ui="v2"] .scan-wrap{ gap:16px; padding:12px 16px 24px; background:var(--card); }
+html[data-ui="v2"].dark .scan-wrap{ background:var(--card2); }
+html[data-ui="v2"] .scan-hd{ min-height:48px; font-size:17px; font-weight:600; }
+html[data-ui="v2"] .scan-x{ width:40px; height:40px; border-radius:20px; border:0; background:var(--border); color:var(--text); font-size:14px; }
+html[data-ui="v2"] .scan-view{ border-radius:12px; }
+html[data-ui="v2"] .scan-frame{ border:2px solid #FF6A2B; border-radius:8px; }
+html[data-ui="v2"] .scan-msg{ text-align:left; font-size:14px; color:var(--text); line-height:1.5; }
+html[data-ui="v2"] .scan-msg i{ font-size:12px; color:var(--text3); margin-top:4px; }
+html[data-ui="v2"] .scan-foot{ gap:8px; }
+html[data-ui="v2"] .scan-foot .btn-sm{ height:44px; padding:0 16px; border-radius:12px; font-size:14px; flex:none; }
+html[data-ui="v2"] .scan-id{ padding:0 0 16px; margin:0; border:0; border-bottom:1px solid var(--border); border-radius:0; background:none; }
+html[data-ui="v2"] .scan-id-nm{ font-size:20px; font-weight:600; letter-spacing:-.01em; }
+html[data-ui="v2"] .scan-id-sub{ font-size:13px; margin-top:4px; }
+html[data-ui="v2"] .scan-sure{ font-size:13px; font-weight:500; color:var(--accent-l); margin-top:8px; }
+html[data-ui="v2"] .scan-warn{ font-size:13px; margin-top:4px; }
+html[data-ui="v2"] .scan-again{ margin-top:8px; gap:8px; }
+html[data-ui="v2"] .scan-again .btn-sm{ height:48px; border-radius:12px; font-size:15px; }
+html[data-ui="v2"] .scan-wrap #scanRes .diet-label-hint{ margin-top:12px; }
+
+/* 담기 시트 안의 확인 단추(AI·성분표)는 중간 단계다. 시트의 주 단추는 아래 「추가」 하나 —
+   그래서 여기서는 주황을 쓰지 않고 먹색 테두리로 둔다. */
+html[data-ui="v2"] .dt-add .dt-go{
+  background:none !important; border:1px solid var(--text) !important; color:var(--text) !important; }
+
+/* 숫자 칸은 폰에서도 두 칸씩 — 한 줄에 하나씩 쌓이면 화면 세 장을 넘긴다 */
+html[data-ui="v2"] .dt .modal-grid2,
+html[data-ui="v2"] .diet-ai-card .modal-grid2{ grid-template-columns:1fr 1fr !important; }

@@ -194,12 +194,12 @@ const PlanGen = {
   open() {
     const p = this.profile() || { goal: 'muscle', level: 'beg', loc: 'gym', days: 3, mins: 60, equip: ['dumbbell'], focus: [], cardio: false, injury: [], exclude: [] };
     this._p = JSON.parse(JSON.stringify(p));
-    App.openModal('@dumbbell 맞춤 운동 플랜', `<div id="pgBody" class="pg"></div>
+    App.openModal('@dumbbell 맞춤 운동 플랜', `<div class="fz fz-pg"><div id="pgBody" class="pg"></div>
       <div class="modal-btns">
         <button class="btn-sm accent" onclick="PlanGen.make()">플랜 만들기</button>
         <button class="btn-sm" onclick="PlanGen.aiMake()">AI 로 만들기</button>
         <button class="btn-sm" onclick="App.closeModal()">취소</button>
-      </div>`);
+      </div></div>`);
     this._paint();
   },
   _chip(k, v, l, multi) {
@@ -228,10 +228,9 @@ const PlanGen = {
     h += row('아픈 곳', [['shoulder', '어깨'], ['back', '허리'], ['knee', '무릎'], ['wrist', '손목']].map(([v, l]) => this._chip('injury', v, l, true)).join(''), '그 부위에 부담이 큰 동작을 뺍니다');
     h += row('추천하지 않을 기구', this.EQUIP.map(([e, l]) => this._chip('exclude', e, l, true)).join(''), '있어도 쓰기 싫은 기구 — 플랜·교체·추가 목록에서 뺍니다');
     const plan = this.generate(p);
-    h += `<div class="pg-prev"><div class="pg-t">미리 보기</div>${plan.routines.map((r, i) => `
-      <div class="pg-day"><b>${['일', '월', '화', '수', '목', '금', '토'][plan.weekdays[i]]} · ${esc(r.name)}</b>
-        <span>${r.exercises.map(x => esc(x.name)).join(' · ') || '가능한 운동이 없습니다 — 기구를 더 골라 주세요'}</span></div>`).join('')}
-      <p class="pg-note">세트 ${esc((this.SETS[p.goal] || this.SETS.muscle).join(' / '))} · 종목 ${plan.routines[0]?.exercises.length || 0}개 · 쉬는 날 ${p.cardio ? '가벼운 유산소' : '휴식'}</p></div>`;
+    h += `<div class="pg-prev"><div class="pg-t">미리 보기<small><span class="num">${esc((this.SETS[p.goal] || this.SETS.muscle).join(' / '))}</span> · 종목 <span class="num">${plan.routines[0]?.exercises.length || 0}</span>개 · 쉬는 날 ${p.cardio ? '가벼운 유산소' : '휴식'}</small></div>${plan.routines.map((r, i) => `
+      <div class="pg-day"><em>${['일', '월', '화', '수', '목', '금', '토'][plan.weekdays[i]]}</em><div><b>${esc(r.name)}</b>
+        <span>${r.exercises.map(x => esc(x.name)).join(' · ') || '가능한 운동이 없습니다 — 기구를 더 골라 주세요'}</span></div></div>`).join('')}</div>`;
     b.innerHTML = h;
   },
   _pickPlace(id) { this._p.place = id; this._paint(); },
@@ -333,19 +332,24 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
     const n = Math.max(cur.length, Number(String(sets).match(/^(\d+)/)?.[1]) || 3);
     const prev = this.last(name, ds);
     this._lg = { name, ds };
-    App.openModal('@dumbbell ' + name, `
-      ${prev ? `<p class="pg-note">지난번(${prev.ds.slice(5).replace('-', '/')}): ${prev.sets.map(s => `${s.w || 0}kg×${s.r || 0}`).join(', ')}</p>` : ''}
-      <p class="pg-note">${esc(this.suggest(name, sets, ds) || '처음 기록입니다 — 2~3회 더 할 수 있는 무게로 시작하세요')}</p>
+    const nx = this.nextWeight(name, sets, ds);
+    const ic = (n, c) => typeof ExMedia !== 'undefined' && ExMedia.ic ? ExMedia.ic(n, c) : '';
+    App.openModal('@dumbbell ' + name, `<div class="fz fz-lg">
+      ${prev ? `<div class="lg-sum">
+        <div class="lg-sum-i"><span>지난번 · <span class="num">${prev.ds.slice(5).replace('-', '/')}</span></span><b class="num">${prev.sets.map(s => `${s.w || 0}×${s.r || 0}`).join('  ')}</b></div>
+        ${nx != null ? `<div class="lg-sum-i lg-next"><span>오늘 권장</span><b class="num">${nx}<small>kg</small></b></div>` : ''}
+      </div>` : `<p class="fz-note">처음 기록입니다. 2~3회 더 할 수 있는 무게로 시작하세요.</p>`}
+      <div class="lg-head"><span>세트</span><span>무게 kg</span><span></span><span>횟수</span></div>
       <div id="lgRows" class="lg-rows">${Array.from({ length: n }, (_, i) => this._lgRow(i, cur[i])).join('')}</div>
-      <button class="habit-add-btn" onclick="PlanGen._lgAdd()">+ 세트</button>
-      <details class="lg-hist"><summary>지난 기록 · 그래프</summary><div class="wh">${typeof WorkoutHistory!=='undefined' ? WorkoutHistory.html(name) : ''}</div></details>
-      <div class="modal-btns"><button class="btn-sm accent" onclick="PlanGen._lgSave()">저장</button><button class="btn-sm" onclick="App.closeModal()">취소</button></div>`);
+      <button class="fz-act" onclick="PlanGen._lgAdd()">${ic('plus')}<span>세트 추가</span></button>
+      <details class="lg-hist"><summary>지난 기록 · 그래프${ic('down', 'fz-ic-end')}</summary><div class="wh">${typeof WorkoutHistory!=='undefined' ? WorkoutHistory.html(name) : ''}</div></details>
+      <div class="modal-btns"><button class="btn-sm accent" onclick="PlanGen._lgSave()">저장</button><button class="btn-sm" onclick="App.closeModal()">취소</button></div></div>`);
   },
   _lgRow(i, s) {
     s = s || {};
-    return `<div class="lg-row"><span class="lg-n">${i + 1}</span>
-      <input class="inp inp-sm lg-w" readonly inputmode="none" placeholder="kg" value="${s.w ?? ''}" onclick="PlanGen._lgPick(this,'w')">
-      <span>kg ×</span><input class="inp inp-sm lg-r" readonly inputmode="none" placeholder="회" value="${s.r ?? ''}" onclick="PlanGen._lgPick(this,'r')"><span>회</span></div>`;
+    return `<div class="lg-row"><span class="lg-n num">${i + 1}</span>
+      <input class="inp inp-sm lg-w num" readonly inputmode="none" placeholder="–" aria-label="${i + 1}세트 무게 kg" value="${s.w ?? ''}" onclick="PlanGen._lgPick(this,'w')">
+      <span class="lg-x">×</span><input class="inp inp-sm lg-r num" readonly inputmode="none" placeholder="–" aria-label="${i + 1}세트 횟수" value="${s.r ?? ''}" onclick="PlanGen._lgPick(this,'r')"></div>`;
   },
   // 기록 창의 무게·횟수도 운동 모드처럼 숫자 휠로. 고른 값은 아래 줄(빈 칸·같은 값)에도 채운다.
   _lgPick(el, f) {
@@ -415,15 +419,15 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
   openSwap(idx, name, ds, rid) {
     this._sw = { idx, name, ds, rid };
     const alts = this.alternatives(name);
-    App.openModal('@dumbbell 운동 교체', `
-      <p class="pg-note"><b>${esc(name)}</b> 대신 같은 동작 → 같은 자극 부위 순서입니다. 가진 기구로 하는 것부터, 모자라면 기구가 필요한 것도 표시합니다.</p>
+    App.openModal('@dumbbell 운동 교체', `<div class="fz fz-sw">
+      <p class="fz-note"><b>${esc(name)}</b> 대신 할 운동입니다. 같은 동작, 가진 기구로 하는 것부터 보여 드립니다.</p>
       <div class="sw-list">${alts.map((a, i) => {
         const th = typeof ExMedia !== 'undefined' ? ExMedia.thumbFor(a.n) : '';
         const eq = (this.EQUIP.find(([e]) => e === this.equipOf(a.n)) || [])[1];
-        return `<button class="sw-row" onclick="PlanGen._swap(${i})">${th ? `<span class="ex-th">${ExMedia.poseHtml(th)}</span>` : '<span class="ex-th none"></span>'}<span class="sw-nm">${esc(a.n)}${a.need ? `<small>${esc(eq || '기구')} 필요</small>` : ''}</span></button>`;
+        return `<button class="sw-row" onclick="PlanGen._swap(${i})">${th ? `<span class="ex-th">${ExMedia.poseHtml(th)}</span>` : `<span class="ex-th none">${typeof Icons !== 'undefined' ? Icons.svg('dumbbell') : ''}</span>`}<span class="sw-nm">${esc(a.n)}${a.need ? `<small>${esc(eq || '기구')} 필요</small>` : ''}</span></button>`;
       }).join('') || `<p class="pg-note">이 운동의 자극 부위를 알 수 없어 추천을 못 했습니다. '+ 운동 추가' 에서 직접 골라 주세요.</p>`}</div>
       <label class="sw-ban"><input type="checkbox" id="swBan"> '${esc(name)}' 은(는) 앞으로 추천하지 않기</label>
-      <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div>`);
+      <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div></div>`);
     this._alts = alts.map(a => a.n);
   },
   _swap(i) {

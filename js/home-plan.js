@@ -175,91 +175,52 @@ const HomePlan = {
     return 'hp-tag-rest';
   },
 
+  _ic(n, c) { return typeof ExMedia !== 'undefined' && ExMedia.ic ? ExMedia.ic(n, c) : ''; },
+
   _exCard(x, dayIdx, exIdx) {
     const isOpen = this._open[dayIdx + '-' + exIdx];
     const imgSrc = this.IMG[x.img] || '';
+    // 태그 색칠 대신 한 줄 글: 자극 부위 · 세트(숫자) · 휴식
+    const meta = x.tg.map(t => t.c === 's' ? `<b class="num">${esc(t.t)}</b>` : `<span>${esc(t.t)}</span>`).join('<i></i>');
 
     // 그림은 늘 보인다(시작·끝 자세 두 칸 그대로). 이름은 한 줄로 작게, 자세 팁·영상만 접어 둔다.
     return `<div class="hp-ex ${isOpen ? 'hp-ex-open' : ''}">
       ${imgSrc ? `<div class="hp-pic"><img src="${imgSrc}" alt="${esc(x.n)} 시작·끝 자세" loading="lazy"></div>` : ''}
       <div class="hp-ex-line">
-        <span class="hp-ex-num">${exIdx + 1}</span>
+        <span class="hp-ex-num num">${String(exIdx + 1).padStart(2, '0')}</span>
         <span class="hp-ex-name">${esc(x.n)}</span>
         <span class="hp-ex-en">${esc(x.e)}</span>
       </div>
-      <div class="hp-tags">${x.tg.map(t => `<span class="${this._tagClass(t.c)}">${esc(t.t)}</span>`).join('')}</div>
-      <button type="button" class="hp-more" onclick="HomePlan.toggle(${dayIdx},${exIdx})">${isOpen ? '접기' : '자세 팁 · 영상'}</button>
+      <div class="hp-meta">${meta}</div>
+      <button type="button" class="hp-more" aria-expanded="${!!isOpen}" onclick="HomePlan.toggle(${dayIdx},${exIdx})"><span>${isOpen ? '접기' : '자세 팁 · 영상'}</span>${this._ic('down', 'hp-more-ic')}</button>
       ${isOpen ? `<div class="hp-ex-detail">
-        <div class="hp-yt-section">
-          <a class="hp-yt-btn" href="${this.ytUrl(x.yt.ko)}" target="_blank" rel="noopener">
-            <span class="hp-yt-icon">▶</span>
-            <span class="hp-yt-txt">${esc(x.n)} 자세 영상</span>
-          </a>
-          <a class="hp-yt-btn" href="${this.ytUrl(x.yt.en)}" target="_blank" rel="noopener">
-            <span class="hp-yt-icon">▶</span>
-            <span class="hp-yt-txt">${esc(x.e)} Form Guide</span>
-          </a>
-        </div>
         <div class="hp-info-rows">
           ${x.info.map(r => `<div class="hp-info-row"><span class="hp-info-label">${esc(r[0])}</span><span>${esc(r[1])}</span></div>`).join('')}
         </div>
-        <div class="hp-alt">
-          <div class="hp-alt-title">대체 운동</div>
-          ${x.alt.map(a => `<div class="hp-alt-item">↳ ${esc(a)}</div>`).join('')}
+        ${x.alt.length ? `<div class="hp-alt"><span class="hp-alt-title">대체 운동</span><span>${x.alt.map(esc).join(' · ')}</span></div>` : ''}
+        ${x.lb ? `<div class="hp-weight-label">${esc(x.lb)}</div>` : ''}
+        <div class="hp-yt-section">
+          <a class="fz-link" href="${this.ytUrl(x.yt.ko)}" target="_blank" rel="noopener">${this._ic('play')}<span>자세 영상</span>${this._ic('ext', 'fz-ic-end')}</a>
+          <a class="fz-link" href="${this.ytUrl(x.yt.en)}" target="_blank" rel="noopener">${this._ic('play')}<span>${esc(x.e)} form guide</span>${this._ic('ext', 'fz-ic-end')}</a>
         </div>
-        <div class="hp-weight-label">${esc(x.lb)}</div>
       </div>` : ''}
     </div>`;
   },
 
   _scheduleHtml() {
+    const W = [['월', 'DAY A · 푸시', 1], ['화', '휴식 또는 유산소'], ['수', 'DAY B · 풀', 1], ['목', '휴식 또는 유산소'],
+      ['금', 'DAY C · 하체+코어', 1], ['토', '휴식 또는 유산소'], ['일', '완전 휴식']];
+    const list = (t, rows) => `<section class="hp-sec"><h3 class="hp-section-title">${t}</h3>
+      <ul class="hp-list">${rows.map(([k, v]) => `<li>${k ? `<strong>${k}</strong>` : ''}<span>${v}</span></li>`).join('')}</ul></section>`;
     return `
-      <div class="hp-schedule">
+      <section class="hp-sec hp-schedule">
         <h3 class="hp-section-title">주간 스케줄</h3>
-        <div class="hp-week-grid">
-          <div class="hp-day hp-day-on"><span class="hp-day-d">월</span><span class="hp-day-t">DAY A<br>푸시</span></div>
-          <div class="hp-day hp-day-off"><span class="hp-day-d">화</span><span class="hp-day-t">휴식<br>or 유산소</span></div>
-          <div class="hp-day hp-day-on"><span class="hp-day-d">수</span><span class="hp-day-t">DAY B<br>풀</span></div>
-          <div class="hp-day hp-day-off"><span class="hp-day-d">목</span><span class="hp-day-t">휴식<br>or 유산소</span></div>
-          <div class="hp-day hp-day-on"><span class="hp-day-d">금</span><span class="hp-day-t">DAY C<br>하체+코어</span></div>
-          <div class="hp-day hp-day-off"><span class="hp-day-d">토</span><span class="hp-day-t">휴식<br>or 유산소</span></div>
-          <div class="hp-day hp-day-off"><span class="hp-day-d">일</span><span class="hp-day-t">완전<br>휴식</span></div>
-        </div>
-      </div>
-
-      <div class="hp-panel">
-        <h3 class="hp-section-title">점진적 과부하 가이드</h3>
-        <ul class="hp-list">
-          <li><strong>1~2주:</strong> 추천 중량 하한, 폼 완성 집중</li>
-          <li><strong>3~4주:</strong> 추천 중량 상한으로 올리기</li>
-          <li><strong>5~6주:</strong> 각 운동 1~2kg 증량 or 2~3rep 추가</li>
-          <li><strong>7~8주:</strong> 밴드 풀업 보조 줄이기, 주 4일 확장 고려</li>
-        </ul>
-      </div>
-
-      <div class="hp-panel">
-        <h3 class="hp-section-title">주 4일 확장 (8주 후)</h3>
-        <ul class="hp-list">
-          <li><strong>월:</strong> 가슴 + 삼두</li>
-          <li><strong>화:</strong> 등 + 이두</li>
-          <li><strong>목:</strong> 어깨 + 팔</li>
-          <li><strong>금:</strong> 하체 + 코어</li>
-        </ul>
-      </div>
-
-      <div class="hp-panel">
-        <h3 class="hp-section-title">8주 목표</h3>
-        <ul class="hp-list">
-          <li>풀업 무보조 5회 이상</li>
-          <li>푸시업 30회 이상</li>
-          <li>덤벨 프레스 20kg×12회</li>
-          <li>체중 80kg↓ (체지방 24%↓)</li>
-        </ul>
-      </div>
-
-      <div class="hp-tip">
-        <strong>휴식일 유산소:</strong> 걷기 30~40분 (심박 120~130) 또는 Zone2 자전거. 격렬한 유산소는 피하고 회복 집중.
-      </div>`;
+        <ul class="hp-week">${W.map(([d, t, on]) => `<li class="${on ? 'on' : ''}"><span class="hp-day-d">${d}</span><span class="hp-day-t">${t}</span></li>`).join('')}</ul>
+      </section>
+      ${list('점진적 과부하', [['1~2주', '추천 중량 하한, 폼 완성 집중'], ['3~4주', '추천 중량 상한으로 올리기'], ['5~6주', '각 운동 1~2kg 증량 또는 2~3회 추가'], ['7~8주', '밴드 풀업 보조 줄이기, 주 4일 확장 고려']])}
+      ${list('주 4일 확장 (8주 후)', [['월', '가슴 + 삼두'], ['화', '등 + 이두'], ['목', '어깨 + 팔'], ['금', '하체 + 코어']])}
+      ${list('8주 목표', [['', '풀업 무보조 5회 이상'], ['', '푸시업 30회 이상'], ['', '덤벨 프레스 20kg × 12회'], ['', '체중 80kg 이하 (체지방 24% 이하)']])}
+      <div class="hp-tip"><strong>휴식일 유산소</strong> 걷기 30~40분(심박 120~130) 또는 Zone2 자전거. 격렬한 유산소는 피하고 회복에 집중합니다.</div>`;
   },
 
   _render() {
@@ -271,7 +232,7 @@ const HomePlan = {
     // 탭 버튼
     const tabs = this.DAY_LABELS.map((d, i) =>
       `<button class="hp-tab${i === tabIdx ? ' hp-tab-on' : ''}" onclick="HomePlan.switchTab(${i})">${d.name}<small>${d.sub}</small></button>`
-    ).join('') + `<button class="hp-tab${tabIdx === 3 ? ' hp-tab-on' : ''}" onclick="HomePlan.switchTab(3)">${typeof Icons!=='undefined'?Icons.svg('calendar'):''}<small>스케줄</small></button>`;
+    ).join('') + `<button class="hp-tab${tabIdx === 3 ? ' hp-tab-on' : ''}" onclick="HomePlan.switchTab(3)">스케줄</button>`;
 
     let content = '';
     if (tabIdx < 3) {
@@ -291,7 +252,7 @@ const HomePlan = {
     this._tab = Number(day) || 0;
     this._open = {};
     if (ex != null) this._open[this._tab + '-' + ex] = true;
-    App.openModal('@dumbbell 홈트레이닝 플랜', '<div id="homePlanBody"></div>');
+    App.openModal('@dumbbell 홈트레이닝 플랜', '<div id="homePlanBody" class="fz fz-hp"></div>');
     setTimeout(() => this._render(), 30);
   }
 };

@@ -151,8 +151,9 @@ const AIUsage = {
     if (!w) return '';
     const left = Math.max(0, Math.min(100, Math.round(100 - (Number(w.pct) || 0))));
     const tone = left <= 10 ? 'var(--red)' : left <= 30 ? 'var(--yellow)' : 'var(--accent)';
-    return `<div class="aiu-bar">
-      <div class="aiu-bar-top"><span>${label}</span><b>${left}% 남음</b></div>
+    const t = left <= 10 ? 't-crit' : left <= 30 ? 't-lo' : 't-ok';
+    return `<div class="aiu-bar ${t}">
+      <div class="aiu-bar-top"><span>${label}</span><b><span class="num">${left}%</span><small> 남음</small></b></div>
       <div class="aiu-track"><div class="aiu-fill" style="width:${left}%;background:${tone}"></div></div>
       <div class="aiu-sub">${w.reset ? this._until(w.reset) : ''}</div>
     </div>`;
@@ -164,14 +165,14 @@ const AIUsage = {
     if (!s) return `<div class="aiu-svc"><div class="aiu-head"><b>${name}</b><span class="aiu-sub">아직 받은 값 없음</span></div></div>`;
     const stale = Date.now() - Date.parse(s.at) > 30 * 60000;
     const head = `<div class="aiu-head">${this.gauge(key, 34)}<b>${name}</b><span class="aiu-plan">${esc(s.plan || '')}</span>
-      <span class="aiu-sub${stale ? ' aiu-stale' : ''}">${this._ago(s.at)}</span></div>`;
+      <span class="aiu-sub${stale ? ' aiu-stale' : ''}">${stale ? '갱신 늦음 · ' : ''}${this._ago(s.at)}</span></div>`;
     if (key === 'higgsfield') {
       const tot = Number(s.total) || 0;
       const left = Number(s.credits) || 0;
       const pctLeft = tot > 0 ? Math.max(0, Math.min(100, left / tot * 100)) : null;
       return `<div class="aiu-svc">${head}
-        <div class="aiu-bar">
-          <div class="aiu-bar-top"><span>남은 크레딧</span><b>${this._num(left)}${tot ? ` / ${this._num(tot)}` : ''}</b></div>
+        <div class="aiu-bar ${pctLeft != null && pctLeft < 10 ? 't-crit' : 't-ok'}">
+          <div class="aiu-bar-top"><span>남은 크레딧</span><b><span class="num">${this._num(left)}</span>${tot ? `<small class="num"> / ${this._num(tot)}</small>` : ''}</b></div>
           ${pctLeft == null ? '' : `<div class="aiu-track"><div class="aiu-fill" style="width:${pctLeft}%;background:${pctLeft < 10 ? 'var(--red)' : 'var(--accent)'}"></div></div>`}
           <div class="aiu-sub">${s.ends ? '구독 갱신 ' + new Date(s.ends).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }) : ''}</div>
         </div></div>`;
@@ -185,13 +186,11 @@ const AIUsage = {
       <div class="aiu-wrap">
         ${['claude', 'chatgpt', 'higgsfield'].filter(k => this.shown().includes(k)).map(k => this._svc(k)).join('')}
         <div class="aiu-link">
-          <div class="aiu-head"><b>PC 크롬 사용량 수집 확장</b><span class="aiu-sub">${ext ? '이 브라우저에 설치됨 · 계정에 자동 연결' : '이 브라우저에서는 보이지 않음'}</span></div>
-          <div class="aiu-sub" style="margin-top:4px">Claude·ChatGPT·Higgsfield 는 남은 사용량을 API 로 알려 주지 않아서, PC 크롬에 로그인된 사이트에서 확장이 5분마다 읽어 옵니다.
-            확장을 설치한 크롬에서 bashy.app 에 한 번 로그인하면 연결은 저절로 됩니다.</div>
-          <div class="modal-btns" style="justify-content:flex-start;flex-wrap:wrap">
-            <a class="btn-sm aiu-a" href="https://github.com/viliiousy/javice/blob/main/docs/extension-install.md" target="_blank" rel="noopener">설치 방법</a>
-          </div>
-          <div class="aiu-sub" style="margin-top:6px">위쪽에 표시할 AI 는 설정 › 디자인 › 상단바 정보에서 고릅니다.</div>
+          <div class="aiu-head"><b>PC 크롬 사용량 수집 확장</b><span class="aiu-sub">${ext ? '이 브라우저에 설치됨 · 자동 연결' : '이 브라우저에는 없음'}</span></div>
+          <p class="aiu-sub aiu-p">Claude·ChatGPT·Higgsfield 는 남은 사용량을 API 로 알려 주지 않아, PC 크롬에 로그인된 사이트에서 확장이 5분마다 읽어 옵니다.
+            확장을 설치한 크롬에서 bashy.app 에 한 번 로그인하면 연결은 저절로 됩니다.</p>
+          <p class="aiu-sub aiu-p">위쪽에 표시할 AI 는 설정 › 디자인 › 상단바 정보에서 고릅니다.</p>
+          <a class="btn-sm aiu-a" href="https://github.com/viliiousy/javice/blob/main/docs/extension-install.md" target="_blank" rel="noopener">설치 방법</a>
         </div>
       </div>`);
     this.refresh();

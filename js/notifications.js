@@ -267,23 +267,30 @@ const Notifications = {
       : local ? '이 기기에서 울립니다 (기기 안 예약 · 인터넷 없어도 울림)'
       : sub ? '이 기기에 등록됨 · 서버 알림' : '이 기기는 아직 등록되지 않았습니다';
     const sw = (on, fn) => Settings._sw(on, fn);
-    const t = (sec, key, v) => `<input type="time" class="set-time" value="${v}" onchange="Notifications._setTime('${sec}','${key}',this.value)">`;
-    const block = (sec, label, sub2, times) => `
-      <div class="set-item"><span class="set-tx"><b>${label}</b><small>${sub2}</small></span>${sw(s[sec]?.enabled, `Notifications._toggle('${sec}',${!s[sec]?.enabled})`)}</div>
-      ${s[sec]?.enabled ? `<div class="set-times">${times}</div>` : ''}`;
-    return `
-      <div class="set-item"><span class="set-tx"><b>알림 받기</b><small>${stateTxt}</small></span>${sw(s.enabled, 'Notifications._toggleEnable()')}</div>
+    const t = (sec, key, v, lbl) => `<label class="nt-cell"><span>${lbl}</span><input type="time" class="set-time num" value="${v}" onchange="Notifications._setTime('${sec}','${key}',this.value)"></label>`;
+    // 켜진 갈래는 이름 줄과 시각 줄을 한 묶음으로 — 사이에 선을 긋지 않는다
+    const block = (sec, label, sub2, times) => {
+      const on = !!s[sec]?.enabled;
+      return `<div class="nt-blk${on ? ' on' : ''}">
+        <div class="set-item"><span class="set-tx"><b>${label}</b><small>${sub2}</small></span>${sw(on, `Notifications._toggle('${sec}',${!on})`)}</div>
+        ${on ? `<div class="set-times nt-times">${times}</div>` : ''}
+      </div>`;
+    };
+    const dietDef = { 아침:'09:00', 점심:'13:00', 저녁:'19:00' };
+    return `<div class="nt${s.enabled ? '' : ' nt-off'}">
+      <div class="set-item nt-master"><span class="set-tx"><b>알림 받기</b><small>${stateTxt}</small></span>${sw(s.enabled, 'Notifications._toggleEnable()')}</div>
       ${s.enabled ? `
       <div class="set-h">무엇을 알려 드릴까요</div>
-      ${block('habits', '습관', '남은 습관이 있을 때 · 시간 정한 습관은 그 시각에', t('habits','time', s.habits?.time||'21:00'))}
-      ${block('diet', '식단 기록', '끼니마다 기록 알림', ['아침','점심','저녁'].map(m => `<label>${m}${t('diet', m, s.diet?.[m]||{아침:'09:00',점심:'13:00',저녁:'19:00'}[m])}</label>`).join(''))}
-      ${block('tasks', '오늘 마감 할일', '마감인 할일이 있는 날만', t('tasks','time', s.tasks?.time||'09:00'))}
-      ${block('checklist', '체크리스트', '그날 날짜를 정해 둔 항목', t('checklist','time', s.checklist?.time||'09:00'))}
-      ${block('calendar', '오늘 일정 요약', '일정이 있는 날 아침에', t('calendar','time', s.calendar?.time||'08:00'))}
+      ${block('habits', '습관', '남은 습관이 있을 때 · 시간 정한 습관은 그 시각에', t('habits','time', s.habits?.time||'21:00', '알림 시각'))}
+      ${block('diet', '식단 기록', '끼니마다 기록 알림', ['아침','점심','저녁'].map(m => t('diet', m, s.diet?.[m]||dietDef[m], m)).join(''))}
+      ${block('tasks', '오늘 마감 할일', '마감인 할일이 있는 날만', t('tasks','time', s.tasks?.time||'09:00', '알림 시각'))}
+      ${block('checklist', '체크리스트', '그날 날짜를 정해 둔 항목', t('checklist','time', s.checklist?.time||'09:00', '알림 시각'))}
+      ${block('calendar', '오늘 일정 요약', '일정이 있는 날 아침에', t('calendar','time', s.calendar?.time||'08:00', '알림 시각'))}
       ${local ? '' : '<p class="set-note">웹에서는 서버가 10분마다 확인해 보냅니다. 시각이 최대 10분 늦을 수 있습니다.</p>'}` : ''}
-      <div class="set-h"></div>
+      <div class="set-h">점검</div>
       ${Settings._link('테스트 알림 보내기', 'Notifications.sendTest()', local ? '3초 뒤 이 기기에서 울립니다' : '이 기기로 바로 보냅니다')}
-      ${!local && s.enabled ? Settings._link('이 기기 다시 등록', 'Notifications.subscribe()', '알림이 안 올 때') : ''}`;
+      ${!local && s.enabled ? Settings._link('이 기기 다시 등록', 'Notifications.subscribe()', '알림이 안 올 때') : ''}
+    </div>`;
   },
 
   _after() {

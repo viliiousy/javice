@@ -276,6 +276,12 @@ const Diet = {
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'\\&#39;', '\\':'\\\\',
   }[c])); },
 
+  // 출처 표시. 예전 화면(v1)은 이모지로, v2 는 작은 글자 꼬리표로 보여 준다 —
+  // 둘 다 같은 뜻(어디서 온 숫자인가)이고, 어느 쪽을 쓸지는 css/v2-diet.css 가 고른다.
+  SRC: { '🥗':'식약처', '🌍':'OFF', '📋':'성분표', '🤖':'AI 추정' },
+  _em(e){ return e ? `<span class="dt-em">${e} </span>` : ''; },
+  _srcTag(e){ const t=this.SRC[e]; return t ? `<span class="dt-src${e==='🤖'?' ai':''}">${t}</span>` : ''; },
+
   _aiBtnHtml(meal, ds){
     return `<button class="diet-ai-btn" id="dietAiBtn" onclick="Diet.aiLookup('${meal}','${ds}')">AI 로 영양정보 찾기</button>
       <div id="dietAiRes"></div>`;
@@ -368,13 +374,13 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     const A=s=>this._attr(s);
     return `<div class="diet-ai-card">
       <div class="diet-ai-hd">
-        <span class="diet-ai-nm">🤖 ${esc(f.n)}</span>
+        <span class="diet-ai-nm">${this._em('🤖')}${esc(f.n)}</span>
         <span class="diet-ai-warn">AI 추정값 · 맞는지 보고 담으세요</span>
       </div>
       ${(f.parts&&f.parts.length>1)?`<div class="diet-ai-parts">
         ${f.parts.map(x=>`<div class="dap-row"><span class="dap-n">${esc(x.n)}${
-          x.amt?` <i>${esc(x.amt)}</i>`:''}</span><span class="dap-c">${x.c}<i>kcal</i></span></div>`).join('')}
-        <div class="dap-row dap-sum"><span class="dap-n">합계</span><span class="dap-c">${f.c}<i>kcal</i></span></div>
+          x.amt?` <i>${esc(x.amt)}</i>`:''}</span><span class="dap-c num">${x.c}<i>kcal</i></span></div>`).join('')}
+        <div class="dap-row dap-sum"><span class="dap-n">합계</span><span class="dap-c num">${f.c}<i>kcal</i></span></div>
       </div>`:''}
       ${f.fixed?`<div class="diet-ai-note">단백질·탄수·지방으로 계산한 값과 크게 달라서 칼로리를 다시 계산했어요.</div>`:''}
       <div class="diet-ai-grid">
@@ -384,7 +390,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
         <label>탄수화물<input id="aiCb" type="number" step="0.1" class="inp inp-sm" value="${f.cb}"></label>
         <label>지방<input id="aiFt" type="number" step="0.1" class="inp inp-sm" value="${f.ft}"></label>
       </div>
-      <button class="btn-sm accent diet-ai-add" onclick="Diet.aiConfirm('${meal}','${ds}')">담고 사전에 저장</button>
+      <button class="btn-sm accent diet-ai-add dt-go" onclick="Diet.aiConfirm('${meal}','${ds}')">담고 사전에 저장</button>
     </div>`;
   },
   aiConfirm(meal, ds){
@@ -457,11 +463,10 @@ JSON 만 출력해. 다른 말은 붙이지 마.
       <button class="diet-food-fav${fv?' on':''}" title="즐겨찾기"
         onclick="event.stopPropagation();Diet.favFromSearch(${i},'${meal}','${ds}')">${fv?'★':'☆'}</button>
       <div class="diet-food-main" onclick="Diet.selectFood(${i},'${meal}','${ds}')">
-        <span class="diet-food-nm">${f.e} ${esc(f.n)}</span>
-        ${f.u?`<span class="diet-food-u">${esc(f.u)}</span>`:''}
-        ${ate?`<span class="diet-food-n" title="지금까지 담은 횟수">${ate.n}회</span>`:''}
+        <span class="diet-food-nm">${this._em(f.e)}${esc(f.n)}</span>
+        <span class="dt-meta">${f.u?`<span class="diet-food-u">${esc(f.u)}</span>`:''}${this._srcTag(f.e)}${ate?`<span class="diet-food-n" title="지금까지 담은 횟수">${ate.n}회</span>`:''}</span>
       </div>
-      <span class="diet-food-cal">${f.c}<i>kcal</i></span>
+      <span class="diet-food-cal num">${f.c}<i>kcal</i></span>
     </div>`;
   },
   searchFood(q, meal, ds){
@@ -546,12 +551,10 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     box.innerHTML = `<div class="diet-rec-hd">식약처 영양성분DB <i>${Number(j.total||0).toLocaleString('ko-KR')}건 중</i></div>`
       + this._dbHits.map((f,i) => `<div class="diet-food">
           <div class="diet-food-main" onclick="Diet.selectDbFood(${i},'${meal}','${ds}')">
-            <span class="diet-food-nm">${f.e} ${esc(f.n)}</span>
-            <span class="diet-food-u">${esc(f.u)}</span>
-            ${f.grp?`<span class="diet-food-n">${esc(f.grp)}</span>`:''}
-            ${f.note?`<span class="diet-food-note">${esc(f.note)}</span>`:''}
+            <span class="diet-food-nm">${this._em(f.e)}${esc(f.n)}</span>
+            <span class="dt-meta"><span class="diet-food-u">${esc(f.u)}</span>${f.grp?`<span class="diet-food-n">${esc(f.grp)}</span>`:''}${f.note?`<span class="diet-food-note">${esc(f.note)}</span>`:''}</span>
           </div>
-          <span class="diet-food-cal">${f.c}<i>kcal</i></span>
+          <span class="diet-food-cal num">${f.c}<i>kcal</i></span>
         </div>`).join('')
       + `<div class="diet-macro-note">${j.total > this._dbHits.length
             ? `${Number(j.total).toLocaleString('ko-KR')}건 중 ${this._dbHits.length}개 · 제품명을 더 붙여 치면 좁혀져요 · `
@@ -571,7 +574,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
       <div class="diet-label-hint">포장 뒷면의 표를 찍으면 <b>적힌 값을 그대로</b> 읽어 옵니다. 추정하지 않아요.</div>
       <input id="lblFile" type="file" accept="image/*" capture="environment" style="display:none"
              onchange="Diet._onLabelPick(this,'${A}','${meal}','${ds}')">
-      <button class="btn-sm dp-rt-btn" onclick="document.getElementById('lblFile').click()">영양성분표 촬영 / 선택</button>
+      <button class="btn-sm dp-rt-btn dt-ghost" onclick="document.getElementById('lblFile').click()">영양성분표 촬영 / 선택</button>
       <div id="lblResult"></div>
     </div>`;
   },
@@ -613,16 +616,16 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
       const nm = String(j.name || q).trim().slice(0,40) || q;
       const u  = String(j.basis || '').trim().slice(0,24);
       box.innerHTML = `<div class="diet-ai-card">
-        <div class="diet-ai-hd"><span class="diet-ai-nm">📋 ${esc(nm)}</span>
+        <div class="diet-ai-hd"><span class="diet-ai-nm">${this._em('📋')}${esc(nm)}</span>
           <span class="diet-ai-u">${esc(u)}</span></div>
         <div class="diet-label-hint">읽은 값이 맞는지 보고 고칠 수 있어요. 못 읽은 칸은 비어 있습니다.</div>
-        <div class="modal-grid2">
+        <div class="modal-grid2 dt-grid">
           <label>열량(kcal)<input id="lbC"  type="number" class="inp inp-sm" value="${j.kcal ?? ''}"></label>
           <label>단백질(g)<input id="lbP"  type="number" step="0.1" class="inp inp-sm" value="${j.protein ?? ''}"></label>
           <label>탄수(g)<input id="lbCb" type="number" step="0.1" class="inp inp-sm" value="${j.carb ?? ''}"></label>
           <label>지방(g)<input id="lbF"  type="number" step="0.1" class="inp inp-sm" value="${j.fat ?? ''}"></label>
         </div>
-        <button class="btn-sm accent dp-rt-btn" onclick="Diet._saveLabel('${A(nm)}','${A(u)}','${meal}','${ds}')">담기</button>
+        <button class="btn-sm accent dp-rt-btn dt-go" onclick="Diet._saveLabel('${A(nm)}','${A(u)}','${meal}','${ds}')">담기</button>
       </div>`;
     }catch(err){
       box.innerHTML = `<div class="diet-empty-hint">읽기 실패 · ${esc(err.message)}</div>`;
@@ -680,21 +683,21 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
     const cart=this._cart||[];
     if(!cart.length) return '';
     return `<div class="diet-cart">
-      <div class="diet-cart-hd">담은 것 ${cart.length}개</div>
+      <div class="diet-cart-hd">담은 것 <b class="num">${cart.length}</b></div>
       ${cart.map((s,i)=>{
         const u=this._scaleUnit(s.u, s.qty);
         return `<div class="diet-cart-row">
-          <span class="diet-cart-nm">${s.e} ${esc(s.n)}${u?` <i>${esc(u)}</i>`:''}</span>
+          <span class="diet-cart-nm">${this._em(s.e)}${esc(s.n)}${u?` <i>${esc(u)}</i>`:''}</span>
           <div class="diet-qty">
             <button onclick="Diet.cartQty(${i},-1,'${meal}','${ds}')" ${s.qty<=1?'disabled':''} aria-label="줄이기">−</button>
-            <span class="diet-qty-n">${s.qty}</span>
+            <span class="diet-qty-n num">${s.qty}</span>
             <button onclick="Diet.cartQty(${i},1,'${meal}','${ds}')" aria-label="늘리기">+</button>
           </div>
-          <span class="diet-cart-cal">${Math.round(s.c*s.qty)}<i>kcal</i></span>
+          <span class="diet-cart-cal num">${Math.round(s.c*s.qty)}<i>kcal</i></span>
           <button class="diet-cart-del" onclick="Diet.cartRemove(${i},'${meal}','${ds}')" aria-label="빼기">✕</button>
         </div>`;
       }).join('')}
-      <div class="diet-cart-sum">합계 <b>${this._cartCal()}</b>kcal</div>
+      <div class="diet-cart-sum">합계 <b class="num">${this._cartCal()}</b>kcal</div>
     </div>`;
   },
   // 같은 음식을 또 누르면 줄을 늘리지 않고 수량만 올린다
@@ -731,7 +734,7 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
     if(!box) return;
     const open = box.style.display==='none';
     box.style.display = open ? '' : 'none';
-    if(btn) btn.textContent = open ? '− 직접 입력 닫기' : '＋ 직접 입력';
+    if(btn) btn.textContent = open ? '직접 입력 닫기' : '직접 입력';
     if(open) setTimeout(()=>document.getElementById('fName')?.focus(),50);
   },
   addManualToCart(meal, ds){
@@ -785,9 +788,11 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
     const otherItems=recent.filter(f=>!favs.includes(f.name));
     const quickList=[...favItems,...otherItems];
 
+    // v2 에서는 숨는다(css/v2-diet.css) — 검색창이 비어 있을 때 '최근 먹은 것' 이 같은 목록을
+    // 즐겨찾기·횟수까지 붙여 이미 보여 준다. 두 번 보이면 어느 쪽을 눌러야 하는지 헷갈린다.
     const quickHTML=quickList.length?`
-      <div style="margin-bottom:12px">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:6px">빠른 추가 (클릭)</div>
+      <div class="diet-quick">
+        <div class="diet-quick-hd">빠른 추가</div>
         <div class="diet-quick-list">
           ${quickList.map(f=>{
             const freq=this.getFreqLast30(f.name);
@@ -800,33 +805,33 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
         </div>
       </div>`:'';
 
-    App.openModal(`@diet ${meal} 추가`,`
-      <input id="dietSearch" class="inp diet-search" autocomplete="off"
-        placeholder="음식 검색 — 초성도 됩니다 (예: ㄷㄱㅅㅅ)"
+    App.openModal(`@diet ${meal} 추가`,`<div class="dt dt-add">
+      <input id="dietSearch" class="inp diet-search" autocomplete="off" enterkeyhint="search"
+        placeholder="음식 이름 · 초성도 돼요 (ㄷㄱㅅㅅ)"
         oninput="Diet.searchFood(this.value,'${meal}','${ds}')">
       <button class="scan-btn" onclick="Scan.open('${meal}','${ds}')">
-        바코드 스캔<i>이름으로 고르지 않아도 돼요</i></button>
+        바코드 스캔<i>제품 하나로 바로 찾아요</i></button>
       <div id="dietCart"></div>
       <div id="dietSearchRes"></div>
       <div id="dietDbRes"></div>
       ${quickHTML}
-      <button id="dietManualBtn" class="diet-manual-btn" onclick="Diet.toggleManual()">＋ 직접 입력</button>
-      <div id="dietManual" style="display:none">
-        <div style="font-size:11px;color:var(--text3);margin:8px 0 6px">식약처 DB 에도 없는 음식 — 포장의 영양성분표를 보고 적어주세요</div>
-        <div class="modal-row"><label class="modal-lbl">음식 이름 *</label>
+      <button id="dietManualBtn" class="diet-manual-btn" onclick="Diet.toggleManual()">직접 입력</button>
+      <div id="dietManual" class="dt-manual" style="display:none">
+        <div class="dt-note">식약처 DB 에도 없는 음식 — 포장의 영양성분표를 보고 적어 주세요</div>
+        <div class="modal-row"><label class="modal-lbl" for="fName">음식 이름</label>
           <input id="fName" type="text" placeholder="예: 엄마표 된장찌개" class="inp"></div>
-        <div class="modal-grid2">
-          <div><label class="modal-lbl">칼로리 (kcal)</label><input id="fCal" type="number" min="0" placeholder="0" class="inp inp-sm"></div>
-          <div><label class="modal-lbl">단백질 (g)</label><input id="fProt" type="number" min="0" step="0.1" placeholder="0" class="inp inp-sm"></div>
-          <div><label class="modal-lbl">탄수화물 (g)</label><input id="fCarb" type="number" min="0" step="0.1" placeholder="0" class="inp inp-sm"></div>
-          <div><label class="modal-lbl">지방 (g)</label><input id="fFat" type="number" min="0" step="0.1" placeholder="0" class="inp inp-sm"></div>
+        <div class="modal-grid2 dt-grid">
+          <div><label class="modal-lbl" for="fCal">열량 (kcal)</label><input id="fCal" type="number" inputmode="decimal" min="0" placeholder="0" class="inp inp-sm"></div>
+          <div><label class="modal-lbl" for="fProt">단백질 (g)</label><input id="fProt" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0" class="inp inp-sm"></div>
+          <div><label class="modal-lbl" for="fCarb">탄수화물 (g)</label><input id="fCarb" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0" class="inp inp-sm"></div>
+          <div><label class="modal-lbl" for="fFat">지방 (g)</label><input id="fFat" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0" class="inp inp-sm"></div>
         </div>
-        <button class="btn-sm" style="width:100%;margin-top:8px" onclick="Diet.addManualToCart('${meal}','${ds}')">담기</button>
+        <button class="btn-sm dt-ghost dt-wide" onclick="Diet.addManualToCart('${meal}','${ds}')">담기</button>
       </div>
-      <div class="modal-btns">
+      <div class="modal-btns dt-foot">
         <button id="dietCommit" onclick="Diet.commitCart('${meal}','${ds}')" class="btn-sm accent" disabled>담은 음식 없음</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
-      </div>`);
+      </div></div>`);
     setTimeout(()=>{ this._paintCart(meal, ds); this.searchFood('', meal, ds);
                      document.getElementById('dietSearch')?.focus(); },50);
   },
@@ -849,24 +854,28 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
     const ds=dateStr||this._localDateStr();
     const key=JARVIS._getKey();
     if(!key){ App.showToast('Bashy API 키를 먼저 설정해주세요 (설정 › AI)','error'); return; }
-    App.openModal('@camera 음식 사진 AI 분석',`
-      <p style="color:var(--text2);font-size:13px;margin-bottom:10px">사진을 업로드하면 AI가 자동 분석합니다.</p>
-      <div style="margin-bottom:10px"><label class="modal-lbl">식사 구분</label>
-        <select id="photoMeal" class="inp inp-sm">
-          ${this.MEALS.map(m=>`<option value="${m}"${m===this._suggestMeal()?'selected':''}>${m}</option>`).join('')}
-        </select>
+    const sug=this._suggestMeal();
+    const camIc=typeof Icons!=='undefined'?Icons.svg('camera'):'';
+    App.openModal('@camera 사진으로 기록',`<div class="dt dt-photo">
+      <p class="dt-lead">사진을 올리면 AI 가 음식과 열량을 추정해요.</p>
+      <div class="dt-field"><div class="modal-lbl">끼니</div>
+        <input type="hidden" id="photoMeal" value="${sug}">
+        <div class="dt-seg" role="radiogroup" aria-label="끼니">
+          ${this.MEALS.map(m=>`<button type="button" role="radio" class="${m===sug?'on':''}" aria-checked="${m===sug}"
+            onclick="Diet._pickPhotoMeal(this,'${m}')">${m}</button>`).join('')}
+        </div>
       </div>
       <div id="photoDropZone" class="photo-drop-zone" onclick="document.getElementById('photoFileInput').click()">
-        <div id="photoPreviewWrap"><div style="font-size:48px">📷</div>
-          <p style="color:var(--text2);font-size:13px">클릭하거나 사진을 올려주세요</p></div>
+        <div id="photoPreviewWrap" class="dt-drop">${camIc}
+          <span>눌러서 사진 고르기</span><small>또는 여기로 끌어 놓기</small></div>
         <input id="photoFileInput" type="file" accept="image/*" style="display:none"
           onchange="Diet._onPhotoSelected(this,'${ds}')">
       </div>
-      <div id="photoResult" style="display:none;margin-top:10px"></div>
-      <div class="modal-btns" style="margin-top:10px">
+      <div id="photoResult" style="display:none"></div>
+      <div class="modal-btns">
         <button id="btnAnalyzePhoto" onclick="Diet._analyzePhoto('${ds}')" class="btn-sm accent" disabled>AI 분석</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
-      </div>`);
+      </div></div>`);
     setTimeout(()=>{
       const zone=document.getElementById('photoDropZone'); if(!zone) return;
       zone.addEventListener('dragover',e=>{e.preventDefault();zone.style.borderColor='var(--accent)';});
@@ -876,12 +885,17 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
   },
 
   _photoBase64:null,
+  _pickPhotoMeal(btn, m){
+    const inp=document.getElementById('photoMeal'); if(inp) inp.value=m;
+    btn.parentElement.querySelectorAll('button').forEach(b=>{
+      const on=b===btn; b.classList.toggle('on',on); b.setAttribute('aria-checked',on); });
+  },
   _onPhotoSelected(input,dateStr){ const f=input.files[0]; if(f) this._loadFile(f,dateStr); },
   _loadFile(file,dateStr){
     const reader=new FileReader();
     reader.onload=e=>{
       this._photoBase64=e.target.result.split(',')[1];
-      document.getElementById('photoPreviewWrap').innerHTML=`<img src="data:${file.type};base64,${this._photoBase64}" style="max-width:100%;max-height:160px;border-radius:8px;object-fit:contain">`;
+      document.getElementById('photoPreviewWrap').innerHTML=`<img class="dt-shot" alt="고른 사진" src="data:${file.type};base64,${this._photoBase64}" style="max-width:100%;max-height:160px;border-radius:8px;object-fit:contain">`;
       const btn=document.getElementById('btnAnalyzePhoto'); if(btn){ btn.disabled=false; }
     };
     reader.readAsDataURL(file);
@@ -905,12 +919,16 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
       if(!parsed?.foods){ App.showToast('분석 실패','error'); if(btn){btn.disabled=false;btn.textContent='AI 분석';} return; }
       const resultEl=document.getElementById('photoResult'); if(!resultEl) return;
       resultEl.style.display='block';
-      resultEl.innerHTML=`<div style="background:var(--card2);border-radius:10px;padding:10px">
-        <p style="font-size:11px;color:var(--text2);margin-bottom:6px">총 ${parsed.total_cal||0}kcal 추정</p>
-        ${parsed.foods.map(f=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px"><span>${esc(f.name)} ${esc(f.amount||'')}</span><span style="color:var(--text2)">${f.cal}kcal</span></div>`).join('')}
-        ${parsed.comment?`<p style="font-size:11px;color:var(--accent-l);margin-top:6px">${esc(parsed.comment)}</p>`:''}
+      const tot=parsed.total_cal||parsed.foods.reduce((a,f)=>a+(Number(f.cal)||0),0);
+      resultEl.innerHTML=`<div class="dt-pres">
+        <div class="dt-pres-hd"><span class="modal-lbl">AI 추정</span>
+          <span class="dt-pres-tot"><b class="num">${Math.round(tot).toLocaleString('ko-KR')}</b> kcal</span></div>
+        ${parsed.foods.map(f=>`<div class="dt-pres-row"><span class="dt-pres-nm">${esc(f.name)}${f.amount?` <i>${esc(f.amount)}</i>`:''}</span><span class="dt-pres-c num">${f.cal}<i>kcal</i></span></div>`).join('')}
+        ${parsed.comment?`<p class="dt-pres-cm">${esc(parsed.comment)}</p>`:''}
       </div>
-      <button onclick="Diet._savePhotoFoods(${JSON.stringify(parsed.foods).replace(/"/g,'&quot;')},'${meal}','${dateStr}')" class="btn-sm accent" style="width:100%;padding:9px;margin-top:8px">✅ ${meal}에 추가</button>`;
+      <button onclick="Diet._savePhotoFoods(${JSON.stringify(parsed.foods).replace(/"/g,'&quot;')},'${meal}','${dateStr}')" class="btn-sm accent dt-go">${meal}에 추가</button>`;
+      // 결과가 나오면 주 단추는 '추가' 다. 다시 분석은 보조로 내린다.
+      if(btn) btn.classList.remove('accent');
       if(btn){btn.textContent='다시 분석';btn.disabled=false;}
     }catch(err){ App.showToast('분석 실패: '+err.message,'error'); if(btn){btn.disabled=false;btn.textContent='AI 분석';} }
   },
@@ -932,43 +950,35 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
     const s=this.getSettings();
     const rest=s.restDays||[0,6]; // 기본: 일,토
     const days=['일','월','화','수','목','금','토'];
-    App.openModal('@gear 식단 목표 설정',`
-      <div style="margin-bottom:12px">
-        <div style="font-weight:700;font-size:13px;margin-bottom:8px">평일 기본 목표</div>
-        <div class="modal-row"><label class="modal-lbl">칼로리 (kcal)</label>
-          <input id="sCalG" type="number" value="${s.calorieGoal}" class="inp inp-sm" style="width:90px"></div>
-        <div class="modal-grid2">
-          <div><label class="modal-lbl">단백질 (g)</label><input id="sProtG" type="number" value="${s.proteinGoal}" class="inp inp-sm"></div>
-          <div><label class="modal-lbl">탄수화물 (g)</label><input id="sCarbG" type="number" value="${s.carbGoal}" class="inp inp-sm"></div>
-          <div><label class="modal-lbl">지방 (g)</label><input id="sFatG" type="number" value="${s.fatGoal}" class="inp inp-sm"></div>
+    const row=(p,g)=>`<div class="dt-goal">
+        <label class="dt-goal-k"><span>열량</span><span class="dt-in"><input id="${p}CalG" type="number" inputmode="numeric" value="${g.cal}" class="inp inp-sm"><i>kcal</i></span></label>
+        <label><span>단백질</span><span class="dt-in"><input id="${p}ProtG" type="number" inputmode="numeric" value="${g.pro}" class="inp inp-sm"><i>g</i></span></label>
+        <label><span>탄수화물</span><span class="dt-in"><input id="${p}CarbG" type="number" inputmode="numeric" value="${g.carb}" class="inp inp-sm"><i>g</i></span></label>
+        <label><span>지방</span><span class="dt-in"><input id="${p}FatG" type="number" inputmode="numeric" value="${g.fat}" class="inp inp-sm"><i>g</i></span></label>
+      </div>`;
+    App.openModal('@gear 식단 목표',`<div class="dt dt-set">
+      <section class="dt-sec">
+        <div class="dt-sec-hd">평일</div>
+        ${row('s',{cal:s.calorieGoal,pro:s.proteinGoal,carb:s.carbGoal,fat:s.fatGoal})}
+      </section>
+      <section class="dt-sec">
+        <div class="dt-sec-hd">휴일</div>
+        <div class="modal-lbl">휴일로 쓸 요일</div>
+        <div class="dt-days">
+          ${days.map((d,i)=>`<label class="dt-day${rest.includes(i)?' on':''}${i===0?' sun':i===6?' sat':''}">
+            <input type="checkbox" value="${i}" ${rest.includes(i)?'checked':''} class="rest-day-chk">${d}</label>`).join('')}
         </div>
-      </div>
-      <div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:12px">
-        <div style="font-weight:700;font-size:13px;margin-bottom:8px">휴일 목표</div>
-        <div class="modal-row" style="flex-wrap:wrap;gap:5px"><label class="modal-lbl" style="width:100%">휴일 요일 선택</label>
-          ${days.map((d,i)=>`<label style="cursor:pointer;padding:3px 8px;border:1px solid var(--border);border-radius:20px;font-size:12px;background:${rest.includes(i)?'var(--accent)':'var(--bg)'};color:${rest.includes(i)?'white':'var(--text2)'}">
-            <input type="checkbox" value="${i}" ${rest.includes(i)?'checked':''} class="rest-day-chk" style="display:none"> ${d}</label>`).join('')}
-        </div>
-        <div class="modal-row" style="margin-top:8px"><label class="modal-lbl">칼로리 (kcal)</label>
-          <input id="rCalG" type="number" value="${s.restCalGoal||s.calorieGoal}" class="inp inp-sm" style="width:90px"></div>
-        <div class="modal-grid2">
-          <div><label class="modal-lbl">단백질 (g)</label><input id="rProtG" type="number" value="${s.restProteinGoal||s.proteinGoal}" class="inp inp-sm"></div>
-          <div><label class="modal-lbl">탄수화물 (g)</label><input id="rCarbG" type="number" value="${s.restCarbGoal||s.carbGoal}" class="inp inp-sm"></div>
-          <div><label class="modal-lbl">지방 (g)</label><input id="rFatG" type="number" value="${s.restFatGoal||s.fatGoal}" class="inp inp-sm"></div>
-        </div>
-      </div>
+        ${row('r',{cal:s.restCalGoal||s.calorieGoal,pro:s.restProteinGoal||s.proteinGoal,carb:s.restCarbGoal||s.carbGoal,fat:s.restFatGoal||s.fatGoal})}
+      </section>
       <div class="modal-btns">
         <button onclick="Diet.saveSettings()" class="btn-sm accent">저장</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
-      </div>`);
+      </div></div>`);
     // 휴일 버튼 토글
     setTimeout(()=>{
       document.querySelectorAll('.rest-day-chk').forEach(cb=>{
         const lbl=cb.closest('label');
-        cb.addEventListener('change',()=>{
-          lbl.style.background=cb.checked?'var(--accent)':'var(--bg)';
-          lbl.style.color=cb.checked?'white':'var(--text2)';
-        });
+        cb.addEventListener('change',()=>lbl.classList.toggle('on',cb.checked));
       });
     },50);
   },

@@ -157,20 +157,33 @@ const ExMedia = {
     return `<span class="pose" role="img" aria-label="${label||''}"><i style="background-image:url('${src}')"></i><i class="pb" style="background-image:url('${src}')"></i></span>`;
   },
 
+  // 운동 창들이 같이 쓰는 가는 선 아이콘(Icons 에 없는 것만) — 별(즐겨찾기)·재생(영상)·바깥 링크·꺾쇠
+  IC: {
+    star: '<path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8L12 3.6Z"/>',
+    play: '<circle cx="12" cy="12" r="9"/><path d="M10.2 8.8v6.4l5-3.2-5-3.2Z"/>',
+    ext:  '<path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/>',
+    chev: '<path d="m9 6 6 6-6 6"/>',
+    down: '<path d="m6 9 6 6 6-6"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    x:    '<path d="M6 6l12 12M18 6 6 18"/>',
+  },
+  ic(name, cls) { const d = this.IC[name]; return d ? `<svg class="fz-ic${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>` : ''; },
+
   open(name) {
     const e = this.find(name); if (!e) return;
     const yt = typeof Fitness !== 'undefined' ? Fitness.ytUrl(e.ko) : '#';
-    App.openModal('@dumbbell ' + e.ko, `
+    const meta = [e.en, e.part].filter(Boolean).map(esc).join(' · ');
+    App.openModal('@dumbbell ' + e.ko, `<div class="fz fz-exm">
       <div class="exm-media" id="exmMedia">
         <div class="exm-anim">${this.poseHtml(this.frames(e), esc(e.ko)+' 시작·끝 자세')}</div>
         <div class="exm-none">${Icons.big('dumbbell')}<span>자세 그림 준비 중</span></div>
       </div>
-      <div class="exm-sub">${[e.en, e.part].filter(Boolean).map(esc).join(' · ')}</div>
-      ${e.cues.length ? `<ol class="exm-cues">${e.cues.map(c => `<li>${esc(c)}</li>`).join('')}</ol>` : ''}
+      ${meta ? `<div class="exm-sub">${meta}</div>` : ''}
+      ${e.cues.length ? `<div class="fz-lbl">자세 요령</div><ol class="exm-cues">${e.cues.map((c, i) => `<li><span class="num">${i + 1}</span><span>${esc(c)}</span></li>`).join('')}</ol>` : ''}
+      <a class="fz-link" href="${yt}" target="_blank" rel="noopener">${this.ic('play')}<span>자세 영상 찾기</span>${this.ic('ext', 'fz-ic-end')}</a>
       <div class="modal-btns">
-        <a class="btn-sm" href="${yt}" target="_blank" rel="noopener">▶ 자세 영상 찾기</a>
         <button class="btn-sm accent" onclick="App.closeModal()">닫기</button>
-      </div>`);
+      </div></div>`);
     // 그림이 있으면 움직이는 칸을, 없으면 '준비 중' 을 보인다.
     const im = new Image();
     im.onload = () => document.getElementById('exmMedia')?.classList.add('has');

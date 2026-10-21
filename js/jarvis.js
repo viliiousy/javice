@@ -765,34 +765,38 @@ const JARVIS = {
 
   showKeySetup() {
     App.openModal('@key AI 비서 설정', this.setupHtml() + `
-      <div class="modal-btns">
+      <div class="modal-btns ai-setup-btns">
         <button onclick="JARVIS.saveSetup();App.closeModal()" class="btn-sm accent">저장</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
       </div>`);
   },
+  // 키 발급 페이지 링크는 무료 키(Groq·Gemini)에만 단다 — 유료 API 키를 사도록 이끄는 단추는 두지 않는다.
+  _FREE_KEY: ['groq','gemini'],
   // 설정 도우미와 같이 쓰는 화면 — 기본 AI 고르기 + 제공자별 키
   setupHtml() {
     const cur=this.prov;
     return `<div class="ai-setup">
-      <p class="ai-note">AI 비서가 어떤 AI 로 답할지 고릅니다. 처음이라면 <b>Groq</b>(무료 · 하루 약 1,000회, 사진 분석 포함) 키를 권합니다. <b>Gemini</b> 무료 키는 하루 사용량이 적어(빠른 모델 약 20회) 예비로 두기 좋습니다.
-        ChatGPT·Claude·Grok 은 각 회사 개발자 사이트의 <b>API 키</b>가 필요하고 쓴 만큼 요금이 붙습니다.</p>
-      <p class="ai-note">ChatGPT Plus·Claude Pro 같은 <b>월 구독</b>은 API 키가 아니라서 여기에 넣을 수 없습니다. 대신 설정 › AI › <b>ChatGPT · Claude 에 Bashy 연결</b>을 하면, 그 앱에서 말하는 것으로 식단·습관·할 일·몸무게를 기록할 수 있습니다(구독 요금 안에서).</p>
-      <p class="ai-note">키를 넣은 AI 가 여러 개면 고른 AI 를 먼저 쓰고, 그 키가 없으면 키가 있는 다른 AI 로 자동으로 넘어갑니다.</p>
-      <div class="ai-provs">${Object.entries(this.PROVIDERS).map(([id,P])=>`
+      <p class="ai-note ai-lead">AI 비서가 답할 때 쓸 AI 를 고릅니다. 처음이라면 무료인 <b>Groq</b> 키를 권합니다(하루 약 1,000회 · 사진 분석 포함). <b>Gemini</b> 무료 키는 하루 사용량이 적어(약 20회) 예비로 두기 좋습니다.</p>
+      <div class="ai-sec">기본 AI</div>
+      <div class="ai-provs" role="radiogroup" aria-label="기본 AI">${Object.entries(this.PROVIDERS).map(([id,P])=>`
         <label class="ai-prov${id===cur?' on':''}">
           <input type="radio" name="aiProv" value="${id}" ${id===cur?'checked':''} onchange="JARVIS._pickProv(this)">
           <span class="ai-pn">${P.name}</span>
-          <span class="ai-ps">${this._keyOf(id)?'키 있음':'키 없음'}</span>
+          <span class="ai-ps${this._keyOf(id)?' has':''}">${this._keyOf(id)?'키 있음':'키 없음'}</span>
         </label>`).join('')}</div>
       ${Object.entries(this.PROVIDERS).map(([id,P])=>`
         <div class="ai-keyrow" data-prov="${id}"${id===cur?'':' hidden'}>
           ${id==='groq' ? this._groqGuide() : ''}
-          <label class="modal-lbl">${P.name} API 키 <a href="${P.keyUrl}" target="_blank" rel="noopener">발급받기 ↗</a></label>
+          <label class="modal-lbl">${P.name} API 키${this._FREE_KEY.includes(id) ? ` <a href="${P.keyUrl}" target="_blank" rel="noopener">무료 키 받기 ↗</a>` : ''}</label>
           <div class="ai-keyline"><input type="password" class="inp ai-key" data-prov="${id}" placeholder="${P.ph}" value="${esc(this._keyOf(id))}" autocomplete="off">
             <button type="button" class="btn-sm" onclick="JARVIS.testKey('${id}', this)">확인</button></div>
           <div class="ai-keymsg" data-prov="${id}"></div>
+          ${P.free || this._FREE_KEY.includes(id) ? '' : `<p class="ai-note">이미 가지고 있는 ${P.short} API 키가 있을 때 넣어 주세요.</p>`}
         </div>`).join('')}
-      <p class="ai-note">키는 이 계정에만 저장되고, 이 기기에서 각 AI 회사로 바로 보냅니다.</p>
+      <div class="ai-foot">
+        <p class="ai-note">ChatGPT Plus·Claude Pro 같은 월 구독은 API 키가 아니어서 여기에 넣을 수 없습니다. 대신 설정 › AI › <b>ChatGPT · Claude 에 Bashy 연결</b>을 하면 그 앱에서 말한 내용이 Bashy 에 기록됩니다.</p>
+        <p class="ai-note">키가 여러 개면 고른 AI 를 먼저 쓰고, 그 키가 없으면 키가 있는 다른 AI 로 넘어갑니다. 키는 이 계정에만 저장되고, 이 기기에서 각 AI 회사로 바로 보냅니다.</p>
+      </div>
     </div>`;
   },
   // 무료 Groq 키를 사용자 본인이 받는 길 — 앱이 대신 내주는 키는 없다(각자 자기 계정·자기 한도)
@@ -801,7 +805,7 @@ const JARVIS = {
       <li><a href="https://console.groq.com/keys" target="_blank" rel="noopener"><b>console.groq.com</b></a> 을 열고 구글 계정으로 가입합니다 (무료 · 카드 등록 없음)</li>
       <li><b>Create API Key</b> → 이름 아무거나(예: Bashy) → 나온 키를 <b>복사</b> (gsk_ 로 시작 · 이 화면에서 한 번만 보입니다)</li>
       <li>아래 칸에 붙여 넣고 <b>확인</b> → 연결되면 저장</li>
-    </ol><p class="ai-note">무료 한도: 하루 약 1,000번 대화·사진 분석. 키는 내 계정에만 저장되고, 이 기기에서 Groq 로 바로 보냅니다.</p>`;
+    </ol>`;
   },
   // 넣은 키가 실제로 되는지 모델 목록을 한 번 불러 본다
   async testKey(p, btn) {
