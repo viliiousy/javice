@@ -3560,3 +3560,10 @@ html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto;
 .dm.dm-over{ background:var(--accent-bg, rgba(255,106,43,.08)); box-shadow:inset 0 0 0 2px var(--accent); }
 .dm-food{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
 .dm-hint{ font-size:12px; color:var(--text3); padding:4px 0 8px; }
+/* 식단 담기: 최근 / 즐겨찾기 */
+.dq-tabs{ display:flex; gap:4px; padding:4px; border-radius:12px; background:var(--card2); border:1px solid var(--border); margin:8px 0; }
+.dq-tabs button{ flex:1; height:36px; border:0; border-radius:8px; background:none; color:var(--text3); font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+.dq-tabs button.on{ background:var(--text); color:var(--card); }
+.dq-tabs.dq-dim{ opacity:.5; }
+.dq-list .rw{ border-radius:0; }
+.diet-rec-hd i{ font-style:normal; font-weight:400; color:var(--text3); margin-left:8px; font-size:12px; }

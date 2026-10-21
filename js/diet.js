@@ -496,6 +496,48 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     }
     return out;
   },
+  // ── 검색창이 비었을 때의 목록: 최근 / 즐겨찾기 (고른 쪽은 계정에 남는다) ──
+  //   최근     — 즐겨찾기한 것 먼저, 그 안에서도 최근에 먹은 순 → 나머지 최근 순
+  //   즐겨찾기 — 즐겨찾기만, 최근에 먹은 순(한 번도 안 먹은 건 뒤로)
+  //   줄을 왼쪽으로 밀면 삭제: 최근에서는 기록에서 빼고, 즐겨찾기에서는 별을 뗀다
+  LIST_KEY: 'gl_diet_list_tab',
+  listTab(){ return UserStore.get(this.LIST_KEY)==='fav' ? 'fav' : 'recent'; },
+  setListTab(v, meal, ds){
+    UserStore.set(this.LIST_KEY, v); FirebaseSync?.scheduleSave();
+    try{ Haptic.light(); }catch(e){}
+    const inp=document.getElementById('dietSearch'); if(inp && inp.value){ inp.value=''; }
+    this.searchFood('', meal, ds);
+  },
+  _listItems(tab){
+    const favs=this.getFavs(), H=this.getHistory().filter(h=>h&&h.name);
+    const idx=new Map(this._allFoods().map(f=>[f.n,f]));
+    const fromH=h=>idx.get(h.name) || { e:'🍴', n:h.name, u:h.unit||'', c:h.cal||0, p:h.protein||0, cb:h.carb||0, ft:h.fat||0 };
+    if(tab==='fav'){
+      const eatenFav=H.filter(h=>favs.includes(h.name)).map(fromH);
+      const never=favs.filter(n=>!H.some(h=>h.name===n)).map(n=>idx.get(n) || { e:'🍴', n, u:'', c:0, p:0, cb:0, ft:0 });
+      return eatenFav.concat(never);
+    }
+    const all=H.slice(0,40).map(fromH);
+    return all.filter(f=>favs.includes(f.n)).concat(all.filter(f=>!favs.includes(f.n)));
+  },
+  _paintList(meal, ds){
+    const box=document.getElementById('dietSearchRes'); if(!box) return;
+    const tab=this.listTab(), favs=this.getFavs(), list=this._listItems(tab);
+    document.querySelectorAll('.dq-tabs button').forEach(b=>b.classList.toggle('on', b.dataset.v===tab));
+    document.querySelector('.dq-tabs')?.classList.remove('dq-dim');
+    this._hits=list;
+    box.innerHTML = list.length
+      ? `<div class="diet-rec-hd">${tab==='fav'?'즐겨찾기 · 최근에 먹은 순':'최근 먹은 것 · 즐겨찾기 먼저'}<i>왼쪽으로 밀면 ${tab==='fav'?'즐겨찾기 해제':'삭제'}</i></div>
+         <div class="dq-list">${list.map((f,i)=>this._foodRowHtml(f,i,meal,ds,favs).replace('<div class="diet-food">', `<div class="diet-food" data-row data-i="${i}" data-label="${esc(f.n)}">`)).join('')}</div>`
+      : `<div class="diet-empty-hint">${tab==='fav'?'즐겨찾기한 음식이 없습니다. 검색 결과의 ☆ 를 누르면 여기에 모입니다.':'아직 먹은 기록이 없습니다. 위에서 검색해 담아 보세요.'}</div>`;
+    try{ RowUI.paint(box.querySelector('.dq-list'), { edit:()=>{}, del:k=>this._listDel(+k, tab, meal, ds) }); }catch(e){}
+  },
+  _listDel(i, tab, meal, ds){
+    const f=(this._hits||[])[i]; if(!f) return;
+    if(tab==='fav'){ const fv=this.getFavs().filter(n=>n!==f.n); this.saveFavs(fv); App.showToast(`${f.n} 즐겨찾기 해제`); }
+    else { this.saveHistory(this.getHistory().filter(h=>h&&h.name!==f.n)); this._hIdx=null; App.showToast(`${f.n} 최근 기록에서 뺐습니다`); }
+    this._paintList(meal, ds);
+  },
   // 검색 결과와 '최근 먹은 것' 이 같은 줄 모양을 쓴다. 둘이 달라 보이면
   // 위에 있는 게 눌러도 되는 것인지 사람이 한 번 더 생각하게 된다.
   _foodRowHtml(f, i, meal, ds, favs){
@@ -517,16 +559,12 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     // 검색어가 없으면 빈 화면 대신 최근 먹은 것을 보여 준다.
     // 매일 먹는 게 대체로 비슷해서, 대부분은 여기서 바로 끝난다.
     if(!String(q||'').trim()){
-      const rec=this._recent(8);
-      this._hits=rec;
-      box.innerHTML = rec.length
-        ? `<div class="diet-rec-hd">최근 먹은 것</div>`
-          + rec.map((f,i)=>this._foodRowHtml(f,i,meal,ds,favs)).join('')
-        : '';
       clearTimeout(this._dbTimer);
       const empty=document.getElementById('dietDbRes'); if(empty) empty.innerHTML='';
+      this._paintList(meal, ds);
       return;
     }
+    document.querySelector('.dq-tabs')?.classList.add('dq-dim');
     let hits=this._search(q);
     // 내 기록에 없으면 브랜드 없는 기본형을 먼저 권한다(이름이 겹치면 내 것만)
     const gen=this._generic(q).filter(g=>!hits.some(h=>this._canon(h.n)===this._canon(g.n)));
@@ -926,6 +964,10 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
         oninput="Diet.searchFood(this.value,'${meal}','${ds}')">
       <button class="scan-btn" onclick="Scan.open('${meal}','${ds}')">
         바코드 스캔<i>제품 하나로 바로 찾아요</i></button>
+      <div class="dq-tabs" role="tablist">
+        <button type="button" data-v="recent" onclick="Diet.setListTab('recent','${meal}','${ds}')">최근</button>
+        <button type="button" data-v="fav" onclick="Diet.setListTab('fav','${meal}','${ds}')">즐겨찾기</button>
+      </div>
       <div id="dietCart"></div>
       <div id="dietSearchRes"></div>
       <div id="dietDbRes"></div>
