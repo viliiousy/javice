@@ -325,6 +325,7 @@ const Fitness = {
   // ── 루틴 만들기·고치기 ───────────────────
   // 운동 추가 창(종목 고르기)을 그대로 쓰고, 위에 루틴 이름·요일 칸만 얹는다.
   showRoutineEdit(id) {
+    this._freeDs = null;
     const R = this.routines(), r = id && R[id];
     this._rid = id || null;
     this._cart = r ? (r.exercises||[]).map(x => ({ name:x.name, sets:x.sets||this.DEFAULT_SETS, ...(x.w?{w:x.w}:{}) })) : [];
@@ -514,8 +515,8 @@ const Fitness = {
     return out.slice(0,60).map(x=>[x[2],x[3]]);
   },
   _paintPick(){
-    document.querySelectorAll('.ex-part').forEach(b=>
-      b.classList.toggle('on', b.dataset.part === this._part));
+    document.querySelectorAll('.fz-pick .ex-part').forEach(b=>
+      b.classList.toggle('on', b.dataset.part === (this._part || '')));
     const box=document.getElementById('exResults');
     if(box) box.innerHTML=this._pickHtml();
     const cart=document.getElementById('exCart');
@@ -524,7 +525,7 @@ const Fitness = {
     if(btn){
       const n=(this._cart||[]).length;
       btn.disabled=!n;
-      btn.textContent = n ? (this._rid !== undefined ? `루틴 저장 · ${n}종목` : `${n}개 추가`) : '운동을 골라 주세요';
+      btn.textContent = n ? (this._rid !== undefined ? `루틴 저장 · ${n}종목` : this._freeDs ? `이 ${n}종목으로 정하기` : `${n}개 추가`) : '운동을 골라 주세요';
     }
   },
   _pickHtml(){
@@ -648,11 +649,11 @@ const Fitness = {
   },
   cartSets(i,v){ const x=(this._cart||[])[i]; if(x) x.sets=String(v||'').trim(); },
   cartRemove(i){ if(this._cart){ this._cart.splice(i,1); this._paintPick(); } },
-  setPart(p){ this._part = (this._part===p ? null : p); this._paintPick(); },
+  setPart(p){ this._part = (p==null || this._part===p) ? null : p; this._paintPick(); },
   setQ(v){ this._q=v; this._paintPick(); },
 
   showInlineAdd(date) {
-    this._cart=[]; this._rid=undefined;
+    this._cart=[]; this._rid=undefined; this._freeDs=null;
     this._addDate = date ? new Date(date) : new Date();
     const same=this._dateStr(this._addDate)===this._dateStr(new Date());
     this._openPicker(same?'오늘 한 운동 추가':`${this._addDate.getMonth()+1}/${this._addDate.getDate()} 운동 추가`, '', '');
@@ -666,6 +667,7 @@ const Fitness = {
       <input id="exSearch" class="inp" type="search" autocomplete="off"
         placeholder="${n}개 종목에서 검색 · 초성 가능 (ㅅㅋㅌ)" oninput="Fitness.setQ(this.value)">
       <div class="ex-parts">
+        <button class="ex-part ex-part-all" data-part="" onclick="Fitness.setPart(null)">전체</button>
         ${parts.map(p=>`<button class="ex-part" data-part="${p}" onclick="Fitness.setPart('${p}')">${p}</button>`).join('')}
       </div>
       <button type="button" class="ex-make" onclick="Fitness.pickOwn('')">${this._ic('plus')}<span>목록에 없는 운동 직접 만들기</span></button>
@@ -682,6 +684,12 @@ const Fitness = {
   commitCart() {
     const cart=this._cart||[];
     if(!cart.length){ App.showToast('고른 운동이 없습니다','error'); return; }
+    if(this._freeDs){   // 자유 설정: 고른 운동이 그날 운동 목록이 된다(오늘만 / 앞으로 이 요일도)
+      const ds=this._freeDs, scope=this._freeScope||'day'; this._freeDs=null;
+      const msg=this.applyList(ds, cart.map(x=>({ name:x.name, sets:x.sets||this.defSets(x.name) })), scope);
+      this._cart=[]; App.closeModal(); this.render(new Date(ds+'T00:00:00'));
+      App.showToast(scope==='day' ? `오늘 운동을 ${cart.length}종목으로 정했습니다` : msg,'success'); return;
+    }
     const d=this._addDate||new Date();
     const custom=this.getCustomExercises(d);
     for(const x of cart) custom.push({ name:x.name, sets:x.sets||this.DEFAULT_SETS });
@@ -698,11 +706,15 @@ const Fitness = {
     this._po = o;
     App.openModal('@dumbbell ' + o.title, `<div class="fz fz-po">${o.head||''}
       <input id="poQ" class="inp" type="search" autocomplete="off" placeholder="운동 검색 · 초성 가능" oninput="Fitness._poPaint()">
+      <div class="ex-parts po-parts">${[...((o.recommend||[]).length?[['__rec', o.recLabel?.split(' ')[0]==='즐겨찾기'?'즐겨찾기':'추천']]:[]), ['__all','전체'], ...this._parts().map(p=>[p,p])].map(([k,l])=>`<button type="button" class="ex-part" data-pp="${esc(k)}" onclick="Fitness._poCat('${esc(k)}')">${esc(l)}</button>`).join('')}</div>
       <button type="button" class="ex-make" onclick="Fitness._poMake('')">${this._ic('plus')}<span>목록에 없는 운동 직접 만들기</span></button>
       <div id="poList" class="sw-list po-list"></div>
       <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div></div>`);
+    this._poC = (o.recommend||[]).length ? '__rec' : '__all';
     setTimeout(()=>this._poPaint(), 0);
   },
+  // 검색어가 없을 때 무엇을 보여 줄지: 추천 / 전체 / 부위별 — 부위 상관없이 아무 운동이나 넣고 뺄 수 있게
+  _poCat(k){ this._poC=k; const q=document.getElementById('poQ'); if(q) q.value=''; this._poPaint(); },
   _poRow(n, i, small='') {
     const th = typeof ExMedia!=='undefined' ? ExMedia.thumbFor(n) : '';
     return `<button class="sw-row" onclick="Fitness._poPick(${i})">${th?`<span class="ex-th">${ExMedia.poseHtml(th)}</span>`:`<span class="ex-th none">${typeof Icons!=='undefined'?Icons.svg('dumbbell'):''}</span>`}<span class="sw-nm">${esc(n)}${small?`<small>${small}</small>`:''}</span>${this._ic('chev','fz-ic-end')}</button>`;
@@ -710,6 +722,17 @@ const Fitness = {
   _poPaint() {
     const o=this._po, box=document.getElementById('poList'); if(!o||!box) return;
     const q=(document.getElementById('poQ')?.value||'').trim();
+    document.querySelectorAll('.po-parts .ex-part').forEach(b=>b.classList.toggle('on', !q && b.dataset.pp===this._poC));
+    if(!q && this._poC && this._poC!=='__rec'){
+      const part = this._poC==='__all' ? null : this._poC;
+      const src = part && EX_DB[part] ? EX_DB[part].map(n=>[part,n]) : Object.entries(EX_DB).flatMap(([p,ns])=>ns.map(n=>[p,n]));
+      const favs=this.getFavs();
+      const list = src.filter(([,n])=>!(o.exclude||[]).includes(n) && (typeof PlanGen==='undefined' || PlanGen.pickerOk(n)))
+        .sort((a,b)=>(favs.includes(b[1])-favs.includes(a[1])) || a[1].localeCompare(b[1],'ko')).slice(0, part ? 400 : 120);
+      this._poOwn=-1; this._poNames=list.map(h=>h[1]);
+      box.innerHTML = list.map(([p,n],i)=>this._poRow(n,i,part?'':esc(p))).join('') + (!part ? '<p class="pg-note">전체 중 앞쪽만 보입니다 — 부위를 고르거나 이름으로 찾아 주세요.</p>' : '');
+      return;
+    }
     if(!q){
       const rec=o.recommend||[];
       this._poOwn=-1; this._poNames=rec.map(r=>r.n);
@@ -922,6 +945,7 @@ const Fitness = {
     App.openModal('@dumbbell 오늘 부위 바꾸기', `<div class="fz fz-pt">
       <p class="fz-note">할 부위를 고르세요. 여러 개 고르면 번갈아 섞습니다. 기구·아픈 곳 설정은 맞춤 플랜과 같습니다.</p>
       <div class="pt-chips">${P.map(x => `<button type="button" class="pt-chip" data-p="${x}" onclick="Fitness._ptToggle('${x}')">${x}</button>`).join('')}</div>
+      <button type="button" class="pt-free" onclick="Fitness.freeDay('${ds}')">${this._ic('plus')}<span>부위 상관없이 직접 고르기</span>${this._ic('chev','fz-ic-end')}</button>
       <div id="ptPrev" class="pt-prev"><p class="pg-note">부위를 고르면 미리 보기가 나옵니다.</p></div>
       <div class="modal-btns pt-btns">
         <button class="btn-sm" onclick="Fitness._ptApply('plan')" id="ptPlan" disabled>앞으로 이 요일도</button>
@@ -940,6 +964,16 @@ const Fitness = {
     }).join('') : '<p class="pg-note">부위를 고르면 미리 보기가 나옵니다.</p>';
     ['ptDay', 'ptPlan'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = !t.list.length; });
     try { Haptic.light(); } catch (e) {}
+  },
+  // 부위 대신 직접 고르기 — 지금 목록을 담아 둔 채로 열어, 넣고 빼서 그날 운동을 정한다
+  freeDay(ds, scope='day') {
+    const { list } = this.exercisesFor(new Date(ds+'T00:00:00'));
+    App.closeModal();
+    this._rid = undefined; this._freeDs = ds; this._freeScope = scope;
+    this._cart = list.map(x=>({ name:x.name, sets:x.sets||this.defSets(x.name) }));
+    this._addDate = new Date(ds+'T00:00:00');
+    this._openPicker('운동 직접 고르기', `<p class="fz-note">부위 상관없이 넣고 빼서 ${scope==='day'?'오늘':'이 요일'} 운동을 정합니다. 위 ‘고른 운동’ 에서 ✕ 로 뺄 수 있습니다.</p>`, '');
+    setTimeout(()=>{ const b=document.getElementById('exCommit'); if(b) b.dataset.free='1'; this._paintPick(); }, 60);
   },
   _ptApply(scope) {
     const t = this._pt; if (!t || !t.list?.length) return;

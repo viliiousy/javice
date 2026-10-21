@@ -344,3 +344,10 @@ html[data-ui="v2"] .fit-foot .habit-add-btn{ flex:1; }
 .pt-s{ font-size:13px; color:var(--text3); }
 .pt-btns{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:16px; }
 .pt-btns button:disabled{ opacity:.4; }
+.pt-free{ display:flex; align-items:center; gap:8px; width:100%; min-height:48px; padding:0; margin:0 0 8px; border:0; border-top:1px solid var(--v2-line, var(--border));
+  background:none; color:var(--text); font:inherit; font-size:15px; cursor:pointer; text-align:left; }
+.pt-free > svg:first-child{ width:16px; height:16px; color:var(--accent); }
+.pt-free span{ flex:1; }
+.po-parts{ display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; margin:8px 0; flex-wrap:nowrap; }
+.po-parts::-webkit-scrollbar{ display:none; }
+.po-parts .ex-part{ flex:none; }
