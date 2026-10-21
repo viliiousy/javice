@@ -297,6 +297,7 @@ const FirebaseSync = {
       try { InBody.render(); } catch {}
       try { App.refreshLocal(); } catch {}   // Bashy 일정·할일 (계정에 저장된 것)
       try { App._updateStatsBanner(); } catch {}
+      try { Tabs.applyOff(); Tabs.applyOrder(); } catch {}   // 다른 기기에서 바꾼 카드 순서·켜고 끄기
     });
     // 동기화 알림 토스트
     if (!quiet) try { App?.showToast('다른 기기에서 바뀐 내용을 불러왔습니다', 'success'); } catch {}

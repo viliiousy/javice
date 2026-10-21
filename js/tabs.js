@@ -38,6 +38,31 @@ const Tabs = {
   ],
 
   OFF_KEY: 'gl_cards_off',
+  ORDER_KEY: 'gl_cards_order',     // 카드 순서(사람마다) — 예: 식단보다 운동을 위로
+  order() {
+    let o = []; try { o = JSON.parse(UserStore.get(this.ORDER_KEY) || '[]') || []; } catch {}
+    const all = this.CARDS.map(c => c.cls);
+    return o.filter(x => all.includes(x)).concat(all.filter(x => !o.includes(x)));
+  },
+  hasOrder() { try { return (JSON.parse(UserStore.get(this.ORDER_KEY) || '[]') || []).length > 0; } catch { return false; } },
+  // 순서를 화면에 입힌다: 카드를 한 줄 흐름으로 펴고(order 속성) — 기본 순서면 원래 배치 그대로
+  applyOrder() {
+    const on = this.hasOrder();
+    document.documentElement.classList.toggle('card-ordered', on);
+    const o = this.order();
+    this.CARDS.forEach(c => { const el = document.querySelector('.' + c.cls); if (el) el.style.order = on ? String(o.indexOf(c.cls) + 1) : ''; });
+  },
+  moveCard(cls, dir) {
+    const t = this.tabOf(cls), o = this.order();
+    // 같은 카테고리 안에서만 자리를 바꾼다(폰에서는 카테고리마다 따로 보이므로)
+    const same = o.filter(x => this.tabOf(x) === t), i = same.indexOf(cls), j = i + dir;
+    if (j < 0 || j >= same.length) return;
+    const a = o.indexOf(same[i]), b = o.indexOf(same[j]); [o[a], o[b]] = [o[b], o[a]];
+    UserStore.set(this.ORDER_KEY, JSON.stringify(o)); window.FirebaseSync?.scheduleSave?.();
+    this.applyOrder(); try { Haptic.light(); } catch (e) {}
+    (document.getElementById('cardSetBody') ? this._paintSettings() : Settings._re('cats'));
+  },
+  resetOrder() { UserStore.set(this.ORDER_KEY, '[]'); window.FirebaseSync?.scheduleSave?.(); this.applyOrder(); (document.getElementById('cardSetBody') ? this._paintSettings() : Settings._re('cats')); App.showToast('카드 순서를 처음대로 돌렸습니다', 'success'); },
   TABS_OFF_KEY: 'gl_tabs_off',
   getTabsOff() { try { return JSON.parse(UserStore.get(this.TABS_OFF_KEY) || '[]'); } catch { return []; } },
   tabOn(id) { return !this.getTabsOff().includes(id); },
@@ -59,8 +84,10 @@ const Tabs = {
       const on = this.tabOn(t.id);
       return `<div class="set-h">${t.label}</div>
         ${Settings._item(`${t.label} 카테고리`, Settings._sw(on, `Tabs.toggleTab('${t.id}', ${!on})`), on ? '아래 탭과 카드가 보입니다' : '탭과 카드가 모두 숨겨집니다(기록은 그대로)')}
-        ${on ? this.CARDS.filter(c => c.tab === t.id).map(c => Settings._item(c.name, Settings._sw(!off.includes(c.cls), `Tabs.toggleCard('${c.cls}', ${off.includes(c.cls)});Settings._re('cats')`))).join('') : ''}`;
-    }).join('');
+        ${on ? (() => { const list = this.order().filter(x => this.tabOf(x) === t.id).map(x => this.CARDS.find(c => c.cls === x));
+          return list.map((c, i) => Settings._item(c.name, `<span class="co-mv"><button type="button" class="co-b" ${i === 0 ? 'disabled' : ''} onclick="Tabs.moveCard('${c.cls}',-1)" aria-label="위로">↑</button><button type="button" class="co-b" ${i === list.length - 1 ? 'disabled' : ''} onclick="Tabs.moveCard('${c.cls}',1)" aria-label="아래로">↓</button></span>`
+            + Settings._sw(!off.includes(c.cls), `Tabs.toggleCard('${c.cls}', ${off.includes(c.cls)});Settings._re('cats')`))).join(''); })() : ''}`;
+    }).join('') + `<p class="co-note">↑↓ 로 카드 순서를 바꿉니다. 폰은 카테고리 화면 안에서, PC 는 전체 화면에서 이 순서대로 놓입니다.${this.hasOrder() ? ` <button type="button" class="co-reset" onclick="Tabs.resetOrder()">처음 순서로</button>` : ''}</p>`;
   },
   _cur: 'today',
   get current(){ return this._cur; },
@@ -77,6 +104,7 @@ const Tabs = {
     });
     this._paintBar();
     this.applyOff();
+    this.applyOrder();
     // 매일 여는 앱의 기본 상태는 언제나 '오늘'이다. 마지막 탭을 복원하지 않는다.
     this.set('today', true);
   },
@@ -143,14 +171,16 @@ const Tabs = {
     const b = document.getElementById('cardSetBody');
     if (!b) return;
     const off = this.getOff();
-    const byTab = this.DEF.map(t => ({ t, list: this.CARDS.filter(c => c.tab === t.id) }));
+    const ord = this.order();
+    const byTab = this.DEF.map(t => ({ t, list: ord.filter(x => this.tabOf(x) === t.id).map(x => this.CARDS.find(c => c.cls === x)) }));
     b.innerHTML = byTab.map(({ t, list }) => `
       <div class="cardset-grp">
         <div class="cardset-hd">${Icons.svg(t.icon)} ${t.label}</div>
-        ${list.map(c => {
+        ${list.map((c, i) => {
           const on = !off.includes(c.cls);
           return `<label class="cardset-row">
             <span class="cardset-nm">${c.name}</span>
+            <span class="co-mv" onclick="event.preventDefault()"><button type="button" class="co-b" ${i === 0 ? 'disabled' : ''} onclick="Tabs.moveCard('${c.cls}',-1)" aria-label="위로">↑</button><button type="button" class="co-b" ${i === list.length - 1 ? 'disabled' : ''} onclick="Tabs.moveCard('${c.cls}',1)" aria-label="아래로">↓</button></span>
             <span class="ec-sw"><input type="checkbox" ${on ? 'checked' : ''}
               onchange="Tabs.toggleCard('${c.cls}', this.checked)"><span></span></span>
           </label>`;

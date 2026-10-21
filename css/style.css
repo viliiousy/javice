@@ -3444,3 +3444,28 @@ body.wk-on{ overflow:hidden; }
 /* 스포츠 종목 — 멈춘 사진 한 장 */
 .pose.still i{ background-size:cover; background-position:center; }
 .wk-idle-p{ margin:8px 0 16px; font-size:14px; line-height:1.55; color:var(--text3); }
+
+/* 카드 순서를 사람마다 바꿨을 때(설정 › 보일 카테고리 ↑↓) — 열 껍데기를 풀고 카드가 order 대로 한 줄로 흐른다.
+   기본 순서인 사람은 이 규칙을 안 탄다(원래 배치 그대로). */
+html.card-ordered .dash-top, html.card-ordered .dash-rest, html.card-ordered .dash-col{ display:contents; }
+html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto; margin:0; min-width:0; }
+@media (max-width:900px){
+  html.card-ordered .dashboard{ display:flex !important; flex-direction:column; }
+}
+@media (min-width:901px){
+  html.card-ordered .dashboard{ display:grid !important; grid-template-columns:repeat(3, minmax(0,1fr)); grid-template-areas:none !important; grid-auto-flow:row dense; gap:16px; align-items:start; }
+  html.card-ordered .dashboard .card-calendar{ grid-row:span 2 !important; }
+  html.card-ordered .dashboard .card-inbody{ grid-column:span 2 !important; }
+  html.card-ordered .dashboard .card-econ{ grid-column:1 / -1 !important; }
+}
+@media (min-width:901px) and (max-width:1080px){
+  html.card-ordered .dashboard{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+}
+/* 설정 줄의 ↑↓ */
+.co-mv{ display:inline-flex; gap:4px; margin-right:8px; }
+.co-b{ width:32px; height:32px; border-radius:8px; border:1px solid var(--border, rgba(127,127,127,.25)); background:transparent; color:var(--text); font-size:15px; line-height:1; cursor:pointer; }
+.co-b:disabled{ opacity:.25; cursor:default; }
+.co-b:not(:disabled):active{ background:var(--accent); color:#fff; border-color:var(--accent); }
+.co-note{ font-size:13px; color:var(--text-dim, #888); margin:12px 0 0; line-height:1.5; }
+.co-reset{ border:0; background:none; color:var(--accent); font-size:13px; padding:0; cursor:pointer; text-decoration:underline; }
+.cardset-row .co-mv{ margin-left:auto; }
