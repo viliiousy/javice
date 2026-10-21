@@ -150,6 +150,18 @@ const MemoLock = {
         const em = (r?.result?.profile?.email || '').toLowerCase();
         return !!em && em === String(u.email || '').toLowerCase();
       }
+      // 웹 구글: 로그인에 쓰는 구글 창(GIS)으로 다시 확인한다 — Firebase 팝업은 도메인 등록이 필요해 쓰지 않는다
+      if (kind === 'google' && window.google?.accounts?.oauth2) {
+        const tok = await new Promise((res, rej) => {
+          const c = google.accounts.oauth2.initTokenClient({ client_id: CONFIG.GOOGLE_CLIENT_ID, scope: 'openid email profile',
+            prompt: 'consent', login_hint: u.email || '',
+            callback: r => r && r.access_token ? res(r.access_token) : rej(new Error(r?.error || 'cancel')),
+            error_callback: e => rej(new Error(e?.type === 'popup_closed' ? 'cancel' : (e?.message || e?.type || 'cancel'))) });
+          c.requestAccessToken();
+        });
+        await u.reauthenticateWithCredential(firebase.auth.GoogleAuthProvider.credential(null, tok));
+        return true;
+      }
       const P = kind === 'apple' ? new firebase.auth.OAuthProvider('apple.com') : new firebase.auth.GoogleAuthProvider();
       if (kind === 'google') P.setCustomParameters({ prompt: 'login', login_hint: u.email || '' });
       await u.reauthenticateWithPopup(P);
