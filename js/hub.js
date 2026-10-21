@@ -348,7 +348,7 @@ const ST = {
       this.next();
     } catch (e) {
       HA.ready = false; HA.markStale(true);
-      if (/연결되어 있지 않습니다|nolink/i.test(e.message)) { HA.note('SmartThings 가 아직 연결되지 않았습니다 — bashy.app › 기기 연결에서 연결해 주세요', true); if (!Object.keys(HA.states).length) HA.renderEmpty(); this.next(60000); }
+      if (/연결되어 있지 않습니다|nolink/i.test(e.message)) { HA.note('SmartThings 가 아직 연결되지 않았습니다 — 아래 SmartThings 연결을 눌러 주세요', true); if (!Object.keys(HA.states).length) HA.renderEmpty(); this.next(60000); }
       else { HA.note('SmartThings 불러오기 실패 — 다시 시도 중', true); this.next(20000); }
     } finally { this._busy = false; }
   },
@@ -777,8 +777,10 @@ const HA = {
     $('indoor').innerHTML = '';
     $('tiles').innerHTML = `<div class="empty-home">
       <b>스마트홈을 연결하면</b> 집 기기를 여기서 켜고 끌 수 있습니다.<br>
-      서버 없이 쓰려면 bashy.app › 기기 연결에서 <b>SmartThings</b> 를 연결하고, 집에 Home Assistant 가 있으면 설정에 주소와 토큰을 넣어 주세요.<br>
-      <button class="chip" onclick="document.getElementById('gear').click()">설정 열기</button></div>`;
+      SmartThings 는 삼성 계정으로 한 번 허락하면 끝입니다. 집에 Home Assistant 서버가 있으면 그쪽을 고르세요.<br>
+      <button class="chip chip-acc" data-quick="st">SmartThings 연결</button>
+      <button class="chip" data-quick="ha">Home Assistant 연결</button></div>`;
+    $('tiles').querySelectorAll('[data-quick]').forEach(b => { b.onclick = () => Settings.quick(b.dataset.quick); });
   },
 
   // 왼쪽 날씨 아래 '실내' 한 줄. 거실(또는 첫 공간)의 온도·습도 센서.
@@ -1530,7 +1532,7 @@ const Voice = {
     if (c.aiUrl) return this.askAI(text, c);
     return HA.ready
       ? '집 기기 명령으로는 알아듣지 못했습니다.'
-      : '아직 연결된 곳이 없습니다. ⚙ 설정에서 Home Assistant 를 연결해 주세요.';
+      : '아직 연결된 곳이 없습니다. 화면의 SmartThings 연결 단추를 눌러 주세요.';
   },
 
   async askAI(text, c) {
@@ -1616,7 +1618,7 @@ const Cloud = {
         ${qr ? `<div class="pair-qr">${qr}</div>` : ''}
         <div class="pair-txt">
           <div class="pair-pin">${p.pin.slice(0, 3)} ${p.pin.slice(3)}</div>
-          <div>휴대폰 카메라로 QR 을 찍거나,<br><b>bashy.app → 프로필 → 기기 연결</b> 에 이 번호를 넣고 승인해 주세요.</div>
+          <div>휴대폰 카메라로 QR 을 찍으면 승인 화면이 바로 열립니다.<br>카메라가 안 되면 휴대폰 <b>bashy.app › 설정 › 스마트홈 허브 › 허브 태블릿 승인</b>에 이 번호를 넣어 주세요.</div>
           <div id="pairLeft" class="s-help"></div>
         </div>
       </div>
@@ -1666,6 +1668,9 @@ const Settings = {
     $('setTest').addEventListener('click', () => this.test());
     $('provSel').addEventListener('change', () => this.showProv());
     $('stLink').addEventListener('click', () => this.stLink());
+    $('haTokBtn')?.addEventListener('click', () => this.haTokenPage());
+    $('haPasteBtn')?.addEventListener('click', () => this.haPaste());
+    $('haDefBtn')?.addEventListener('click', () => { const e = $('setForm').elements.haUrl; e.value = 'http://homeassistant.local:8123'; e.focus(); });
   },
   open() {
     this.fill();
@@ -1673,6 +1678,30 @@ const Settings = {
     $('setStatus').textContent = '';
     this.showProv();
     $('settings').showModal();
+  },
+  // 빈 화면의 단추: 설정을 열고 그 연결 방식으로 바로 간다. 계정 연결 전이면 계정 연결부터.
+  quick(p) {
+    this.open();
+    const sel = $('provSel'); if (sel) { sel.value = p; this.showProv(); }
+    if (!Cfg.get().code) { Cloud.startPair(); return; }
+    if (p === 'st') this.stLink();
+    else setTimeout(() => $('setForm').elements.haUrl?.focus(), 100);
+  },
+  // HA 토큰 만드는 자리(<주소>/profile/security)를 바로 연다
+  haTokenPage() {
+    const f = $('setForm'); let u = (f.elements.haUrl.value || '').trim();
+    if (!u) { f.elements.haUrl.focus(); toast('먼저 Home Assistant 주소를 넣어 주세요'); return; }
+    if (!/^https?:\/\//i.test(u)) { u = 'http://' + u; f.elements.haUrl.value = u; }
+    const url = u.replace(/\/+$/, '') + '/profile/security';
+    const B = Native.plugin('Browser');
+    if (B) B.open({ url }); else window.open(url, '_blank');
+  },
+  async haPaste() {
+    let t = null; try { t = ((await navigator.clipboard.readText()) || '').trim(); } catch {}
+    const el = $('setForm').elements.haToken;
+    if (t == null) { el.focus(); toast('토큰 칸을 길게 눌러 붙여 넣어 주세요'); return; }
+    if (!/^[\w-]+\.[\w-]+\.[\w-]+$/.test(t)) { toast('클립보드에 Home Assistant 토큰이 없습니다'); return; }
+    el.value = t; toast('토큰을 넣었습니다');
   },
   // 고른 연결 방식에 필요한 칸만 보인다
   showProv() {
@@ -1682,7 +1711,7 @@ const Settings = {
   },
   async stState() {
     const el = $('stState'), btn = $('stLink');
-    if (!Cfg.get().code && !$('setForm').elements.code.value.trim()) { el.textContent = '먼저 위에서 bashy 계정으로 연결해 주세요'; btn.hidden = true; return; }
+    if (!Cfg.get().code && !$('setForm').elements.code.value.trim()) { el.textContent = '먼저 위의 bashy 계정으로 연결을 눌러 주세요 (휴대폰으로 QR 한 번)'; btn.hidden = true; return; }
     btn.hidden = false; el.textContent = '확인 중…';
     try {
       const j = await hubCall({ act: 'stDevices' });

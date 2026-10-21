@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import Capacitor
 import LocalAuthentication
 import WidgetKit
@@ -36,7 +37,20 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "calEvents", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "calAdd", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "calDelete", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openSettings", returnType: CAPPluginReturnPromise),
     ]
+
+    // 권한(알림·카메라·캘린더)을 거절했을 때 '설정 › Bashy' 를 찾아가게 하지 않고 바로 연다.
+    // target: "notifications" 는 iOS 16+ 에서 알림 설정 화면으로, 나머지는 Bashy 설정 화면으로.
+    @objc func openSettings(_ call: CAPPluginCall) {
+        let target = call.getString("target") ?? "app"
+        var str = UIApplication.openSettingsURLString
+        if target == "notifications", #available(iOS 16.0, *) { str = UIApplication.openNotificationSettingsURLString }
+        guard let url = URL(string: str) else { call.reject("열 수 없습니다"); return }
+        DispatchQueue.main.async {
+            UIApplication.shared.open(url, options: [:]) { ok in call.resolve(["ok": ok]) }
+        }
+    }
 
     // ── 효과음 (쉬는 시간 째깍·끝 알림) ─────────────
     // 웹 소리(Web Audio)는 아이폰 무음 스위치를 켜 두면 안 들린다. 앱이 직접 재생하고,

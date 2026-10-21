@@ -73,9 +73,14 @@ const App = {
     try { LocalNotify.init(); } catch(e){ console.warn('LocalNotify init',e); }
     try { if(typeof Widgets!=='undefined') Widgets.init(); } catch(e){}
     // 허브에서 '연결 코드가 없다' 며 돌아왔으면 이 계정으로 연결해 주고 다시 허브로
-    if(/[?&]linkhub=1/.test(location.search)) Settings.hubLink(120000).then(c=>{ if(c) location.replace('hub.html?from=app'); else App.showToast('로그인한 뒤 설정 › 기기·허브에서 허브를 열어 주세요','error'); });
+    if(/[?&]linkhub=1/.test(location.search)) Settings.hubLink(120000).then(c=>{ if(c) location.replace('hub.html?from=app'); else App.showToast('로그인이 끝나면 허브를 다시 열어 주세요','error',{label:'허브 열기',fn:()=>Settings.openHub()}); });
     else if(localStorage.getItem('gl_hub_mode')==='1') Settings.hubLink().catch(()=>{});
     try{ Settings.hubMenu(); }catch(e){}
+    // 바로 가기 주소: ?set=notify · ?set=ai · ?set=connector · ?set=cal · ?set=device · ?set=widget …
+    // 안내 문구에 '설정 › ○○ 로 가세요' 대신 이 주소(또는 QR)를 주면 한 번에 그 화면이 열린다.
+    { const sp=new URLSearchParams(location.search), sc=sp.get('set');
+      if(sc){ sp.delete('set'); const q=sp.toString(); history.replaceState(null,'',location.pathname+(q?'?'+q:'')+location.hash);
+        setTimeout(()=>{ try{ if(sc==='key') JARVIS.showKeySetup(); else Settings.open(Settings.CATS.some(c=>c.id===sc)||Settings.SUB[sc]?sc:undefined); }catch(e){} }, 1200); } }
     // 휴대폰 앱은 세로로 쓴다(허브에서 가로로 돌렸다가 돌아온 경우 포함). 태블릿은 자유
     try{ if(Platform.native&&Math.min(screen.width,screen.height)<600){ const P=window.Capacitor.Plugins, SO=P.ScreenOrientation; const so=()=>SO&&SO.lock({orientation:'portrait'}).catch(()=>{}); (P.BashyNative&&P.BashyNative.setOrientation)?P.BashyNative.setOrientation({mode:'portrait'}).catch(so):so(); } }catch(e){}
     try { Diet.render(new Date()); } catch(e){ console.warn('Diet render',e); }
@@ -1214,7 +1219,12 @@ const App = {
     const menu=document.getElementById('profileMenu');
     if(!menu) return;
     menu.classList.toggle('hidden');
-    try{ Settings.hubMenu(); }catch(e){}   // 다른 기기에서 동기화된 허브 모드 값까지 반영
+    try{ Settings.hubMenu(); }catch(e){}
+    // 바로 가기 주소: ?set=notify · ?set=ai · ?set=connector · ?set=cal · ?set=device · ?set=widget …
+    // 안내 문구에 '설정 › ○○ 로 가세요' 대신 이 주소(또는 QR)를 주면 한 번에 그 화면이 열린다.
+    { const sp=new URLSearchParams(location.search), sc=sp.get('set');
+      if(sc){ sp.delete('set'); const q=sp.toString(); history.replaceState(null,'',location.pathname+(q?'?'+q:'')+location.hash);
+        setTimeout(()=>{ try{ if(sc==='key') JARVIS.showKeySetup(); else Settings.open(Settings.CATS.some(c=>c.id===sc)||Settings.SUB[sc]?sc:undefined); }catch(e){} }, 1200); } }   // 다른 기기에서 동기화된 허브 모드 값까지 반영
     // 프로필 아이콘 위치 기준으로 메뉴 위치 설정
     if(!menu.classList.contains('hidden')){
       const hUser=document.getElementById('hUser');
@@ -1366,11 +1376,18 @@ const App = {
   },
   closeModal(){ document.getElementById('modal').classList.add('hidden'); },
 
-  showToast(msg,type=''){
+  // act = { label, fn } 를 주면 토스트 안에 그 일을 바로 하는 단추가 붙는다.
+  // '설정 › AI 에서 키를 넣어 주세요' 처럼 길을 알려 주는 대신, 누르면 그 화면이 바로 열린다.
+  showToast(msg,type='',act){
     const t=document.getElementById('toast');
-    t.textContent=msg; t.className=`toast${type?' '+type:''}`;
+    t.textContent=msg; t.className=`toast${type?' '+type:''}${act?' has-act':''}`;
+    if(act&&act.label&&typeof act.fn==='function'){
+      const b=document.createElement('button'); b.type='button'; b.className='toast-act'; b.textContent=act.label;
+      b.onclick=e=>{ e.stopPropagation(); t.classList.add('hidden'); try{ act.fn(); }catch(err){ console.warn(err); } };
+      t.appendChild(b);
+    }
     clearTimeout(this._tt);
-    this._tt=setTimeout(()=>t.classList.add('hidden'),3000);
+    this._tt=setTimeout(()=>t.classList.add('hidden'),act?6000:3000);
   },
 };
 

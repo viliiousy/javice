@@ -122,7 +122,7 @@ const InBody = {
     let res;
     try { res = await window.Capacitor.Plugins.BashyNative.healthRead({ days: days || 60 }); } catch (e) { res = { ok: false, error: e.message }; }
     if (!res || !res.ok) {
-      if (manual) App.showToast('건강 앱을 읽지 못했습니다 — 설정 › 건강 › 데이터 접근 › Bashy 에서 항목을 허용해 주세요', 'error');
+      if (manual) App.showToast('건강 앱을 읽지 못했습니다 — 건강 앱 › 프로필 › 앱 › Bashy 에서 항목을 켜 주세요', 'error', { label: '건강 앱 열기', fn: () => Settings.openExt('x-apple-health://') });
       return null;
     }
     const D = res.data || {};

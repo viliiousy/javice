@@ -488,11 +488,15 @@ const Econ = {
     const has = !!k.appkey;
     App.openModal('증권사 연동', `<div class="ecv ecv-sheet">
       <div class="ec-lead"><span class="ec-lead-k">한국투자증권</span><span class="ec-lead-s">${has ? '연동됨' : '연동 전'}</span></div>
-      <p class="ec-hint">KIS Developers(apiportal.koreainvestment.com)에서 본인 계좌로 받은 앱키·앱시크릿을 넣어 주세요.
-        해외 주식은 홈페이지에서 '해외주식 API 사용 동의'를 해야 함께 옵니다. 키움·토스증권은 아직 연결할 수 없어 캡처로 채우기를 써 주세요.</p>
-      <div class="modal-row"><label class="modal-lbl" for="kisKey">앱키 (App Key)</label><input id="kisKey" class="inp" autocomplete="off" placeholder="${has ? '저장됨 — 바꿀 때만 입력' : 'PS…'}"></div>
-      <div class="modal-row"><label class="modal-lbl" for="kisSec">앱시크릿 (App Secret)</label><input id="kisSec" class="inp" type="password" autocomplete="off" placeholder="${has ? '저장됨 — 바꿀 때만 입력' : ''}"></div>
-      <div class="modal-row"><label class="modal-lbl" for="kisAcct">계좌번호</label><input id="kisAcct" class="inp num" inputmode="numeric" placeholder="12345678-01" value="${k.cano ? esc(k.cano + '-' + (k.prdt || '01')) : ''}"></div>
+      ${has ? '' : `<ol class="ez-steps">
+        <li><button type="button" class="ez-chip" onclick="Settings.openExt('https://apiportal.koreainvestment.com/')">KIS Developers 열기 ↗</button> 에서 한국투자 아이디로 로그인합니다</li>
+        <li>위쪽 <b>API 신청</b>(KIS Developers 서비스 신청) › 가져올 <b>계좌</b>를 고르고 신청 → <b>앱키</b>·<b>앱시크릿</b>이 나옵니다</li>
+        <li>각 값의 <b>복사</b>를 누르고 돌아와 아래 칸 옆 <b>붙여넣기</b>를 누릅니다 (계좌번호도 같은 화면에 있습니다)</li>
+      </ol>`}
+      <p class="ec-hint">해외 주식은 신청할 때 <b>해외주식</b>도 함께 체크해야 같이 옵니다. 키움·토스증권은 아직 연결할 수 없어 <a href="#" onclick="event.preventDefault();Econ.showHoldScan()">캡처로 채우기</a>를 써 주세요.</p>
+      <div class="modal-row"><label class="modal-lbl" for="kisKey">앱키 (App Key)</label><div class="ez-inl"><input id="kisKey" class="inp" autocomplete="off" spellcheck="false" placeholder="${has ? '저장됨 — 바꿀 때만 입력' : 'PS…'}"><button type="button" class="btn-sm" onclick="Econ._kisPaste('kisKey')">붙여넣기</button></div></div>
+      <div class="modal-row"><label class="modal-lbl" for="kisSec">앱시크릿 (App Secret)</label><div class="ez-inl"><input id="kisSec" class="inp" type="password" autocomplete="off" spellcheck="false" placeholder="${has ? '저장됨 — 바꿀 때만 입력' : ''}"><button type="button" class="btn-sm" onclick="Econ._kisPaste('kisSec')">붙여넣기</button></div></div>
+      <div class="modal-row"><label class="modal-lbl" for="kisAcct">계좌번호</label><div class="ez-inl"><input id="kisAcct" class="inp num" inputmode="numeric" placeholder="12345678-01" value="${k.cano ? esc(k.cano + '-' + (k.prdt || '01')) : ''}"><button type="button" class="btn-sm" onclick="Econ._kisPaste('kisAcct')">붙여넣기</button></div></div>
       <label class="ec-trow"><span>모의투자 계좌</span><span class="ec-sw"><input type="checkbox" id="kisMock" ${k.mock ? 'checked' : ''}><span></span></span></label>
       <div id="kisRes" class="ec-res-box"></div>
       <div class="modal-btns">
@@ -500,6 +504,19 @@ const Econ = {
         <button class="btn-sm" onclick="Econ.open(\'hold\')">닫기</button>
         ${has ? '<button class="btn-sm ec-forget" onclick="Econ.brokerForget()">연동 해제</button>' : ''}
       </div></div>`);
+  },
+  // 키 화면에서 복사해 온 값을 그 칸에 넣는다. 앱키(PS…)를 시크릿 칸에 눌렀으면 맞는 칸으로 옮긴다.
+  async _kisPaste(id) {
+    const t = await Settings.readClip();
+    const el = document.getElementById(id);
+    if (t == null) { el?.focus(); App.showToast('붙여넣기가 막혀 있습니다 — 칸을 길게 눌러 붙여 넣어 주세요', 'error'); return; }
+    if (!t) { App.showToast('클립보드가 비어 있습니다 — KIS 화면에서 복사를 먼저 눌러 주세요', 'error'); return; }
+    let v = t.split(/\s+/)[0], to = id;
+    if (id !== 'kisAcct' && /^\d{8}-?\d{2}$/.test(v)) to = 'kisAcct';
+    else if (id === 'kisSec' && /^PS[A-Za-z0-9]{30,}$/.test(v)) to = 'kisKey';
+    else if (id === 'kisAcct' && !/^[\d-]{8,12}$/.test(v)) to = /^PS/.test(v) ? 'kisKey' : 'kisSec';
+    const box = document.getElementById(to); if (box) box.value = v;
+    if (to !== id) App.showToast((to === 'kisKey' ? '앱키' : to === 'kisSec' ? '앱시크릿' : '계좌번호') + ' 칸에 넣었습니다', 'success');
   },
   async brokerFetch() {
     const box = document.getElementById('kisRes'), go = document.getElementById('kisGo');
@@ -544,7 +561,7 @@ const Econ = {
   // 캡처는 브라우저 밖으로 나가지 않고, AI 에게는 그림만 보낸다. 로그인 정보는 어디에도 안 남는다.
   showHoldScan() {
     if (!JARVIS._getKey()) {
-      App.showToast('Bashy API 키를 먼저 설정해주세요 (설정 › AI)','error'); return;
+      JARVIS.needKey('AI 키가 있어야 합니다 — 무료 키로 바로 쓸 수 있습니다'); return;
     }
     App.openModal('@camera 캡처로 보유 종목 채우기', `<div class="ecv ecv-sheet">
       <p class="ec-hint">증권사 앱의 보유 종목 화면을 캡처해 올리면 종목·수량·평단을 읽어 옵니다.

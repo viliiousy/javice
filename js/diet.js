@@ -294,7 +294,7 @@ const Diet = {
     const q=(document.getElementById('dietSearch')?.value||'').trim();
     if(!q) return;
     const key=JARVIS._getKey();
-    if(!key){ App.showToast('Bashy API 키를 먼저 설정해주세요 (설정 › AI)','error'); return; }
+    if(!key){ JARVIS.needKey('AI 키가 있어야 합니다 — 무료 키로 바로 쓸 수 있습니다'); return; }
     const btn=document.getElementById('dietAiBtn');
     const box=document.getElementById('dietAiRes');
     if(btn){ btn.disabled=true; btn.textContent='찾는 중…'; }
@@ -593,7 +593,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     const box = document.getElementById('lblResult');
     if(!box) return;
     if(!JARVIS._getKey()){
-      box.innerHTML = `<div class="diet-empty-hint">Bashy API 키를 먼저 설정해주세요 (설정 › AI)</div>`; return;
+      box.innerHTML = `<div class="diet-empty-hint">표를 읽으려면 AI 키가 필요합니다. <button type="button" class="btn-sm accent" onclick="JARVIS.showKeySetup()">무료 키 넣기</button></div>`; return;
     }
     box.innerHTML = `<div class="diet-empty-hint">표를 읽는 중…</div>`;
     // 이 프롬프트의 핵심은 '추정하지 마라' 다. 아는 제품이라도 기억으로 채우면
@@ -857,7 +857,7 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
   showPhotoAnalysis(dateStr=null){
     const ds=dateStr||this._localDateStr();
     const key=JARVIS._getKey();
-    if(!key){ App.showToast('Bashy API 키를 먼저 설정해주세요 (설정 › AI)','error'); return; }
+    if(!key){ JARVIS.needKey('AI 키가 있어야 합니다 — 무료 키로 바로 쓸 수 있습니다'); return; }
     const sug=this._suggestMeal();
     const camIc=typeof Icons!=='undefined'?Icons.svg('camera'):'';
     App.openModal('@camera 사진으로 기록',`<div class="dt dt-photo">

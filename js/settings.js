@@ -14,6 +14,7 @@ const Settings = {
     { id:'cal',    ic:'calendar', name:'일정과 할일', sub:() => { try { return `${CalSources.summary()} · 상단 지난 할일 ${localStorage.getItem('gl_top_overdue')==='0'?'숨김':'보임'}`; } catch(e){ return '캘린더 · 할일'; } } },
     { id:'econ',   ic:'trend',   name:'경제 · 증권', sub:() => '증권사 연동 · 보유 종목 · 관심 종목' },
     { id:'device', ic:'monitor', name:'스마트홈 허브', sub:() => `허브 모드 ${localStorage.getItem('gl_hub_mode')==='1'?'켜짐':'꺼짐'} · SmartThings · 구글 홈 · Home Assistant` },
+    { id:'widget', ic:'grid',    name:'위젯 · 시리 · 홈 화면', sub:() => Settings._widgetSub() },
     { id:'secure', ic:'key',     name:'보안 · 계정', sub:() => '저장된 키 · 로그아웃 · 계정 삭제' },
     { id:'help',   ic:'book',    name:'도움말',      sub:() => '사용 도우미 · 버전' },
   ],
@@ -96,7 +97,8 @@ const Settings = {
         ${this._link('ChatGPT · Claude 에 Bashy 연결', "Settings.go('connector')", 'ChatGPT Plus·Claude 구독(무료 플랜 포함)에서 “점심 김치찌개 먹었어” 하면 Bashy 에 기록됩니다')}
         <div class="set-h">앱 안 AI 비서 (API 키)</div>
         ${this._link('기본 AI · 키 설정', 'JARVIS.showKeySetup()', '무료: Groq·Gemini / 유료: ChatGPT·Claude·Grok API 키')}
-        ${this._link('AI 사용량', 'AIUsage.open()', '남은 한도와 초기화 시각 · 위쪽 고리는 디자인 › 상단바 정보에서')}
+        ${this._link('AI 사용량', 'AIUsage.open()', 'Claude·ChatGPT·Higgsfield 남은 한도와 초기화 시각')}
+        ${this._link('위쪽 고리에 보일 AI 고르기', "Settings.go('topinfo')", '상단바에 사용량 고리로 보일 서비스')}
         <div class="set-h">개인정보</div>
         ${this._link('AI 데이터 전송 동의 철회', "JARVIS.revokeConsent();App.showToast('동의를 철회했습니다 — 다음에 AI 를 쓸 때 다시 묻습니다')", 'AI 회사(Groq·OpenAI·Anthropic·Google·xAI)로 보내기 전에 받은 동의를 지웁니다')}`;
     } else if (cat === 'cal') {
@@ -137,13 +139,18 @@ const Settings = {
         ${this._link('계정 삭제', 'Settings.deleteAccount()', 'Bashy 에 저장된 모든 기록과 구글 연결을 지웁니다', true)}`;
     } else if (cat === 'device') {
       const hub = localStorage.getItem('gl_hub_mode') === '1';
-      h = `<div class="set-h">허브</div>
+      h = `<div class="set-h">허브 태블릿</div>
+        ${this._link('허브 태블릿 승인 (6자리 번호)', 'DevicePair.openPair()', '태블릿 화면에 뜬 번호를 넣으면 이 계정에 연결됩니다 · QR 을 찍었다면 이미 채워져 있습니다')}
+        <div class="set-h">허브</div>
         ${this._item('허브 모드', this._sw(hub, 'Settings.toggleHub()'), '켜 두면 프로필 메뉴에 \'허브 모드로 전환\' 단추가 생깁니다. 누르면 큰 시계·할 일·AI 사용량·집 기기 화면(가로)으로 바뀝니다')}
         ${this._link('지금 허브 화면 열기', 'Settings.openHub()', '허브 오른쪽 아래 ‹ 앱으로 를 누르면 돌아옵니다')}
         <div class="set-h">스마트홈</div>
         ${this._link('스마트홈 연결', 'DevicePair.open()', 'SmartThings · 구글 홈 · Home Assistant 연결')}`;
+    } else if (cat === 'widget') {
+      h = this._widgetHtml();
     } else if (cat === 'help') {
       h = `${this._link('사용 도우미 다시 보기', 'App.closeModal();Onboard.open(true)', '신체정보·AI·습관·식단·운동·경제 설정')}
+        ${this._link('위젯 · 시리 · 홈 화면에 추가', "Settings.go('widget')", '휴대폰 홈 화면에서 바로 열기')}
         ${this._item('버전', `<span class="set-val">${this.VERSION}</span>`)}`;
     }
     return (this.SUB[cat] ? `<button type="button" class="set-back" onclick="Settings.go('${this.SUB[cat][1]}')">‹ ${this.CATS.find(c => c.id === this.SUB[cat][1])?.name || '설정'}</button>` : this._back()) + `<div class="set-page">${h}</div>`;
@@ -233,32 +240,156 @@ const Settings = {
     }
     return `https://bashy.app/mcp/${FirebaseSync._uid}.${key}`;
   },
+  // 주소는 화면을 그릴 때 미리 받아 둔다. 단추를 누른 순간엔 기다리지 않고 바로 복사·열기 해야
+  // 사파리가 '사용자가 누른 일' 로 보고 복사와 새 창을 막지 않는다.
+  MCP_GO: {
+    claude:  { name: 'Claude',  url: 'https://claude.ai/customize/connectors' },
+    chatgpt: { name: 'ChatGPT', url: 'https://chatgpt.com/plugins' },
+  },
   async mcpPaint(fresh) {
     const box = document.getElementById('mcpBox'); if (!box) return;
     const url = await this.mcpUrl(fresh);
     if (!url) { box.textContent = '로그인(동기화)이 끝난 뒤 다시 열어 주세요.'; return; }
     this._mcp = url;
     box.className = 'mcp';
+    const share = typeof navigator.share === 'function';
     box.innerHTML = `
-      <p class="mcp-p">ChatGPT·Claude 의 <b>월 구독</b>은 API 키가 아니라서 Bashy 가 대신 부를 수 없습니다. 대신 반대로, 그 AI 가 Bashy 를 <b>도구</b>로 쓰게 연결합니다.
-        연결하면 ChatGPT·Claude 앱에서 “점심에 김치찌개 먹었어”, “물 마시기 체크해 줘”, “오늘 몸무게 81.2”, “오늘 뭐 남았어?” 라고 말하면 Bashy 에 바로 기록·조회됩니다. 계산은 그 사람의 구독이 합니다.</p>
-      <div class="mcp-url"><code>${esc(url)}</code><button class="btn-sm accent" onclick="Settings.mcpCopy()">복사</button></div>
+      <p class="mcp-p">ChatGPT·Claude 의 <b>월 구독</b>은 API 키가 아니라서 Bashy 가 대신 부를 수 없습니다. 대신 그 AI 가 Bashy 를 <b>도구</b>로 쓰게 연결합니다.
+        연결하면 그 앱에서 “점심에 김치찌개 먹었어”, “물 마시기 체크해 줘”, “오늘 몸무게 81.2” 라고 말하면 Bashy 에 바로 기록됩니다.</p>
+      <div class="ez-go2">
+        <button type="button" class="ez-go" onclick="Settings.mcpGo('claude')"><b>Claude 에 연결</b><small>주소를 복사하고 커넥터 화면을 엽니다</small></button>
+        <button type="button" class="ez-go" onclick="Settings.mcpGo('chatgpt')"><b>ChatGPT 에 연결</b><small>주소를 복사하고 플러그인 화면을 엽니다</small></button>
+      </div>
+      <div class="mcp-url"><code>${esc(url)}</code><button class="btn-sm" onclick="Settings.mcpCopy()">복사</button></div>
       <p class="mcp-warn">이 주소는 비밀번호와 같습니다. 남에게 보이지 마세요 — 새어 나갔으면 아래 ‘주소 새로 만들기’.</p>
-      <div class="set-h">Claude (무료 플랜도 1개 가능 · Pro·Max)</div>
-      <ol class="mcp-ol"><li>claude.ai 에서 <b>설정(Customize) › 커넥터 › + 추가 › 사용자 지정 커넥터</b></li>
-        <li>이름 <b>Bashy</b>, URL 칸에 위 주소 붙여 넣기, 로그인 방식은 <b>로그인 없음</b> → 추가</li>
-        <li>대화창 아래 도구 단추에서 Bashy 를 켜고 말하면 됩니다(앱에서도 동작)</li></ol>
-      <div class="set-h">ChatGPT (Plus·Pro)</div>
-      <ol class="mcp-ol"><li>chatgpt.com 에서 <b>설정 › 앱 및 커넥터 › 고급 설정 › 개발자 모드</b> 켜기</li>
-        <li><b>앱 및 커넥터 › 만들기</b> → 이름 Bashy, URL 에 위 주소, 인증 <b>없음</b> → 만들기</li>
-        <li>새 대화에서 + › 개발자 모드 › Bashy 를 고르고 말하면 됩니다. 기록할 때마다 확인을 한 번 누릅니다</li></ol>
+      <div class="set-h">Claude (무료 플랜도 1개 · Pro · Max)</div>
+      <ol class="ez-steps">
+        <li>위 <b>Claude 에 연결</b>을 누르면 주소가 복사되고 claude.ai 커넥터 화면이 열립니다</li>
+        <li><b>사용자 지정 커넥터 추가</b>(Add custom connector) → 이름 <button type="button" class="ez-chip" onclick="Settings.copy('Bashy','이름을 복사했습니다')">Bashy 복사</button>, URL 칸에 <b>붙여 넣기</b> → 추가</li>
+        <li>대화창 <b>+</b> › 커넥터에서 Bashy 를 켜고 말하면 됩니다 (휴대폰 앱에서도 동작)</li></ol>
+      <div class="set-h">ChatGPT (Plus · Pro)</div>
+      <ol class="ez-steps">
+        <li>위 <b>ChatGPT 에 연결</b>을 누르면 주소가 복사되고 chatgpt.com 플러그인 화면이 열립니다 (PC 웹에서)</li>
+        <li><b>+</b> › <b>Add custom MCP server</b> → 이름 <button type="button" class="ez-chip" onclick="Settings.copy('Bashy','이름을 복사했습니다')">Bashy 복사</button>, Connection 에 <b>붙여 넣기</b>, 인증 <b>없음</b> → 확인 체크 → 만들기</li>
+        <li>새 대화에서 <b>@Bashy</b> 를 고르고 말하면 됩니다. 메뉴가 안 보이면 설정 › 앱 › 고급 설정 › <b>개발자 모드</b>를 먼저 켭니다</li></ol>
+      ${share ? `<div class="set-h">PC 에서 하려면</div>
+      ${this._link('이 주소를 PC 로 보내기', 'Settings.mcpShare()', '카카오톡 나에게 보내기 · 메일 등으로 PC 에 옮깁니다')}` : ''}
       <div class="set-h">할 수 있는 일</div>
       <p class="mcp-p">오늘 요약 보기 · 식단 기록(칼로리는 AI 가 추정) · 습관 체크 · 구글 할 일 추가·완료 · 몸무게·체지방·근육량 기록 · 메모 추가 · 몸 기록 추이</p>
       <div class="modal-btns" style="justify-content:flex-start"><button class="btn-sm" onclick="if(confirm('새 주소를 만들면 지금 연결해 둔 ChatGPT·Claude 커넥터는 끊깁니다. 계속할까요?'))Settings.mcpPaint(true)">주소 새로 만들기</button></div>`;
   },
-  async mcpCopy() {
-    try { await navigator.clipboard.writeText(this._mcp || ''); App.showToast('복사했습니다', 'success'); }
-    catch { App.showToast('복사 실패 — 주소를 길게 눌러 복사해 주세요', 'error'); }
+  mcpGo(k) {
+    const G = this.MCP_GO[k]; if (!G || !this._mcp) return;
+    this.copy(this._mcp, `주소를 복사했습니다 — 열린 ${G.name} 화면의 URL 칸에 붙여 넣으세요`);
+    this.openExt(G.url);
+  },
+  mcpCopy() { this.copy(this._mcp || '', '복사했습니다'); },
+  mcpShare() { if (this._mcp && navigator.share) navigator.share({ title: 'Bashy 커넥터 주소', text: this._mcp }).catch(() => {}); },
+
+  // ── 쉬운 연결 도우미 (여러 화면이 같이 쓴다) ─────────────
+  // 복사: 클립보드 API 가 막힌 곳(오래된 웹뷰)은 숨은 입력칸으로 한 번 더 시도한다.
+  copy(text, ok = '복사했습니다') {
+    const done = () => App.showToast(ok, 'success');
+    const legacy = () => {
+      try {
+        const t = document.createElement('textarea'); t.value = text; t.setAttribute('readonly', ''); t.style.cssText = 'position:fixed;opacity:0;top:0';
+        document.body.appendChild(t); t.select(); const r = document.execCommand('copy'); t.remove();
+        r ? done() : App.showToast('복사하지 못했습니다 — 길게 눌러 복사해 주세요', 'error');
+      } catch { App.showToast('복사하지 못했습니다 — 길게 눌러 복사해 주세요', 'error'); }
+    };
+    try { if (navigator.clipboard?.writeText) { navigator.clipboard.writeText(text).then(done, legacy); return; } } catch {}
+    legacy();
+  },
+  // 클립보드 읽기 — 사용자가 단추를 누른 순간에만 부른다(브라우저가 그때만 허락한다)
+  async readClip() {
+    try { return ((await navigator.clipboard.readText()) || '').trim(); } catch { return null; }
+  },
+  // 바깥 페이지 열기. 앱(아이폰·안드로이드)에서는 시스템 브라우저/그 앱으로, 웹에서는 새 탭으로.
+  // shortcuts:// 같은 앱 주소는 그 앱을 연다.
+  openExt(url) {
+    if (!/^https?:/i.test(url)) { location.href = url; return; }
+    const w = window.open(url, '_blank', 'noopener');
+    if (!w && !Platform.native) location.href = url;
+  },
+  // 휴대폰 설정의 이 앱 화면(알림·카메라·캘린더 권한)을 바로 연다. 예전 앱 빌드는 이 기능이 없어 false.
+  async osSettings(target = 'app') {
+    const B = window.Capacitor?.Plugins?.BashyNative;
+    if (!Platform.native || !B || typeof B.openSettings !== 'function') return false;
+    try { await B.openSettings({ target }); return true; } catch { return false; }
+  },
+  // 권한이 막혔을 때 쓰는 안내: 앱이면 '설정 열기' 단추가 달린 토스트, 아니면 글로만
+  permHelp(msg, target = 'app') {
+    const B = window.Capacitor?.Plugins?.BashyNative;
+    if (Platform.native && B && typeof B.openSettings === 'function') App.showToast(msg, 'error', { label: '설정 열기', fn: () => this.osSettings(target) });
+    else App.showToast(msg, 'error');
+  },
+
+  // ── 홈 화면에 추가 (웹) ─────────────
+  // 안드로이드·PC 크롬은 설치 창을 바로 띄울 수 있다. 아이폰 사파리는 막혀 있어 공유 단추 안내만 한다.
+  _bip: null,
+  get standalone() { return Platform.native || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; },
+  get iosWeb() { return !Platform.native && /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1 && !Platform.native); },
+  async install() {
+    if (this._bip) {
+      const e = this._bip; this._bip = null;
+      e.prompt();
+      try { const r = await e.userChoice; if (r.outcome === 'accepted') App.showToast('홈 화면에 Bashy 를 담았습니다', 'success'); } catch {}
+      this._re('widget');
+      return;
+    }
+    this.go('widget');
+  },
+  _widgetSub() {
+    if (Platform.ios) return '홈 화면 위젯 · 시리로 할 일·몸무게 기록';
+    if (Platform.native) return '홈 화면 위젯 (오늘 · 습관)';
+    return this.standalone ? '홈 화면에서 앱처럼 열고 있습니다' : '홈 화면에 Bashy 아이콘 담기';
+  },
+  _widgetHtml() {
+    const B = window.Capacitor?.Plugins?.BashyNative;
+    if (Platform.ios) {
+      const siri = [['Bashy에 할 일 추가', '할 일 이름을 물어보고 바로 넣습니다'], ['Bashy 오늘 할 일', '앱을 열어 오늘 화면을 보여 줍니다'], ['Bashy에 몸무게 기록', '숫자를 물어보고 오늘 몸무게로 남깁니다']];
+      return `<div class="set-h">홈 화면 위젯</div>
+        <ol class="ez-steps">
+          <li>이 창을 닫고 <b>홈 화면 빈 곳을 길게</b> 누릅니다 (아이콘이 흔들릴 때까지)</li>
+          <li>왼쪽 위 <b>편집</b> › <b>위젯 추가</b> (예전 iOS 는 <b>+</b>)</li>
+          <li>검색 칸에 <button type="button" class="ez-chip" onclick="Settings.copy('Bashy','Bashy 를 복사했습니다 — 검색 칸에 붙여 넣으세요')">Bashy 복사</button> → <b>Bashy 오늘</b> › 크기 고르고 <b>위젯 추가</b></li>
+        </ol>
+        <p class="set-note">아이폰은 앱이 위젯을 대신 놓아 줄 수 없게 막혀 있어 위 세 단계만 직접 해 주세요. 위젯은 앱을 열 때마다 새 숫자로 바뀝니다.</p>
+        <div class="set-h">시리 · 단축어 — 설정 없이 바로 됩니다</div>
+        ${siri.map(([p, d]) => `<div class="set-item"><span class="set-tx"><b>“시리야, ${p}”</b><small>${d}</small></span></div>`).join('')}
+        ${this._link('단축어 앱에서 보기', "Settings.openExt('shortcuts://')", '단축어 앱 › 앱 단축어 › Bashy — 홈 화면 단추나 뒷면 탭에 붙일 수 있습니다')}`;
+    }
+    if (Platform.native) {
+      const pin = B && typeof B.pinWidget === 'function';
+      return `<div class="set-h">홈 화면 위젯</div>
+        ${pin ? `${this._link('오늘 위젯 놓기', "Settings.pinWidget('today')", '남은 할 일·습관·식단 요약 — 누르면 홈 화면에 놓을 위치를 묻습니다')}
+          ${this._link('습관 위젯 놓기', "Settings.pinWidget('habit')", '오늘 습관 진행')}` : ''}
+        <ol class="ez-steps">
+          <li>홈 화면 빈 곳을 <b>길게</b> 누르고 <b>위젯</b>을 누릅니다</li>
+          <li>목록에서 <b>Bashy</b> › <b>Bashy 오늘</b> 또는 <b>Bashy 습관</b>을 길게 눌러 원하는 곳에 놓습니다</li>
+        </ol>`;
+    }
+    // 웹
+    if (this.standalone) return `<p class="set-note">이미 홈 화면에서 앱처럼 열고 있습니다. 위젯과 시리는 App Store·Play 스토어의 Bashy 앱에서 쓸 수 있습니다.</p>`;
+    if (this._bip) return `<div class="set-h">홈 화면에 추가</div>
+      <button type="button" class="ez-go ez-go-1" onclick="Settings.install()"><b>홈 화면에 Bashy 담기</b><small>한 번 누르면 설치 창이 뜹니다 · 앱처럼 전체 화면으로 열립니다</small></button>`;
+    if (this.iosWeb) return `<div class="set-h">홈 화면에 추가 (아이폰 사파리)</div>
+      <ol class="ez-steps">
+        <li>화면 아래(아이패드는 위) <b>공유 단추</b> <span class="ez-ic" aria-hidden="true">⬆︎</span> 를 누릅니다</li>
+        <li>목록을 내려 <b>홈 화면에 추가</b> › 오른쪽 위 <b>추가</b></li>
+        <li>이제 홈 화면의 Bashy 아이콘으로 열면 <b>알림</b>도 받을 수 있습니다</li>
+      </ol>
+      <p class="set-note">아이폰 사파리는 웹사이트가 이 창을 대신 띄울 수 없게 막혀 있습니다.</p>`;
+    return `<div class="set-h">홈 화면에 추가</div>
+      <ol class="ez-steps">
+        <li>크롬 주소창 오른쪽의 <b>설치</b> 아이콘(모니터에 화살표)을 누르거나, <b>⋮</b> › <b>홈 화면에 추가</b>(PC 는 <b>Bashy 설치</b>)</li>
+        <li><b>설치</b>를 누르면 앱처럼 따로 열립니다</li>
+      </ol>`;
+  },
+  async pinWidget(kind) {
+    const B = window.Capacitor?.Plugins?.BashyNative;
+    try { const r = await B.pinWidget({ kind }); if (r && r.ok === false) throw new Error(r.error || '이 홈 화면은 위젯 놓기를 지원하지 않습니다'); App.showToast('홈 화면에서 놓을 위치를 골라 주세요', 'success'); }
+    catch (e) { App.showToast((e.message || e) + ' — 아래 순서대로 직접 놓아 주세요', 'error'); }
   },
 
   // ── 일정과 할일: 아이폰 캘린더 · 구독 주소 ─────────────
@@ -285,7 +416,10 @@ const Settings = {
       await DeviceCal.enable(on);
       if (on) await DeviceCal.calendars(true);
       App.showToast(on ? '아이폰 캘린더를 함께 봅니다' : '아이폰 캘린더를 껐습니다', 'success');
-    } catch (e) { App.showToast(e.message || String(e), 'error'); }
+    } catch (e) {
+      const m = e.message || String(e);
+      if (/설정 ›/.test(m)) this.permHelp('캘린더 접근이 꺼져 있습니다 — 설정 열기 › 캘린더 › ‘전체 접근’', 'app'); else App.showToast(m, 'error');
+    }
     try { Auth._paintGConnect(); } catch (e) {}
     this._paintDevCal();
     App.sync();
@@ -312,9 +446,59 @@ const Settings = {
           <input id="icsName" class="inp" type="text" maxlength="30" placeholder="이름 (비우면 캘린더 이름)">
           <div class="cal-sw" role="radiogroup" aria-label="색">${IcsCal.COLORS.map(c => `<button type="button" role="radio" aria-checked="${c === cur}" class="${c === cur ? 'on' : ''}" style="--c:${c}" onclick="Settings.icsPick('${c}')"></button>`).join('')}</div>
         </div>
-        <button type="button" id="icsGo" class="btn-sm accent" onclick="Settings.icsAdd()">구독 추가</button>
-        <p class="set-note">네이버·iCloud·아웃룩 캘린더의 공유(공개) 설정에서 iCal(ICS) 주소를 복사해 붙여 넣으세요. 구독한 일정은 읽기만 하고, 15분마다 새로 받습니다.</p>
-      </div>`;
+        <div class="cal-ics-btns">
+          <button type="button" class="btn-sm" onclick="Settings.icsPaste()">복사한 주소 붙여넣기</button>
+          <button type="button" id="icsGo" class="btn-sm accent" onclick="Settings.icsAdd()">구독 추가</button>
+        </div>
+        <p class="set-note">구독한 일정은 읽기만 하고, 15분마다 새로 받습니다.</p>
+      </div>
+      <div class="set-h">주소는 어디서 복사하나요</div>
+      <div class="ez-tabs" role="tablist">${Object.entries(this.ICS_GUIDE).map(([k, g]) => `<button type="button" role="tab" class="${k === this._icsTab ? 'on' : ''}" onclick="Settings.icsTab('${k}')">${g.name}</button>`).join('')}</div>
+      <div id="icsGuide">${this._icsGuide(this._icsTab)}</div>`;
+  },
+  // 서비스마다 'ICS 주소' 가 숨어 있는 자리가 다르다. 그 화면을 바로 열고, 누를 단추 이름을 그대로 적는다.
+  _icsTab: 'naver',
+  ICS_GUIDE: {
+    naver:   { name: '네이버', open: 'https://calendar.naver.com/', openLbl: '네이버 캘린더 열기 (PC 웹)', steps: [
+      '<b>네이버 캘린더 열기</b>를 누릅니다 (휴대폰이면 브라우저 메뉴에서 <b>PC 버전</b>으로)',
+      '왼쪽 <b>내 캘린더</b>에서 가져올 캘린더 이름 옆 <b>⋯</b> › <b>캘린더 설정</b>(또는 위쪽 <b>환경설정</b> › 캘린더 관리)',
+      '<b>캘린더 공개</b>를 켜고, 아래 <b>iCal 주소</b>의 <b>복사</b>를 누릅니다',
+      '이 화면으로 돌아와 <b>복사한 주소 붙여넣기</b> → 자동으로 구독됩니다'] },
+    icloud:  { name: 'iCloud', open: 'https://www.icloud.com/calendar/', openLbl: 'iCloud 캘린더 열기', steps: [
+      '아이폰이라면 <b>캘린더 앱</b> › 아래 <b>캘린더</b> › 가져올 캘린더 옆 <b>ⓘ</b>',
+      '맨 아래 <b>공개 캘린더</b>를 켜고 <b>링크 공유…</b> › <b>복사</b>',
+      'PC 라면 <b>iCloud 캘린더 열기</b> › 캘린더 이름 옆 <b>공유 아이콘</b> › <b>공개 캘린더</b> 체크 › <b>링크 복사</b>',
+      '이 화면으로 돌아와 <b>복사한 주소 붙여넣기</b> (webcal:// 주소도 그대로 됩니다)'] },
+    outlook: { name: 'Outlook', open: 'https://outlook.live.com/calendar/0/options/calendar/SharedCalendars', openLbl: 'Outlook 일정 게시 화면 열기', steps: [
+      '<b>Outlook 일정 게시 화면 열기</b>를 누릅니다 (회사 계정은 outlook.office.com 에서 같은 메뉴)',
+      '<b>일정 게시</b>에서 캘린더를 고르고 권한을 <b>모든 세부 정보 볼 수 있음</b> › <b>게시</b>',
+      '나온 링크 중 <b>ICS</b> 를 눌러 <b>링크 복사</b>',
+      '이 화면으로 돌아와 <b>복사한 주소 붙여넣기</b>'] },
+    google:  { name: '다른 구글 계정', open: 'https://calendar.google.com/calendar/r/settings', openLbl: '구글 캘린더 설정 열기', steps: [
+      '로그인한 구글 계정은 이미 연결되어 있습니다. <b>다른 구글 계정</b>의 일정을 더 볼 때만 쓰세요',
+      '<b>구글 캘린더 설정 열기</b> › 왼쪽 <b>내 캘린더의 설정</b>에서 캘린더 이름',
+      '<b>캘린더 통합</b>까지 내려 <b>iCal 형식의 비공개 주소</b> 오른쪽 <b>복사</b> 아이콘',
+      '이 화면으로 돌아와 <b>복사한 주소 붙여넣기</b>'] },
+  },
+  _icsGuide(k) {
+    const g = this.ICS_GUIDE[k] || this.ICS_GUIDE.naver;
+    return `<ol class="ez-steps">${g.steps.map(t => `<li>${t}</li>`).join('')}</ol>
+      <button type="button" class="btn-sm ez-open" onclick="Settings.openExt('${g.open}')">${g.openLbl} ↗</button>`;
+  },
+  icsTab(k) {
+    this._icsTab = k;
+    document.querySelectorAll('.ez-tabs button').forEach(b => b.classList.toggle('on', b.getAttribute('onclick').includes(`'${k}'`)));
+    const el = document.getElementById('icsGuide'); if (el) el.innerHTML = this._icsGuide(k);
+  },
+  // 복사해 온 주소를 붙여 넣고 바로 구독까지 — 입력칸을 눌러 붙여 넣는 단계를 없앤다
+  async icsPaste() {
+    const t = await this.readClip();
+    const inp = document.getElementById('icsUrl');
+    if (t == null) { inp?.focus(); App.showToast('붙여넣기가 막혀 있습니다 — 주소 칸을 길게 눌러 붙여 넣어 주세요', 'error'); return; }
+    const m = t.match(/(webcals?|https?):\/\/\S+/i);
+    if (!m) { App.showToast('클립보드에 캘린더 주소가 없습니다 — 아래 안내대로 주소를 먼저 복사해 주세요', 'error'); return; }
+    if (inp) inp.value = m[0];
+    this.icsAdd();
   },
   _paintIcs() { const el = document.getElementById('setIcs'); if (el) el.innerHTML = this._icsHtml(); },
   icsPick(c) {
@@ -368,3 +552,6 @@ const Settings = {
     this._re('secure');
   },
 };
+// 안드로이드·PC 크롬: '홈 화면에 추가' 창을 우리 단추로 띄울 수 있게 잡아 둔다
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); Settings._bip = e; });
+window.addEventListener('appinstalled', () => { Settings._bip = null; });

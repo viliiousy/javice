@@ -69,11 +69,17 @@ const DevicePair = {
         <div id="dpHa" style="display:grid;gap:12px">
         <div style="font-size:12px;color:var(--text3);line-height:1.6">집 Wi-Fi 의 Home Assistant 서버에 바로 붙습니다. 여기 저장하면 같은 계정의 허브가 모두 이 설정을 받아 갑니다.</div>
         <label style="font-size:12px;color:var(--text2)">Home Assistant 주소 (집)
-          <input id="dpHaUrl" class="inp inp-sm" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://192.168.0.10:8123"></label>
+          <input id="dpHaUrl" class="inp inp-sm" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://homeassistant.local:8123"></label>
+        <div class="ez-row"><button type="button" class="ez-chip" onclick="DevicePair._haDefault()">기본 주소 넣기 (homeassistant.local)</button></div>
         <label style="font-size:12px;color:var(--text2)">외부 주소 (선택)
           <input id="dpHaExt" class="inp inp-sm" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://bashy-bot.duckdns.org"></label>
         <label style="font-size:12px;color:var(--text2)">장기 액세스 토큰
-          <input id="dpHaTok" class="inp inp-sm" type="password" autocomplete="off" spellcheck="false" placeholder="HA 프로필 → 보안 → 장기 액세스 토큰"></label>
+          <input id="dpHaTok" class="inp inp-sm" type="password" autocomplete="off" spellcheck="false" placeholder="아래 단추로 만들어 붙여 넣기"></label>
+        <ol class="ez-steps">
+          <li><button type="button" class="ez-chip" onclick="DevicePair._haTokenPage()">토큰 만드는 화면 열기 ↗</button> (위 주소의 Home Assistant 보안 화면이 열립니다 · 집 Wi-Fi 에서)</li>
+          <li>맨 아래 <b>장기 액세스 토큰</b> › <b>토큰 만들기</b> → 이름 <b>Bashy</b> → <b>확인</b> → 나온 토큰 <b>복사</b></li>
+          <li>돌아와 <button type="button" class="ez-chip" onclick="DevicePair._haPaste()">토큰 붙여넣기</button> → <b>설정 저장</b></li>
+        </ol>
         <div id="dpCfgMsg" style="font-size:12px;color:var(--text3);min-height:1.2em"></div>
         <div class="modal-btns"><button class="btn-sm accent" onclick="DevicePair.saveCfg()">설정 저장</button></div>
         </div>
@@ -136,6 +142,28 @@ const DevicePair = {
     catch (e) { App.showToast(e.message, 'error'); }
   },
 
+  _haNorm(u) {
+    u = String(u || '').trim(); if (!u) return '';
+    if (!/^https?:\/\//i.test(u)) u = 'http://' + u;          // 192.168.0.10:8123 처럼 넣어도 된다
+    return u.replace(/\/+$/, '');
+  },
+  _haDefault() { const el = document.getElementById('dpHaUrl'); if (el) { el.value = 'http://homeassistant.local:8123'; el.focus(); } },
+  // HA 의 토큰 만드는 자리는 <주소>/profile/security 에 있다 — 메뉴를 찾아 들어갈 필요 없이 바로 연다
+  _haTokenPage() {
+    const el = document.getElementById('dpHaUrl');
+    const u = this._haNorm(el?.value || this._cfg?.haUrl);
+    if (!u) { el?.focus(); App.showToast('먼저 위에 Home Assistant 주소를 넣어 주세요', 'error'); return; }
+    if (el) el.value = u;
+    Settings.openExt(u + '/profile/security');
+  },
+  async _haPaste() {
+    const t = await Settings.readClip(), el = document.getElementById('dpHaTok');
+    if (t == null) { el?.focus(); App.showToast('붙여넣기가 막혀 있습니다 — 토큰 칸을 길게 눌러 붙여 넣어 주세요', 'error'); return; }
+    if (!/^[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+$/.test(t)) { App.showToast('클립보드에 Home Assistant 토큰이 없습니다 — 토큰 화면에서 복사를 먼저 눌러 주세요', 'error'); return; }
+    if (el) el.value = t;
+    App.showToast('토큰을 넣었습니다 — 설정 저장을 눌러 주세요', 'success');
+  },
+
   // 허브 설정은 /users/<uid>/_link/hubCfg 에 둔다 (본인만 읽고 쓰는 자리). 토큰은 화면에 다시 보여 주지 않는다.
   async loadCfg() {
     const msg = t => { const m = document.getElementById('dpCfgMsg'); if (m) m.textContent = t; };
@@ -153,7 +181,7 @@ const DevicePair = {
   async saveCfg() {
     const msg = t => { const m = document.getElementById('dpCfgMsg'); if (m) m.textContent = t; };
     const v = id => (document.getElementById(id)?.value || '').trim();
-    const haUrl = v('dpHaUrl'), haUrlExt = v('dpHaExt'), tok = v('dpHaTok');
+    const haUrl = this._haNorm(v('dpHaUrl')), haUrlExt = this._haNorm(v('dpHaExt')), tok = v('dpHaTok');
     for (const u of [haUrl, haUrlExt]) if (u && !/^https?:\/\//.test(u)) { msg('주소는 http:// 또는 https:// 로 시작해야 합니다'); return; }
     const next = { ...(this._cfg || {}), provider: 'ha', haUrl, haUrlExt, at: new Date().toISOString() };
     if (tok) next.haToken = tok;

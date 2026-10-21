@@ -189,12 +189,24 @@ const AIUsage = {
           <div class="aiu-head"><b>PC 크롬 사용량 수집 확장</b><span class="aiu-sub">${ext ? '이 브라우저에 설치됨 · 자동 연결' : '이 브라우저에는 없음'}</span></div>
           <p class="aiu-sub aiu-p">Claude·ChatGPT·Higgsfield 는 남은 사용량을 API 로 알려 주지 않아, PC 크롬에 로그인된 사이트에서 확장이 5분마다 읽어 옵니다.
             확장을 설치한 크롬에서 bashy.app 에 한 번 로그인하면 연결은 저절로 됩니다.</p>
-          <p class="aiu-sub aiu-p">위쪽에 표시할 AI 는 설정 › 디자인 › 상단바 정보에서 고릅니다.</p>
-          <a class="btn-sm aiu-a" href="https://bashy.app/extension.html" target="_blank" rel="noopener">확장 받기</a>
+          ${ext ? '' : this._extGet()}
+          <button type="button" class="btn-sm aiu-a" onclick="Settings.open('topinfo')">위쪽에 보일 AI 고르기</button>
         </div>
       </div>`);
     this.refresh();
     this.linkExtension();
+  },
+
+  // 확장은 PC 크롬에만 깔린다. 휴대폰에서 '확장 받기' 를 누르면 갈 곳이 없으니, PC 로 링크를 옮기는 길을 준다.
+  EXT_URL: 'https://bashy.app/extension.html',
+  _extGet() {
+    const mob = /Android|iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) || (typeof Platform !== 'undefined' && Platform.native);
+    if (!mob) return `<a class="btn-sm accent aiu-a" href="${this.EXT_URL}" target="_blank" rel="noopener">확장 받기 — 한 번 눌러 내려받기</a>`;
+    return `<p class="aiu-sub aiu-p">지금은 휴대폰이라 설치할 수 없습니다. PC 크롬 주소창에 <b>bashy.app/extension</b> 을 치거나, 아래 단추로 링크를 PC 로 보내세요.</p>
+      <div class="aiu-btns">
+        ${typeof navigator.share === 'function' ? `<button type="button" class="btn-sm accent" onclick="navigator.share({title:'Bashy 사용량 확장',url:'${this.EXT_URL}'}).catch(()=>{})">PC 로 링크 보내기</button>` : ''}
+        <button type="button" class="btn-sm" onclick="Settings.copy('${this.EXT_URL}','링크를 복사했습니다 — 카카오톡 나에게 보내기 등으로 PC 에 붙여 넣으세요')">링크 복사</button>
+      </div>`;
   },
 
   // 확장이 이 페이지에 붙어 있으면(content script 가 data-bashy-ext 를 남긴다) 계정 연결 코드를 넘겨 준다.

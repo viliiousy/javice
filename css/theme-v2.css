@@ -650,3 +650,40 @@ html[data-ui="v2"] .mm-foot-r .btn-sm{ height:44px; min-width:88px; border-radiu
 html[data-ui="v2"] .mm-del{ height:44px; display:inline-flex; align-items:center; gap:6px; background:none; border:0; color:var(--text3); font:inherit; font-size:14px; cursor:pointer; }
 html[data-ui="v2"] .mm-del .ic{ width:16px; height:16px; }
 .dp-card.is-off .btn-sm:disabled{ opacity:.4; cursor:default; }
+
+/* ── 쉬운 연결 (복사+열기 단추, 단계 안내, 붙여넣기) ─────────────
+   '설정 › ○○ 에서…' 라고 길만 알려 주던 자리를, 누르면 바로 되는 단추와 누를 곳을 적은 단계로 바꿨다. */
+.toast-act{ flex:none; margin-left:8px; height:32px; padding:0 12px; border-radius:16px; border:0; background:#FF6A2B; color:#17181B;
+  font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+.toast.has-act{ pointer-events:auto; white-space:normal; width:min(440px, calc(100vw - 32px)); box-sizing:border-box; text-align:left; justify-content:space-between; }
+.ez-go2{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:16px 0 8px; }
+.ez-go{ display:grid; gap:2px; align-content:center; min-height:56px; padding:8px 16px; border-radius:12px; border:0; background:var(--accent); color:#17181B;
+  text-align:left; font:inherit; cursor:pointer; }
+.ez-go b{ font-size:15px; font-weight:600; }
+.ez-go small{ font-size:12px; opacity:.8; }
+.ez-go:active{ background:var(--accent-h); }
+.ez-go-1{ width:100%; margin:8px 0; }
+@media (max-width:420px){ .ez-go2{ grid-template-columns:1fr; } }
+.ez-steps{ margin:8px 0; padding-left:20px; font-size:13px; line-height:1.7; color:var(--text2); }
+.ez-steps li{ margin:4px 0; }
+.ez-steps li::marker{ font-family:"Space Grotesk",sans-serif; color:var(--text3); }
+.ez-steps b{ color:var(--text); font-weight:600; }
+.ez-chip{ display:inline-flex; align-items:center; height:28px; padding:0 10px; margin:0 2px; border-radius:14px; border:1px solid var(--border);
+  background:none; color:var(--text); font:inherit; font-size:12.5px; font-weight:500; cursor:pointer; vertical-align:baseline; }
+.ez-chip:active{ background:var(--card2, rgba(0,0,0,.04)); }
+.ez-row{ display:flex; flex-wrap:wrap; gap:8px; }
+.ez-inl{ display:flex; gap:8px; } .ez-inl .inp{ flex:1; min-width:0; } .ez-inl .btn-sm{ flex:none; }
+.ez-tabs{ display:flex; gap:8px; overflow-x:auto; padding:8px 0; scrollbar-width:none; }
+.ez-tabs::-webkit-scrollbar{ display:none; }
+.ez-tabs button{ flex:none; height:32px; padding:0 14px; border-radius:16px; border:1px solid var(--border); background:none; color:var(--text2);
+  font:inherit; font-size:13px; cursor:pointer; }
+.ez-tabs button.on{ background:var(--text); border-color:var(--text); color:var(--card); font-weight:600; }
+.ez-open{ margin:4px 0 8px; }
+.ez-ic{ font-family:"Space Grotesk",sans-serif; }
+.ai-setup .ai-paste{ margin-top:8px; width:100%; height:44px; border-radius:12px; }
+.ai-setup .ai-paste.accent{ background:var(--accent); border-color:var(--accent); color:#17181B; font-weight:600; }
+.cal-ics-btns{ display:flex; gap:8px; flex-wrap:wrap; }
+html[data-ui="v2"] .cal-ics-btns .btn-sm:not(.accent){ height:40px; padding:0 16px; border-radius:20px; border:1px solid var(--border); background:none; color:var(--text); }
+.nt-fix{ padding:4px 0 8px; border-bottom:1px solid var(--border); }
+.nt-fix .ez-steps{ margin:8px 0 0; }
+.aiu-btns{ display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }

@@ -539,14 +539,15 @@ const JARVIS = {
   // 키가 없을 때: 무료 키 안내 + 구독(ChatGPT Plus·Claude Pro)만 있는 사람은 그 앱으로 같은 질문을 넘긴다.
   // 구독은 API 키가 아니어서 이 앱이 대신 부를 수 없다 — 대신 질문을 채운 채로 그 앱을 연다.
   _noKey(q) {
-    this._addMsg('ai','AI 키가 아직 없습니다. 열쇠 단추에서 무료 키(Groq·Gemini)를 넣으면 여기서 바로 답합니다.\nChatGPT·Claude 구독만 있다면 설정 › AI › ‘ChatGPT · Claude 에 Bashy 연결’ 을 해 두세요 — 그 앱에서 말하면 Bashy 에 바로 기록됩니다. 아래 단추는 이 질문만 그 앱으로 넘깁니다.');
+    this._addMsg('ai','AI 키가 아직 없습니다. 열쇠 단추에서 무료 키(Groq·Gemini)를 넣으면 여기서 바로 답합니다.\nChatGPT·Claude 구독만 있다면 아래 ‘구독에 Bashy 연결’ 을 한 번 해 두세요 — 그 앱에서 말하면 Bashy 에 바로 기록됩니다. ‘에서 묻기’ 단추는 이 질문만 그 앱으로 넘깁니다.');
     const wrap=document.getElementById('jMsgs'); if(!wrap) return;
     const d=document.createElement('div'); d.className='j-msg j-ai j-handoff';
     const e=encodeURIComponent(q);
     d.innerHTML=`<div class="j-avatar"></div><div class="j-ho">
       <a class="btn-sm" href="https://chatgpt.com/?q=${e}" target="_blank" rel="noopener">ChatGPT 에서 묻기</a>
       <a class="btn-sm" href="https://claude.ai/new?q=${e}" target="_blank" rel="noopener">Claude 에서 묻기</a>
-      <button class="btn-sm accent" onclick="JARVIS.showKeySetup()">키 넣기</button></div>`;
+      <button class="btn-sm" onclick="Settings.open('connector')">구독에 Bashy 연결</button>
+      <button class="btn-sm accent" onclick="JARVIS.showKeySetup()">무료 키 넣기</button></div>`;
     wrap.appendChild(d); wrap.scrollTop=wrap.scrollHeight;
   },
 
@@ -781,15 +782,17 @@ const JARVIS = {
         </label>`).join('')}</div>
       ${Object.entries(this.PROVIDERS).map(([id,P])=>`
         <div class="ai-keyrow" data-prov="${id}"${id===cur?'':' hidden'}>
-          ${id==='groq' ? this._groqGuide() : ''}
-          <label class="modal-lbl">${P.name} API 키${this._FREE_KEY.includes(id) ? ` <a href="${P.keyUrl}" target="_blank" rel="noopener">무료 키 받기 ↗</a>` : ''}</label>
-          <div class="ai-keyline"><input type="password" class="inp ai-key" data-prov="${id}" placeholder="${P.ph}" value="${esc(this._keyOf(id))}" autocomplete="off">
+          ${id==='groq' ? this._groqGuide() : id==='gemini' ? this._geminiGuide() : ''}
+          <label class="modal-lbl">${P.name} API 키${this._FREE_KEY.includes(id) ? ` <a href="${P.keyUrl}" target="_blank" rel="noopener" onclick="JARVIS._wentForKey('${id}')">무료 키 받기 ↗</a>` : ''}</label>
+          <div class="ai-keyline"><input type="password" class="inp ai-key" data-prov="${id}" placeholder="${P.ph}" value="${esc(this._keyOf(id))}" autocomplete="off" spellcheck="false" autocapitalize="off"
+              onpaste="setTimeout(()=>JARVIS._keyTyped(this),0)">
             <button type="button" class="btn-sm" onclick="JARVIS.testKey('${id}', this)">확인</button></div>
+          <button type="button" class="btn-sm ai-paste" onclick="JARVIS.pasteKey()">복사한 키 붙여넣기</button>
           <div class="ai-keymsg" data-prov="${id}"></div>
           ${P.free || this._FREE_KEY.includes(id) ? '' : `<p class="ai-note">이미 가지고 있는 ${P.short} API 키가 있을 때 넣어 주세요.</p>`}
         </div>`).join('')}
       <div class="ai-foot">
-        <p class="ai-note">ChatGPT Plus·Claude Pro 같은 월 구독은 API 키가 아니어서 여기에 넣을 수 없습니다. 대신 설정 › AI › <b>ChatGPT · Claude 에 Bashy 연결</b>을 하면 그 앱에서 말한 내용이 Bashy 에 기록됩니다.</p>
+        <p class="ai-note">ChatGPT Plus·Claude Pro 같은 월 구독은 API 키가 아니어서 여기에 넣을 수 없습니다. 대신 <a href="#" onclick="event.preventDefault();JARVIS._toConnector()"><b>ChatGPT · Claude 에 Bashy 연결</b></a>을 하면 그 앱에서 말한 내용이 Bashy 에 기록됩니다.</p>
         <p class="ai-note">키가 여러 개면 고른 AI 를 먼저 쓰고, 그 키가 없으면 키가 있는 다른 AI 로 넘어갑니다. 키는 이 계정에만 저장되고, 이 기기에서 각 AI 회사로 바로 보냅니다.</p>
       </div>
     </div>`;
@@ -797,17 +800,91 @@ const JARVIS = {
   // 무료 Groq 키를 사용자 본인이 받는 길 — 앱이 대신 내주는 키는 없다(각자 자기 계정·자기 한도)
   _groqGuide() {
     return `<ol class="ai-guide">
-      <li><a href="https://console.groq.com/keys" target="_blank" rel="noopener"><b>console.groq.com</b></a> 을 열고 구글 계정으로 가입합니다 (무료 · 카드 등록 없음)</li>
-      <li><b>Create API Key</b> → 이름 아무거나(예: Bashy) → 나온 키를 <b>복사</b> (gsk_ 로 시작 · 이 화면에서 한 번만 보입니다)</li>
-      <li>아래 칸에 붙여 넣고 <b>확인</b> → 연결되면 저장</li>
+      <li><a href="https://console.groq.com/keys" target="_blank" rel="noopener" onclick="JARVIS._wentForKey('groq')"><b>Groq 키 화면 열기 ↗</b></a> — 구글 계정으로 가입합니다 (무료 · 카드 등록 없음)</li>
+      <li><b>Create API Key</b> → 이름 아무거나(예: Bashy) → <b>Submit</b> → 나온 키의 <b>Copy</b> (gsk_ 로 시작 · 한 번만 보입니다)</li>
+      <li>이 화면으로 돌아와 <b>복사한 키 붙여넣기</b> — 확인과 저장까지 저절로 됩니다</li>
     </ol>`;
+  },
+  _geminiGuide() {
+    return `<ol class="ai-guide">
+      <li><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" onclick="JARVIS._wentForKey('gemini')"><b>Gemini 키 화면 열기 ↗</b></a> — 구글 계정으로 로그인합니다 (무료)</li>
+      <li><b>API 키 만들기</b>(Create API key) → 나온 키 옆 <b>복사</b> (AIza 로 시작)</li>
+      <li>이 화면으로 돌아와 <b>복사한 키 붙여넣기</b> — 확인과 저장까지 저절로 됩니다</li>
+    </ol>`;
+  },
+  // 키 모양으로 어느 회사 키인지 안다 — 다른 칸에 붙여 넣어도 맞는 칸으로 옮긴다
+  _provOfKey(k) {
+    k = String(k || '').trim();
+    if (/^gsk_/.test(k)) return 'groq';
+    if (/^AIza/.test(k)) return 'gemini';
+    if (/^sk-ant-/.test(k)) return 'anthropic';
+    if (/^xai-/.test(k)) return 'xai';
+    if (/^sk-/.test(k)) return 'openai';
+    return null;
+  },
+  // 키를 받으러 다른 탭으로 갔다가 돌아오면 붙여넣기 단추를 눈에 띄게
+  _wentForKey(p) {
+    this._waitKey = p;
+    const back = () => {
+      if (document.hidden) return;
+      document.removeEventListener('visibilitychange', back);
+      const b = document.querySelector(`.ai-setup .ai-keyrow[data-prov="${this._waitKey}"] .ai-paste`);
+      if (b) { b.classList.add('accent'); b.focus({ preventScroll: true }); }
+      const m = document.querySelector(`.ai-setup .ai-keymsg[data-prov="${this._waitKey}"]`);
+      if (m && !m.textContent) { m.className = 'ai-keymsg'; m.textContent = '복사해 왔으면 아래 ‘복사한 키 붙여넣기’ 를 누르세요'; }
+    };
+    document.addEventListener('visibilitychange', back);
+  },
+  // 클립보드에서 키를 꺼내 맞는 칸에 넣고, 확인 → 성공하면 바로 저장
+  async pasteKey() {
+    let k = null;
+    try { k = ((await navigator.clipboard.readText()) || '').trim(); } catch { k = null; }
+    const cur = document.querySelector('.ai-setup input[name="aiProv"]:checked')?.value || this.prov;
+    if (k == null) { const i = document.querySelector(`.ai-setup .ai-key[data-prov="${cur}"]`); i?.focus(); App.showToast('붙여넣기가 막혀 있습니다 — 키 칸을 길게 눌러 붙여 넣어 주세요', 'error'); return; }
+    k = k.split(/\s+/)[0];
+    const p = this._provOfKey(k);
+    if (!p) { App.showToast('클립보드에 AI 키가 없습니다 — 키 화면에서 복사를 먼저 눌러 주세요', 'error'); return; }
+    const inp = document.querySelector(`.ai-setup .ai-key[data-prov="${p}"]`); if (!inp) return;
+    inp.value = k;
+    this._keyTyped(inp);
+  },
+  async _keyTyped(inp) {
+    const k = (inp.value || '').trim(); if (!k) return;
+    const p = this._provOfKey(k) || inp.dataset.prov;
+    let box = inp;
+    if (p !== inp.dataset.prov) {   // 다른 회사 칸에 붙여 넣었다 → 맞는 칸으로 옮긴다
+      box = document.querySelector(`.ai-setup .ai-key[data-prov="${p}"]`) || inp;
+      if (box !== inp) { box.value = k; inp.value = this._keyOf(inp.dataset.prov) || ''; }
+    }
+    const radio = document.querySelector(`.ai-setup input[name="aiProv"][value="${p}"]`);
+    if (radio && !radio.checked) { radio.checked = true; this._pickProv(radio); }
+    const ok = await this.testKey(p);
+    if (ok) {
+      localStorage.setItem(this.PROVIDERS[p].key, k);
+      localStorage.setItem('gl_ai_prov', p);
+      window.FirebaseSync?.scheduleSave?.();
+      const st = document.querySelector(`.ai-setup .ai-prov input[value="${p}"]`)?.closest('.ai-prov')?.querySelector('.ai-ps');
+      if (st) { st.textContent = '키 있음'; st.classList.add('has'); }
+      const m = document.querySelector(`.ai-setup .ai-keymsg[data-prov="${p}"]`);
+      if (m) m.textContent = `연결되어 저장했습니다 — 이제 ${this.PROVIDERS[p].short} 로 답합니다.`;
+      document.querySelector(`.ai-setup .ai-keyrow[data-prov="${p}"] .ai-paste`)?.classList.remove('accent');
+    }
+  },
+  _toConnector() {
+    const ob = document.getElementById('obMcp');
+    if (ob && document.body.classList.contains('ob-open')) ob.scrollIntoView({ behavior:'smooth', block:'start' });
+    else Settings.open('connector');
+  },
+  // 키가 필요한 기능에서 부른다: 길을 말로 알려 주지 않고 '키 넣기' 단추를 바로 준다
+  needKey(msg = 'AI 키가 필요합니다') {
+    App.showToast(msg, 'error', { label: '무료 키 넣기', fn: () => this.showKeySetup() });
   },
   // 넣은 키가 실제로 되는지 모델 목록을 한 번 불러 본다
   async testKey(p, btn) {
     const box=document.querySelector(`.ai-setup .ai-key[data-prov="${p}"]`);
     const msg=document.querySelector(`.ai-setup .ai-keymsg[data-prov="${p}"]`);
-    const key=(box?.value||'').trim(); if(!msg) return;
-    if(!key){ msg.className='ai-keymsg bad'; msg.textContent='키를 먼저 붙여 넣어 주세요'; return; }
+    const key=(box?.value||'').trim(); if(!msg) return false;
+    if(!key){ msg.className='ai-keymsg bad'; msg.textContent='키를 먼저 붙여 넣어 주세요'; return false; }
     msg.className='ai-keymsg'; msg.textContent='확인 중…'; if(btn) btn.disabled=true;
     try{
       const P=this.PROVIDERS[p];
@@ -818,8 +895,11 @@ const JARVIS = {
       if(!r.ok) throw new Error(j?.error?.message || (r.status===401?'키가 맞지 않습니다':'HTTP '+r.status));
       const n=(j.data||j.models||[]).length;
       msg.className='ai-keymsg ok'; msg.textContent=`연결됨 — 쓸 수 있는 모델 ${n}개. 저장을 누르면 이 키로 답합니다.`;
+      if(btn) btn.disabled=false;
+      return true;
     }catch(e){ msg.className='ai-keymsg bad'; msg.textContent='실패: '+(e.message||e); }
     if(btn) btn.disabled=false;
+    return false;
   },
   _pickProv(input) {
     const box=input.closest('.ai-setup');

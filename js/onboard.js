@@ -218,8 +218,12 @@ const Onboard = {
     try { Diet.render(App?.S?.selDate || new Date()); } catch {}
     return true;
   },
+  _mcp(k) {
+    if (!Settings._mcp) { App.showToast('로그인(동기화)이 끝난 뒤 다시 눌러 주세요 — 설정 › AI 에서도 할 수 있습니다', 'error'); Settings.mcpUrl().then(u => { if (u) Settings._mcp = u; }).catch(() => {}); return; }
+    Settings.mcpGo(k);
+  },
   _inbodyPhoto() {
-    if (typeof JARVIS === 'undefined' || !JARVIS._getKey()) { App.showToast('사진 읽기는 AI 키가 있어야 합니다. 숫자를 직접 넣어 주세요', ''); return; }
+    if (typeof JARVIS === 'undefined' || !JARVIS._getKey()) { App.showToast('사진 읽기는 AI 키가 있어야 합니다. 다음 AI 단계에서 무료 키를 넣을 수 있고, 지금은 숫자를 직접 넣어 주세요', ''); return; }
     document.getElementById('obIbFile')?.click();
   },
   _onIbPhoto(input) {
@@ -245,10 +249,16 @@ const Onboard = {
 
   // ── AI 비서 ────────────────────────────
   _ai() {
+    // 연결 주소는 미리 받아 둔다 — 누르는 순간 복사·새 창이 막히지 않게
+    setTimeout(() => { Settings.mcpUrl().then(u => { if (u) Settings._mcp = u; }).catch(() => {}); }, 0);
     return `<p class="ob-p">말로 기록하기, 사진으로 식단·인바디 읽기는 AI 가 합니다. 기본으로 쓸 AI 를 고르고 키를 넣어 주세요. 키가 없으면 이 단계를 건너뛰고 나중에 AI 창의 열쇠 단추에서 넣어도 됩니다.</p>
       ${JARVIS.setupHtml()}
-      <div class="ob-sub2">ChatGPT·Claude 월 구독이 있다면</div>
-      <p class="ob-p">구독은 API 키가 아니라 위 칸에 넣을 수 없습니다. 대신 <b>설정 › AI › ChatGPT · Claude 에 Bashy 연결</b>에서 주소를 받아 ChatGPT·Claude 에 커넥터로 붙이면, 그 앱에서 “점심 김치찌개 먹었어” 처럼 말해 Bashy 에 기록할 수 있습니다(구독 요금 안에서).</p>
+      <div class="ob-sub2" id="obMcp">ChatGPT·Claude 월 구독이 있다면</div>
+      <p class="ob-p">구독은 API 키가 아니라 위 칸에 넣을 수 없습니다. 대신 아래 단추로 Bashy 를 그 AI 에 커넥터로 붙이면, 그 앱에서 “점심 김치찌개 먹었어” 처럼 말해 Bashy 에 기록할 수 있습니다(구독 요금 안에서). 단추를 누르면 연결 주소가 복사되고 붙여 넣을 화면이 열립니다.</p>
+      <div class="ez-go2">
+        <button type="button" class="ez-go" onclick="Onboard._mcp('claude')"><b>Claude 에 연결</b><small>주소 복사 + 커넥터 화면 열기</small></button>
+        <button type="button" class="ez-go" onclick="Onboard._mcp('chatgpt')"><b>ChatGPT 에 연결</b><small>주소 복사 + 플러그인 화면 열기</small></button>
+      </div>
       <div class="ob-sub2">구독 AI 사용량 표시</div>
       <p class="ob-p">Claude·ChatGPT·Higgsfield 구독의 남은 사용량을 맨 위 고리로 보여 줍니다. Bashy 안에서 그 AI 를 쓰지 않아도 됩니다 — PC 크롬에 <a href="https://bashy.app/extension.html" target="_blank" rel="noopener">Bashy 사용량 확장</a>을 깔고 같은 크롬에서 bashy.app 에 로그인하면 됩니다. 표시할 것을 고르세요.</p>
       ${AIUsage.trackHtml()}`;

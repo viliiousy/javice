@@ -152,9 +152,14 @@ const Notifications = {
   async subscribe() {
     try {
       // 권한 요청
+      // 아이폰 사파리는 홈 화면에 담아 연 앱에서만 웹 알림을 준다 — 그 전엔 묻지도 못한다
+      if (!this._fm() && this._needsHomeScreen()) {
+        App.showToast('아이폰은 홈 화면에 추가한 Bashy 에서 알림을 받을 수 있습니다', 'error', { label: '방법 보기', fn: () => Settings.open('widget') });
+        return false;
+      }
       const permission = await this._permission(true);
       if (permission !== 'granted') {
-        App.showToast('알림 권한이 거부됐습니다', 'error');
+        this._deniedHelp();
         return false;
       }
 
@@ -238,12 +243,14 @@ const Notifications = {
   async sendTest() {
     if (typeof LocalNotify !== 'undefined' && LocalNotify.ok) {
       const ok = await LocalNotify.test();
-      App.showToast(ok ? '3초 뒤 테스트 알림이 울립니다 (앱을 잠시 나가 보세요)' : '알림 권한이 꺼져 있습니다 — 아이폰 설정 › Bashy › 알림', ok ? 'success' : 'error');
+      if (ok) App.showToast('3초 뒤 테스트 알림이 울립니다 (앱을 잠시 나가 보세요)', 'success');
+      else this._deniedHelp();
       return;
     }
+    if (this._needsHomeScreen()) { App.showToast('아이폰은 홈 화면에 추가한 Bashy 에서 알림을 받을 수 있습니다', 'error', { label: '방법 보기', fn: () => Settings.open('widget') }); return; }
     if (typeof Notification === 'undefined') { App.showToast('이 브라우저는 알림을 지원하지 않습니다', 'error'); return; }
     if (Notification.permission !== 'granted') await Notification.requestPermission();
-    if (Notification.permission !== 'granted') { App.showToast('알림 권한이 없습니다', 'error'); return; }
+    if (Notification.permission !== 'granted') { this._deniedHelp(); return; }
     try {
       const reg = this._swReg || await navigator.serviceWorker?.ready;
       if (reg?.showNotification) reg.showNotification('Bashy 알림 테스트', { body:'알림이 정상적으로 울립니다.', icon:'/icons/icon-192.png' });
@@ -263,7 +270,7 @@ const Notifications = {
     const perm = local ? await LocalNotify.permission(false) : (typeof Notification !== 'undefined' ? Notification.permission : 'denied');
     const sub = this.localToken();
     const stateTxt = !s.enabled ? '꺼져 있습니다'
-      : perm !== 'granted' ? (local ? '아이폰 알림 권한이 꺼져 있습니다 — 설정 › Bashy › 알림' : '브라우저 알림 권한이 필요합니다')
+      : perm !== 'granted' ? (local || this._fm() ? '휴대폰 설정에서 Bashy 알림이 꺼져 있습니다' : this._needsHomeScreen() ? '아이폰은 홈 화면에 추가해야 알림을 받습니다' : perm === 'denied' ? '이 브라우저에서 알림을 막아 두었습니다' : '알림 허용이 필요합니다')
       : local ? '이 기기에서 울립니다 (기기 안 예약 · 인터넷 없어도 울림)'
       : sub ? '이 기기에 등록됨 · 서버 알림' : '이 기기는 아직 등록되지 않았습니다';
     const sw = (on, fn) => Settings._sw(on, fn);
@@ -279,6 +286,7 @@ const Notifications = {
     const dietDef = { 아침:'09:00', 점심:'13:00', 저녁:'19:00' };
     return `<div class="nt${s.enabled ? '' : ' nt-off'}">
       <div class="set-item nt-master"><span class="set-tx"><b>알림 받기</b><small>${stateTxt}</small></span>${sw(s.enabled, 'Notifications._toggleEnable()')}</div>
+      ${s.enabled && perm !== 'granted' ? this._fixHtml(local || !!this._fm(), perm) : ''}
       ${s.enabled ? `
       <div class="set-h">무엇을 알려 드릴까요</div>
       ${block('habits', '습관', '남은 습관이 있을 때 · 시간 정한 습관은 그 시각에', t('habits','time', s.habits?.time||'21:00', '알림 시각'))}
@@ -307,10 +315,41 @@ const Notifications = {
     if (s.enabled) {
       if (typeof LocalNotify !== 'undefined' && LocalNotify.ok) {
         const p = await LocalNotify.permission(true);
-        if (p !== 'granted') App.showToast('아이폰 설정 › Bashy › 알림 에서 허용해 주세요', 'error');
+        if (p !== 'granted') this._deniedHelp();
       } else if (!this.localToken()) await this.subscribe();
     }
     this._after();
+  },
+
+  // 아이폰·아이패드 사파리(홈 화면에 담지 않음): Notification 자체가 없다
+  _needsHomeScreen() {
+    if (typeof Platform !== 'undefined' && Platform.native) return false;
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const sa = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+    return ios && !sa;
+  },
+  // 권한이 막혔을 때: 앱이면 '설정 열기' 한 번, 웹이면 그 브라우저에서 누를 곳을 그대로 알려 준다
+  _deniedHelp() {
+    if (typeof Platform !== 'undefined' && Platform.native) { Settings.permHelp('알림이 꺼져 있습니다 — 설정 열기 › 알림 허용', 'notifications'); return; }
+    App.showToast('브라우저가 알림을 막고 있습니다', 'error', { label: '푸는 방법', fn: () => Settings.open('notify') });
+  },
+  // 설정 › 알림 화면 위쪽에 붙는 '알림 켜는 길' 묶음
+  _fixHtml(native, perm) {
+    const L = (a, b, c) => Settings._link(a, b, c);
+    if (native) {
+      const can = !!window.Capacitor?.Plugins?.BashyNative?.openSettings;
+      return `<div class="nt-fix">${can ? L('휴대폰 설정에서 알림 켜기', "Settings.osSettings('notifications')", 'Bashy 알림 화면이 바로 열립니다 · 알림 허용을 켜고 돌아오세요')
+        : '<p class="set-note">휴대폰 설정 › 앱 › Bashy › 알림 에서 허용해 주세요.</p>'}
+        ${L('다시 확인', "Settings._re('notify')", '켜고 돌아왔으면 눌러 주세요')}</div>`;
+    }
+    if (this._needsHomeScreen()) return `<div class="nt-fix">${L('홈 화면에 추가하는 방법', "Settings.go('widget')", '공유 단추 › 홈 화면에 추가 — 그 아이콘으로 열면 알림을 받을 수 있습니다')}</div>`;
+    if (perm !== 'denied') return `<div class="nt-fix">${L('알림 허용하기', 'Notifications.subscribe().then(()=>Settings._re(\'notify\'))', '브라우저가 묻는 창에서 허용을 누릅니다')}</div>`;
+    const ua = navigator.userAgent, edge = /Edg\//.test(ua), saf = /Safari/.test(ua) && !/Chrome|Chromium|Edg/.test(ua), mob = /Android/.test(ua);
+    const steps = saf ? ['위쪽 메뉴 <b>Safari</b> › <b>설정</b> › <b>웹사이트</b> › <b>알림</b>', '<b>bashy.app</b> 을 <b>허용</b>으로 바꿉니다']
+      : mob ? ['주소창 왼쪽 <b>조절 아이콘</b>(또는 자물쇠) 을 누릅니다', '<b>권한</b> › <b>알림</b> 을 켭니다']
+      : [`주소창 왼쪽 <b>조절 아이콘</b>(${edge ? '자물쇠' : '사이트 정보'}) 을 누릅니다`, '<b>알림</b> 스위치를 켜거나 <b>허용</b>으로 바꿉니다'];
+    return `<div class="nt-fix"><ol class="ez-steps">${steps.map(t => `<li>${t}</li>`).join('')}<li>아래 <b>다시 확인</b>을 누릅니다</li></ol>
+      ${L('다시 확인', 'Notifications.subscribe().then(()=>Settings._re(\'notify\'))', '허용했으면 이 기기를 바로 등록합니다')}</div>`;
   },
 
   _toggle(section, val) {

@@ -268,7 +268,7 @@ const PlanGen = {
   },
   async aiMake() {
     const p = this._p;
-    if (!JARVIS._getKey()) { App.showToast('AI 키가 필요합니다 — 설정 › AI 에서 무료 키를 넣어 주세요', 'error'); return; }
+    if (!JARVIS._getKey()) { JARVIS.needKey('AI 키가 필요합니다 — 무료 키로 바로 만들 수 있습니다'); return; }
     const base = this.generate(p);
     const allowed = Object.entries(EX_DB).filter(([k]) => k !== '스포츠' && k !== '내 운동').flatMap(([, v]) => v).filter(n => this.allowed(n, p));
     const logs = this.recentLogs();

@@ -89,13 +89,13 @@
         </div>
       </fieldset>
 
-      <fieldset>
-        <legend>AI 사용량</legend>
+      <details class="s-adv">
+        <summary>연결 코드 직접 넣기 (보통은 필요 없음)</summary>
         <label>연결 코드
-          <input name="code" autocomplete="off" spellcheck="false" placeholder="bashy.app → 프로필 → AI 사용량 · 허브">
+          <input name="code" autocomplete="off" spellcheck="false" placeholder="위의 bashy 계정으로 연결을 누르면 저절로 채워집니다">
         </label>
-        <p class="s-help">bashy.app 프로필 메뉴의 <b>AI 사용량 · 허브</b>에서 복사한 코드입니다.</p>
-      </fieldset>
+        <p class="s-help">위에서 <b>bashy 계정으로 연결</b>을 하면 이 코드는 저절로 들어옵니다. 다른 허브에서 쓰던 코드를 옮길 때만 넣어 주세요.</p>
+      </details>
 
       <fieldset>
         <legend>스마트홈</legend>
@@ -126,18 +126,20 @@
 
         <div class="prov" data-prov="ha">
           <label>Home Assistant 주소
-            <input name="haUrl" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://172.30.1.14">
+            <input name="haUrl" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://homeassistant.local:8123">
           </label>
+          <button type="button" id="haDefBtn" class="chip">기본 주소 넣기 (homeassistant.local)</button>
           <label>외부 주소 (선택)
             <input name="haUrlExt" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://bashy-bot.duckdns.org">
           </label>
           <label>장기 액세스 토큰
-            <input name="haToken" type="password" autocomplete="off" spellcheck="false" placeholder="HA 프로필 → 보안 → 장기 액세스 토큰">
+            <input name="haToken" type="password" autocomplete="off" spellcheck="false" placeholder="아래 단추로 만들어 붙여 넣기">
           </label>
+          <div class="s-row"><button type="button" id="haTokBtn" class="chip chip-acc">토큰 만드는 화면 열기</button><button type="button" id="haPasteBtn" class="chip">토큰 붙여넣기</button></div>
           <ol class="s-steps">
             <li><b>주소</b>: 집 Wi-Fi 에서 Home Assistant 를 여는 주소 (예: http://192.168.0.10:8123).</li>
             <li><b>외부 주소</b>: 밖(LTE)에서도 쓰려면 DuckDNS·Nabu Casa 같은 바깥 주소. 없으면 비워 둡니다.</li>
-            <li><b>토큰</b>: Home Assistant 왼쪽 아래 프로필 › 보안 › <b>장기 액세스 토큰 만들기</b> → 이름을 아무거나 넣고 나온 긴 글자를 붙여 넣습니다.</li>
+            <li><b>토큰</b>: <b>토큰 만드는 화면 열기</b>를 누르면 Home Assistant 보안 화면이 바로 열립니다. 맨 아래 <b>장기 액세스 토큰 › 토큰 만들기</b> → 이름 Bashy → 나온 글자를 복사하고 돌아와 <b>토큰 붙여넣기</b>.</li>
             <li>아래 <b>연결 확인</b>으로 바로 시험할 수 있습니다.</li>
           </ol>
           <p class="s-help">SmartThings · Smart Life(Tuya) · 샤오미 기기를 Home Assistant 에 연결해 두면 여기서 함께 켜고 끕니다.</p>

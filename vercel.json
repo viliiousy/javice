@@ -2,6 +2,16 @@
   "version": 2,
   "redirects": [
     {
+      "source": "/extension",
+      "destination": "/extension.html",
+      "permanent": false
+    },
+    {
+      "source": "/ext",
+      "destination": "/extension.html",
+      "permanent": false
+    },
+    {
       "source": "/(.*)",
       "has": [
         {

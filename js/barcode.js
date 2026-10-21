@@ -59,8 +59,9 @@ const Scan = {
     }catch(err){
       // 권한을 막았을 때와 카메라가 없을 때는 할 말이 다르다.
       const denied = /NotAllowed|Permission/i.test(err.name || '');
-      this._say(denied ? '카메라 권한이 막혀 있어요. 설정에서 허용하거나, 아래에 숫자를 적어 주세요'
+      this._say(denied ? (Platform.native ? '카메라 권한이 막혀 있어요. 설정 열기를 눌러 카메라를 켜거나, 아래에 숫자를 적어 주세요' : '카메라 권한이 막혀 있어요. 주소창 왼쪽 아이콘 › 카메라 › 허용 후 다시 열거나, 아래에 숫자를 적어 주세요')
                        : '카메라를 열지 못했어요. 아래에 바코드 숫자를 적어 주세요');
+      if (denied && Platform.native && typeof Settings !== 'undefined') Settings.permHelp('카메라 권한이 꺼져 있습니다', 'app');
       return;
     }
     // 있으면 브라우저 것을 쓴다 — 안드로이드 크롬은 이쪽이 훨씬 빠르다.
