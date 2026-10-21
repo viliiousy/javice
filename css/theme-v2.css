@@ -776,3 +776,14 @@ html[data-ui="v2"] .memo-fs .mfs-s{ font-size:11px !important; }
 html[data-ui="v2"] .memo-fs .mfs-l{ font-size:17px !important; }
 html[data-ui="v2"] .toast::before{ margin-top:6px; }
 .ec-rf svg{ width:16px !important; height:16px !important; flex:none; }
+
+/* ── 기본 확인(주요 동작) 단추는 주황 하나로 (10/21) ──
+   저장·확인·시작·추가처럼 '이걸 한다' 단추는 모두 var(--accent). 글자색은 밝은 화면 흰색, 어두운 화면 검정(--accent-fg).
+   고른 상태를 나타내는 칩·탭(.on)은 그대로 글자색 반전 — 동작 단추와 선택 표시를 구분한다. */
+html[data-ui="v2"] .btn-primary,
+html[data-ui="v2"] .btn-sm.accent,
+html[data-ui="v2"] .modal-btns .accent,
+html[data-ui="v2"] .ob-btn.pri,
+html[data-ui="v2"] .dk-act.on{ background:var(--accent) !important; border-color:var(--accent) !important; color:var(--accent-fg) !important; }
+html[data-ui="v2"] .btn-sm.accent svg, html[data-ui="v2"] .dk-act.on svg{ color:inherit; stroke:currentColor; }
+html[data-ui="v2"] .btn-sm.accent:disabled, html[data-ui="v2"] .modal-btns .accent:disabled{ opacity:.4; }
