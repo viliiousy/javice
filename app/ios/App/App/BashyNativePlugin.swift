@@ -4,6 +4,7 @@ import LocalAuthentication
 import WidgetKit
 import AVFoundation
 import HealthKit
+import AppIntents
 #if canImport(ActivityKit)
 import ActivityKit
 #endif
@@ -246,6 +247,16 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
     override public func load() {
         installSounds()
         NotificationCenter.default.addObserver(self, selector: #selector(onIntent), name: BashyIntentStore.didChange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(onWorkoutAction(_:)), name: Notification.Name("BashyWorkoutAction"), object: nil)
+    }
+
+    // 잠금 화면·워치 단추 → 화면(JS)의 운동 모드로. 화면이 아직 준비 전이면 붙을 때까지 들고 있는다.
+    @objc func onWorkoutAction(_ n: Notification) {
+        let act = (n.userInfo?["act"] as? String) ?? ""
+        DispatchQueue.main.async {
+            if act == "skip" { self.stopRest(); self.liveRestEnded() }   // 화면이 늦게 깨어나도 소리·표시는 바로 멈춘다
+            self.notifyListeners("workoutAction", data: ["act": act], retainUntilConsumed: true)
+        }
     }
 
     @objc func onIntent() {
@@ -297,3 +308,18 @@ struct WorkoutAttributes: ActivityAttributes {
     var startedAt: Date
 }
 #endif
+
+// 잠금 화면·다이내믹 아일랜드·애플 워치(스마트 스택)의 운동 단추 — 세트 완료 / 쉬는 시간 +30초 / 건너뛰기.
+// 앱 쪽과 위젯 쪽에 같은 이름으로 둔다(눌리면 앱 프로세스에서 perform 이 돈다).
+@available(iOS 17.0, *)
+struct WorkoutActionIntent: LiveActivityIntent {
+    static var title: LocalizedStringResource = "운동 동작"
+    static var openAppWhenRun: Bool = false
+    @Parameter(title: "동작") var act: String
+    init() { act = "done" }
+    init(act: String) { self.act = act }
+    func perform() async throws -> some IntentResult {
+        NotificationCenter.default.post(name: Notification.Name("BashyWorkoutAction"), object: nil, userInfo: ["act": act])
+        return .result()
+    }
+}

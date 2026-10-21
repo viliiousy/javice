@@ -1,6 +1,7 @@
 import WidgetKit
 import ActivityKit
 import SwiftUI
+import AppIntents
 
 // Bashy 홈 화면 위젯 — 앱이 넘겨 준 '오늘 요약'(BashyNativePlugin.setWidget)만 그린다.
 // 저장소: App Group(group.app.bashy) UserDefaults 의 "today" (JSON 문자열)
@@ -169,10 +170,72 @@ private func restEndOf(_ ctx: ActivityViewContext<WorkoutAttributes>) -> Date? {
     return end
 }
 
+// 운동 단추 줄 (iOS 17+): 쉬는 중이면 +30초·건너뛰기, 아니면 세트 완료
+struct WorkoutButtons: View {
+    let ctx: ActivityViewContext<WorkoutAttributes>
+    var compact = false
+    var body: some View {
+        if #available(iOS 17.0, *) {
+            HStack(spacing: 8) {
+                if restEndOf(ctx) != nil {
+                    Button(intent: WorkoutActionIntent(act: "add30")) { Text("+30초").frame(maxWidth: .infinity) }
+                        .tint(Color.white.opacity(0.18))
+                    Button(intent: WorkoutActionIntent(act: "skip")) { Text("건너뛰기").frame(maxWidth: .infinity) }
+                        .tint(accent)
+                } else {
+                    Button(intent: WorkoutActionIntent(act: "done")) { Text(ctx.state.step.contains("세트") ? "세트 완료" : "다음 운동").frame(maxWidth: .infinity) }
+                        .tint(accent)
+                }
+            }
+            .font(.system(size: compact ? 13 : 14, weight: .semibold))
+            .buttonStyle(.borderedProminent)
+            .foregroundColor(.white)
+        }
+    }
+}
+
+// 애플 워치 스마트 스택(.small): 지금 운동 + 시간 + 단추
+@available(iOS 18.0, *)
+struct WorkoutWatchView: View {
+    let ctx: ActivityViewContext<WorkoutAttributes>
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(ctx.state.title).font(.system(size: 14, weight: .semibold)).lineLimit(1)
+                Spacer(minLength: 4)
+                if let end = restEndOf(ctx) {
+                    Text(timerInterval: Date()...end, countsDown: true).font(.system(size: 14, weight: .semibold).monospacedDigit()).foregroundColor(accent).frame(width: 48, alignment: .trailing)
+                } else {
+                    Text(ctx.attributes.startedAt, style: .timer).font(.system(size: 13).monospacedDigit()).frame(width: 52, alignment: .trailing)
+                }
+            }
+            Text(ctx.state.step).font(.system(size: 12)).foregroundColor(.secondary).lineLimit(1)
+            WorkoutButtons(ctx: ctx, compact: true)
+        }
+    }
+}
+
 struct WorkoutLiveView: View {
     let ctx: ActivityViewContext<WorkoutAttributes>
     var body: some View {
+        if #available(iOS 18.0, *) { FamilySwitch(ctx: ctx) } else { WorkoutLockView(ctx: ctx) }
+    }
+}
+
+@available(iOS 18.0, *)
+struct FamilySwitch: View {
+    let ctx: ActivityViewContext<WorkoutAttributes>
+    @Environment(\.activityFamily) var family
+    var body: some View {
+        if family == .small { WorkoutWatchView(ctx: ctx).padding(8) } else { WorkoutLockView(ctx: ctx) }
+    }
+}
+
+struct WorkoutLockView: View {
+    let ctx: ActivityViewContext<WorkoutAttributes>
+    var body: some View {
         let s = ctx.state
+        VStack(spacing: 12) {
         HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(s.step.isEmpty ? "운동 중" : s.step).font(.system(size: 12, weight: .semibold)).foregroundColor(accent)
@@ -191,6 +254,8 @@ struct WorkoutLiveView: View {
                         .foregroundColor(.white).multilineTextAlignment(.trailing).frame(width: 110, alignment: .trailing)
                 }
             }
+        }
+        WorkoutButtons(ctx: ctx)
         }
         .padding(16)
         .activityBackgroundTint(Color(red: 0.063, green: 0.067, blue: 0.075))
@@ -218,6 +283,7 @@ struct WorkoutLiveActivity: Widget {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(ctx.state.title).font(.system(size: 17, weight: .semibold)).lineLimit(1)
                         Text(ctx.state.sub).font(.system(size: 12)).foregroundColor(.secondary).lineLimit(1)
+                        WorkoutButtons(ctx: ctx, compact: true).padding(.top, 6)
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }
             } compactLeading: {
@@ -239,6 +305,30 @@ struct WorkoutLiveActivity: Widget {
 struct BashyWidgets: WidgetBundle {
     var body: some Widget {
         BashyWidget()
-        WorkoutLiveActivity()
+        if #available(iOS 18.0, *) { WorkoutLiveActivityWatch() } else { WorkoutLiveActivity() }
     }
 }
+
+// iOS 18: 애플 워치 스마트 스택에도 맞춤 화면(.small)을 띄운다
+@available(iOS 18.0, *)
+struct WorkoutLiveActivityWatch: Widget {
+    var body: some WidgetConfiguration {
+        WorkoutLiveActivity().body.supplementalActivityFamilies([.small])
+    }
+}
+
+// 잠금 화면·다이내믹 아일랜드·애플 워치(스마트 스택)의 운동 단추 — 세트 완료 / 쉬는 시간 +30초 / 건너뛰기.
+// 앱 쪽과 위젯 쪽에 같은 이름으로 둔다(눌리면 앱 프로세스에서 perform 이 돈다).
+@available(iOS 17.0, *)
+struct WorkoutActionIntent: LiveActivityIntent {
+    static var title: LocalizedStringResource = "운동 동작"
+    static var openAppWhenRun: Bool = false
+    @Parameter(title: "동작") var act: String
+    init() { act = "done" }
+    init(act: String) { self.act = act }
+    func perform() async throws -> some IntentResult {
+        NotificationCenter.default.post(name: Notification.Name("BashyWorkoutAction"), object: nil, userInfo: ["act": act])
+        return .result()
+    }
+}
+

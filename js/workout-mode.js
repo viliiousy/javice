@@ -702,6 +702,24 @@ const WorkoutMode = {
 
 document.addEventListener('visibilitychange', () => { if (!document.hidden && WorkoutMode.st) WorkoutMode._time(); });
 
+// 잠금 화면·다이내믹 아일랜드·애플 워치의 운동 단추 (아이폰 앱) — 세트 완료 / +30초 / 쉬는 시간 건너뛰기
+WorkoutMode.remote = function (act) {
+  const S = this.st; if (!S) return;
+  try {
+    if (act === 'skip') return this.skipRest();
+    if (act === 'add30') return S.restEnd ? this.addRest(30) : undefined;
+    if (act === 'done') {
+      const x = S.ex[S.cur], k = x.rows.findIndex(r => !r.ok);
+      if (x.cardio || k < 0) this.nextEx(true); else this.setDone(k);
+    }
+  } catch (e) { console.warn('[운동 단추]', e); }
+};
+(function bindWorkoutRemote() {
+  const B = window.Capacitor?.Plugins?.BashyNative;
+  if (!B || !B.addListener || window.Capacitor?.getPlatform?.() !== 'ios') return;
+  B.addListener('workoutAction', d => WorkoutMode.remote(d && d.act));
+})();
+
 
 // ── 숫자 휠 (아이폰 시간 고르기처럼 굴려서 고르기) ─────────────────
 // 칸마다 따로 굴린다. 가운데 줄이 고른 값. 한 칸 넘어갈 때마다 '틱' 진동과 짧은 소리.
