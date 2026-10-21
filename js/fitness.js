@@ -65,7 +65,7 @@ const Fitness = {
   _rtRO() { const v = UserStore.json(this.ROUTINE_KEY, null); return (v && typeof v === 'object') ? v : {}; },
   picks(dow) {
     const v = this._dpRO()[dow], R = this._rtRO();
-    const ok = p => ['A','B','C','cardio','rest','none'].includes(p) || R[p];   // 예전 Hevy 루틴 id 는 무시
+    const ok = p => ['A','B','C','cardio','rest','none'].includes(p) || R[p] || String(p).startsWith('part:');   // 예전 Hevy 루틴 id 는 무시
     let a = (Array.isArray(v) ? v : [v]).filter(p => p && ok(p));
     if (a.length > 1) a = a.filter(p => p !== 'rest' && p !== 'none');
     return a.length ? a : [this._defaultFor(dow)];
@@ -87,10 +87,15 @@ const Fitness = {
   // 한 회차의 계획
   _planOne(pick, dow) {
     const R = this._rtRO();
-    if (!['A','B','C','cardio','rest','none'].includes(pick) && !R[pick]) pick = this._defaultFor(dow);
+    if (!['A','B','C','cardio','rest','none'].includes(pick) && !R[pick] && !String(pick).startsWith('part:')) pick = this._defaultFor(dow);
     const P = this._planOne0(pick, R); P.pick = pick; return P;
   },
   _planOne0(pick, R) {
+    // 부위로 고른 날: '가슴', '가슴,어깨' — 맞춤 플랜 규칙으로 그 부위 운동을 짠다
+    if (String(pick).startsWith('part:') && typeof PlanGen !== 'undefined') {
+      const parts = pick.slice(5).split(',').filter(Boolean);
+      return { name: parts.join('·'), exercises: PlanGen.dayFor(parts), src: 'part', parts };
+    }
     if (R[pick]) return { name:R[pick].name, exercises:(R[pick].exercises||[]).map(x=>({ name:x.name, sets:x.sets||'', ...(x.w?{w:x.w}:{}) })), src:'routine', rid:pick };
     if (pick === 'none')   return { name:'계획 없음', exercises:[], src:'none' };
     if (pick === 'rest')   return { name:'휴식', exercises:[], src:'day' };
@@ -101,6 +106,7 @@ const Fitness = {
   render(date=new Date(), planIdx=null) {
     // 피트니스 카드가 없는 레이아웃에서는 조용히 종료
     if (!document.getElementById('fitnessWrap')) return;
+    this._renameAuto();
     try { if (typeof WorkoutMode!=='undefined') WorkoutMode.staleCheck(); } catch(e) {}
     const d    = new Date(date);
     const dow  = planIdx!==null ? planIdx : d.getDay();
@@ -230,6 +236,17 @@ const Fitness = {
   },
 
   // 운동 줄 썸네일: 홈트 플랜 그림 → 전체 종목 그림 순으로 찾는다
+  // 예전 자동 플랜 이름(푸시·풀·상체 A …)을 부위 이름으로 한 번 바꾼다 — 사용자가 직접 지은 이름은 건드리지 않는다
+  _renameAuto() {
+    if (this._renamed || typeof PlanGen === 'undefined' || !PlanGen.partLabel) return; this._renamed = true;
+    const R = this.routines(); let ch = false; const seen = {};
+    for (const [id, r] of Object.entries(R)) {
+      if (!r.auto || r.named || !/^(푸시|풀|하체|상체|전신)( [AB])?( \d)?$/.test(r.name)) continue;
+      const lb = PlanGen.partLabel(r.exercises); if (!lb) continue;
+      seen[lb] = (seen[lb] || 0) + 1; r.name = seen[lb] > 1 ? `${lb} ${seen[lb]}` : lb; ch = true;
+    }
+    if (ch) this.saveRoutines(R);
+  },
   _sessOf(ex, plan) { return plan && plan.src==='multi' ? (plan.sessions[ex.sess] || {}) : (plan || {}); },
   _thumb(ex, plan) {
     plan = this._sessOf(ex, plan);
@@ -257,6 +274,8 @@ const Fitness = {
     const DOW = ['일','월','화','수','목','금','토'];
     const OPTS = [
       ...Object.entries(R).map(([id,r]) => [id, '내 루틴 · ' + r.name]),
+      ...[['가슴'],['등'],['하체'],['어깨'],['팔'],['복근'],['가슴','어깨'],['가슴','팔'],['등','팔'],['어깨','팔'],['하체','복근']]
+        .map(ps => ['part:' + ps.join(','), '부위 · ' + ps.join(' + ')]),
       ['none','계획 없음'], ['rest','휴식'], ['cardio','유산소'],
       ['A','홈트 DAY A 푸시'],['B','홈트 DAY B 풀'],['C','홈트 DAY C 하체+코어'],
     ];
@@ -272,7 +291,7 @@ const Fitness = {
         <button class="rt-ed" onclick="Fitness.showRoutineEdit('${id}')">편집</button>
       </div>`).join('');
     App.openModal('@dumbbell 요일별 운동', `<div class="fz fz-dp">
-      <p class="fz-note">요일마다 할 루틴을 고릅니다. 웨이트 + 주짓수처럼 하루에 두 번 이상 하면 ‘한 번 더’ 를 눌러 주세요.</p>
+      <p class="fz-note">요일마다 할 루틴이나 부위(가슴·어깨 …)를 고릅니다. 루틴 이름은 아래 ‘내 루틴 › 편집’ 에서 직접 바꿀 수 있고, 하루에 두 번 이상 하면 ‘한 번 더’ 를 눌러 주세요.</p>
       <div class="dp-list">${rows}</div>
       <div class="rt-box">
         <div class="fz-lbl">내 루틴</div>
@@ -358,7 +377,7 @@ const Fitness = {
     if (!cart.length) { App.showToast('운동을 하나 이상 골라 주세요', 'error'); return; }
     const R = this.routines();
     const id = this._rid || ('r_' + Date.now().toString(36));
-    R[id] = { name, exercises: cart.map(x => ({ name:x.name, sets:x.sets||this.defSets(x.name), ...(x.w?{w:x.w}:{}) })) };
+    R[id] = { name, exercises: cart.map(x => ({ name:x.name, sets:x.sets||this.defSets(x.name), ...(x.w?{w:x.w}:{}) })), named:true };
     this.saveRoutines(R);
     const dp = this.dayPlan();
     const picked = [...document.querySelectorAll('.rt-day:checked')].map(c => c.value);

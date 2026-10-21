@@ -162,12 +162,22 @@ const PlanGen = {
         used.add(name);
         out.push({ name, sets: out.length < 2 && p.goal !== 'lose' ? mainSet : accSet, slot: s });
       }
-      const dup = order.slice(0, di).filter(k => k === key).length;
-      return { name: `${nm}${dup ? ' ' + (dup + 1) : ''}`, exercises: out };
+      // 이름은 '푸시·풀' 같은 분할 이름 대신 실제 부위로 — 무엇을 하는 날인지 바로 보이게
+      return { name: this.partLabel(out) || nm, exercises: out };
     });
+    // 같은 부위 이름이 둘이면 '가슴·삼두 2' 처럼 번호
+    const cnt = {}; routines.forEach(r => { cnt[r.name] = (cnt[r.name] || 0) + 1; if (cnt[r.name] > 1) r.name += ' ' + cnt[r.name]; });
     return { routines, weekdays: this.WEEKDAYS[days] || this.WEEKDAYS[3] };
   },
 
+  // 운동 목록 → '가슴·어깨·삼두' 같은 부위 이름 (많이 나온 순, 최대 3개)
+  partLabel(exs) {
+    const cnt = {};
+    for (const e of exs || []) { const pt = e.slot ? this.PART_OF[e.slot] : this.partOf(e.name); if (pt) cnt[pt] = (cnt[pt] || 0) + 1; }
+    const order = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]);
+    if (order.length >= 4 && order.includes('하체') && order.some(x => ['가슴', '등', '어깨'].includes(x))) return '전신';
+    return order.slice(0, 3).join('·');
+  },
   // ── 오늘 부위 바꾸기 ─────────────────────
   // 자동 플랜이 '하체' 인 날에 가슴을 하고 싶을 때, 루틴을 통째로 다시 만들지 않고 그날만 부위로 다시 뽑는다.
   // 고른 부위들의 동작 칸을 번갈아 채우고, 기구·아픈 곳·뺀 운동 규칙은 맞춤 플랜과 같다.
