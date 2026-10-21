@@ -29,6 +29,10 @@ let html = readFileSync(idx, 'utf8');
 html = html.replace(/<script>\s*if\('serviceWorker'in navigator\)[^<]*<\/script>/, '<!-- 서비스 워커: 앱에서는 쓰지 않음 -->');
 // 웹 구글 로그인(GIS)은 앱에서 쓰지 않는다 — 앱은 네이티브 로그인(js/google-auth.js nativeLogin)
 html = html.replace(/<script src="https:\/\/accounts\.google\.com\/gsi\/client"[^>]*><\/script>/, '<!-- GIS: 앱에서는 네이티브 로그인 -->');
+// 빌드 번호를 앱 안에 박아 둔다 — 안드로이드 APK 사용자에게 새 빌드가 나오면 알리는 데 쓴다(js/app-update.js)
+const BUILD = { n: Number(process.env.BUILD_NUM || 0), at: new Date().toISOString() };
+writeFileSync(join(www, 'js', 'build-info.js'), `window.BASHY_BUILD=${JSON.stringify(BUILD)};\n`);
+html = html.replace('<script src="js/platform.js"></script>', '<script src="js/build-info.js"></script>\n<script src="js/platform.js"></script>');
 writeFileSync(idx, html);
 
 console.log('www 준비 완료:', www);
