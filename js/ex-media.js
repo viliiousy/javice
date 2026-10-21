@@ -151,9 +151,26 @@ const ExMedia = {
   },
   // 그림이 실제로 있는 운동인지 (없으면 자리 자체를 만들지 않는다)
   has(e) { return !!e && (typeof EX_HAVE === 'undefined' || EX_HAVE.has(e.id)); },
-  thumbFor(name) { const e = this.find(name); return this.has(e) ? this.frames(e) : ''; },
+  thumbFor(name) {
+    const sp = this.sportImg(name); if (sp) return sp;
+    const e = this.find(name); return this.has(e) ? this.frames(e) : '';
+  },
+  // 스포츠 종목(주짓수·골프 …)은 자세 애니메이션 대신 같은 화풍의 사진 한 장 — 'still:' 로 표시해 poseHtml 이 멈춘 그림으로 그린다.
+  // 사진이 아직 없으면 같은 틀의 이름 첫 글자 타일로 채운다(목록에서 통일감이 깨지지 않게).
+  sportImg(name) {
+    if (typeof EX_DB === 'undefined' || !EX_DB['스포츠']) return '';
+    const i = EX_DB['스포츠'].indexOf(name);
+    let mine = false;
+    if (i < 0) { mine = typeof Fitness !== 'undefined' && Fitness.myPart && Fitness.myPart(name) === '스포츠'; if (!mine) return ''; }
+    const id = i >= 0 ? 's' + String(i).padStart(3, '0') : '';
+    if (id && typeof SPORT_HAVE !== 'undefined' && SPORT_HAVE.includes(id)) return 'still:img/sport/' + id + '.webp';
+    const ch = String(name).trim().charAt(0) || '·';
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><rect width='120' height='120' fill='#f2f3f5'/><circle cx='60' cy='60' r='38' fill='#ff7a1a' fill-opacity='.14'/><text x='60' y='61' text-anchor='middle' dominant-baseline='central' font-family='IBM Plex Sans KR, sans-serif' font-size='44' font-weight='700' fill='#3a3f47'>${ch.replace(/[<&'"]/g, '')}</text></svg>`;
+    return 'still:data:image/svg+xml,' + encodeURIComponent(svg);
+  },
   // 두 프레임을 겹쳐 두고 위의 것만 천천히 나타났다 사라지게 한다 — 안 움직이는 부분은 그대로 서 있다.
   poseHtml(src, label) {
+    if (String(src).startsWith('still:')) return `<span class="pose still" role="img" aria-label="${label||''}"><i style="background-image:url(&quot;${String(src).slice(6)}&quot;)"></i></span>`;
     return `<span class="pose" role="img" aria-label="${label||''}"><i style="background-image:url('${src}')"></i><i class="pb" style="background-image:url('${src}')"></i></span>`;
   },
 

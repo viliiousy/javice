@@ -301,10 +301,13 @@ const Habits = {
   },
   // 체크 애니메이션(설정에서 켰을 때만) — 다시 그린 뒤의 체크칸을 찾아 터뜨린다
   _fx(id, all, n) {
-    if (typeof Fx==='undefined' || !Fx.on) return;
+    if (typeof Fx==='undefined') return;
+    const first = Fx.unset;              // 처음 체크: 기본으로 보여 주고 나서 켤지 묻는다
+    if (!first && !Fx.on) return;
     try {
-      Fx.check(document.querySelector(`#habitsWrap .habit-item[data-reorderable="${id}"] .habit-chk`));
-      if (all) setTimeout(()=>Fx.perfect(document.querySelector('.card-habits'), n), 260);
+      Fx.check(document.querySelector(`#habitsWrap .habit-item[data-reorderable="${id}"] .habit-chk`), first);
+      if (all) setTimeout(()=>Fx.perfect(document.querySelector('.card-habits'), n, first), 260);
+      if (first) setTimeout(()=>Fx.ask(), all ? 2000 : 1100);
     } catch(e) { console.warn('fx', e); }
   },
 

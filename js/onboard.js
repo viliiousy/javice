@@ -250,7 +250,7 @@ const Onboard = {
       <div class="ob-sub2">ChatGPT·Claude 월 구독이 있다면</div>
       <p class="ob-p">구독은 API 키가 아니라 위 칸에 넣을 수 없습니다. 대신 <b>설정 › AI › ChatGPT · Claude 에 Bashy 연결</b>에서 주소를 받아 ChatGPT·Claude 에 커넥터로 붙이면, 그 앱에서 “점심 김치찌개 먹었어” 처럼 말해 Bashy 에 기록할 수 있습니다(구독 요금 안에서).</p>
       <div class="ob-sub2">구독 AI 사용량 표시</div>
-      <p class="ob-p">Claude·ChatGPT·Higgsfield 구독의 남은 사용량을 맨 위 고리로 보여 줍니다. Bashy 안에서 그 AI 를 쓰지 않아도 됩니다 — PC 크롬에 <a href="https://github.com/viliiousy/javice/blob/main/docs/extension-install.md" target="_blank" rel="noopener">Bashy 사용량 확장</a>을 깔고 같은 크롬에서 bashy.app 에 로그인하면 됩니다. 표시할 것을 고르세요.</p>
+      <p class="ob-p">Claude·ChatGPT·Higgsfield 구독의 남은 사용량을 맨 위 고리로 보여 줍니다. Bashy 안에서 그 AI 를 쓰지 않아도 됩니다 — PC 크롬에 <a href="https://bashy.app/extension.html" target="_blank" rel="noopener">Bashy 사용량 확장</a>을 깔고 같은 크롬에서 bashy.app 에 로그인하면 됩니다. 표시할 것을 고르세요.</p>
       ${AIUsage.trackHtml()}`;
   },
 

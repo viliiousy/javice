@@ -28,5 +28,12 @@ jobs:
           sed -i "s/v[0-9]\{2\}\.[0-9]\{2\}\.[0-9]\{2\}\.[0-9]\{4\} 업데이트/$VERSION 업데이트/g" index.html
           echo "Version injected: $VERSION"
 
+      - name: Zip Chrome extension
+        # 사이트에서 링크 하나로 바로 받게(bashy.app/bashy-extension.zip). 폴더째 묶어 압축을 풀면 bashy-extension 폴더가 나온다.
+        run: |
+          rm -rf /tmp/bashy-extension && cp -r extension /tmp/bashy-extension
+          (cd /tmp && zip -qr "$GITHUB_WORKSPACE/bashy-extension.zip" bashy-extension -x '*.DS_Store')
+          ls -l bashy-extension.zip
+
       - name: Deploy to Vercel
         run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes

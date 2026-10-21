@@ -122,3 +122,9 @@ html[data-ui="v2"] .nt .set-link:last-child{ border-bottom:0; }
   color:var(--accent); background:color-mix(in srgb, var(--card) 88%, transparent); white-space:nowrap; font-style:normal; }
 #fxLayer .fx-stamp b{ font-size:26px; font-weight:800; letter-spacing:-.02em; }
 #fxLayer .fx-stamp span{ font-size:18px; font-weight:700; }
+.fx-ask{ padding-top:24px; }
+.fx-ask-t{ display:block; font-size:19px; font-weight:600; }
+.fx-ask-p{ margin:8px 0 0; font-size:14px; color:var(--text3); line-height:1.55; }
+.fx-ask-btns{ display:grid; grid-template-columns:1fr 2fr; gap:8px; margin-top:24px; }
+.fx-ask-btns .mx-go{ margin:0; }
+.fx-ask-no{ height:48px; border:1px solid var(--border); border-radius:12px; background:none; color:var(--text2); font:inherit; font-size:16px; cursor:pointer; }

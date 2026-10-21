@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>사용량 확장 설치 · Bashy</title>
+<link rel="icon" href="icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{ --bg:#101113; --fg:#ECEDEE; --sub:#8B8F97; --line:#26282D; --acc:#FF6A2B; --chip:#1A1B1F; }
+*{ box-sizing:border-box; }
+body{ margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 'IBM Plex Sans KR',system-ui,sans-serif; }
+main{ max-width:640px; margin:0 auto; padding:48px 16px 64px; }
+h1{ font-size:28px; font-weight:600; margin:0 0 8px; letter-spacing:-.01em; }
+.lead{ color:var(--sub); margin:0 0 24px; }
+.dl{ display:flex; align-items:center; justify-content:space-between; gap:16px; width:100%; min-height:64px; padding:0 20px; border-radius:12px;
+  background:var(--acc); color:#101113; font-weight:600; font-size:17px; text-decoration:none; }
+.dl small{ font:500 14px 'Space Grotesk',sans-serif; opacity:.7; }
+.note{ margin:8px 0 0; color:var(--sub); font-size:14px; }
+ol{ list-style:none; counter-reset:s; padding:0; margin:40px 0 0; border-top:1px solid var(--line); }
+ol li{ counter-increment:s; display:grid; grid-template-columns:40px 1fr; gap:8px; padding:16px 0; border-bottom:1px solid var(--line); }
+ol li::before{ content:counter(s); font:600 20px/1.4 'Space Grotesk',sans-serif; color:var(--acc); }
+code{ font:500 14px 'Space Grotesk',monospace; background:var(--chip); padding:2px 8px; border-radius:6px; user-select:all; }
+.copy{ margin-left:8px; height:28px; padding:0 10px; border:1px solid var(--line); border-radius:14px; background:none; color:var(--sub); font:inherit; font-size:13px; cursor:pointer; }
+b{ font-weight:600; }
+h2{ font-size:17px; font-weight:600; margin:40px 0 8px; }
+p.muted, .muted{ color:var(--sub); font-size:14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Bashy 사용량 확장</h1>
+  <p class="lead">PC 크롬에 깔아 두면 Claude · ChatGPT · Higgsfield 남은 사용량이 Bashy 맨 위 고리에 채워집니다.</p>
+
+  <a class="dl" href="/bashy-extension.zip" download="bashy-extension.zip">확장 내려받기 <small>ZIP · 크롬용</small></a>
+  <p class="note">누르면 바로 내려받아집니다. 받은 파일을 더블클릭해 압축을 풀어 두세요.</p>
+
+  <ol>
+    <li><span>크롬 주소창에 <code>chrome://extensions</code><button class="copy" onclick="navigator.clipboard.writeText('chrome://extensions');this.textContent='복사됨'">복사</button> 를 붙여 넣어 엽니다.</span></li>
+    <li><span>오른쪽 위 <b>개발자 모드</b>를 켭니다.</span></li>
+    <li><span><b>압축해제된 확장 프로그램을 로드합니다</b>를 누르고, 방금 압축을 푼 <b>bashy-extension</b> 폴더를 고릅니다.</span></li>
+    <li><span>같은 크롬에서 <b>bashy.app</b> 에 로그인하면 끝입니다. 연결 코드는 필요 없습니다.</span></li>
+  </ol>
+
+  <h2>업데이트</h2>
+  <p class="muted">새 파일을 받아 같은 폴더에 덮어쓴 뒤, <code>chrome://extensions</code> 에서 Bashy 사용량 수집기의 새로 고침(↻)을 누릅니다.</p>
+
+  <h2>개인정보</h2>
+  <p class="muted">확장은 위 세 사이트의 사용량 숫자만 읽고 대화 내용은 읽거나 보내지 않습니다. 보내는 곳은 bashy.app 하나뿐입니다.</p>
+</main>
+</body>
+</html>

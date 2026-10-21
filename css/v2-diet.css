@@ -232,3 +232,24 @@ html[data-ui="v2"] .dt-add .dt-go{
 /* 숫자 칸은 폰에서도 두 칸씩 — 한 줄에 하나씩 쌓이면 화면 세 장을 넘긴다 */
 html[data-ui="v2"] .dt .modal-grid2,
 html[data-ui="v2"] .diet-ai-card .modal-grid2{ grid-template-columns:1fr 1fr !important; }
+
+/* ── 운동으로 쓴 열량 ─────────────────────────── */
+html[data-ui="v2"] .dk-burn{ display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; min-height:40px; margin:12px 0 0; padding:0 12px;
+  border:0; border-radius:10px; background:color-mix(in srgb, var(--accent) 10%, transparent); color:var(--text2); font:inherit; font-size:13px; cursor:pointer; text-align:left; }
+html[data-ui="v2"] .dk-burn b{ color:var(--text); font-weight:600; }
+html[data-ui="v2"] .dk-burn-plus{ color:var(--accent); }
+html[data-ui="v2"] .dk-burn-plus b{ color:var(--accent); }
+html[data-ui="v2"] .db-big{ display:flex; align-items:baseline; gap:6px; }
+html[data-ui="v2"] .db-big .num{ font-size:40px; font-weight:600; letter-spacing:-.02em; color:var(--text); }
+html[data-ui="v2"] .db-big i{ font-style:normal; color:var(--text3); }
+html[data-ui="v2"] .db-note{ margin:4px 0 16px; font-size:13px; color:var(--text3); }
+html[data-ui="v2"] .db-list{ border-top:1px solid var(--v2-line); }
+html[data-ui="v2"] .db-row{ display:grid; grid-template-columns:1fr auto 64px; gap:12px; align-items:center; min-height:48px; border-bottom:1px solid var(--v2-line); font-size:15px; }
+html[data-ui="v2"] .db-row small{ color:var(--text3); font-size:13px; }
+html[data-ui="v2"] .db-row b{ text-align:right; font-weight:600; }
+html[data-ui="v2"] .db-opts{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px; }
+html[data-ui="v2"] .db-opt{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-height:64px; padding:8px 12px; border:1px solid var(--border); border-radius:12px;
+  background:none; color:var(--text); font:inherit; cursor:pointer; text-align:left; }
+html[data-ui="v2"] .db-opt b{ font-size:15px; font-weight:600; }
+html[data-ui="v2"] .db-opt small{ font-size:12px; color:var(--text3); line-height:1.35; }
+html[data-ui="v2"] .db-opt.on{ border-color:var(--text); box-shadow:inset 0 0 0 1px var(--text); }

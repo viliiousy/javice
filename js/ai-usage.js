@@ -190,7 +190,7 @@ const AIUsage = {
           <p class="aiu-sub aiu-p">Claude·ChatGPT·Higgsfield 는 남은 사용량을 API 로 알려 주지 않아, PC 크롬에 로그인된 사이트에서 확장이 5분마다 읽어 옵니다.
             확장을 설치한 크롬에서 bashy.app 에 한 번 로그인하면 연결은 저절로 됩니다.</p>
           <p class="aiu-sub aiu-p">위쪽에 표시할 AI 는 설정 › 디자인 › 상단바 정보에서 고릅니다.</p>
-          <a class="btn-sm aiu-a" href="https://github.com/viliiousy/javice/blob/main/docs/extension-install.md" target="_blank" rel="noopener">설치 방법</a>
+          <a class="btn-sm aiu-a" href="https://bashy.app/extension.html" target="_blank" rel="noopener">확장 받기</a>
         </div>
       </div>`);
     this.refresh();

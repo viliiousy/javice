@@ -15,10 +15,10 @@ Bashy 상단의 AI 사용량 고리(Claude · ChatGPT · Higgsfield)는 이 확�
 AI 비서(답하기)에는 이 확장이 필요 없습니다. 사용량 표시에만 씁니다.
 
 ## 설치 (약 2분)
-1. 저장소 첫 화면 https://github.com/viliiousy/javice 에서 **Code → Download ZIP**을 누르고 압축을 풉니다.
+1. https://bashy.app/extension.html 에서 **확장 내려받기**를 누르고 받은 ZIP 의 압축을 풉니다.
 2. 크롬 주소창에 `chrome://extensions` 를 엽니다.
 3. 오른쪽 위 **개발자 모드**를 켭니다.
-4. **압축해제된 확장 프로그램을 로드합니다** → 압축 푼 폴더 안의 `extension` 폴더를 고릅니다.
+4. **압축해제된 확장 프로그램을 로드합니다** → 압축 푼 `bashy-extension` 폴더를 고릅니다.
 5. 같은 크롬에서 **bashy.app** 에 로그인합니다. 연결 코드를 넣을 필요 없이 계정에 저절로 연결됩니다.
 6. 확장 아이콘(퍼즐 모양 → Bashy 사용량 수집기)을 누르고 **지금 수집**을 누르면 바로 반영됩니다.
 

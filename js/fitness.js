@@ -195,9 +195,12 @@ const Fitness = {
         </div>`;}).join(''); })()}
       </div>
       ${plan.from ? `<p class="fit-from">${plan.from.slice(5).replace('-','/')} 계획을 오늘 하는 중 · <a href="javascript:Fitness.undoFrom('${dsx}')">되돌리기</a></p>` : ''}
+      ${(()=>{ const b=this.burn(d); return b.kcal ? `<div class="fit-burn"><span>운동으로 쓴 열량</span><b class="num">약 ${b.kcal.toLocaleString('ko-KR')}</b><i>kcal</i></div>` : ''; })()}
       <div class="fit-foot">
         <button class="habit-add-btn" onclick="WorkoutHistory.openAll()">기록 보기</button>
       </div>`;
+    // 운동 체크가 바뀌면 식단 카드의 '더 먹어도 되는 열량' 도 같이 바뀐다
+    try { if (typeof Diet!=='undefined' && document.getElementById('dietWrap')) Diet.render(d); } catch(e) {}
     // 평소에는 보기·체크만 — 교체·순서·빼기는 '수정' 에서
   },
 
@@ -872,6 +875,38 @@ const Fitness = {
       sb.textContent = sv&&sv.ex&&sv.ex.length&&sv.ds===this._dateStr(new Date())&&isToday ? `이어서 ${sv.ex.filter(e=>e.done).length}/${sv.ex.length}` : '시작';
       sb.onclick=()=>WorkoutMode.startFor(dsx);
     }
+  },
+
+  // ── 운동 소모 열량(추정) ─────────────────
+  // 그날 한 운동만 센다: 체크했거나 무게 기록이 있는 종목.
+  //   시간 운동(스포츠·유산소): (MET−1) × 몸무게 × 시간.  분은 기록 → 계획(‘60분’) 순.
+  //   근력: 한 세트 + 쉬는 시간을 2.5분으로 보고 MET 5. 세트 수는 기록 → 계획 순.
+  // 몸무게는 인바디 최근 기록, 없으면 70kg.
+  weightKg() {
+    try { const r = typeof InBody!=='undefined' && InBody.getRecords().filter(x=>Number(x.wt)>25).pop(); const w = Number(r && r.wt); if (w > 25) return w; } catch(e) {}
+    return 70;
+  },
+  burn(date=new Date()) {
+    const d=new Date(date), ds=this._dateStr(d);
+    let list=[]; try { list=this.exercisesFor(d).list; } catch(e) { return { kcal:0, items:[], kg:this.weightKg() }; }
+    const chk=this._checked(d), log=typeof PlanGen!=='undefined' ? PlanGen.log(ds) : {}, kg=this.weightKg();
+    const items=[];
+    list.forEach((x,i)=>{
+      const L=log[x.name]||[], done=chk.includes(i);
+      if(!done && !L.length) return;
+      const timed=typeof PlanGen!=='undefined' && PlanGen.timed(x.name);
+      let kcal, info;
+      if(timed){
+        const min=+(String(x.sets||'').match(/(\d+)\s*분/)||[])[1] || (PlanGen.partOf(x.name)==='스포츠'?60:30);
+        const met=(typeof EX_MET!=='undefined' && EX_MET[x.name]) || (PlanGen.partOf(x.name)==='스포츠'?6:6);
+        kcal=(met-1)*kg*min/60; info=`${min}분`;
+      } else {
+        const n=L.length || (typeof WorkoutMode!=='undefined' ? WorkoutMode._nSets(x.sets) : 3);
+        kcal=(5-1)*kg*(n*2.5)/60; info=`${n}세트`;
+      }
+      items.push({ name:x.name, kcal:Math.round(kcal), info });
+    });
+    return { kcal:items.reduce((t,x)=>t+x.kcal,0), items, kg };
   },
 
   _delCustom(customIdx, dateStr=null) {

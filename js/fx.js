@@ -7,6 +7,25 @@ const Fx = {
   KEY: 'gl_fx_anim',
   get on() { try { return UserStore.get(this.KEY) === '1'; } catch { return false; } },
   set on(v) { try { UserStore.set(this.KEY, v ? '1' : '0'); window.FirebaseSync?.scheduleSave?.(); } catch {} },
+  // 아직 한 번도 고르지 않았으면(처음 체크) 효과를 먼저 보여 주고 켤지 묻는다
+  get unset() { try { const v = UserStore.get(this.KEY); return v !== '1' && v !== '0'; } catch { return false; } },
+  ask() {
+    if (document.getElementById('fxAsk')) return;
+    const el = document.createElement('div'); el.id = 'fxAsk'; el.className = 'mx-ov';
+    el.innerHTML = `<div class="mx-sh fx-ask" role="dialog" aria-label="체크 애니메이션">
+      <b class="fx-ask-t">방금 그 효과, 계속 볼까요?</b>
+      <p class="fx-ask-p">습관을 체크할 때마다 터지고, 그날 습관을 다 채우면 올클리어 도장이 찍힙니다.</p>
+      <div class="fx-ask-btns"><button type="button" class="fx-ask-no">끄기</button><button type="button" class="mx-go fx-ask-yes">켜 두기</button></div>
+    </div>`;
+    document.body.appendChild(el);
+    const pick = v => {
+      this.on = v; el.classList.remove('on'); setTimeout(() => el.remove(), 220);
+      setTimeout(() => App.showToast(`${v ? '켰' : '껐'}습니다. 나중에 설정 › 소리 · 진동 · 효과에서 바꿀 수 있어요`, 'success'), 120);
+    };
+    el.querySelector('.fx-ask-yes').onclick = () => pick(true);
+    el.querySelector('.fx-ask-no').onclick = () => pick(false);
+    requestAnimationFrame(() => el.classList.add('on'));
+  },
   _calm() { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } },
   _layer() {
     let L = document.getElementById('fxLayer');
@@ -61,8 +80,8 @@ const Fx = {
   },
 
   // 그날 습관 전부 — 카드 전체
-  perfect(card, n) {
-    if (!card || !this.on || this._calm()) return;
+  perfect(card, n, force) {
+    if (!card || (!force && !this.on) || this._calm()) return;
     const r = card.getBoundingClientRect(); if (!r.width) return;
     // 카드 테두리가 주황으로 한 바퀴 번쩍
     const fr = this._el('fx-frame', { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });

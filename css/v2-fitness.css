@@ -325,3 +325,7 @@ html[data-ui="v2"] .fz .ex-make svg{ width:16px; height:16px; color:var(--accent
 .mx-chips button{ height:32px; padding:0 14px; border:1px solid var(--border); border-radius:16px; background:none; color:var(--text2); font:inherit; font-size:13px; cursor:pointer; }
 .mx-chips button.on{ background:var(--text); border-color:var(--text); color:var(--card); font-weight:600; }
 .mx-go{ width:100%; height:48px; margin-top:24px; border:0; border-radius:12px; background:var(--accent); color:#17181B; font:inherit; font-size:16px; font-weight:600; cursor:pointer; }
+html[data-ui="v2"] .fit-burn{ display:flex; align-items:baseline; gap:6px; padding:12px 0 0; font-size:13px; color:var(--text3); }
+html[data-ui="v2"] .fit-burn span{ flex:1; }
+html[data-ui="v2"] .fit-burn b{ font-size:17px; font-weight:600; color:var(--text); }
+html[data-ui="v2"] .fit-burn i{ font-style:normal; }
