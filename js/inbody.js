@@ -212,8 +212,7 @@ const InBody = {
     if (!recs.length) {
       wrap.innerHTML = `
         <p class="empty">${Icons.big('chart')}아직 기록이 없습니다<br><span style="font-size:11px">체중만 입력해도 추이를 볼 수 있어요</span></p>
-        <div class="habit-add-btn" onclick="InBody.showAdd()">+ 인바디 기록</div>
-        ${this.healthAvail() && !this.healthOn() ? `<div class="habit-add-btn" onclick="InBody.healthConnect()">애플 건강 연결</div>` : ''}`;
+        ${this._footHtml()}`;
       this._renderBadge(null);
       return;
     }
@@ -226,7 +225,7 @@ const InBody = {
       this._periodHtml() +
       this._chartHtml(inP, views) +
       this._listHtml(inP, recs.length) +
-      `<div class="habit-add-btn" onclick="InBody.showAdd()">+ 인바디 기록</div>`;
+      this._footHtml();
 
     this._renderBadge(la);
   },
@@ -344,7 +343,7 @@ const InBody = {
       ${tile('근육량',   la.ms  || '—', 'kg',   'ms', la.ms && la.msEst)}
       ${tile('체지방률', la.bf  || '—', '%',    'bf')}
       ${tile('BMI',      la.bmi || '—', '',     'bmi')}
-      ${tile('기초대사', la.bmr || '—', 'kcal', null)}
+      ${(() => { const b = la.bmr || (this.getRecords().filter(r => r.bmr).slice(-1)[0] || {}).bmr; return b ? tile('기초대사', b, 'kcal', null) : ''; })()}
     </div>`;
   },
 
@@ -557,52 +556,83 @@ const InBody = {
   },
 
   // ── 입력 ───────────────────────────────
+  // 카드 아래: 불러오기 / 직접 입력
+  _footHtml() {
+    return `<div class="ib-foot">
+      <button type="button" class="ib-fb" onclick="InBody.showLoad()">${typeof Icons!=='undefined'?Icons.svg('download','ib-fi'):''}<span>불러오기</span>${this.healthOn()?'<i>자동</i>':''}</button>
+      <button type="button" class="ib-fb" onclick="InBody.showAdd()">${typeof Icons!=='undefined'?Icons.svg('pen','ib-fi'):''}<span>직접 입력</span></button>
+    </div>`;
+  },
+
+  // ── 불러오기 ────────────────────────────
+  showLoad() {
+    const ios = this.healthAvail(), on = this.healthOn();
+    const last = this.getRecords().filter(r => r.src === 'health').slice(-1)[0];
+    App.openModal('@download 인바디 기록 불러오기', `
+      <div class="ib-src">
+        <div class="ib-src-h"><b>애플 건강</b><span>${on ? '자동으로 가져오는 중' : ios ? '연결 안 됨' : '아이폰 앱에서만'}</span></div>
+        <p>인바디 앱 › 설정에서 <b>건강 앱 연동</b>을 켜 두면, 인바디에서 잰 체중·체지방률·제지방량·BMI 가 건강 앱을 거쳐 여기로 들어옵니다. 골격근량은 건강 앱에 없어 지난 실측으로 추정합니다.</p>
+        ${on ? `<p class="ib-src-m">${last ? `마지막으로 가져온 기록 <b class="num">${last.dt.slice(5).replace('-','/')}</b>` : '아직 가져온 기록이 없습니다'}</p>
+          <div class="ib-src-b"><button class="btn-sm" onclick="InBody.healthOff();App.closeModal()">자동 가져오기 끄기</button><button class="btn-sm accent" onclick="InBody._loadNow()">지금 가져오기</button></div>`
+        : ios ? `<button class="ib-go" onclick="InBody.healthConnect()">애플 건강 연결</button>`
+        : `<p class="ib-src-m">아이폰의 Bashy 앱에서 연결하면, 같은 계정의 웹·태블릿에도 함께 보입니다.</p>`}
+      </div>
+      <div class="ib-src">
+        <div class="ib-src-h"><b>갓생일지</b><span>한 번만</span></div>
+        <p>예전 갓생일지 앱에 남긴 인바디 기록을 그대로 옮깁니다. 같은 날짜 기록은 건드리지 않습니다.</p>
+        <button class="btn-sm" onclick="InBody.showImport()">갓생일지 기록 붙여넣기</button>
+      </div>`);
+  },
+  async _loadNow() {
+    const n = await this.healthSync(true, 365);
+    if (n == null) return;
+    App.closeModal();
+    App.showToast(n ? `${n}일치 새 기록을 가져왔습니다` : '새 기록이 없습니다', 'success');
+  },
+
+  // ── 직접 입력 ────────────────────────────
+  // 체중이 주인공(크게), 나머지 다섯 칸은 2열로 조용하게. 단위는 칸 안 오른쪽에.
   _formHtml(r) {
     const v = k => (r && r[k]) ? r[k] : '';
+    const ht = (() => { try { return Number(JSON.parse(UserStore.get('gl_profile') || '{}').ht) || 0; } catch { return 0; } })();
+    const f = (id, lbl, k, unit, step = '0.1', extra = '') => `<label class="ib-f"><span>${lbl}${extra}</span>
+      <span class="ib-in"><input id="${id}" type="number" step="${step}" inputmode="decimal" class="num" value="${v(k)}" placeholder="—"><i>${unit}</i></span></label>`;
     return `
-      <div class="modal-row"><label class="modal-lbl">날짜 *</label>
-        <input id="ibDt" type="date" class="inp" value="${r ? r.dt : this._todayStr()}"></div>
-      <div class="modal-grid2">
-        <div><label class="modal-lbl">체중 * (kg)</label>
-          <input id="ibWt" type="number" step="0.1" inputmode="decimal" class="inp" value="${v('wt')}"></div>
-        <div><label class="modal-lbl">근육량 (kg)${r && r.msEst ? this._estBadge() : ''}</label>
-          <input id="ibMs" type="number" step="0.1" inputmode="decimal" class="inp" value="${v('ms')}"
-                 ${r && r.msEst ? 'title="추정값입니다. 인바디에서 잰 수치를 넣으면 실측으로 바뀝니다."' : ''}></div>
-      </div>
-      <div class="modal-grid2">
-        <div><label class="modal-lbl">체지방률 (%)</label>
-          <input id="ibBf" type="number" step="0.1" inputmode="decimal" class="inp" value="${v('bf')}"></div>
-        <div><label class="modal-lbl">기초대사량 (kcal)</label>
-          <input id="ibBmr" type="number" inputmode="numeric" class="inp" value="${v('bmr')}"></div>
-      </div>
-      <div class="modal-grid2">
-        <div><label class="modal-lbl">제지방량 (kg)</label>
-          <input id="ibLbm" type="number" step="0.1" inputmode="decimal" class="inp" value="${v('lbm')}"></div>
-        <div><label class="modal-lbl">BMI</label>
-          <input id="ibBmi" type="number" step="0.1" inputmode="decimal" class="inp" value="${v('bmi')}"></div>
+      <div class="ib-form" data-ht="${ht}">
+        <label class="ib-date"><span>측정한 날</span><input id="ibDt" type="date" value="${r ? r.dt : this._todayStr()}"></label>
+        <label class="ib-hero"><span>체중</span>
+          <span class="ib-hin"><input id="ibWt" type="number" step="0.1" inputmode="decimal" class="num" value="${v('wt')}" placeholder="0.0" oninput="InBody._autoBmi();InBody._fit(this)"><i>kg</i></span></label>
+        <div class="ib-grid">
+          ${f('ibMs', '골격근량', 'ms', 'kg', '0.1', r && r.msEst ? '<em>추정</em>' : '')}
+          ${f('ibBf', '체지방률', 'bf', '%')}
+          ${f('ibLbm', '제지방량', 'lbm', 'kg')}
+          ${f('ibBmi', 'BMI', 'bmi', '', '0.1', ht ? '<em>키로 자동</em>' : '')}
+          ${f('ibBmr', '기초대사량', 'bmr', 'kcal', '1')}
+        </div>
       </div>`;
+  },
+  // 키를 알면 체중을 넣는 대로 BMI 를 채운다(직접 고친 값은 건드리지 않는다)
+  _fit(el) { if (el) el.style.width = (Math.max(3, String(el.value || el.placeholder).length) * 0.6 + 0.1) + 'em'; },
+  _autoBmi() {
+    const box = document.querySelector('.ib-form'), ht = Number(box?.dataset.ht) / 100;
+    const w = parseFloat(document.getElementById('ibWt')?.value), b = document.getElementById('ibBmi');
+    if (!ht || !b || !(w > 0) || b.dataset.touched) return;
+    b.value = Math.round(w / (ht * ht) * 10) / 10;
   },
 
   showAdd() {
-    App.openModal('@chart 인바디 기록', this._formHtml(null) + `
-      <div class="modal-btns">
-        <button onclick="InBody._save(null)" class="btn-sm accent">저장</button>
-        <button onclick="App.closeModal()" class="btn-sm">취소</button>
-      </div>
-      ${this._healthLink()}
-      <div class="ib-import-link" onclick="InBody.showImport()">갓생일지에서 가져오기</div>`);
-    setTimeout(() => document.getElementById('ibWt')?.focus(), 50);
+    App.openModal('@pen 인바디 직접 입력', this._formHtml(null) + `
+      <button class="ib-go" onclick="InBody._save(null)">저장</button>`);
+    setTimeout(() => { document.getElementById('ibBmi')?.addEventListener('input', e => { e.target.dataset.touched = '1'; }); InBody._fit(document.getElementById('ibWt')); document.getElementById('ibWt')?.focus(); }, 50);
   },
 
   showEdit(dt) {
     const r = this.getRecords().find(x => x.dt === dt);
     if (!r) return;
-    App.openModal('@chart 인바디 수정', this._formHtml(r) + `
-      <div class="modal-btns">
-        <button onclick="InBody._save('${dt}')" class="btn-sm accent">저장</button>
-        <button onclick="InBody.remove('${dt}')" class="btn-danger">삭제</button>
-        <button onclick="App.closeModal()" class="btn-sm">취소</button>
-      </div>`);
+    App.openModal('@pen 인바디 기록 고치기', this._formHtml(r) + `
+      <button class="ib-go" onclick="InBody._save('${dt}')">저장</button>
+      <button class="ib-del" onclick="InBody.remove('${dt}')">이 기록 삭제</button>`);
+    setTimeout(() => { const b = document.getElementById('ibBmi'); if (b) b.dataset.touched = '1'; InBody._fit(document.getElementById('ibWt')); }, 50);
   },
 
   _save(origDt) {
@@ -654,18 +684,14 @@ const InBody = {
   // god_life는 localStorage 'mft5' 한 키에 전부 저장한다.
   // 다른 도메인이라 자동으로 못 읽으므로 JSON을 붙여넣게 한다.
   showImport() {
-    App.openModal('@download 갓생일지 인바디 가져오기', `
-      <p class="modal-lbl" style="line-height:1.6">
-        갓생일지 사이트에서 개발자도구 콘솔을 열고
-        <code class="ib-code">localStorage.mft5</code> 를 입력해 나온 값을
-        통째로 붙여넣으세요. 인바디 기록만 추출합니다.<br>
-        <span style="color:var(--text3)">인바디 배열만 붙여넣어도 됩니다.</span>
-      </p>
-      <textarea id="ibImport" class="inp" rows="7" placeholder='{"ib":[{"dt":"2026-01-01","wt":70,...}]}'></textarea>
-      <div class="modal-btns">
-        <button onclick="InBody._runImport()" class="btn-sm accent">가져오기</button>
-        <button onclick="App.closeModal()" class="btn-sm">취소</button>
-      </div>`);
+    App.openModal('@download 갓생일지 기록 붙여넣기', `
+      <ol class="ib-steps">
+        <li>갓생일지 사이트를 연 브라우저에서 개발자 도구 › 콘솔을 엽니다.</li>
+        <li><code class="ib-code">localStorage.mft5</code> 를 입력하고 나온 값을 통째로 복사합니다.</li>
+        <li>아래에 붙여 넣으면 인바디 기록만 골라 옮깁니다. 인바디 배열만 붙여 넣어도 됩니다.</li>
+      </ol>
+      <textarea id="ibImport" class="inp ib-ta" rows="6" placeholder='{"ib":[{"dt":"2026-01-01","wt":70,...}]}'></textarea>
+      <button class="ib-go" onclick="InBody._runImport()">가져오기</button>`);
   },
 
   _runImport() {
