@@ -87,6 +87,8 @@ const LocalNotify = {
       // 식단 — 끼니마다
       if (s.diet?.enabled) ['아침', '점심', '저녁'].forEach((m, i) => {
         const t = s.diet[m] || { 아침: '09:00', 점심: '13:00', 저녁: '19:00' }[m];
+        // 이미 그 끼니를 기록했으면(알림 시각 전에) 그날 알림은 걸지 않는다
+        try { if ((Diet.getData(date)[m] || []).length) return; } catch (e) {}
         add(n + 2 + i, this._at(day, t), `${m} 기록`, `${m} 드셨으면 식단에 남겨 두세요.`);
       });
       // 오늘 마감 할일

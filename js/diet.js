@@ -56,7 +56,7 @@ const Diet = {
     const v=UserStore.parse(this._key(date), null);
     return (v && typeof v==='object') ? v : {아침:[],점심:[],저녁:[],간식:[]};
   },
-  saveData(d,date=new Date()){ UserStore.set(this._key(date),JSON.stringify(d)); FirebaseSync?.scheduleSave(); },
+  saveData(d,date=new Date()){ UserStore.set(this._key(date),JSON.stringify(d)); FirebaseSync?.scheduleSave(); try{ LocalNotify?.reschedule(); }catch(e){} },   // 끼니를 적으면 그 끼니 알림을 뺀다
 
   // ── 즐겨찾기 ──────────────────────────
   getFavs(){ const v=UserStore.parse(this._favKey(), []); return Array.isArray(v)?v:[]; },
@@ -415,10 +415,35 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     this.searchFood(food.n, meal, ds);
   },
 
+  // ── 띄어쓰기·순서·표기가 달라도 찾기 (서버 lib/mfds.js 와 같은 규칙) ──
+  _VAR: [['마끼아또','마키아또','마키아토','마끼야또','마키야또','마끼아토'],['프라푸치노','프라프치노','프라푸찌노'],
+    ['카라멜','캐러멜','캬라멜'],['라떼','라테'],['요거트','요구르트'],['치즈케이크','치즈케익']],
+  _MODS: ['제로','라이트','무설탕','저당','디카페인','슈거프리','로우슈거'],
+  _canon(s){ let t=String(s||'').toLowerCase().replace(/[\s_()\[\]·.,/-]+/g,''); for(const g of this._VAR) for(const v of g.slice(1)) t=t.split(v).join(g[0]); return t; },
+  _tokens(q){
+    const out=[];
+    for(let w of String(q||'').trim().split(/\s+/)){ w=this._canon(w); if(!w) continue;
+      for(const m of this._MODS) if(w!==m && w.includes(m)){ out.push(m); w=w.split(m).join(''); }
+      if(w) out.push(w); }
+    return [...new Set(out)];
+  },
+  // 브랜드 없는 기본 음료(대표값, 톨 355mL 기준 대략) — 내 기록에도 식약처 DB 에도 기본형이 없을 때 먼저 권한다
+  GENERIC: [
+    ['☕','아메리카노','1잔(355mL)',10,1,2,0], ['☕','카페라떼','1잔(355mL)',180,10,14,9], ['☕','바닐라라떼','1잔(355mL)',230,9,31,8],
+    ['☕','카라멜마끼아또','1잔(355mL)',230,9,32,7], ['☕','카푸치노','1잔(355mL)',120,7,10,6], ['☕','카페모카','1잔(355mL)',290,10,36,12],
+    ['☕','돌체라떼','1잔(355mL)',300,10,38,11], ['☕','콜드브루','1잔(355mL)',5,0,1,0], ['☕','아인슈페너','1잔(355mL)',200,3,18,13],
+    ['🍵','녹차라떼','1잔(355mL)',240,9,35,7], ['🍫','초코라떼','1잔(355mL)',320,11,45,11], ['🍋','레몬에이드','1잔(355mL)',150,0,38,0],
+    ['🍊','자몽에이드','1잔(355mL)',160,0,40,0], ['🧋','복숭아 아이스티','1잔(355mL)',150,0,37,0],
+  ],
+  _generic(q){
+    const tk=this._tokens(q), cq=this._canon(q); if(!cq) return [];
+    return this.GENERIC.filter(([,n])=>{ const cn=this._canon(n); return cn.includes(cq) || (tk.length && tk.every(t=>cn.includes(t))); })
+      .map(([e,n,u,c,p,cb,ft])=>({ e, n, u, c, p, cb, ft, gen:true }));
+  },
   _search(q){
     q = String(q||'').trim();
     if(!q) return [];
-    const lower  = q.toLowerCase();
+    const lower  = q.toLowerCase(), cq = this._canon(q), tk = this._tokens(q), core = tk.filter(t=>!this._MODS.includes(t));
     const isCho  = /^[ㄱ-ㅎ]+$/.test(q);          // 전부 초성이면 초성 검색
     const favs   = this.getFavs();
     const scored = [];
@@ -430,9 +455,11 @@ JSON 만 출력해. 다른 말은 붙이지 마.
         if(ch.startsWith(q))      rank = 1;
         else if(ch.includes(q))   rank = 3;
       } else {
-        if(nm === lower)          rank = 0;
-        else if(nm.startsWith(lower)) rank = 1;
-        else if(nm.includes(lower))   rank = 2;
+        const cn = this._canon(f.n);
+        if(nm === lower || cn === cq)          rank = 0;
+        else if(nm.startsWith(lower) || cn.startsWith(cq)) rank = 1;
+        else if(nm.includes(lower) || cn.includes(cq))   rank = 2;
+        else if(core.length && core.every(t=>cn.includes(t))) rank = tk.every(t=>cn.includes(t)) ? 2 : 3;   // 띄어쓰기·순서가 달라도
         else if(this._cho(f.n).includes(q)) rank = 4;   // 한글 자모가 섞여도 잡아준다
       }
       if(rank < 0) continue;
@@ -470,7 +497,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
         onclick="event.stopPropagation();Diet.favFromSearch(${i},'${meal}','${ds}')">${fv?'★':'☆'}</button>
       <div class="diet-food-main" onclick="Diet.selectFood(${i},'${meal}','${ds}')">
         <span class="diet-food-nm">${this._em(f.e)}${esc(f.n)}</span>
-        <span class="dt-meta">${f.u?`<span class="diet-food-u">${esc(f.u)}</span>`:''}${this._srcTag(f.e)}${ate?`<span class="diet-food-n" title="지금까지 담은 횟수">${ate.n}회</span>`:''}</span>
+        <span class="dt-meta">${f.u?`<span class="diet-food-u">${esc(f.u)}</span>`:''}${f.gen?'<span class="dt-src">브랜드 없는 기본 · 대략</span>':this._srcTag(f.e)}${ate?`<span class="diet-food-n" title="지금까지 담은 횟수">${ate.n}회</span>`:''}</span>
       </div>
       <span class="diet-food-cal num">${f.c}<i>kcal</i></span>
     </div>`;
@@ -491,7 +518,10 @@ JSON 만 출력해. 다른 말은 붙이지 마.
       const empty=document.getElementById('dietDbRes'); if(empty) empty.innerHTML='';
       return;
     }
-    const hits=this._search(q);
+    let hits=this._search(q);
+    // 내 기록에 없으면 브랜드 없는 기본형을 먼저 권한다(이름이 겹치면 내 것만)
+    const gen=this._generic(q).filter(g=>!hits.some(h=>this._canon(h.n)===this._canon(g.n)));
+    hits=hits.concat(gen);
     this._hits=hits;
     // 내 목록이 비어도 부정 문구를 띄우지 않는다. 프리셋을 뺀 뒤로는 그게 기본 상태다 —
     // 매번 '없어요' 를 읽게 하는 대신, 아래 식약처 칸이 무슨 일이 벌어지는지 말한다.
@@ -504,7 +534,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     // 예전 프리셋에는 매크로 칸이 없어서 '닭가슴살' 이 정확히 있는데도
     // 단·탄·지를 못 채웠다 — 이름이 맞는다는 이유로 실측을 막고 있었다.
     const lower = String(q).trim().toLowerCase();
-    const hit   = hits.find(f=>f.n.toLowerCase()===lower);
+    const hit   = hits.find(f=>!f.gen && f.n.toLowerCase()===lower);
     const full  = hit && ((Number(hit.p)||0) || (Number(hit.cb)||0) || (Number(hit.ft)||0));
     const dbBox = document.getElementById('dietDbRes');
     clearTimeout(this._dbTimer);

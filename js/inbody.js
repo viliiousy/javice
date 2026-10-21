@@ -154,6 +154,9 @@ const InBody = {
       for (const k of ['wt', 'bf', 'lbm', 'bmi']) if (v[k] && Number(r[k]) !== v[k]) { r[k] = v[k]; ch = true; }
       if (ch) { r.src = 'health'; map[dt] = r; changed++; }
     }
+    // BMI 가 안 온 날은 체중과 키로 채운다(키는 아래에서 건강 앱 값으로도 갱신된다)
+    { const h = (((D.ht || [])[0] || {}).v || this._ht()) / 100;
+      if (h > 1) for (const r of Object.values(map)) if (Number(r.wt) > 0 && !(Number(r.bmi) > 0)) { r.bmi = Math.round(r.wt / (h * h) * 10) / 10; changed++; } }
     // 골격근량 추정: 실측(msEst 아님)이 있는 기록으로 회귀를 세워, 비어 있는 날만 채운다
     const list = Object.values(map).sort((a, b) => a.dt.localeCompare(b.dt));
     for (const r of list) if (!(Number(r.ms) > 0) || r.msEst) {
@@ -362,7 +365,7 @@ const InBody = {
       ${tile('체중',     la.wt  || '—', 'kg',   'wt')}
       ${tile('근육량',   la.ms  || '—', 'kg',   'ms', la.ms && la.msEst)}
       ${tile('체지방률', la.bf  || '—', '%',    'bf')}
-      ${tile('BMI',      la.bmi || '—', '',     'bmi')}
+      ${tile('BMI',      this.bmiOf(la) || '—', '',     'bmi')}
       ${(() => { const b = la.bmr || (this.getRecords().filter(r => r.bmr).slice(-1)[0] || {}).bmr; return b ? tile('기초대사', b, 'kcal', null) : ''; })()}
     </div>`;
   },
@@ -620,6 +623,13 @@ const InBody = {
     lbm: { lbl:'제지방량',   unit:'kg',   lo:20,  hi:130,  dec:true },
     bmi: { lbl:'BMI',        unit:'',     lo:10,  hi:50,   dec:true },
     bmr: { lbl:'기초대사량', unit:'kcal', lo:800, hi:3500, step:10 },
+  },
+  // BMI: 기록에 없으면 그 날 체중과 키(프로필)로 계산한다 — 체중계가 체중만 보내는 날이 많다
+  bmiOf(r) {
+    if (!r) return null;
+    if (Number(r.bmi) > 0) return Number(r.bmi);
+    const h = this._ht() / 100, w = Number(r.wt);
+    return h > 1 && w > 0 ? Math.round(w / (h * h) * 10) / 10 : null;
   },
   _ht() { try { return Number(JSON.parse(UserStore.get('gl_profile') || '{}').ht) || 0; } catch { return 0; } },
   _formHtml() {

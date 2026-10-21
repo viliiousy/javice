@@ -40,7 +40,9 @@ const TopInfo = {
     const lbl = { wt: '', bf: '지방', bmi: 'BMI', ms: '근육' };
     for (const k of ['wt', 'bf', 'bmi', 'ms']) {
       if (!c[k]) continue;
-      const v = last(k); if (v == null) continue;
+      // BMI 는 가장 최근 체중 기록 기준(없으면 체중·키로 계산) — 인바디 카드와 같은 값을 보인다
+      const v = k === 'bmi' && typeof InBody !== 'undefined' && InBody.bmiOf ? (InBody.bmiOf(recs.filter(r => Number(r.wt) > 0).slice(-1)[0]) ?? last(k)) : last(k);
+      if (v == null) continue;
       out += `<div class="stat-chip stat-${k}" data-s="inbody" title="최근 기록">${lbl[k] ? `<span class="ti-lb">${lbl[k]}</span>` : ''}<b>${v}</b>${unit[k]}${this._trend(recs, k)}</div>`;
     }
     // 칼로리는 늘 왼쪽, 몸 수치(몸무게·체지방·BMI·근육량)는 한 묶음으로 오른쪽에 모은다
