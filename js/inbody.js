@@ -1,7 +1,7 @@
 // js/inbody.js — 인바디 (체성분 기록 + 추이 그래프)
 // god_life(갓생일지)의 인바디 탭을 javice 모듈 규약으로 이식
 // 데이터: [{ dt:'YYYY-MM-DD', wt, ms, bf, bmr, lbm, bmi, msEst? }]  (dt 오름차순 정렬 유지)
-// wt/bf/lbm/bmi 는 애플 헬스에서 자동 유입(api/inbody.js), bmr 은 수동 입력
+// wt/bf/lbm/bmi 는 애플 건강에서 자동 유입(아이폰 앱), bmr·골격근량은 직접 입력이나 결과 화면 캡처
 // ms(골격근량)는 헬스에 없어 서버가 과거 실측으로 추정한다. 추정치는 msEst:true 로 표시하고
 // 화면에서 실측과 구분한다 — 추정을 실측처럼 보이게 하지 않는다.
 
@@ -667,9 +667,52 @@ const InBody = {
       ${m ? `<button class="ib-del" onclick="InBody.remove('${m}')">이 기록 삭제</button>` : ''}`);
   },
 
+  // 직접 입력: 숫자로 넣을지, 인바디 결과 화면 캡처로 채울지 먼저 고른다
   showAdd() {
-    this._dr = { dt: this._todayStr() }; this._drMode = null;
+    App.openModal('@pen 인바디 직접 입력', `
+      <div class="ib-pick2">
+        <button class="ib-opt" onclick="InBody._manual()"><b>숫자로 입력</b><span>체중·골격근량·체지방률 등을 휠로 골라 넣습니다</span></button>
+        <button class="ib-opt" onclick="document.getElementById('ibCap').click()"><b>결과 화면 캡처로 채우기</b><span>인바디 앱 결과 화면이나 결과지 사진 한 장을 고르면 AI 가 골격근량·기초대사량까지 읽어 칸을 채웁니다. 저장 전에 확인할 수 있습니다</span></button>
+        <input id="ibCap" type="file" accept="image/*" hidden onchange="InBody._onCap(this)">
+        <p id="ibCapMsg" class="ib-cap-msg"></p>
+      </div>`);
+  },
+  _manual(prefill) {
+    this._dr = { dt: this._todayStr(), ...(prefill || {}) }; this._drMode = null;
     this._reopen();
+  },
+  // 사진을 줄여(긴 변 1600px) AI 로 보낸다 — 인바디 앱 화면·결과지 모두
+  _onCap(input) {
+    const f = input.files && input.files[0]; if (!f) return;
+    const msg = t => { const m = document.getElementById('ibCapMsg'); if (m) m.textContent = t; };
+    msg('사진을 읽는 중…');
+    const img = new Image(), url = URL.createObjectURL(f);
+    img.onload = async () => {
+      const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      const b64 = c.toDataURL('image/jpeg', 0.85);
+      try {
+        const data = await JARVIS.chat({ max_tokens: 500, temperature: 0, messages: [{ role: 'user', content: [
+          { type: 'image_url', image_url: { url: b64 } },
+          { type: 'text', text: `이 사진은 인바디(InBody) 체성분 측정 결과 화면이나 결과지입니다. 적힌 값을 그대로 읽어 JSON 하나로만 답하세요. 추정하지 말고, 없는 값은 null.
+{"ok":true,"dt":"YYYY-MM-DD 측정일(보이면)","wt":체중kg,"ms":골격근량kg,"bf":체지방률%,"lbm":제지방량kg,"bmi":BMI,"bmr":기초대사량kcal}
+인바디 결과가 아니면 {"ok":false}.` } ] }] }, 'vision');
+        const t = data.choices?.[0]?.message?.content || '';
+        let j = null; try { const m = t.match(/\{[\s\S]*\}/); j = m ? JSON.parse(m[0]) : null; } catch (e) {}
+        if (!j || j.ok === false) { msg('인바디 결과를 찾지 못했습니다. 숫자가 잘 보이게 다시 골라 주세요'); return; }
+        const n = (v, lo, hi) => { v = Number(v); return v >= lo && v <= hi ? Math.round(v * 10) / 10 : undefined; };
+        const p = { wt: n(j.wt, 20, 300), ms: n(j.ms, 5, 100), bf: n(j.bf, 1, 70), lbm: n(j.lbm, 10, 200), bmi: n(j.bmi, 8, 80), bmr: j.bmr ? Math.round(Number(j.bmr)) : undefined };
+        Object.keys(p).forEach(x => p[x] == null && delete p[x]);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(j.dt || '')) p.dt = j.dt;
+        if (!p.wt) { msg('체중을 읽지 못했습니다. 다시 골라 주시거나 숫자로 입력해 주세요'); return; }
+        if (p.bmi) p._bmiTouched = true;
+        this._manual(p);
+        App.showToast('사진에서 읽은 값입니다 — 맞는지 확인하고 저장해 주세요');
+      } catch (e) { msg(e.message || '읽지 못했습니다'); }
+    };
+    img.onerror = () => msg('사진을 열지 못했습니다');
+    img.src = url;
   },
 
   showEdit(dt) {

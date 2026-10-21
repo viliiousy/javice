@@ -71,3 +71,11 @@ button.ib-pick{ width:100%; background:none; color:var(--text); cursor:pointer; 
 .ib-pick b{ font-family:'Space Grotesk',sans-serif; font-size:17px; font-weight:500; }
 .ib-pick:active, button.ib-hin:active{ opacity:.7; }
 .ib-clr{ display:block; margin:8px auto 0; border:0; background:none; color:var(--text3); font:inherit; font-size:13px; cursor:pointer; }
+
+/* 직접 입력 — 방법 고르기 */
+.ib-pick2{ display:grid; gap:8px; }
+.ib-opt{ display:grid; gap:4px; padding:16px; border:1px solid var(--border); border-radius:12px; background:none; color:var(--text); font:inherit; text-align:left; cursor:pointer; }
+.ib-opt b{ font-size:16px; font-weight:600; }
+.ib-opt span{ font-size:13px; line-height:1.55; color:var(--text3); }
+.ib-opt:active{ background:var(--bg2); }
+.ib-cap-msg{ margin:8px 0 0; min-height:1.2em; font-size:13px; color:var(--text2); }
