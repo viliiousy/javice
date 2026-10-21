@@ -151,12 +151,15 @@ const InBody = {
       const e = this._estMs(list.filter(x => x.dt < r.dt), r);
       if (e && Number(r.ms) !== e) { r.ms = e; r.msEst = true; }
     }
-    // 키 → 프로필
-    const ht = (D.ht || [])[0];
-    if (ht && ht.v > 100 && ht.v < 250) {
-      let pf = {}; try { pf = JSON.parse(UserStore.get('gl_profile') || '{}') || {}; } catch {}
-      if (Math.round(pf.ht) !== Math.round(ht.v)) { pf.ht = Math.round(ht.v * 10) / 10; UserStore.set('gl_profile', JSON.stringify(pf)); FirebaseSync?.scheduleSave(); }
-    }
+    // 키·성별·나이 → 프로필 (처음 설정 도우미와 칼로리 계산이 쓴다)
+    const ht = (D.ht || [])[0], me = res.me || {};
+    let pf = {}; try { pf = JSON.parse(UserStore.get('gl_profile') || '{}') || {}; } catch {}
+    let pch = false;
+    if (ht && ht.v > 100 && ht.v < 250 && Math.round(pf.ht) !== Math.round(ht.v)) { pf.ht = Math.round(ht.v * 10) / 10; pch = true; }
+    if (me.sex && !pf.sex) { pf.sex = me.sex; pch = true; }
+    if (me.age > 10 && me.age < 110 && pf.age !== me.age) { pf.age = me.age; pch = true; }
+    if (pch) { UserStore.set('gl_profile', JSON.stringify(pf)); FirebaseSync?.scheduleSave(); }
+    this._me = { ...me, ht: ht ? Math.round(ht.v * 10) / 10 : undefined };
     if (changed) {
       this.saveRecords(list); this.render();
       // 새로 들어온 날짜를 알려 준다: "인바디 10월 21일 기록이 업데이트되었습니다"

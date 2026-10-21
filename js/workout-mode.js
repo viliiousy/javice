@@ -386,9 +386,9 @@ const WorkoutMode = {
     r.innerHTML = `<div class="wk-rt">쉬는 시간</div><div class="wk-rb num">${this._fmt(left)}</div>
       <div class="wk-rtrack"><i class="wk-rp" style="width:${pct * 100}%"></i></div>
       <div class="wk-rnext">다음: ${esc(this._nextLabel())}</div>
-      <div class="wk-rbtns"><button class="btn-sm" onclick="WorkoutMode.addRest(-15)">−15초</button>
+      <div class="wk-rbtns"><button class="btn-sm" onclick="WorkoutMode.addRest(-10)">−10초</button>
         <button class="btn-sm accent" onclick="WorkoutMode.skipRest()">건너뛰기</button>
-        <button class="btn-sm" onclick="WorkoutMode.addRest(15)">+15초</button></div>`;
+        <button class="btn-sm" onclick="WorkoutMode.addRest(10)">+10초</button></div>`;
   },
   _nextLabel() {
     const S = this.st, x = S.ex[S.cur], k = x.rows.findIndex(r => !r.ok);
@@ -707,7 +707,8 @@ WorkoutMode.remote = function (act) {
   const S = this.st; if (!S) return;
   try {
     if (act === 'skip') return this.skipRest();
-    if (act === 'add30') return S.restEnd ? this.addRest(30) : undefined;
+    if (act === 'add30' || act === 'add10') return S.restEnd ? this.addRest(10) : undefined;
+    if (act === 'sub10') return S.restEnd ? this.addRest(-10) : undefined;
     if (act === 'done') {
       const x = S.ex[S.cur], k = x.rows.findIndex(r => !r.ok);
       if (x.cardio || k < 0) this.nextEx(true); else this.setDone(k);

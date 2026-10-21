@@ -178,7 +178,9 @@ struct WorkoutButtons: View {
         if #available(iOS 17.0, *) {
             HStack(spacing: 8) {
                 if restEndOf(ctx) != nil {
-                    Button(intent: WorkoutActionIntent(act: "add30")) { Text("+30초").frame(maxWidth: .infinity) }
+                    Button(intent: WorkoutActionIntent(act: "sub10")) { Text("−10초").frame(maxWidth: .infinity) }
+                        .tint(Color.white.opacity(0.18))
+                    Button(intent: WorkoutActionIntent(act: "add10")) { Text("+10초").frame(maxWidth: .infinity) }
                         .tint(Color.white.opacity(0.18))
                     Button(intent: WorkoutActionIntent(act: "skip")) { Text("건너뛰기").frame(maxWidth: .infinity) }
                         .tint(accent)
@@ -199,18 +201,28 @@ struct WorkoutButtons: View {
 struct WorkoutWatchView: View {
     let ctx: ActivityViewContext<WorkoutAttributes>
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(ctx.state.title).font(.system(size: 14, weight: .semibold)).lineLimit(1)
-                Spacer(minLength: 4)
-                if let end = restEndOf(ctx) {
-                    Text(timerInterval: Date()...end, countsDown: true).font(.system(size: 14, weight: .semibold).monospacedDigit()).foregroundColor(accent).frame(width: 48, alignment: .trailing)
+        let resting = restEndOf(ctx)
+        HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(resting != nil ? "쉬는 시간" : ctx.state.title)
+                    .font(.system(size: 13, weight: .semibold)).foregroundColor(resting != nil ? accent : .white).lineLimit(1)
+                if let end = resting {
+                    Text(timerInterval: Date()...end, countsDown: true)
+                        .font(.system(size: 34, weight: .bold).monospacedDigit()).foregroundColor(accent).minimumScaleFactor(0.7).lineLimit(1)
                 } else {
-                    Text(ctx.attributes.startedAt, style: .timer).font(.system(size: 13).monospacedDigit()).frame(width: 52, alignment: .trailing)
+                    Text(ctx.attributes.startedAt, style: .timer)
+                        .font(.system(size: 30, weight: .bold).monospacedDigit()).foregroundColor(.white).minimumScaleFactor(0.7).lineLimit(1)
                 }
+                Text(resting != nil ? ctx.state.title : ctx.state.step).font(.system(size: 11)).foregroundColor(.secondary).lineLimit(1)
             }
-            Text(ctx.state.step).font(.system(size: 12)).foregroundColor(.secondary).lineLimit(1)
-            WorkoutButtons(ctx: ctx, compact: true)
+            Spacer(minLength: 0)
+            if #available(iOS 17.0, *) {
+                Button(intent: WorkoutActionIntent(act: resting != nil ? "skip" : "done")) {
+                    Image(systemName: resting != nil ? "forward.end.fill" : "checkmark").font(.system(size: 18, weight: .bold))
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.borderedProminent).buttonBorderShape(.circle).tint(accent)
+            }
         }
     }
 }
@@ -227,7 +239,7 @@ struct FamilySwitch: View {
     let ctx: ActivityViewContext<WorkoutAttributes>
     @Environment(\.activityFamily) var family
     var body: some View {
-        if family == .small { WorkoutWatchView(ctx: ctx).padding(8) } else { WorkoutLockView(ctx: ctx) }
+        if family == .small { WorkoutWatchView(ctx: ctx).padding(.horizontal, 6) } else { WorkoutLockView(ctx: ctx) }
     }
 }
 

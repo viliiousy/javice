@@ -79,3 +79,12 @@ button.ib-pick{ width:100%; background:none; color:var(--text); cursor:pointer; 
 .ib-opt span{ font-size:13px; line-height:1.55; color:var(--text3); }
 .ib-opt:active{ background:var(--bg2); }
 .ib-cap-msg{ margin:8px 0 0; min-height:1.2em; font-size:13px; color:var(--text2); }
+
+/* 처음 설정 도우미 — 애플 건강 연결 칸 */
+.ob-hk{ display:flex; align-items:center; gap:16px; padding:16px; margin-bottom:24px; border:1px solid var(--border); border-radius:12px; }
+.ob-hk > div{ flex:1; display:grid; gap:4px; }
+.ob-hk b{ font-size:15px; font-weight:600; color:var(--text); }
+.ob-hk span{ font-size:12.5px; line-height:1.55; color:var(--text3); }
+.ob-hk .ob-btn{ flex:none; min-width:72px; }
+.ob-hk.on{ border-color:#FF6A2B; }
+.ob-hk.on b{ color:#FF6A2B; }

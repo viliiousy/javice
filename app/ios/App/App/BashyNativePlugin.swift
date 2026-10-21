@@ -69,7 +69,10 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
             ("bmi", .bodyMassIndex, .count(), 1),
             ("ht", .height, .meterUnit(with: .centi), 1),
         ]
-        let types = Set(kinds.compactMap { HKObjectType.quantityType(forIdentifier: $0.1) })
+        var types: Set<HKObjectType> = Set(kinds.compactMap { HKObjectType.quantityType(forIdentifier: $0.1) })
+        // 성별·생년월일(처음 설정 도우미가 칼로리 계산에 쓴다)
+        if let sx = HKObjectType.characteristicType(forIdentifier: .biologicalSex) { types.insert(sx) }
+        if let dob = HKObjectType.characteristicType(forIdentifier: .dateOfBirth) { types.insert(dob) }
         health.requestAuthorization(toShare: nil, read: types) { ok, err in
             guard ok else { call.resolve(["ok": false, "error": err?.localizedDescription ?? "denied"]); return }
             let since = Date().addingTimeInterval(-days * 86400)
@@ -91,7 +94,15 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
                 }
                 self.health.execute(q)
             }
-            group.notify(queue: .main) { call.resolve(["ok": true, "data": out]) }
+            group.notify(queue: .main) {
+                var me: [String: Any] = [:]
+                if let sx = try? self.health.biologicalSex().biologicalSex { me["sex"] = sx == .male ? "m" : sx == .female ? "f" : "" }
+                if let dob = try? self.health.dateOfBirthComponents(), let y = dob.year {
+                    me["birthYear"] = y
+                    if let d = Calendar.current.date(from: dob) { me["age"] = Calendar.current.dateComponents([.year], from: d, to: Date()).year ?? 0 }
+                }
+                call.resolve(["ok": true, "data": out, "me": me])
+            }
         }
     }
 

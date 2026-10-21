@@ -125,7 +125,13 @@ const Onboard = {
   _body() {
     const la = (typeof InBody !== 'undefined' && InBody.latest()) || {};
     const v = (k, d = '') => this.d[k] ?? la[k] ?? d;
-    return `
+    // 아이폰 앱: 애플 건강부터 — 키·몸무게·체지방률·성별·나이를 채우고, 앞으로 인바디 측정도 자동으로 들어온다
+    const hk = typeof InBody !== 'undefined' && InBody.healthAvail();
+    const hkOn = hk && InBody.healthOn();
+    return `${hk ? `<div class="ob-hk${hkOn ? ' on' : ''}">
+        <div><b>${hkOn ? '애플 건강 연결됨' : '애플 건강에서 불러오기'}</b><span>${hkOn ? '키·몸무게·체지방률·성별·나이를 채웠습니다. 인바디로 잴 때마다 자동으로 들어옵니다' : '인바디 앱·체중계가 건강 앱에 남긴 값으로 아래를 채우고, 앞으로 인바디 측정도 자동으로 기록합니다'}</span></div>
+        ${hkOn ? '' : `<button class="ob-btn pri" onclick="Onboard._health()">연결</button>`}
+      </div>` : ''}
       <div class="ob-row2">
         <div class="ob-seg" id="obSex">
           <button data-v="m" class="${(this.d.sex || 'm') === 'm' ? 'on' : ''}" onclick="Onboard._seg(this)">남성</button>
@@ -153,6 +159,14 @@ const Onboard = {
       <div id="obRes" class="ob-res"></div>
       <button class="ob-link" onclick="Onboard._inbodyPhoto()">${Icons.svg('camera')} 인바디 결과지 사진으로 채우기</button>
       <input id="obIbFile" type="file" accept="image/*" hidden onchange="Onboard._onIbPhoto(this)">`;
+  },
+  async _health() {
+    const n = await InBody.healthConnect();
+    const la = InBody.latest() || {}, me = InBody._me || {};
+    let pf = {}; try { pf = JSON.parse(UserStore.get('gl_profile') || '{}') || {}; } catch {}
+    Object.assign(this.d, { sex: me.sex || pf.sex || this.d.sex, age: me.age || pf.age || this.d.age, ht: me.ht || pf.ht || this.d.ht,
+      wt: la.wt || this.d.wt, bf: la.bf || this.d.bf, ms: la.ms || this.d.ms });
+    this.paint();
   },
   _seg(b) {
     b.parentElement.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
