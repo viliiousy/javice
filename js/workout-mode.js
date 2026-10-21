@@ -177,8 +177,68 @@ const WorkoutMode = {
   _fmt(s) { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; },
 
   saved() { try { return JSON.parse(UserStore.get(this.SESSION_KEY) || 'null'); } catch { return null; } },
+  // ── 오래 손대지 않으면 ─────────────────────
+  // 세트 완료·무게 바꾸기·교체 같은 손길이 30분 없으면 '아직 운동 중이신가요?', 1시간이면 저장하고 끝낸다.
+  // 앱이 백그라운드여도 울리게 기기 알림을 미리 걸어 두고, 손길이 있을 때마다 다시 건다.
+  IDLE_ASK: 30 * 60e3, IDLE_END: 60 * 60e3,
+  _touch() {
+    const S = this.st; if (!S) return;
+    S.lastAct = Date.now(); S.idleAsked = false; S.autoEnded = false;
+    document.getElementById('wkIdle')?.remove();
+    if (Date.now() - (this._idleSet || 0) < 15000) return;   // 연달아 누를 때는 15초에 한 번만 다시 건다
+    this._idleSet = Date.now();
+    const P = typeof LocalNotify !== 'undefined' && LocalNotify.P;
+    if (!P) return;
+    const ex = S.ex[S.cur]?.name || '운동';
+    P.cancel({ notifications: [{ id: 7995 }, { id: 7994 }] }).catch(() => {}).then(() => P.schedule({ notifications: [
+      { id: 7995, title: '아직도 운동 중이신가요?', body: `30분 동안 기록이 없습니다 · ${ex}. 계속하시려면 앱을 열어 주세요.`, schedule: { at: new Date(S.lastAct + this.IDLE_ASK), allowWhileIdle: true } },
+      { id: 7994, title: '운동을 저장하고 끝냈습니다', body: '1시간 동안 기록이 없어 지금까지 한 운동을 저장했습니다.', schedule: { at: new Date(S.lastAct + this.IDLE_END), allowWhileIdle: true } },
+    ] })).catch(() => {});
+  },
+  _idleCancel() { const P = typeof LocalNotify !== 'undefined' && LocalNotify.P; if (P) P.cancel({ notifications: [{ id: 7995 }, { id: 7994 }] }).catch(() => {}); this._idleSet = 0; },
+  _idleCheck() {
+    const S = this.st; if (!S || !S.lastAct) return;
+    const idle = Date.now() - S.lastAct;
+    if (idle >= this.IDLE_END) return this._autoEnd();
+    if (idle >= this.IDLE_ASK && !S.idleAsked && !S.restEnd) {
+      S.idleAsked = true;
+      if (document.hidden && typeof Notification !== 'undefined' && Notification.permission === 'granted' && !(typeof LocalNotify !== 'undefined' && LocalNotify.P)) {
+        try { new Notification('아직도 운동 중이신가요?', { body: '30분 동안 기록이 없습니다. 1시간이 되면 저장하고 끝냅니다.' }); } catch (e) {}
+      }
+      document.getElementById('wkIdle')?.remove();
+      const el = document.createElement('div'); el.id = 'wkIdle'; el.className = 'wk-end';
+      el.innerHTML = `<div class="wk-end-bg"></div><div class="wk-end-sh" role="dialog" aria-label="아직 운동 중인지 확인">
+        <div class="wk-end-t">아직도 운동 중이신가요?</div>
+        <p class="wk-idle-p">30분 동안 세트 완료나 변경이 없었습니다. 1시간이 되면 지금까지 한 운동을 저장하고 운동 모드를 끝냅니다.</p>
+        <button class="wk-end-go" onclick="WorkoutMode._touch();WorkoutMode._persist()">계속 운동하기</button>
+        <div class="wk-end-row"><button class="wk-end-ghost" onclick="document.getElementById('wkIdle')?.remove();WorkoutMode._finishSave()">저장하고 끝내기</button></div>
+      </div>`;
+      document.body.appendChild(el); requestAnimationFrame(() => el.classList.add('on'));
+      try { Haptic.medium(); } catch (e) {}
+    }
+  },
+  // 1시간 손길이 없었다 — 목록이 바뀌었으면 '오늘만' 으로 두고, 지금까지 한 것을 저장하고 끝낸다
+  _autoEnd() {
+    const S = this.st; if (!S) return;
+    document.getElementById('wkIdle')?.remove(); document.getElementById('wkEnd')?.remove();
+    S._scoped = true; S.endAt = S.lastAct;
+    if (S.planNames && S.ex.map(e => e.name).join('|') !== S.planNames.join('|')) {
+      try { Fitness.applyList(S.ds, S.ex.map(e => ({ name: e.name, sets: e.sets, sess: e.sess })), 'day'); } catch (e) {}
+    }
+    S.autoEnded = true;
+    this._finishSave();
+    App.showToast('1시간 동안 기록이 없어 지금까지 한 운동을 저장하고 끝냈습니다', 'success');
+  },
+  // 앱을 다시 열었을 때: 끝내지 않은 운동이 1시간 넘게 그대로면 저장하고 정리한다
+  staleCheck() {
+    if (this.st) return;
+    const sv = this.saved(); if (!sv || !sv.lastAct || sv.autoEnded) return;
+    if (Date.now() - sv.lastAct < this.IDLE_END) return;
+    this.st = sv; this._autoEnd();
+  },
   _persist() {
     const S = this.st; if (!S) return;
+    if (!S.autoEnded) this._touch();
     const { ...keep } = S;
     UserStore.set(this.SESSION_KEY, JSON.stringify(keep)); window.FirebaseSync?.scheduleSave?.();
   },
@@ -275,7 +335,7 @@ const WorkoutMode = {
     this._open();
   },
   _resume(sv) {
-    this.st = sv; this.st.restEnd = 0;
+    this.st = sv; this.st.restEnd = 0; this.st.autoEnded = false; this.st.lastAct = Date.now();
     App.showToast(`이어서 합니다 — ${this._fmt((Date.now() - sv.t0) / 1000)} 지남`);
     this._open();
   },
@@ -371,6 +431,7 @@ const WorkoutMode = {
 
   _time() {
     const S = this.st; if (!S) return;
+    if (!this._ic || Date.now() - this._ic > 5000) { this._ic = Date.now(); this._idleCheck(); if (!this.st) return; }
     const e = document.getElementById('wkEl'); if (e) e.textContent = this._fmt((Date.now() - S.t0) / 1000);
     const r = document.getElementById('wkRest');
     if (!r || !S.restEnd) return;
@@ -655,7 +716,7 @@ const WorkoutMode = {
     this._endClose(); this._finishDiscard();
   },
   pause() { this._persist(); this._stop(); this.close(); App.showToast('운동을 남겨 두었습니다 — ‘운동 시작’ 으로 이어 하기'); try { Fitness.render(new Date(this._lastDs + 'T00:00:00')); } catch (e) {} },
-  _stop() { clearInterval(this._tick); this._cancelNotify(); this.liveEnd(); try { this._lock?.release(); } catch (e) {} this._lastDs = this.st && this.st.ds; },
+  _stop() { clearInterval(this._tick); this._cancelNotify(); this._idleCancel(); this.liveEnd(); try { this._lock?.release(); } catch (e) {} this._lastDs = this.st && this.st.ds; },
   _finishDiscard() {
     const S = this.st; if (!S) return;
     PlanGen.saveLog(S.ds, S.snapLog || {});
@@ -685,7 +746,7 @@ const WorkoutMode = {
     const left = S.ex.some(e => !e.done && e.rows.some(r => !r.ok));
     if (left) { S.restEnd = 0; this._persist(); } else this._clearSaved();
     this._stop();
-    const min = Math.round((Date.now() - S.t0) / 60000);
+    const min = Math.round(((S.endAt || Date.now()) - S.t0) / 60000);
     const vol = S.ex.reduce((t, e) => t + e.rows.filter(r => r.ok).reduce((a, r) => a + (Number(r.w) || 0) * (Number(r.r) || 0), 0), 0);
     const sets = S.ex.reduce((t, e) => t + e.rows.filter(r => r.ok).length, 0);
     const el = document.getElementById('wkMode');
@@ -747,10 +808,25 @@ const Wheel = {
       });
     });
   },
+  // 창을 새로 띄우지 않고 지금 화면 안에 휠을 그린다(습관 알림 시각처럼 폼 안에서 고를 때)
+  inline(box, cols, onChange) {
+    box.innerHTML = `<div class="whl whl-inline">${cols.map((c, ci) => `<div class="whl-col" data-c="${ci}"><div class="whl-sc">
+        <div class="whl-pad"></div>${c.vals.map((v, i) => `<div class="whl-it" data-i="${i}">${esc(c.fmt ? c.fmt(v) : String(v))}</div>`).join('')}<div class="whl-pad"></div>
+      </div></div>`).join('')}<div class="whl-sel" aria-hidden="true"></div></div>`;
+    const read = () => [...box.querySelectorAll('.whl-col')].map((col, ci) => { const c = cols[ci]; return c.vals[Math.max(0, Math.min(c.vals.length - 1, Math.round(col.querySelector('.whl-sc').scrollTop / this.H)))]; });
+    requestAnimationFrame(() => box.querySelectorAll('.whl-col').forEach((col, ci) => {
+      const c = cols[ci], sc = col.querySelector('.whl-sc');
+      const idx = Math.max(0, c.vals.indexOf(c.cur));
+      sc.scrollTop = idx * this.H; col._i = idx; this.paint(col);
+      col._cb = () => onChange && onChange(read());
+      sc.addEventListener('scroll', () => this.onScroll(col), { passive: true });
+    }));
+    return read;
+  },
   onScroll(col) {
     const sc = col.querySelector('.whl-sc');
     const i = Math.round(sc.scrollTop / this.H);
-    if (i !== col._i) { col._i = i; this.tick(); }
+    if (i !== col._i) { col._i = i; this.tick(); if (col._cb) col._cb(); }
     if (!col._raf) col._raf = requestAnimationFrame(() => { col._raf = 0; this.paint(col); });
   },
   // 가운데에서 멀수록 기울이고 흐리게 — 원통(드럼)이 도는 느낌

@@ -3959,3 +3959,4 @@ body.wk-on{ overflow:hidden; }
 .ai-cs-b .btn-sm{ height:44px; }
 /* 스포츠 종목 — 멈춘 사진 한 장 */
 .pose.still i{ background-size:cover; background-position:center; }
+.wk-idle-p{ margin:8px 0 16px; font-size:14px; line-height:1.55; color:var(--text3); }

@@ -35,7 +35,7 @@ const LocalNotify = {
     const P = this.P; if (!P) return;
     try {
       const { notifications = [] } = await P.getPending();
-      const ours = notifications.filter(n => n.id >= this.BASE && n.id < this.BASE + 1000 && n.id !== this.BASE + 999);
+      const ours = notifications.filter(n => n.id >= this.BASE && n.id < this.BASE + 990);   // 7990~7999 는 운동 모드·테스트용(다시 짤 때 지우지 않는다)
       if (ours.length) await P.cancel({ notifications: ours.map(n => ({ id: n.id })) });
     } catch (e) { console.warn('[LocalNotify] cancel', e); }
   },
@@ -64,14 +64,14 @@ const LocalNotify = {
       const date = this._at(day, '12:00');
       const n = day * 40;
       // 습관 — 그날 할 습관이 있을 때만
-      if (s.habits?.enabled) {
+      {   // 시각을 정해 둔 약·습관은 '습관 알림' 묶음 설정과 상관없이 울린다(직접 켠 알림이다)
         try {
           const hs = Habits.getHabitsForDate(date), ck = Habits.getChecked(date);
           const left = hs.filter(h => !ck.includes(h.id)).length;
-          if (hs.length && (day > 0 || left > 0))
+          if (s.habits?.enabled && hs.length && (day > 0 || left > 0))
             add(n + 1, this._at(day, s.habits.time || '21:00'), '오늘의 습관', day === 0 ? `아직 ${left}개 남았습니다. 잊기 전에 체크해 주세요.` : `오늘 습관 ${hs.length}개, 잊기 전에 체크해 주세요.`);
           // 시간이 정해진 약·습관은 그 시각에 따로 울린다
-          hs.filter(h => h.time && h.notify !== false).forEach((h, i) => {
+          hs.filter(h => h.time && (h.cat === 'med' ? h.notify !== false : h.notify === true)).forEach((h, i) => {
             if (day === 0 && ck.includes(h.id)) return;
             add(n + 20 + i, this._at(day, h.time), h.name, `${h.time} — 지금 할 시간입니다.`);
           });

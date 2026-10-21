@@ -317,7 +317,7 @@ const Habits = {
       const ds2=Habits._dateStr(date);
       const cat=this._catOf(h), C=this.CATS[cat];
       // 약은 '몇 시에' 가 이름만큼 중요하다. 그것만 줄에 붙인다.
-      const timeLabel = (cat==='med' && h.time)
+      const timeLabel = (h.time && (cat==='med' || h.notify===true))
         ? `<span class="habit-time">${esc(h.time)}${h.notify===false?'':' · 알림'}</span>` : '';
       // 순서 바꾸는 중에는 밀기·길게누르기를 붙이지 않는다 — 끌어야 하는데 삭제가 열린다.
       return `<div class="habit-item${isDone?' done':''}${reorder?' reorder-mode':''}"
@@ -519,20 +519,55 @@ const Habits = {
     box?.querySelectorAll('.cat-pick-btn')
       .forEach(l => l.classList.toggle('on', l.querySelector('input')?.checked));
     // '약' 을 고를 때만 시각 칸이 나온다. 늘 띄워 두면 나머지 넷에서 뜻 없는 칸이 된다.
-    const med = input.closest('.modal-box, .modal, body')?.querySelector('.med-row');
-    if (med) med.hidden = input.value !== 'med';
+    // 약으로 바꾸면 알림을 기본으로 켠다(약은 시각이 이름만큼 중요하다)
+    const row = document.querySelector('.rm-row');
+    if (row) { const wasMed = row.dataset.med === '1', isMed = input.value === 'med'; row.dataset.med = isMed ? '1' : '0';
+      row.querySelector('.modal-lbl').textContent = isMed ? '복용 시각 · 알림' : '알림';
+      if (isMed && !wasMed) this._rmOn(true); }
   },
 
-  // 약 전용 칸 — 몇 시에 먹을지, 알림을 받을지
+  // 알림 칸 — 약은 처음부터 켜져 있고, 다른 습관은 '알림 설정하기' 를 눌러 켠다.
+  // 시각은 웹에서는 시계 칸, 앱에서는 시·분 두 줄 휠로 고른다.
   _medRowHtml(cat, time, notify) {
-    return `<div class="modal-row med-row"${cat==='med'?'':' hidden'}>
-      <label class="modal-lbl" for="hMedTime">복용 시각</label>
-      <div class="med-line">
-        <input id="hMedTime" type="time" class="inp inp-sm num" value="${esc(time||'09:00')}">
-        <label class="med-chk"><input id="hMedNotify" type="checkbox" ${notify===false?'':'checked'}><span>알림 받기</span></label>
+    const med = cat === 'med', on = med ? notify !== false : (notify === true && !!time);
+    const t = time || (med ? '09:00' : '21:00');
+    const nat = typeof Platform !== 'undefined' && Platform.native;
+    return `<div class="modal-row med-row rm-row" data-on="${on?1:0}" data-med="${med?1:0}">
+      <label class="modal-lbl">${med?'복용 시각 · 알림':'알림'}</label>
+      <button type="button" class="rm-add" onclick="Habits._rmOn(true)">${typeof Icons!=='undefined'?Icons.svg('bell'):''}<span>알림 설정하기</span></button>
+      <div class="rm-body">
+        <div class="med-line">
+          ${nat ? `<input id="hMedTime" type="hidden" value="${esc(t)}"><div id="hRmWheel" class="rm-wheel"></div>`
+                : `<input id="hMedTime" type="time" class="inp inp-sm num" value="${esc(t)}">`}
+          <button type="button" class="rm-off" onclick="Habits._rmOn(false)">알림 끄기</button>
+        </div>
+        <div class="med-note">${med ? '5분 전에 한 번 알리고, 체크가 없으면 한 시간마다 다시 알립니다. 자정이 지나면 처음으로 돌아갑니다.' : '정한 시각에 아직 체크하지 않았으면 알려 드립니다. 반복 요일에만 울립니다.'}</div>
       </div>
-      <div class="med-note">5분 전에 한 번 알리고, 체크가 없으면 한 시간마다 다시 알립니다. 자정이 지나면 처음으로 돌아갑니다.</div>
     </div>`;
+  },
+  _rmOn(on) {
+    const row = document.querySelector('.rm-row'); if (!row) return;
+    row.dataset.on = on ? '1' : '0';
+    if (on) this._rmWheel();
+    try { Haptic.light(); } catch (e) {}
+  },
+  _rmWheel() {
+    const box = document.getElementById('hRmWheel'), inp = document.getElementById('hMedTime');
+    if (!box || !inp || box.childElementCount || typeof Wheel === 'undefined' || document.querySelector('.rm-row')?.dataset.on !== '1') return;
+    const [h, m] = String(inp.value || '09:00').split(':').map(Number);
+    const H = Array.from({ length:24 }, (_, i) => i), M = Array.from({ length:12 }, (_, i) => i*5);
+    Wheel.inline(box, [
+      { vals:H, cur:h||0, fmt:v => String(v).padStart(2,'0')+'시' },
+      { vals:M, cur:M.reduce((a,b) => Math.abs(b-(m||0)) < Math.abs(a-(m||0)) ? b : a, 0), fmt:v => String(v).padStart(2,'0')+'분' },
+    ], ([hh, mm]) => { inp.value = `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`; });
+  },
+  // 저장: 알림을 켰으면 시각과 함께, 껐으면 약은 시각만 남기고 다른 습관은 지운다
+  _rmApply(h) {
+    const row = document.querySelector('.rm-row'), on = row?.dataset.on === '1';
+    const t = document.getElementById('hMedTime')?.value;
+    if (h.cat === 'med') { h.time = t || h.time || '09:00'; h.notify = on; }
+    else if (on) { h.time = t || '21:00'; h.notify = true; }
+    else { delete h.time; delete h.notify; }
   },
 
   showInlineAdd(baseDate, cat='etc') {
@@ -555,7 +590,7 @@ const Habits = {
       '<input id="habitName" type="text" placeholder="예: 물 2L 마시기" class="inp"></div>' +
       '<div class="modal-row hb-cat-row"><label class="modal-lbl">분류</label>' +
       this._catPickerHtml(this._pendingAddCat, 'hAddCat') + '</div>' +
-      this._medRowHtml(this._pendingAddCat, '09:00', true) +
+      this._medRowHtml(this._pendingAddCat, null, undefined) +
       '<div class="modal-row"><label class="modal-lbl">반복 요일</label>' +
       '<div class="day-picker">' + dayBtns + '</div>' +
       `<div class="hb-meta">시작일 <span class="num">${baseDateStr}</span>${dateLabel}</div></div>` +
@@ -566,6 +601,7 @@ const Habits = {
     );
     setTimeout(()=>{
       document.getElementById('habitName')?.focus();
+      Habits._rmWheel();
       document.getElementById('btnHabitAdd')?.addEventListener('click',()=>Habits._saveNew());
       document.getElementById('habitName')?.addEventListener('keypress',e=>{ if(e.key==='Enter') Habits._saveNew(); });
     },50);
@@ -592,10 +628,7 @@ const Habits = {
       days: days.length ? days : [0,1,2,3,4,5,6],
       createdAt,  // 선택한 날짜부터 습관 시작
     };
-    if (cat === 'med') {
-      h.time   = document.getElementById('hMedTime')?.value || '09:00';
-      h.notify = !!document.getElementById('hMedNotify')?.checked;
-    }
+    this._rmApply(h);
     list.push(h);
     this.saveList(list);
     // selDate 기준으로 렌더링
@@ -629,6 +662,7 @@ const Habits = {
           <button onclick="App.closeModal()" class="btn-sm hb-ghost">취소</button>
         </div>
       </div></div>`);
+    setTimeout(()=>this._rmWheel(), 60);
   },
 
   _saveEdit(id) {
@@ -637,10 +671,7 @@ const Habits = {
     h.emoji=document.getElementById('hEditEmoji')?.value.trim()||h.emoji;
     const cat=document.querySelector('input[name="hEditCat"]:checked')?.value;
     if(this.CATS[cat]) h.cat=cat;
-    if(h.cat==='med'){
-      h.time   = document.getElementById('hMedTime')?.value || h.time || '09:00';
-      h.notify = !!document.getElementById('hMedNotify')?.checked;
-    } else { delete h.time; delete h.notify; }   // 약이 아니게 되면 시각도 알림도 뜻이 없다
+    this._rmApply(h);
     const days=[...document.querySelectorAll('.day-edit-chk:checked')].map(c=>parseInt(c.value));
     h.days=days.length?days:[0,1,2,3,4,5,6];
     this.saveList(list);

@@ -311,6 +311,19 @@ async function processUser(uid, tokenData) {
     }
   }
 
+  // ── 시각을 정해 둔 습관(약 말고) ─────────────────────────────
+  // 습관 편집에서 '알림 설정하기' 로 켠 것. 그 시각에 아직 체크하지 않았으면 한 번 알린다.
+  for (const h of habitList.filter(h => h && h.cat!=='med' && h.notify === true && h.time)) {
+    if (Array.isArray(h.days) && h.days.length && !h.days.includes(dow)) continue;
+    if (h.createdAt   && today <  h.createdAt)   continue;
+    if (h.deletedFrom && today >= h.deletedFrom) continue;
+    const slot = `hab_${h.id}`;
+    const p = String(h.time).split(':').map(Number);
+    if (!dueAt(slot, (p[0]||0)*60 + (p[1]||0))) continue;
+    if (habitChecked.includes(h.id)) { settle(slot); continue; }
+    msgs.push({ slot, title:`⏰ ${String(h.name||'습관').slice(0,40)}`, body:`${h.time} — 지금 할 시간입니다` });
+  }
+
   if(settings.habits?.enabled && due('habits', settings.habits.time)) {
     // 약은 저 위에서 제 이름으로 따로 알리므로 여기서 또 세지 않는다.
     const list = habitList.filter(h => !(h && h.cat==='med' && h.notify !== false));

@@ -219,3 +219,17 @@ html[data-ui="v2"] .nt .set-link:last-child{ border-bottom:0; }
 .trk-dn2{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text); }
 .trk-dc{ color:var(--text3); font-size:13px; }
 .trk-dr b{ text-align:right; font-weight:600; }
+
+/* 습관 알림 칸 — 꺼져 있으면 '알림 설정하기' 버튼만, 켜면 시각(앱은 휠) */
+.rm-row .rm-add{ display:inline-flex; align-items:center; gap:8px; height:44px; padding:0 16px; border:1px dashed var(--border); border-radius:12px;
+  background:none; color:var(--text2); font:inherit; font-size:14px; cursor:pointer; }
+.rm-row .rm-add svg{ width:16px; height:16px; color:var(--accent); }
+.rm-row[data-on="1"] .rm-add{ display:none; }
+.rm-row[data-on="0"] .rm-body{ display:none; }
+.rm-row .med-line{ display:flex; align-items:center; gap:16px; }
+.rm-row .rm-off{ margin-left:auto; height:36px; padding:0 12px; border:0; background:none; color:var(--text3); font:inherit; font-size:13px; cursor:pointer; white-space:nowrap; }
+.rm-wheel{ flex:1; min-width:0; max-width:240px; }
+.rm-wheel .whl{ height:160px; margin:0; }
+.rm-wheel .whl-sc{ height:160px; }
+.rm-wheel .whl-pad{ height:60px; }
+.rm-wheel .whl-sel{ top:60px; }

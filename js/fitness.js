@@ -98,6 +98,7 @@ const Fitness = {
   render(date=new Date(), planIdx=null) {
     // 피트니스 카드가 없는 레이아웃에서는 조용히 종료
     if (!document.getElementById('fitnessWrap')) return;
+    try { if (typeof WorkoutMode!=='undefined') WorkoutMode.staleCheck(); } catch(e) {}
     const d    = new Date(date);
     const dow  = planIdx!==null ? planIdx : d.getDay();
     const { plan, list:allEx } = planIdx!==null && planIdx!==d.getDay() ? { plan:this.planFor(dow), list:this.planFor(dow).exercises.map((x,i)=>({...x,pi:i,key:'p'+i})) } : this.exercisesFor(d);
