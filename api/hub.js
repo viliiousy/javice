@@ -722,6 +722,15 @@ module.exports = async (req, res) => {
     if (body.act === 'stStart')     { send(res, await stStart(body.idToken)); return; }
     if (body.act === 'stStatus')    { send(res, await stStatus(body.idToken, !!body.unlink)); return; }
     if (body.act === 'ics')         { send(res, await icsFetch(body.idToken, body.url)); return; }
+    // 앱의 AI 비서가 로그인한 본인의 SmartThings 를 읽고 켠다(허브 연결 코드 없이 Firebase 로그인 토큰으로).
+    // cmd 가 없으면 기기·방·장면 목록, 있으면 stCmd 와 같은 모양({ device, commands } 또는 { scene }).
+    if (body.act === 'stMine') {
+      const me = await uidFromIdToken(body.idToken);
+      if (!me) { res.status(401).json({ error: '로그인이 필요합니다' }); return; }
+      try { res.status(200).json(body.cmd && typeof body.cmd === 'object' ? await stCmd(me, body.cmd) : { ok: true, ...(await stDevices(me)) }); }
+      catch (e) { res.status(e.code === 'NOLINK' ? 409 : 502).json({ error: e.message, nolink: e.code === 'NOLINK' }); }
+      return;
+    }
     const uid  = await verify(body.code);
     if (!uid) { res.status(401).json({ error: '연결 코드가 맞지 않습니다 — bashy.app 설정에서 다시 확인해 주세요' }); return; }
 

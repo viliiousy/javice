@@ -42,7 +42,7 @@ const JARVIS = {
         <div id="jMsgs" class="j-msgs">
           <div class="j-msg j-ai"><div class="j-avatar">B</div>
             <div class="j-bubble">AI 비서입니다. 말하거나 입력하면 기록해 드려요.<br>
-              <span style="font-size:11px;color:var(--accent-l)">할일·일정·체크리스트·습관·식단·메모 관리 가능<br>사진으로 식단 자동 분석</span>
+              <span style="font-size:11px;color:var(--accent-l)">운동·습관·식단·인바디·일정·할일·메모·스마트홈을 말로 처리합니다<br>마이크를 누르면 음성 대화 · 사진으로 식단 분석</span>
             </div>
           </div>
         </div>
@@ -59,7 +59,7 @@ const JARVIS = {
             <button class="j-in-btn" onclick="JARVIS.triggerPhoto()" title="사진으로 식단 기록" aria-label="사진으로 식단 기록">${Icons.svg('camera')}</button>
             <input id="jInput" type="text" class="inp j-inp" placeholder="무엇이든 말하거나 입력하세요" enterkeyhint="send" autocomplete="off"
               oninput="JARVIS._syncSend()">
-            <button id="jMicBtn" class="j-in-btn j-act" onclick="JARVIS._act()" title="음성으로 말하기" aria-label="음성으로 말하기">${Icons.svg('mic')}</button>
+            <button id="jMicBtn" class="j-in-btn j-act" onclick="JARVIS._act()" title="음성 대화" aria-label="음성 대화">${Icons.svg('mic')}</button>
           </div>
         </div>
       </div>`;
@@ -252,7 +252,7 @@ const JARVIS = {
     if(!key){ this._noKey(msg); this._setStatus('대기 중'); return; }
     try{
       const raw=await this._callAPI(key,msg);
-      this._handleReply(raw);
+      await this._handleReply(raw);
     }catch(err){ this._addMsg('ai',`오류: ${err.message}`); }
     this._setStatus('대기 중');
   },
@@ -260,192 +260,35 @@ const JARVIS = {
   async _callAPI(apiKey, userMsg) {
     this.history.push({role:'user',content:userMsg});
     const msgs=this.history.slice(-12);
-    const ctx=this._buildCtx(), sys=this._buildSys(ctx);
+    const ctx=await this._buildCtx(), sys=this._buildSys(ctx);
     const data=await this.chat({ max_tokens:1200, messages:[{role:'system',content:sys},...msgs] });
     const text=data.choices?.[0]?.message?.content||'';
     this.history.push({role:'assistant',content:text});
     return text;
   },
 
-  _handleReply(raw) {
-    let parsed={response:raw,actions:[],tips:[]};
-    try{ const m=raw.match(/\{[\s\S]*\}/); if(m) parsed={response:'',actions:[],tips:[],...JSON.parse(m[0])}; }catch{}
-    const reply=parsed.response||parsed.message||raw;
+  // 명령을 먼저 실행하고, 실행기가 돌려준 결과로만 답한다(js/jarvis-actions.js).
+  // 예전엔 모델의 말을 먼저 띄우고 명령은 뒤에서 조용히 돌려서, 대상을 못 찾아도 '바꿨습니다' 가 남았다.
+  async _handleReply(raw) {
+    let out;
+    try { out = await JarvisActions.handle(this, raw); }
+    catch (e) { console.error('[JARVIS]', e); out = { text: JarvisActions.parse(raw).response || String(raw || ''), tips: [] }; }
+    const reply = out.text;
     if(reply){
       this._addMsg('ai',reply);
       // TTS는 켜져 있을 때만
       if(this._ttsEnabled) this._speak(reply);
     }
-    if(Array.isArray(parsed.actions)) parsed.actions.forEach(a=>this._exec(a));
-    if(Array.isArray(parsed.tips)&&parsed.tips.length) parsed.tips.forEach(t=>this._addMsg('tip',t));
+    if(Array.isArray(out.tips)&&out.tips.length) out.tips.forEach(t=>this._addMsg('tip',t));
     setTimeout(()=>{ if(typeof App!=='undefined') App._updateStatsBanner(); },400);
+    return reply;
   },
 
   // ── 액션 실행기 ───────────────────────
-  async _exec(action) {
-    try {
-      switch(action.type) {
-        case 'add_task': {
-          const lid=action.listId||(Auth.isLoggedIn()?App.S.lists[0]?.id:BashyCal.LIST_ID)||BashyCal.LIST_ID;
-          const t=await TaskStore.createTask(lid,action.title,action.due||null,action.notes||'');
-          t.starred=false;
-          if(!App.S.tasks[lid]) App.S.tasks[lid]=[];
-          App.S.tasks[lid].unshift(t);
-          App._buildTaskFilters(); App._renderTasks();
-          CalendarUI.render(document.getElementById('miniCal'),App.S.calDate,App.S.events,App.S.selDate);
-          App.showToast(`할일: ${action.title}`,'success');
-          break;
-        }
-        case 'edit_task': {
-          const lid=action.listId||App.S.lists[0]?.id; if(!lid||!action.taskId) break;
-          const updated=await TaskStore.updateTask(lid,action.taskId,{title:action.title,notes:action.notes,due:action.due});
-          const t=App.S.tasks[lid]?.find(x=>x.id===action.taskId);
-          if(t) Object.assign(t,{title:updated.title,notes:updated.notes||'',due:updated.due||null});
-          App._renderTasks(); App.showToast(`할일 수정됨`,'success'); break;
-        }
-        case 'delete_task': {
-          let lid=action.listId, tid=action.taskId;
-          if(!tid&&action.title){ for(const [lId,list] of Object.entries(App.S.tasks||{})){ const found=list.find(t=>t.title.includes(action.title)&&t.status==='needsAction'); if(found){tid=found.id;lid=lId;break;} } }
-          if(!lid||!tid) break;
-          await TaskStore.deleteTask(lid,tid);
-          App.S.tasks[lid]=App.S.tasks[lid]?.filter(t=>t.id!==tid);
-          App._renderTasks(); App.showToast(`할일 삭제됨`,'success'); break;
-        }
-        case 'add_event': {
-          // 새 일정 기본 저장 위치(구글 › 아이폰 캘린더 › Bashy)로 넣는다
-          const ev=await CalSources.createEvent(CalSources.defaultDest(),{title:action.summary,start:new Date(action.start),end:new Date(action.end||action.start),description:action.description||'',location:action.location||''});
-          (App._srcEv[ev._src]=App._srcEv[ev._src]||[]).push(ev); App._mergeEvents();
-          CalendarUI.render(document.getElementById('miniCal'),App.S.calDate,App.S.events,App.S.selDate);
-          App._renderCalPanel(); App.showToast(`일정: ${action.summary}`,'success'); break;
-        }
-        case 'delete_event': {
-          const ev=App.S.events.find(e=>!e._readOnly&&(e.id===action.eventId||(action.title&&e.summary?.includes(action.title))));
-          if(ev){ await CalSources.deleteEvent(ev); Object.keys(App._srcEv).forEach(k=>{ App._srcEv[k]=App._srcEv[k].filter(e=>e.id!==ev.id); }); App._mergeEvents(); App._renderCalPanel(); App.showToast('일정 삭제됨','success'); } break;
-        }
-        case 'add_checklist': {
-          const items=Checklist.getItems();
-          items.push({id:'cl_'+Date.now(),title:action.title,dueDate:action.dueDate||null,done:false,createdAt:new Date().toISOString()});
-          Checklist.saveItems(items); Checklist.render(); App.showToast(`체크리스트: ${action.title}`,'success'); break;
-        }
-        case 'edit_checklist': {
-          const items=Checklist.getItems();
-          const it=items.find(i=>i.id===action.id||(action.searchTitle&&i.title.includes(action.searchTitle||action.title)));
-          if(it){ if(action.newTitle) it.title=action.newTitle; if(action.dueDate!==undefined) it.dueDate=action.dueDate; Checklist.saveItems(items); Checklist.render(); App.showToast('체크리스트 수정됨','success'); } break;
-        }
-        case 'delete_checklist': {
-          const before=Checklist.getItems();
-          const after=before.filter(i=>!(i.id===action.id||(action.title&&i.title.includes(action.title))));
-          if(after.length<before.length){ Checklist.saveItems(after); Checklist.render(); App.showToast('체크리스트 삭제됨','success'); } break;
-        }
-        case 'toggle_checklist': {
-          const items=Checklist.getItems();
-          const it=items.find(i=>i.id===action.id||(action.title&&i.title.includes(action.title)));
-          if(it){ it.done=action.done!==undefined?action.done:!it.done; Checklist.saveItems(items); Checklist.render(); } break;
-        }
-        case 'add_memo': {
-          const items=Memo.getItems();
-          items.unshift({id:'memo_'+Date.now(),title:action.title,content:action.content||'',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
-          Memo.saveItems(items); Memo.render(); App.showToast(`메모: ${action.title}`,'success'); break;
-        }
-        case 'edit_memo': {
-          const items=Memo.getItems();
-          const m=items.find(i=>i.id===action.id||(action.searchTitle&&i.title.includes(action.searchTitle)));
-          if(m && m.locked){ App.showToast('잠긴 메모는 AI 가 고칠 수 없습니다 — 메모를 열어 직접 고쳐 주세요','error'); break; }
-          if(m){ if(action.title) m.title=action.title; if(action.content!==undefined) m.content=action.content; m.updatedAt=new Date().toISOString(); Memo.saveItems(items); Memo.render(); App.showToast('메모 수정됨','success'); } break;
-        }
-        case 'delete_memo': {
-          const before=Memo.getItems();
-          const open=typeof MemoLock!=='undefined' && MemoLock.isOpen();
-          const after=before.filter(m=>!((m.id===action.id||(action.title&&m.title.includes(action.title))) && (!m.locked||open)));
-          if(after.length<before.length){ Memo.saveItems(after); Memo.render(); App.showToast('메모 삭제됨','success'); } break;
-        }
-        case 'log_food': {
-          const _targetDate = action.date ? new Date(action.date+'T00:00:00') : new Date();
-          const d=Diet.getData(_targetDate); const meal=action.meal||'간식';
-          if(!d[meal])d[meal]=[];
-          const food={name:action.name,cal:action.cal||0,protein:action.protein||0,carb:action.carb||0,fat:action.fat||0};
-          d[meal].push(food); Diet.saveData(d, _targetDate); Diet.addToHistory(food); Diet.render(_targetDate);
-          const _dl = action.date && action.date!==new Date().toISOString().split('T')[0] ? ` (${action.date})` : '';
-          App.showToast(`${meal}: ${action.name}${_dl}`,'success'); break;
-        }
-        case 'delete_food': {
-          const dd=Diet.getData(); const meal=action.meal||'간식';
-          if(dd[meal]){ dd[meal]=dd[meal].filter(f=>!f.name.includes(action.name||'__')); Diet.saveData(dd); Diet.render(); App.showToast('식단 삭제됨','success'); } break;
-        }
-        case 'complete_habit': {
-          const chk=Habits.getChecked();
-          if(!chk.includes(action.habitId)){ chk.push(action.habitId); Habits.setChecked(chk); Habits.render(); App.showToast(`습관 완료`,'success'); } break;
-        }
-        case 'uncheck_habit': {
-          const chk2=Habits.getChecked(); const ui=chk2.indexOf(action.habitId);
-          if(ui!==-1){ chk2.splice(ui,1); Habits.setChecked(chk2); Habits.render(); App.showToast('↩ 습관 해제','success'); } break;
-        }
-        case 'add_habit': {
-          const list=Habits.getList();
-          list.push({id:'h'+Date.now(),name:action.name,emoji:action.emoji||'✅',days:action.days||[0,1,2,3,4,5,6]});
-          Habits.saveList(list); Habits.render(); App.showToast(`습관 추가: ${action.name}`,'success'); break;
-        }
-        case 'delete_habit': {
-          const hl=Habits.getList();
-          const after=hl.filter(h=>!(h.id===action.habitId||(action.name&&h.name.includes(action.name))));
-          if(after.length<hl.length){ Habits.saveList(after); Habits.render(); App.showToast('습관 삭제됨','success'); } break;
-        }
-      }
-    }catch(err){ console.error('[JARVIS action]',action.type,err); }
-  },
-
-  _buildCtx() {
-    const now=new Date(),dow=now.getDay();
-    const plan=Fitness.planFor(dow),fitChk=Fitness._checked();
-    const hList=Habits.getList(),hChk=Habits.getChecked();
-    const dd=Diet.getData(),dt=Diet.totals(dd),ds=Diet.getSettings();
-    const evToday=(App.S.events||[]).filter(e=>{ try{ return new Date(e.start?.dateTime||e.start?.date).toDateString()===now.toDateString(); }catch{return false;} });
-    const pending=[];
-    Object.entries(App.S.tasks||{}).forEach(([lid,list])=>list.filter(t=>t.status==='needsAction').forEach(t=>pending.push({id:t.id,title:t.title,listId:lid,due:t.due,starred:t.starred})));
-    const clItems=typeof Checklist!=='undefined'?Checklist.getItems().map(i=>({id:i.id,title:i.title,dueDate:i.dueDate,done:i.done})):[];
-    const memos=typeof Memo!=='undefined'?Memo.getItems().slice(0,5).map(m=>({id:m.id,title:m.title})):[];
-    return {
-      now:now.toLocaleString('ko-KR'), weekday:now.toLocaleDateString('ko-KR',{weekday:'long'}),
-      habits:{ done:hList.filter(h=>hChk.includes(h.id)).map(h=>h.name), missing:hList.filter(h=>!hChk.includes(h.id)).map(h=>({id:h.id,name:h.name})) },
-      fitness:{ plan:plan.name, exercises:plan.exercises.map((e,i)=>({name:e.name,done:fitChk.includes(i)})) },
-      diet:{ cal:dt.cal,calGoal:ds.calorieGoal,protein:dt.protein,proteinGoal:ds.proteinGoal },
-      schedule:{ today:evToday.map(e=>({id:e.id,title:e.summary,time:e.start?.dateTime?_fmtTime(new Date(e.start.dateTime)):'종일'})), pending:pending.slice(0,8) },
-      checklist:clItems, memos,
-      habitIds:hList.reduce((o,h)=>{o[h.name]=h.id;return o;},{}),
-      taskLists:App.S.lists.map(l=>({id:l.id,title:l.title})),
-    };
-  },
-
-  _buildSys(ctx) {
-    return `당신은 Bashy — 자기관리 앱 Bashy 의 AI 비서. 간결하고 한국어로 대화. 사용자: 수훈님.
-
-현재 상태: ${JSON.stringify(ctx)}
-
-반드시 JSON만 출력 (다른 텍스트 없이):
-{"response":"한국어 답변 (2-3문장, 간결하게)","actions":[],"tips":[]}
-
-사용 가능한 actions:
-{"type":"add_task","title":"","due":"YYYY-MM-DD or null","notes":"","listId":""}
-{"type":"edit_task","taskId":"","listId":"","title":"","notes":"","due":""}
-{"type":"delete_task","taskId":"","listId":"","title":"검색어"}
-{"type":"add_event","summary":"","start":"2026-05-22T14:00:00+09:00","end":"2026-05-22T15:00:00+09:00","location":"","description":""}
-{"type":"delete_event","eventId":"","title":"검색어"}
-{"type":"add_checklist","title":"","dueDate":"YYYY-MM-DD or null"}
-{"type":"edit_checklist","id":"","searchTitle":"","newTitle":"","dueDate":""}
-{"type":"delete_checklist","id":"","title":"검색어"}
-{"type":"toggle_checklist","id":"","title":"","done":true}
-{"type":"add_memo","title":"","content":""}
-{"type":"edit_memo","id":"","searchTitle":"","title":"","content":""}
-{"type":"delete_memo","id":"","title":"검색어"}
-{"type":"log_food","meal":"아침|점심|저녁|간식","name":"","cal":0,"protein":0,"carb":0,"fat":0}
-{"type":"delete_food","meal":"","name":"검색어"}
-{"type":"complete_habit","habitId":""}
-{"type":"uncheck_habit","habitId":""}
-{"type":"add_habit","name":"","emoji":"","days":[0,1,2,3,4,5,6]}
-{"type":"delete_habit","habitId":"","name":"검색어"}
-
-식품: 닭가슴살100g=165kcal/단31g, 달걀=77kcal/단6g, 흰밥200g=260kcal/탄57g, 삼겹살100g=331kcal, 치킨조각=213kcal, 김밥=420kcal, 아메리카노=5kcal, 프로틴=120kcal/단25g`;
-  },
+  // 명령 목록·실행·이름 찾기(음성 인식 오타 보정)·스마트홈은 js/jarvis-actions.js 에 있다. 결과 { ok, msg, show } 를 돌려준다.
+  _exec(action) { return JarvisActions.exec(action); },
+  _buildCtx() { return JarvisActions.ctx(); },
+  _buildSys(ctx) { return JarvisActions.sys(ctx); },
 
   // ── 음성 ──────────────────────────────
   // 앱(iOS)에서는 기기 음성 인식·읽기(네이티브 플러그인)를 쓰고, 웹에서는 브라우저 기능을 쓴다.
@@ -456,13 +299,13 @@ const JARVIS = {
     if(this._nSR){
       this._nSR.addListener('partialResults', e=>{
         const t=(e.accumulatedText||e.matches?.[0]||'').trim();
-        if(!t) return;
+        if(!t || window.VoiceChat?.active) return;
         const inp=document.getElementById('jInput'); if(inp) inp.value=t;
         const vt=document.getElementById('jVoiceTxt'); if(vt) vt.textContent=t;
       }).catch(()=>{});
       this._nSR.addListener('listeningState', e=>{
         const st=e.state||e.status;
-        if(st==='stopped' && this.listening) this._voiceDone();
+        if(st==='stopped' && this.listening && !window.VoiceChat?.active) this._voiceDone();
       }).catch(()=>{});
       return;
     }
@@ -483,6 +326,8 @@ const JARVIS = {
     if(this.listening) return this._stopListen();
     const v=document.getElementById('jInput')?.value.trim();
     if(v) return this.send();
+    // 빈 칸에서 마이크 = 음성 대화 모드 (듣기 → 자동 보내기 → 답 읽기 → 다시 듣기). js/voice-chat.js
+    if(window.VoiceChat) return VoiceChat.toggle();
     this.toggleMic();
   },
   _syncSend() {
@@ -493,7 +338,7 @@ const JARVIS = {
     btn.dataset.mode=mode;
     btn.innerHTML=Icons.svg(mode);
     btn.classList.toggle('on', mode!=='mic');
-    btn.ariaLabel=btn.title=mode==='send'?'보내기':mode==='stop'?'말하기 끝내기':'음성으로 말하기';
+    btn.ariaLabel=btn.title=mode==='send'?'보내기':mode==='stop'?'말하기 끝내기':'음성 대화';
   },
   async toggleMic() {
     if(this.listening) return this._stopListen();
@@ -525,7 +370,7 @@ const JARVIS = {
     else this.synthesis?.cancel();
   },
   _speak(text) {
-    if(!this._ttsEnabled) return;
+    if(!this._ttsEnabled || window.VoiceChat?.active) return;   // 음성 대화 중에는 voice-chat.js 가 읽는다
     const clean=text.replace(/[*`#\[\]{}]/g,'').replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu,'').trim().slice(0,300);
     if(!clean) return;
     if(this._nTTS){ this._nTTS.stop().catch(()=>{}).finally(()=>this._nTTS.speak({ text:clean, lang:'ko-KR', rate:1.0, pitch:1.0, category:'playback' }).catch(()=>{})); return; }
