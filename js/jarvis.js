@@ -247,6 +247,22 @@ const JARVIS = {
     if(inp) inp.value='';
     this._syncSend();
     this._addMsg('user',msg);
+    // 짧은 기기 명령("조명 꺼 줘"·"거실 불 켜"·"에어컨 24도로")은 허브처럼 바로 처리한다 — AI 를 거치지 않고, 실제 결과로 답한다.
+    // 확실하지 않으면 null 이 오고 아래 AI 로 넘어간다. (js/jarvis-actions.js JHome.quick)
+    try{
+      if(typeof JHome!=='undefined' && JHome.quick){
+        if(JHome.qverb(JHome.qnum(msg))) this._setStatus('기기 확인 중...');
+        const q=await JHome.quick(msg);
+        if(q){
+          this.history.push({role:'user',content:msg},{role:'assistant',content:JSON.stringify({response:q,actions:[]})+' [앱이 바로 실행함]'});
+          this.history=this.history.slice(-24);
+          this._addMsg('ai',q);
+          if(this._ttsEnabled) this._speak(q);
+          this._setStatus('대기 중');
+          return q;
+        }
+      }
+    }catch(e){ console.warn('[JARVIS quick]',e); }
     this._setStatus('생각 중...');
     const key=this._getKey();
     if(!key){ this._noKey(msg); this._setStatus('대기 중'); return; }

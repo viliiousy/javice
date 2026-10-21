@@ -131,7 +131,13 @@ const JHome = {
     const h = this._link.hub, p = h.provider || (h.haToken ? 'ha' : this._link.st ? 'st' : null);
     const name = { st: 'SmartThings', ha: 'Home Assistant', apple: '애플 홈' }[p];
     if (!name) return '연결 안 됨';
-    const d = this._devs && Date.now() - this._devAt < 30 * 60e3 ? this._devs.filter(x => x.kind !== 'sensor').slice(0, 30).map(x => x.name) : null;
+    // 이름·종류·상태를 짧게 — 모델이 device 에 실제 이름을 그대로 넣게 한다
+    const KO = { light: '조명', switch: '스위치', fan: '팬', climate: '냉난방', cover: '커튼', lock: '도어락', vacuum: '청소기', media: 'TV', appliance: '가전', scene: '장면' };
+    const d = this._devs && Date.now() - this._devAt < 30 * 60e3 ? this._devs.filter(x => x.kind !== 'sensor').slice(0, 40).map(x => {
+      if (x.kind === 'scene') return `${x.name}(장면)`;
+      const st = this.qdead(x) ? '끊김' : x.kind === 'climate' ? `${this.qisOn(x) ? '켜짐' : '꺼짐'}${x.target != null ? ' ' + x.target + '도' : ''}` : x.kind === 'light' && this.qisOn(x) && x.level != null ? `켜짐 ${x.level}%` : this.qisOn(x) ? '켜짐' : '꺼짐';
+      return `${x.room && !String(x.name).startsWith(x.room) ? x.room + ' ' : ''}${x.name}(${KO[x.kind] || x.kind}·${st})`;
+    }) : null;
     return d ? { via: name, devices: d } : name;
   },
   _apple() { const C = window.Capacitor; if (!C?.isNativePlatform?.()) return null; if (C.isPluginAvailable && !C.isPluginAvailable('BashyHome')) return null; return C.Plugins?.BashyHome || null; },
@@ -211,7 +217,7 @@ const JHome = {
         .filter(s => s.entity_id.split('.')[0] !== 'sensor' || /temperature|humidity|pm25|carbon_dioxide/.test(s.attributes?.device_class || ''))
         .map(s => { const dom = s.entity_id.split('.')[0], a = s.attributes || {};
           return { prov: 'ha', id: s.entity_id, name: a.friendly_name || s.entity_id, room: an[ea[s.entity_id]] || '', kind: this.HA_DOM[dom], dom,
-            state: s.state, level: a.brightness != null ? Math.round(a.brightness / 2.55) : undefined, temp: dom === 'sensor' ? s.state : a.current_temperature, target: a.temperature, unit: a.unit_of_measurement }; });
+            state: s.state, level: a.brightness != null ? Math.round(a.brightness / 2.55) : undefined, dim: dom === 'light' && (a.brightness != null || (a.supported_color_modes || []).some(m => m !== 'onoff')), temp: dom === 'sensor' ? s.state : a.current_temperature, target: a.temperature, unit: a.unit_of_measurement }; });
     });
   },
   async _appleList() {
@@ -219,7 +225,7 @@ const JHome = {
     const j = await P.list(), rooms = j.rooms || {};
     const K = { light: 'light', switch: 'switch', fan: 'fan', climate: 'climate', cover: 'cover', lock: 'lock', temp: 'sensor', humidity: 'sensor' };
     const out = (j.items || []).filter(it => K[it.kind]).map(it => { const v = it.v || {}, on = v.on != null ? !!v.on : v.active != null ? !!Number(v.active) : false;
-      return { prov: 'apple', id: it.id, name: it.name, room: rooms[it.room] || '', kind: K[it.kind], akind: it.kind, state: it.reachable === false ? '연결 끊김' : it.kind === 'cover' ? (Number(v.pos) > 0 ? 'open' : 'closed') : it.kind === 'lock' ? (Number(v.lock) === 1 ? 'locked' : 'unlocked') : (on ? 'on' : 'off'), level: v.brightness, temp: v.cur, target: v.target, humidity: v.humidity }; });
+      return { prov: 'apple', id: it.id, name: it.name, room: rooms[it.room] || '', kind: K[it.kind], akind: it.kind, state: it.reachable === false ? '연결 끊김' : it.kind === 'cover' ? (Number(v.pos) > 0 ? 'open' : 'closed') : it.kind === 'lock' ? (Number(v.lock) === 1 ? 'locked' : 'unlocked') : (on ? 'on' : 'off'), level: v.brightness, dim: v.brightness != null, temp: v.cur, target: v.target, humidity: v.humidity }; });
     (j.scenes || []).forEach(x => out.push({ prov: 'apple', id: x.id, name: x.name, kind: 'scene', room: '' }));
     return out;
   },
@@ -351,6 +357,313 @@ const JHome = {
     return { ok: !fail.length, msg: done.join(', ') + (fail.length ? ` (실패: ${fail.join(' / ')})` : '') };
   },
 };
+
+// ── 말 한 줄로 바로 (허브와 같은 방식) ──────────────────────
+// "조명 꺼 줘" · "거실 불 켜" · "침실1 조명 밝기 30" · "에어컨 24도로" · "다 꺼" 같은 짧은 기기 말은 AI 를 거치지 않는다.
+// 태블릿 허브(js/hub.js 의 Cmd)와 같은 규칙으로 [동작] + [대상] 을 나눠 바로 실행하고, 실제 결과로 답한다.
+//   대상: ① 기기 이름(방 이름 + 기기 이름 포함, 불·전등·라이트·램프 = 조명) — 가장 길게 겹치는 이름, 같은 길이면 전부
+//         ② 음성 인식 오타는 JMatch 로 가까운 이름  ③ 공간(거실·침실1)  ④ 종류만(불·에어컨…) — '불 꺼' 는 켜진 조명 전부
+//         ⑤ 대상 없이 '다 꺼' 는 켜진 기기 전부. 여럿 중 고를 수 없으면 되묻는다.
+// 확실하지 않으면 null 을 돌려주고, 그때는 지금처럼 AI 가 home 명령으로 처리한다.
+// 허브 쪽 Cmd 는 HA 상태 모양(HA.states·Dev 별명)에 묶여 있어 공유하지 않고 같은 규칙을 이 목록 모양에 옮겼다.
+Object.assign(JHome, {
+  qn: s => String(s || '').toLowerCase().replace(/[\s.,!?~'"·]/g, ''),
+  QKW: s => String(s).replace(/(불|전등|라이트|램프)/g, '조명'),
+  QPURE: /^(조명|난방|보일러|에어컨|컴퓨터|스위치|콘센트|플러그|switch)\d*$/,
+  QCTRL: ['light', 'switch', 'fan', 'climate', 'cover', 'media', 'vacuum'],
+  QKINDS: [
+    { k: 'light', w: '조명', re: /(불|조명|전등|라이트|램프|스탠드)/, is: d => d.kind === 'light' || /(조명|불|램프|라이트|스탠드)/.test(d.name) },
+    { k: 'ac', w: '에어컨', re: /(에어컨|에어콘|냉방)/, is: d => d.kind === 'climate' && !/(보일러|난방|히터)/.test(d.name) },
+    { k: 'heat', w: '난방', re: /(난방|보일러|히터)/, is: d => d.kind === 'climate' && !/(에어컨|에어콘)/.test(d.name) },
+    { k: 'climate', w: '냉난방기', re: /온도/, is: d => d.kind === 'climate' },
+    { k: 'pc', w: '컴퓨터', re: /(컴퓨터|피씨|pc|데스크탑)/i, is: d => /(컴퓨터|pc|데스크탑)/i.test(d.name) },
+    { k: 'air', w: '공기청정기', re: /(공기\s*청정기|청정기|청공)/, is: d => /(청정기|청공)/.test(d.name) || (d.kind === 'fan' && !/(선풍기|서큘|써큘|환풍)/.test(d.name)) },
+    { k: 'fan', w: '선풍기', re: /(선풍기|서큘|써큘|환풍)/, is: d => /(선풍기|서큘|써큘|환풍)/.test(d.name) || (d.kind === 'fan' && !/(청정기|청공)/.test(d.name)) },
+    { k: 'vacuum', w: '청소기', re: /(청소기|로청|로봇\s*청소|^\s*청소\s*(시작|해|돌려|멈춰|그만))/, is: d => d.kind === 'vacuum' },
+    { k: 'tv', w: 'TV', re: /(티비|tv|텔레비전|테레비)/i, is: d => d.kind === 'media' || /(티비|tv|텔레비전)/i.test(d.name) },
+    { k: 'cover', w: '커튼', re: /(커튼|블라인드|셔터|롤스크린)/, is: d => d.kind === 'cover' },
+    { k: 'plug', w: '플러그', re: /(플러그|콘센트|멀티탭)/, is: d => d.kind === 'switch' },
+    { k: 'lock', w: '도어락', re: /(도어락|도어\s*록|현관문|현관|자물쇠)/, is: d => d.kind === 'lock' },
+  ],
+  QUNLOCK: '잠금 해제는 안전을 위해 음성·AI 로 하지 않습니다 — 앱에서 직접 열어 주세요.',
+  QAPP: /(알림|알람|일정|할\s*일|습관|운동|루틴|식단|메모|체크|리마인더|타이머|스톱워치|음악|노래|다크\s*모드|테마|화면|소리|진동|음성|읽어|TTS|tts)/,
+  QALL: /(다\s*(꺼|켜|끄)|전부|모두|모든|전체|싹\s*다|싹|집\s*안)/,
+
+  // 소리로 들어온 숫자 읽기: '이십사 도' → 24도, '밝기 삼십' → 밝기 30
+  qnum(t) {
+    const D = { 일: 1, 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 칠: 7, 팔: 8, 구: 9 };
+    const conv = w => { let n = 0, m = w.match(/^(?:([이삼사오육칠팔구])?백)?(?:([이삼사오육칠팔구])?십)?([일이삼사오육칠팔구])?$/); if (!m) return w;
+      if (/백/.test(w)) n += 100 * (m[1] ? D[m[1]] : 1); if (/십/.test(w)) n += 10 * (m[2] ? D[m[2]] : 1); if (m[3]) n += D[m[3]]; return String(n); };
+    const NUM = '((?:[이삼사오육칠팔구]?백)?(?:[이삼사오육칠팔구]?십)?[일이삼사오육칠팔구]?)';
+    return String(t)
+      .replace(new RegExp(NUM + '(?=\\s*(?:퍼센트|프로|%|도(?!어)))', 'g'), w => /[십백]/.test(w) ? conv(w) : w)
+      .replace(new RegExp('(밝기\\s*(?:를|을)?\\s*)' + NUM + '(?![가-힣])', 'g'), (all, a, w) => /[십백]/.test(w) ? a + conv(w) : all);
+  },
+
+  qverb(t) {
+    if (/(켜져|꺼져|켜졌|꺼졌|열려|닫혀|잠겨)\s*(있|있어|있나|있니|있냐|있어요|있습니까)?\s*\??$|상태\s*(어때|알려|봐|확인)|(켜져|꺼져|열려|닫혀|잠겨)\s*있|몇\s*도(야|예요|에요|입니까|니|지|인지)?\s*\??$/.test(t)) return { act: 'ask' };
+    if (/(도어락|도어\s*록|현관|자물쇠|잠금)/.test(t) && /(잠금\s*해제|해제|풀어|열어|열기|언락|unlock)/i.test(t)) return { act: 'unlock' };
+    if (/(잠가|잠궈|잠그|잠금\s*해\s*줘|잠금해)/.test(t)) return { act: 'lock' };
+    const deg = t.match(/(\d{2})(?:\.\d)?\s*도(?!어)/);
+    if (deg && !/(밝기|%|퍼센트|프로)/.test(t)) return { act: 'temp', v: Number(deg[1]) };
+    if (/(온도|난방|에어컨|에어콘|보일러)/.test(t) && /(올려|높여)/.test(t)) return { act: 'tstep', v: 1 };
+    if (/(온도|난방|에어컨|에어콘|보일러)/.test(t) && /(내려|낮춰)/.test(t)) return { act: 'tstep', v: -1 };
+    const pct = t.match(/(\d{1,3})\s*(%|퍼센트|프로)/) || (/밝기/.test(t) && (t.match(/밝기\D{0,6}?(\d{1,3})/) || t.match(/(\d{1,3})\D*$/)));
+    if (pct) return { act: 'bri', v: Math.min(100, Number(pct[1])) };
+    if (/(더\s*)?밝게|밝혀|환하게|밝기.*(올려|높여)/.test(t)) return { act: 'step', v: 25 };
+    if (/(더\s*)?어둡게|어두워|밝기.*(줄여|내려|낮춰)/.test(t)) return { act: 'step', v: -25 };
+    if (/(열어|열어\s*줘|걷어)/.test(t)) return { act: 'open' };
+    if (/(닫아|쳐\s*줘)/.test(t)) return { act: 'close' };
+    if (/(꺼(?!내)|끄(?!집|어|덕)|끔|끈|\boff\b|오프|멈춰|정지|중지|그만)/i.test(t)) return { act: 'off' };
+    if (/(켜(?!보)|틀어|켬|\bon\b|시작|돌려|작동|실행)/i.test(t)) return { act: 'on' };
+    return null;
+  },
+
+  qisOn(d) { return ['on', 'open', 'opening', 'heat', 'cool', 'heat_cool', 'auto', 'dry', 'fan_only', 'playing', 'unlocked', 'cleaning', 'partially'].includes(String(d.state)); },
+  qdead(d) { return d.state === '연결 끊김' || d.state === 'unavailable'; },
+
+  // 샤오미 통합처럼 '청공  Air Purifier Switch Status' · '모니터 조명 Mi Light Bar' 로 영어 설명이 붙은 이름은 앞의 한글만 (허브 HA.baseName 과 같음)
+  qshort(n) {
+    n = String(n || '');
+    const two = n.split(/\s{2,}/);
+    if (two.length > 1 && /[가-힣]/.test(two[0])) n = two[0];
+    const k = n.replace(/(\s+[A-Za-z][A-Za-z0-9 ._()-]*)$/, '');
+    if (k !== n && /[가-힣]/.test(k)) n = k;
+    const w = n.trim().split(/\s+/);
+    if (w.length === 2 && w[0] === w[1]) n = w[0];
+    return n.trim();
+  },
+  // 답에 쓸 이름: 짧은 이름, 방 이름이 없으면 앞에 붙인다 ('조명1' → '침실1 조명1')
+  qlabel(d) { const s = this.qshort(d.name); return d.room && d.kind !== 'scene' && !this.qn(s).startsWith(this.qn(d.room)) ? `${d.room} ${s}` : s; },
+  // 기기 하나가 들을 수 있는 이름들: 이름, '방 + 이름', 되풀이 접기(침실1 침실1조명1), 끝 숫자 뗀 것, 종류 말 뗀 것
+  qaliases(d) {
+    if (d._qa) return d._qa;
+    const out = new Set();
+    const add = x => {
+      const k = this.QKW(this.qn(x)); if (k.length < 2 || this.QPURE.test(k)) return;
+      out.add(k);
+      const bare = k.replace(/(조명|난방)/g, '');
+      if (bare.length >= 2 && bare !== k && !/^\d+$/.test(bare)) out.add(bare);
+    };
+    const short = this.qshort(d.name);
+    const base = [...new Set([d.name, short])];
+    if (d.room && !this.qn(short).startsWith(this.qn(d.room))) base.push(d.room + ' ' + short);
+    for (const nm of base) {
+      add(nm);
+      const w = String(nm).trim().split(/\s+/);
+      if (w.length > 1 && w[1].startsWith(w[0])) add(w.slice(1).join(' '));
+      add(String(nm).replace(/\s*\d+$/, ''));
+    }
+    Object.defineProperty(d, '_qa', { value: [...out], enumerable: false, configurable: true });
+    return d._qa;
+  },
+
+  // 대상 말만 남긴다 (음성 오타 맞추기용)
+  qphrase(t) {
+    const V = /^(켜|꺼|끄|틀어|돌려|멈춰|정지|중지|그만|실행|시작|작동|열어|닫아|잠가|잠궈|잠그|밝게|어둡게|밝혀|환하게|맞춰|해|줘|주세요|줄래|올려|내려|높여|낮춰|부탁)/;
+    return String(t).replace(/\d{1,3}\s*(%|퍼센트|프로|도)\S*/g, ' ').replace(/밝기\S*/g, ' ').replace(/[.,!?~]/g, ' ')
+      .split(/\s+/).filter(w => w && !V.test(w) && !/^(좀|다|전부|모두|모든|전체|싹|그냥|지금|빨리|제발|자비스|헤이|같이|하나|좀만)$/.test(w))
+      .map(w => w.length > 2 ? w.replace(/(을|를|은|는|이|가|도|좀|으로|로)$/, '') : w).join(' ').trim();
+  },
+
+  // 음성 오타 점수: 숫자 읽기(JMatch.variants)를 맞춘 뒤 자모 편집 거리만 본다.
+  // (JMatch.score 의 '포함되면 높게' 는 쓰지 않는다 — '운동 시작' 이 '운동방 조명' 을 켜지 않게)
+  qfz(q, name) {
+    let best = 0;
+    for (const x of JMatch.variants(q)) for (const y of JMatch.variants(name)) {
+      if (x.length < 2 || y.length < 2) continue;
+      const a = JMatch.jamo(x), b = JMatch.jamo(y);
+      best = Math.max(best, 1 - JMatch.lev(a, b) / Math.max(a.length, b.length));
+    }
+    return best;
+  },
+
+  // { list } — 바로 실행할 대상 / { ask } — 되물을 말 / null — 모르겠음(AI 로)
+  qfind(t, v, list) {
+    const nt = this.QKW(this.qn(t));
+    const ask = v.act === 'ask';
+    let all = list.filter(d => d.kind !== 'scene' && (ask || (d.kind !== 'sensor' && d.kind !== 'appliance')));
+    // 장면: 이름이 말 안에 있고 켜·실행이면
+    if (v.act === 'on') {
+      let sc = null, sl = 0;
+      for (const d of list.filter(x => x.kind === 'scene')) {
+        const ks = [this.qn(d.name), this.qn(d.name).replace(/(모드|장면|씬)$/, '')].filter(k => k.length >= 2);
+        for (const k of ks) if (nt.includes(this.QKW(k)) || this.qn(t).includes(k)) { if (k.length > sl) { sc = d; sl = k.length; } }
+      }
+      if (sc) {
+        const devLen = Math.max(0, ...all.map(d => Math.max(0, ...this.qaliases(d).filter(a => nt.includes(a)).map(a => a.length))));
+        if (sl >= devLen) return { list: [sc] };
+      }
+    }
+    let kind = this.QKINDS.find(k => k.re.test(t));
+    if (!kind && (v.act === 'temp' || v.act === 'tstep')) kind = this.QKINDS.find(k => k.k === 'climate');
+    if (!kind && (v.act === 'bri' || v.act === 'step')) kind = this.QKINDS[0];
+    let pool = kind ? all.filter(kind.is) : all.filter(d => ask || this.QCTRL.includes(d.kind) || d.kind === 'lock');
+    if (v.act === 'open' || v.act === 'close') pool = pool.filter(d => d.kind === 'cover' || d.kind === 'lock');
+    const many = this.QALL.test(t);
+
+    // ① 이름: 가장 길게 겹치는 이름. 같은 길이로 여럿이면 전부 (거실 조명 → 거실 조명1·2)
+    let best = [], bestLen = 0;
+    for (const d of pool) {
+      let m = 0;
+      for (const a of this.qaliases(d)) if (nt.includes(a) && a.length > m) m = a.length;
+      if (!m) continue;
+      if (m > bestLen) { best = [d]; bestLen = m; } else if (m === bestLen) best.push(d);
+    }
+    // ② 공간
+    const rooms = [...new Set(list.map(d => d.room).filter(Boolean))];
+    let area = null, alen = 0;
+    for (const r of rooms) { const k = this.qn(r); if (k.length >= 2 && nt.includes(this.QKW(k)) && k.length > alen) { area = r; alen = k.length; } }
+    if (best.length && !(area && bestLen <= alen)) return { list: best, how: 'name' };
+
+    // ③ 음성 오타: 대상 말과 가장 가까운 이름 (JMatch)
+    const ph = this.qphrase(t);
+    const resid = this.QKW(this.qn(ph)).replace(/조명/g, '').replace(kind ? new RegExp(kind.re.source, 'gi') : /$^/, '').replace(area ? this.qn(area) : /$^/, '');
+    if (ph && resid.length >= 2 && typeof JMatch !== 'undefined') {
+      const q = this.QKW(ph);
+      const sc = pool.map(d => ({ d, s: Math.max(this.qfz(q, this.QKW(d.name)), this.qfz(q, this.QKW(this.qshort(d.name))), d.room ? this.qfz(q, this.QKW(d.room + ' ' + this.qshort(d.name))) : 0) })).sort((a, b) => b.s - a.s);
+      if (sc.length && sc[0].s >= 0.8) {
+        const top = sc.filter(x => sc[0].s - x.s < 0.03);
+        const stem = x => this.qn(this.qlabel(x.d)).replace(/\d+$/, '');
+        if (top.length === 1 || top.every(x => stem(x) === stem(top[0]))) return { list: top.map(x => x.d) };
+        return { ask: `어느 기기인지 말씀해 주세요 — ${top.slice(0, 4).map(x => this.qlabel(x.d)).join(', ')}` };
+      }
+    }
+    if (best.length) return { list: best, how: 'name' };
+
+    if (area) {
+      let inArea = pool.filter(d => d.room === area);
+      // 종류 없이 '거실 켜' 면 조명부터 (에어컨까지 켜지 않게)
+      if (!kind && v.act === 'on' && inArea.some(d => d.kind === 'light')) inArea = inArea.filter(d => d.kind === 'light');
+      if (inArea.length) return { list: inArea };
+    }
+    // ④ 종류만: 하나뿐이면 그것, '다' 가 붙었으면 전부
+    if (kind) {
+      if (!pool.length) return { ask: `연결된 기기 중에 ${kind.w}이(가) 없습니다.` };
+      if (pool.length === 1 || many) return { list: pool };
+      if (v.act === 'off') { const on = pool.filter(d => this.qisOn(d)); return { list: on.length ? on : pool }; }   // "불 꺼" = 켜진 것 전부
+      if (v.act === 'ask') return { list: pool };
+      if (v.act === 'on') { const off = pool.filter(d => !this.qisOn(d) && !this.qdead(d)); if (off.length === 1) return { list: off }; }
+      return { ask: `어느 ${kind.w}인지 말씀해 주세요 — ${pool.slice(0, 4).map(d => this.qlabel(d)).join(', ')}${pool.length > 4 ? ' …' : ''}` };
+    }
+    // ⑤ 대상 없이 '다 꺼' / '집 안 전부 꺼'
+    if (many && (v.act === 'off' || v.act === 'on')) {
+      const rest = this.qn(t).replace(/(다|전부|모두|모든|전체|싹|집안|집|기기|가전|전기|꺼|끄|고|켜|줘|주세요|요|좀|해|줄래|봐|버려|놔|라)/g, '');
+      if (!rest) {
+        if (v.act === 'on') return { ask: '무엇을 켤까요? 조명·에어컨처럼 기기나 공간을 함께 말씀해 주세요.' };
+        const on = pool.filter(d => ['light', 'switch', 'fan', 'climate', 'media'].includes(d.kind) && this.qisOn(d));
+        return on.length ? { list: on } : { ask: '이미 모두 꺼져 있습니다.' };
+      }
+    }
+    return null;
+  },
+
+  qj(w, a, b) {
+    const s = String(w), ch = s[s.length - 1], c = s.charCodeAt(s.length - 1);
+    if (/\d/.test(ch)) return s + ('013678'.includes(ch) ? a : b);
+    return s + ((c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28) ? a : b);
+  },
+  // '거실 조명1, 거실 조명2' → '거실 조명1·2'
+  qnames(ds) {
+    const g = [];
+    for (const d of ds) { const m = this.qlabel(d).match(/^(.*?)(\d+)$/); const p = m ? m[1] : null, x = p != null && g.find(e => e.p === p); if (x) x.n.push(m[2]); else g.push(m ? { p, n: [m[2]] } : { p: this.qlabel(d), n: [] }); }
+    const parts = g.map(e => e.p + e.n.join('·'));
+    return parts.length > 3 ? `${parts[0]} 등 ${ds.length}개` : parts.join(', ');
+  },
+
+  async qexec(v, hits, hub) {
+    if (v.act === 'ask') return hits.slice(0, 12).map(d => `${this.qlabel(d)} ${this.qdead(d) ? '연결 안 됨' : this._stateTxt(d)}`).join(', ') + '.';
+    if (v.act === 'unlock' || (hits.some(d => d.kind === 'lock') && ['on', 'open'].includes(v.act))) return this.QUNLOCK;
+    if (v.act === 'off' && hits.every(d => d.kind === 'lock')) return `도어락은 '잠가 줘' 라고 말씀하시면 잠급니다.`;
+    const dead = hits.filter(d => this.qdead(d)), live = hits.filter(d => !this.qdead(d));
+    if (!live.length) return `${this.qj(this.qlabel(dead[0]), '이', '가')} 지금 연결되어 있지 않습니다.`;
+    const jobs = [];   // [기기, 할 일]
+    for (const d of live) {
+      if (v.act === 'scene' || d.kind === 'scene') { jobs.push([d, () => this._do(d, 'scene', null, hub)]); continue; }
+      if (v.act === 'bri' || v.act === 'step') {
+        if (d.kind !== 'light' || !(d.dim || (d.caps || []).includes('switchLevel'))) continue;
+        const cur = this.qisOn(d) ? (d.level ?? 100) : 0;
+        const val = v.act === 'bri' ? v.v : Math.max(0, Math.min(100, cur + v.v));
+        jobs.push([d, async () => { await this._do(d, 'level', val, hub); d.state = val ? 'on' : 'off'; d.level = val; }]);
+        continue;
+      }
+      if (v.act === 'temp' || v.act === 'tstep') {
+        if (d.kind !== 'climate') continue;
+        const val = v.act === 'temp' ? v.v : Number(d.target ?? 24) + v.v;
+        jobs.push([d, async () => { if (!this.qisOn(d)) { await this._do(d, 'on', null, hub); d._turnedOn = true; d.state = d.mode || 'on'; } await this._do(d, 'temp', val, hub); d.target = val; }]);
+        continue;
+      }
+      if (v.act === 'open' || v.act === 'close') {
+        if (d.kind !== 'cover') continue;
+        jobs.push([d, async () => { await this._do(d, v.act, null, hub); d.state = v.act === 'open' ? 'open' : 'closed'; }]);
+        continue;
+      }
+      if (v.act === 'lock') {
+        if (d.kind !== 'lock' || d.state === 'locked') continue;
+        jobs.push([d, async () => { await this._do(d, 'lock', null, hub); d.state = 'locked'; }]);
+        continue;
+      }
+      if (d.kind === 'lock') continue;
+      if (v.act === 'off' && !this.qisOn(d)) continue;   // 이미 꺼진 건 건너뛴다
+      if (v.act === 'on' && this.qisOn(d) && d.kind !== 'vacuum') continue;
+      jobs.push([d, async () => { await this._do(d, v.act, null, hub); d.state = d.kind === 'vacuum' ? (v.act === 'on' ? 'cleaning' : 'docked') : d.kind === 'cover' ? (v.act === 'on' ? 'open' : 'closed') : v.act; }]);
+    }
+    const tail = dead.length ? ` (${dead.map(d => this.qlabel(d)).join(', ')} 연결 안 됨)` : '';
+    if (!jobs.length) {
+      if (v.act === 'on' || v.act === 'off') return `이미 ${v.act === 'on' ? '켜져' : '꺼져'} 있습니다.${tail}`;
+      if (v.act === 'lock') return `이미 잠겨 있습니다.${tail}`;
+      if (v.act === 'bri' || v.act === 'step') return `${this.qj(this.qnames(live), '은', '는')} 밝기를 바꿀 수 없는 기기입니다.`;
+      if (v.act === 'temp' || v.act === 'tstep') return `${this.qj(this.qnames(live), '은', '는')} 온도를 맞출 수 없는 기기입니다.`;
+      return `${this.qj(this.qnames(live), '은', '는')} 그렇게 조작할 수 없는 기기입니다.`;
+    }
+    const res = await Promise.allSettled(jobs.map(([, f]) => f()));
+    const ok = jobs.filter((_, i) => res[i].status === 'fulfilled').map(([d]) => d);
+    const bad = res.filter(r => r.status === 'rejected').map(r => r.reason?.message || String(r.reason));
+    const fail = bad.length ? ` (실패: ${[...new Set(bad)].join(' / ')})` : '';
+    if (!ok.length) return `실패했습니다: ${[...new Set(bad)].join(' / ')}`;
+    const nm = this.qnames(ok), obj = this.qj(nm, '을', '를');
+    let msg;
+    if (ok.every(d => d.kind === 'scene')) msg = `'${nm}' 장면을 실행했습니다.`;
+    else if (v.act === 'bri') msg = `${nm} 밝기를 ${v.v}% 로 맞췄습니다.`;
+    else if (v.act === 'step') msg = `${obj} ${v.v > 0 ? '밝게' : '어둡게'} 했습니다.`;
+    else if (v.act === 'temp' || v.act === 'tstep') msg = `${ok.some(d => d._turnedOn) ? `${obj} 켜고 ` : `${nm} `}온도를 ${ok.map(d => d.target).filter((x, i, a) => a.indexOf(x) === i).join('·')}도로 맞췄습니다.`;
+    else if (v.act === 'open' || v.act === 'close') msg = `${obj} ${v.act === 'open' ? '열었습니다' : '닫았습니다'}.`;
+    else if (v.act === 'lock') msg = `${obj} 잠갔습니다.`;
+    else if (ok.every(d => d.kind === 'vacuum')) msg = v.act === 'on' ? `${nm} 청소를 시작했습니다.` : `${obj} 충전대로 보냈습니다.`;
+    else msg = `${obj} ${v.act === 'on' ? '켰습니다' : '껐습니다'}.`;
+    ok.forEach(d => { delete d._turnedOn; });
+    return msg + fail + tail;
+  },
+
+  async _qlist(maxAge) {
+    if (this._devs && Date.now() - this._devAt < maxAge) return this._devs;
+    return this.devices(true);
+  },
+  // 허브식 바로 처리. 답할 한 줄(문자열) 또는 null(AI 로 넘김)
+  async quick(text) {
+    const t = this.qnum(String(text || '').trim());
+    if (!t || t.length > 60) return null;
+    const v = this.qverb(t);
+    if (!v) return null;
+    if (v.act === 'unlock') return this.QUNLOCK;   // 연결 여부와 상관없이 늘 거절
+    let c;
+    try { c = await Promise.race([this.cfg(), new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 4000))]); } catch (e) { return null; }
+    if (!c || !c.prov) return null;
+    let list;
+    try { list = await Promise.race([this._qlist(5 * 60e3), new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 6000))]); } catch (e) { return null; }
+    let f = this.qfind(t, v, list);
+    if (!f) return null;
+    // 앱 기능 말('알림 켜 줘'·'운동 시작')이 섞이면 기기 이름이 정확히 들어 있을 때만 바로 처리한다
+    if (this.QAPP.test(t) && f.how !== 'name') return null;
+    if (f.ask) return f.ask;
+    // 켜고 끄는 판단은 지금 상태로 — 받아 둔 목록이 오래됐으면 새로 받아 다시 고른다
+    if (Date.now() - this._devAt > 20e3) {
+      try { list = await this.devices(true); const g = this.qfind(t, v, list); if (g) f = g; if (f.ask) return f.ask; } catch (e) {}
+    }
+    try { return await this.qexec(v, f.list, c.hub); }
+    catch (e) { return '실패했습니다: ' + (e.message || e); }
+  },
+});
 
 // ── 명령 실행기 ─────────────────────────────────────────
 const JarvisActions = {
@@ -1055,7 +1368,7 @@ actions (괄호 안 필드, ?는 생략 가능):
 [체크리스트] add_checklist(title,dueDate?) edit_checklist(title,newTitle?,dueDate?) toggle_checklist(title,done?) delete_checklist(title)
 [메모] add_memo(title,content) edit_memo(title,newTitle?,content?) delete_memo(title) — 잠긴 메모는 못 건드림
 [경제] econ(name?) 시세·보유 조회
-[스마트홈] home(cmd:"list|status|on|off|toggle|level|temp|open|close|scene|start|dock",device?,value?) — '거실 불' 처럼 방+종류도 됨. home 이 '연결 안 됨'이면 설정 › 스마트홈 허브 › 스마트홈 연결을 안내
+[스마트홈] home(cmd:"list|status|on|off|toggle|level|temp|open|close|scene|start|dock",device?,value?) — device 는 상태 home.devices 의 이름 그대로(괄호 앞). '거실 불' 처럼 방+종류도 됨. 불·전등·라이트=조명. 대상 없이 '불 꺼' 는 켜진 조명 각각에 off. level 은 0~100, temp 는 도. 잠금 해제는 하지 않음. home 이 '연결 안 됨'이면 설정 › 스마트홈 허브 › 스마트홈 연결을 안내
 [설정] setting(key:"theme|fx|tts",value)
 예) "100 익스텐션 대신 덤벨 로우 3세트 12회로" → {"response":"바꾸겠습니다","actions":[{"type":"ex_swap","from":"백 익스텐션","to":"덤벨 로우","sets":"3×12"}]}
 시각은 +09:00 ISO(예 2026-05-22T14:00:00+09:00). 식품 참고: 닭가슴살100g=165kcal/단31g, 달걀=77kcal/단6g, 흰밥200g=260kcal/탄57g, 삼겹살100g=331kcal, 치킨조각=213kcal, 김밥=420kcal, 아메리카노=5kcal, 프로틴=120kcal/단25g`;
