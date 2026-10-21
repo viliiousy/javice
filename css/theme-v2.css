@@ -720,3 +720,4 @@ html[data-ui="v2"] .cal-ics-btns .btn-sm:not(.accent){ height:40px; padding:0 16
 .ml-go{ height:48px; border:0; border-radius:12px; background:var(--accent); color:#17181B; font:inherit; font-size:16px; font-weight:600; cursor:pointer; }
 .ml-sub{ height:48px; border:1px solid var(--border); border-radius:12px; background:none; color:var(--text); font:inherit; font-size:15px; cursor:pointer; }
 .ml-link{ display:block; margin:16px auto 0; padding:8px; border:0; background:none; color:var(--text3); font:inherit; font-size:13px; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+.ml-danger{ height:48px; border:0; border-radius:12px; background:none; color:#E5484D; font:inherit; font-size:15px; font-weight:600; cursor:pointer; }

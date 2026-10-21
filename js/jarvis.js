@@ -350,7 +350,7 @@ const JARVIS = {
         case 'edit_memo': {
           const items=Memo.getItems();
           const m=items.find(i=>i.id===action.id||(action.searchTitle&&i.title.includes(action.searchTitle)));
-          if(m && m.locked && !(typeof MemoLock!=='undefined' && MemoLock.isOpen())){ App.showToast('잠긴 메모는 먼저 열어야 고칠 수 있습니다','error'); break; }
+          if(m && m.locked){ App.showToast('잠긴 메모는 AI 가 고칠 수 없습니다 — 메모를 열어 직접 고쳐 주세요','error'); break; }
           if(m){ if(action.title) m.title=action.title; if(action.content!==undefined) m.content=action.content; m.updatedAt=new Date().toISOString(); Memo.saveItems(items); Memo.render(); App.showToast('메모 수정됨','success'); } break;
         }
         case 'delete_memo': {

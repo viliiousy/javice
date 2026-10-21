@@ -62,6 +62,8 @@ const Memo = {
   // 평문만 있던 옛 메모를 그리기용 HTML 로 바꾼다. 저장은 건드리지 않는다 —
   // 손대지 않은 메모까지 전부 다시 쓰면 동기화가 한 번 크게 출렁인다.
   htmlOf(m){
+    // 잠긴(암호화된) 메모는 열려 있는 동안 메모리에 풀어 둔 평문을 쓴다
+    if (m.enc) { const pl = typeof MemoLock !== 'undefined' && MemoLock.plain(m); if (!pl) return ''; m = { ...m, html: pl.html, content: pl.content }; }
     if (m.html) return this.clean(m.html);
     return esc(m.content || '').replace(/\n/g, '<br>');
   },
@@ -293,6 +295,7 @@ const Memo = {
   showEdit(id){
     const m = this.getItems().find(x => x.id === id); if(!m) return;
     if (m.locked && typeof MemoLock !== 'undefined' && !MemoLock.isOpen()) { MemoLock.ensure(() => this.showEdit(id)); return; }
+    if (m.enc && !MemoLock.plain(m)) { App.showToast('이 메모는 예전 열쇠로 잠겨 있어 이 기기에서 열 수 없습니다', 'error'); return; }
     this._lockDraft = !!m.locked;
     App.openModal('@memo 메모', this._form(m) + this._btns(`Memo._saveEdit('${id}')`, id),
       () => { this._wire(this.htmlOf(m)); if(!matchMedia('(pointer:coarse)').matches) document.getElementById('mBody')?.focus(); });
@@ -554,7 +557,8 @@ const Memo = {
     return out;
   },
 
-  _toggleLockDraft(){
+  async _toggleLockDraft(){
+    if (!this._lockDraft && typeof MemoLock !== 'undefined' && !(await MemoLock.prepare())) return;   // 열쇠부터 준비
     this._lockDraft = !this._lockDraft;
     const b = document.getElementById('mmLockBtn');
     if (b) { b.classList.toggle('on', this._lockDraft); b.setAttribute('aria-pressed', this._lockDraft); b.querySelector('span').textContent = this._lockDraft ? '잠금 켜짐' : '잠그기'; }
@@ -566,24 +570,31 @@ const Memo = {
     return { html, content: this.textOf(html) };
   },
 
-  _saveNew(){
+  // 잠근 메모는 내용을 기기에서 암호화해 enc 에만 담는다(html·content 는 비운다)
+  async _pack(m, html, content){
+    if (this._lockDraft && typeof MemoLock !== 'undefined' && MemoLock.prepare && await MemoLock.prepare()) {
+      m.locked = true; m.enc = await MemoLock.seal({ html, content }); m.html = ''; m.content = '';
+      MemoLock._plain[m.id] = { html, content };
+    } else { delete m.locked; delete m.enc; m.html = html; m.content = content; if (typeof MemoLock !== 'undefined') delete MemoLock._plain[m.id]; }
+  },
+  async _saveNew(){
     const title = document.getElementById('mTitle')?.value.trim();
     if(!title){ App.showToast('제목을 입력해주세요','error'); return; }
     const { html, content } = this._read();
+    const m = { id:'memo_'+Date.now(), title, createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() };
+    await this._pack(m, html, content);
     const items = this.getItems();
-    items.unshift({ id:'memo_'+Date.now(), title, html, content, ...(this._lockDraft?{locked:true}:{}),
-      createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() });
-    if (this._lockDraft && typeof MemoLock !== 'undefined') MemoLock._opened();
+    items.unshift(m);
     this.saveItems(items); this.render(); App.closeModal(); App.showToast('메모 저장됨','success');
   },
 
-  _saveEdit(id){
+  async _saveEdit(id){
     const title = document.getElementById('mTitle')?.value.trim();
     if(!title){ App.showToast('제목을 입력해주세요','error'); return; }
     const { html, content } = this._read();
     const items = this.getItems();
     const m = items.find(x => x.id === id);
-    if(m){ m.title=title; m.html=html; m.content=content; m.updatedAt=new Date().toISOString(); if(this._lockDraft) m.locked=true; else delete m.locked; }
+    if(m){ m.title=title; m.updatedAt=new Date().toISOString(); await this._pack(m, html, content); }
     this.saveItems(items); this.render(); App.closeModal(); App.showToast('수정됨','success');
   },
 
