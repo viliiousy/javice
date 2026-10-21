@@ -54,7 +54,7 @@ messaging.onBackgroundMessage(function(payload) {
   show(n.title || d.title, n.body || d.body, d.slot, d);
 });
 
-const CACHE = 'javice-v7';
+const CACHE = 'javice-v8';
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -68,14 +68,39 @@ self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
       .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      // 페이지 이동 요청은 서비스 워커가 깨어나는 동안 미리 출발시킨다 (첫 화면이 그만큼 빨라진다)
+      .then(() => self.registration.navigationPreload && self.registration.navigationPreload.enable().catch(() => {}))
       .then(() => self.clients.claim())
   );
 });
 
+// 네트워크 먼저, 끊겼을 때만 캐시. HTML 은 늘 새로 받으므로 배포하면 바로 반영된다.
+// 다른 출처(구글·Firebase·글꼴 CDN) 요청과 구간 요청(Range, 소리·영상)은 손대지 않고 브라우저에 맡긴다 —
+// 캐시에 없으니 대신 받아 줘 봐야 왕복만 하나 더 생긴다.
 self.addEventListener('fetch', e => {
-  if(e.request.method !== 'GET') return;
-  if(e.request.url.includes('/api/')) return;
-  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+  const req = e.request;
+  if(req.method !== 'GET') return;
+  if(req.headers.has('range')) return;
+  let url;
+  try { url = new URL(req.url); } catch { return; }
+  if(url.origin !== self.location.origin) return;
+  if(url.pathname.startsWith('/api/')) return;
+
+  if(req.mode === 'navigate') {
+    e.respondWith((async () => {
+      try {
+        const pre = await e.preloadResponse;
+        if(pre) return pre;
+        return await fetch(req);
+      } catch {
+        return (await caches.match(req, { ignoreSearch: true }))
+            || (await caches.match('/index.html'))
+            || Response.error();
+      }
+    })());
+    return;
+  }
+  e.respondWith(fetch(req).catch(async () => (await caches.match(req)) || Response.error()));
 });
 
 // 푸시 수신 — Firebase SDK 가 못 읽고 지나간 경우의 폴백.

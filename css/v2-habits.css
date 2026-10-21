@@ -68,8 +68,6 @@ html[data-ui="v2"] .hb-sheet .day-pick-btn:focus-within{ outline:2px solid var(-
 /* ── 약: 시각 칸 + 알림 받기 한 줄 ───────────────────────── */
 html[data-ui="v2"] .hb-sheet .med-line{ display:flex; align-items:center; gap:16px; }
 html[data-ui="v2"] .modal-box .hb-sheet .med-line .inp{ flex:1; width:auto; min-width:0; max-width:200px; }
-html[data-ui="v2"] .hb-sheet .med-chk{ height:44px; gap:8px; font-size:14px; color:var(--text2); white-space:nowrap; margin-left:auto; }
-html[data-ui="v2"] .hb-sheet .med-chk input{ width:18px; height:18px; margin:0; accent-color:var(--text); }
 html[data-ui="v2"] .hb-sheet .med-note{ margin-top:8px; font-size:12px; line-height:18px; color:var(--text3); }
 
 /* ── 단추: 주황 하나(꽉 찬 너비) + 아래 보조 단추 줄 ─────── */
@@ -178,8 +176,6 @@ html[data-ui="v2"] .nt .set-link:last-child{ border-bottom:0; }
 /* 다 한 날 — 체크 */
 .trk .c.full{ background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M2 5.2 4.1 7.3 8 2.9' fill='none' stroke='%2317181B' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/80% no-repeat; }
 .trk .c.sel{ outline:2px solid var(--text); outline-offset:1px; position:relative; z-index:1; }
-.trk-sum{ border-bottom:0; }
-.trk-sum .trk-l{ font-size:11px; color:var(--text3); }
 .trk-key{ display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:16px; font-size:12px; color:var(--text3); }
 .trk-key span{ display:flex; align-items:center; gap:4px; }
 .trk-key .c{ width:12px; height:12px; aspect-ratio:auto; border-radius:2px; }

@@ -14,13 +14,18 @@
   <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <meta name="apple-mobile-web-app-title" content="Bashy">
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <!-- Pretendard: 한글은 Noto Sans KR 기반이되 자간·획을 다듬었고, 숫자·영문은 Inter 계열이다.
-       체중·칼로리·시세처럼 한글 라벨 옆에 숫자가 계속 붙는 화면에서 정렬이 훨씬 안정적이다. -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-  <link rel="stylesheet" href="css/style.css">
+  <!-- 바깥 서버 연결은 CSS 를 받기 전에 미리 열어 둔다 (글꼴 CSS → 글꼴 파일 왕복이 첫 화면을 늦춘다) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="dns-prefetch" href="https://www.gstatic.com">
+  <link rel="dns-prefetch" href="https://accounts.google.com">
+  <!-- Pretendard: 한글은 Noto Sans KR 기반이되 자간·획을 다듬었고, 숫자·영문은 Inter 계열이다.
+       체중·칼로리·시세처럼 한글 라벨 옆에 숫자가 계속 붙는 화면에서 정렬이 훨씬 안정적이다.
+       v2 화면은 IBM Plex 가 먼저라 Pretendard 는 대비용이다 — 첫 화면을 막지 않게 늦게 붙인다. -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"></noscript>
+  <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
   <link rel="stylesheet" href="css/theme-v2.css">
 <link rel="stylesheet" href="css/v2-diet.css">
@@ -50,7 +55,7 @@
 <!-- Login -->
 <div id="loginScreen" class="login-screen ln">
   <main class="ln-wrap">
-    <div class="ln-brand"><img src="icons/icon-192.png" alt="" width="40" height="40"><span>Bashy</span></div>
+    <div class="ln-brand"><img src="icons/icon-192.png" alt="" width="40" height="40" decoding="async"><span>Bashy</span></div>
 
     <h1 class="ln-h">하루를<br>한 화면에</h1>
     <p class="ln-lead">구글 캘린더·할 일에 습관·식단·운동 기록을 붙인 개인 대시보드입니다.</p>
@@ -93,7 +98,7 @@
   <div class="header-sticky-group">
   <header class="header" style="position:static;box-shadow:none;">
     <div class="h-left">
-      <a href="/" class="h-logo" style="text-decoration:none;display:flex;flex-direction:column;align-items:center;gap:1px"><img src="icons/icon-192.png" style="width:34px;height:34px;border-radius:8px"><span style="font-size:10px;font-weight:700;color:var(--accent);letter-spacing:0.5px">Bashy</span></a>
+      <a href="/" class="h-logo" style="text-decoration:none;display:flex;flex-direction:column;align-items:center;gap:1px"><img src="icons/icon-192.png" alt="" width="34" height="34" decoding="async" style="width:34px;height:34px;border-radius:8px"><span style="font-size:10px;font-weight:700;color:var(--accent);letter-spacing:0.5px">Bashy</span></a>
       <div class="h-date">
         <div id="hDate" class="h-date-main"></div>
         <div id="hDay" class="h-date-sub"></div>

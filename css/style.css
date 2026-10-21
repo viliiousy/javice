@@ -79,55 +79,15 @@ html,body{
   padding:20px; background:var(--bg);
   position:relative; overflow:hidden;
 }
-.login-orbs{
-  position:absolute; inset:0; pointer-events:none;
-  background:
-    radial-gradient(70% 50% at 50% -10%,  var(--card) 0%, transparent 65%),
-    radial-gradient(50% 40% at 88% 108%,  var(--card2) 0%, transparent 70%);
-}
-.orb{ display:none; }   /* 구슬은 뺐다 — 색이 문제였지 움직임이 문제가 아니었다 */
+   /* 구슬은 뺐다 — 색이 문제였지 움직임이 문제가 아니었다 */
 @keyframes float{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
 
-.login-card{
-  position:relative; background:var(--card);
-  border:1px solid var(--border);
-  border-radius:20px; padding:44px 40px; width:100%; max-width:420px;
-  text-align:center; box-shadow:var(--shadow-lg);
-}
-.login-emoji{ font-size:56px; display:block; margin-bottom:14px; animation:float 3s ease-in-out infinite; }
-.login-title{
-  font-size:28px; font-weight:900; margin-bottom:6px; color:var(--text);
-  letter-spacing:-0.03em;
-}
-.login-sub{ color:var(--text2); margin-bottom:22px; font-size:14px; }
-.login-features{ display:flex; flex-wrap:wrap; gap:7px; justify-content:center; margin-bottom:28px; }
-.login-features span{
-  display:inline-flex; align-items:center; gap:6px;
-  background:var(--accent-bg); border:1px solid var(--border2);
-  border-radius:20px; padding:4px 12px; font-size:12px; color:var(--accent);
-}
 /* 로그인 화면만 컬러 이모지가 남아 있었다. 무채색 카드 위에서 그 여덟 개가 제일 시끄러웠다.
    나머지 화면과 같은 선 아이콘으로 맞춘다. */
-.login-features .ic{ width:13px; height:13px; opacity:.7; }
-.btn-google-login{
-  width:100%; display:flex; align-items:center; justify-content:center; gap:10px;
-  padding:13px 24px; background:white; color:#334155;
-  border:1.5px solid var(--border2); border-radius:var(--r);
-  font-size:15px; font-weight:600; cursor:pointer; transition:all 0.2s;
-  margin-bottom:10px; font-family:inherit; box-shadow:var(--shadow-sm);
-}
-.btn-google-login:hover{ background:#f8fafc; border-color:var(--accent); transform:translateY(-1px); box-shadow:var(--shadow); }
 /* 다크에서 흰 버튼 하나만 남으면 화면에서 그것만 튄다.
    구글은 흰 버튼 말고 어두운 버튼(#131314)도 공식으로 허용한다 — 로고는 그대로 두고 판만 바꾼다. */
-html.dark .btn-google-login{ background:#131314; color:#e3e3e3; border-color:#5f6368; box-shadow:none; }
-html.dark .btn-google-login:hover{ background:#1c1c1e; border-color:#8e918f; }
 /* 로그인 화면 안내 한 줄. '오프라인 모드로 시작' 단추가 있던 자리다.
    (.login-note 는 아래 권한 안내가 이미 쓰고 있어서 이름을 따로 뒀다.) */
-.login-sync{
-  margin:10px 0 0; font-size:12px; line-height:1.5;
-  color:var(--text3); text-align:center;
-}
-.login-note{ font-size:12px; color:var(--text3); margin-top:14px; }
 
 /* ── 헤더 ────────────────────────────── */
 .header{
@@ -147,7 +107,6 @@ html.dark .btn-google-login:hover{ background:#1c1c1e; border-color:#8e918f; }
 .h-right{ display:flex; align-items:center; gap:10px; }
 .h-user{ display:flex; align-items:center; gap:8px; }
 .h-avatar{ width:28px;height:28px;border-radius:50%;border:2px solid var(--accent-bg); }
-.h-name{ font-size:13px;font-weight:500;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2); }
 
 
 /* ── 스탯 배너 ───────────────────────── */
@@ -164,7 +123,6 @@ html.dark .btn-google-login:hover{ background:#1c1c1e; border-color:#8e918f; }
 }
 .stat-chip.stat-green{ background:#ecfdf5; border-color:#a7f3d0; color:var(--green); }
 .stat-chip.stat-yellow{ background:#fffbeb; border-color:#fde68a; color:var(--yellow); }
-.stats-urgent{ display:flex;flex-direction:column;gap:1px;padding:3px 0 0; }
 .stats-urgent-item{ font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .stats-due{ color:var(--text3);font-size:12px;margin-left:4px; }
 .stats-overdue{ color:var(--red);font-size:12px;margin-left:4px;font-weight:600; }
@@ -172,7 +130,6 @@ html.dark .btn-google-login:hover{ background:#1c1c1e; border-color:#8e918f; }
 .stats-jarvis-icon{ color:var(--accent-l);flex-shrink:0; }
 .stats-jarvis-txt{ overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:calc(100vw - 80px); }
 @keyframes statsPulse{ 0%,100%{opacity:1} 40%{opacity:0.5;transform:scale(1.01)} }
-.stats-flash{ animation:statsPulse 0.5s ease; }
 @keyframes chipBlink{
   0%  { transform:scale(1);   box-shadow:none; }
   25% { transform:scale(1.12); box-shadow:0 0 0 3px rgba(79,70,229,0.35), 0 0 12px rgba(79,70,229,0.25); }
@@ -259,7 +216,6 @@ html.dark .btn-google-login:hover{ background:#1c1c1e; border-color:#8e918f; }
 .fit-tab.tf-add:hover{ border-color:var(--accent); border-style:solid; background:var(--accent-bg); }
 .badge{ font-size:12px; padding:2px 8px; border-radius:12px; background:var(--bg); color:var(--text2); border:1px solid var(--border); font-weight:500; }
 .badge-accent{ background:var(--accent-bg); color:var(--accent); border-color:var(--border2); }
-.badge-green{ background:#ecfdf5; color:var(--green); border-color:#a7f3d0; }
 .empty{ padding:24px 16px; text-align:center; color:var(--text3); font-size:13px; }
 
 /* ── 인풋 ────────────────────────────── */
@@ -288,9 +244,6 @@ textarea.inp{ resize:vertical; min-height:64px; }
 }
 .fit-tab.tf-over{ position:relative; }
 .tf-ic{ width:13px; height:13px; }
-.task-form{ padding:10px 14px; border-bottom:1px solid var(--border); display:flex; flex-direction:column; gap:8px; background:var(--card2); }
-.task-form-row{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-.task-form-btns{ display:flex; gap:6px; justify-content:flex-end; }
 /* flex-basis 가 0 이라야 '할일이 몇 개든 카드 높이에 영향을 주지 않는다'.
    auto 로 두면 할일 스무 개가 카드를 스무 개만큼 늘려 버리고, 그 높이에 맞추느라
    오른쪽 두 열이 빈 채로 끌려 내려간다. 0 으로 두면 카드 키는 달력·요약이 정하고
@@ -308,7 +261,6 @@ textarea.inp{ resize:vertical; min-height:64px; }
   transition:background 0.12s; position:relative;
 }
 .task-item:hover{ background:var(--card2); }
-.task-item.done .task-text{ text-decoration:line-through; color:var(--text3); }
 .task-check{
   width:18px; height:18px; border-radius:50%;
   border:2px solid var(--border2); flex-shrink:0; margin-top:1px;
@@ -319,21 +271,9 @@ textarea.inp{ resize:vertical; min-height:64px; }
 .task-item.done .task-check{ background:var(--green); border-color:var(--green); color:white; font-size:12px; }
 .task-item.done .task-check::after{ content:'✓'; }
 .task-body{ flex:1; min-width:0; cursor:pointer; }
-.task-body:hover .task-text{ color:var(--accent); }
-.task-text{ font-size:13px; word-break:break-word; color:var(--text); }
 .task-notes{ font-size:12px; color:var(--text3); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .task-due-inline{ font-size:12px; color:var(--text3); margin-left:5px; font-weight:400; background:var(--bg); padding:1px 6px; border-radius:10px; }
 .task-due-inline.overdue{ color:var(--red); background:#fee2e2; }
-.task-star{
-  background:transparent; border:none; color:var(--text4);
-  cursor:pointer; font-size:0; padding:2px 4px;
-  transition:all 0.15s; opacity:0; flex-shrink:0;
-}
-.task-star::before{ font-size:14px; content:'☆'; }
-.task-star.starred{ opacity:1; color:var(--yellow); }
-.task-star.starred::before{ content:'★'; }
-.task-item:hover .task-star,
-.task-item:focus-within .task-star{ opacity:1; }
 .task-del{
   opacity:0; background:transparent; border:none; color:var(--text3);
   cursor:pointer; font-size:12px; padding:2px 4px;
@@ -485,18 +425,9 @@ textarea.inp{ resize:vertical; min-height:64px; }
 .cl-check:hover{ border-color:var(--accent); background:var(--accent-bg); }
 .cl-item.done .cl-check{ background:var(--green); border-color:var(--green); color:white; font-size:12px; }
 .cl-item.done .cl-check::after{ content:'✓'; }
-.cl-drag,.memo-drag{
-  color:var(--text4); cursor:grab; font-size:13px; padding:0 3px;
-  opacity:0.4; transition:opacity 0.15s; flex-shrink:0; user-select:none;
-}
-.cl-item:hover .cl-drag, .memo-item:hover .memo-drag{ opacity:0.8; }
-.cl-item.cl-dragging, .memo-item.cl-dragging{ opacity:0.4; }
-.cl-item.cl-dragover, .memo-item.cl-dragover{ border-color:var(--accent)!important; background:var(--accent-bg); }
 .cl-body{ flex:1; min-width:0; cursor:pointer; }
 .cl-body:hover .cl-title{ color:var(--accent); }
 .cl-title{ font-size:13px; color:var(--text); }
-.cl-due{ font-size:12px; color:var(--text3); margin-top:1px; }
-.cl-due.overdue{ color:var(--red); }
 .cl-del-btn{
   background:transparent; border:none; color:var(--text4);
   cursor:pointer; font-size:12px; padding:3px 5px;
@@ -528,7 +459,6 @@ textarea.inp{ resize:vertical; min-height:64px; }
   flex-shrink:0; font-size:12px; transition:all 0.2s; background:var(--card);
 }
 .habit-item.done .habit-chk{ background:var(--green); border-color:var(--green); color:white; }
-.habit-emoji{ font-size:18px; }
 .habit-name{ flex:1; font-size:13px; color:var(--text); }
 .habit-streak{ font-size:12px; color:var(--yellow); white-space:nowrap; font-weight:600; }
 .habit-days{ font-size:12px; color:var(--text3); margin-left:4px; background:var(--bg); padding:1px 5px; border-radius:8px; }
@@ -546,76 +476,14 @@ textarea.inp{ resize:vertical; min-height:64px; }
 
 /* ── 식단 ────────────────────────────── */
 .diet-wrap{ padding:10px; overflow-y:auto; flex:1; }
-.diet-summary{
-  display:flex; align-items:center; gap:10px; margin-bottom:8px;
-  padding:8px 11px; background:var(--card2); border-radius:10px; border:1px solid var(--border);
-}
 /* 링이 52px 이라 이 칸의 높이를 혼자 정하고 있었다. 안에 든 글자가 두 줄도 안 되는데
    칸만 76px 이었다. 링은 숫자 옆의 표시지 주인공이 아니다 — 글자 높이에 맞춘다. */
-.diet-ring{ width:38px; height:38px; flex-shrink:0; }
-.diet-info{ flex:1; min-width:0; }
-.diet-cal-num{ font-size:19px; font-weight:700; color:var(--text); line-height:1.15; }
-.diet-cal-unit{ font-size:12px; font-weight:500; color:var(--text3); margin-left:3px; }
-.diet-cal-sub{ font-size:12px; color:var(--text3); }
 /* 오른쪽 단추 둘도 같이 줄인다. 링만 줄이면 이번엔 얘들이 칸 높이를 정한다. */
-.diet-sum-btns{ display:flex; gap:4px; flex:none; }
-.diet-photo-btn{
-  background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.25);
-  border-radius:7px; color:var(--cyan); cursor:pointer;
-  font-size:14px; line-height:1; padding:5px 6px;
-}
-.diet-set-btn{
-  background:none; border:none; color:var(--text3); cursor:pointer;
-  font-size:13px; line-height:1; padding:5px 3px;
-}
 /* 이름·값·목표를 세 줄로 쌓았더니 칸 하나가 세 줄을 먹었다. 한 줄이면 충분하다 —
    숫자를 읽는 데 필요한 건 '무엇이 얼마인지' 이고, 목표는 그 옆에 작게 붙으면 된다. */
-.diet-macros{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:8px; }
-.macro{
-  display:flex; align-items:baseline; justify-content:center; gap:4px;
-  padding:5px 6px; background:var(--card2); border-radius:8px; border:1px solid var(--border);
-}
-.macro-lbl{ font-size:11px; color:var(--text3); }
-.macro-val{ font-size:13.5px; font-weight:700; }
-.macro-val i{ font-style:normal; font-size:10.5px; font-weight:500; }
-.macro-goal{ font-size:11px; color:var(--text3); }
 
 /* 끼니는 접어 둔다. 접힌 줄 하나에 '뭘 먹었는지·몇 kcal·단탄지' 가 다 들어가고,
    펼치면 그제서야 낱개가 나온다. 네 끼가 늘 펼쳐져 있으면 카드가 화면을 다 먹는다. */
-.meal-sec{ margin-bottom:5px; }
-.meal-hd{
-  display:flex; align-items:center; gap:6px;
-  font-size:12px; color:var(--text2);
-  cursor:pointer; padding:5px 6px; border-radius:var(--r-xs);
-  border:1px solid var(--border); background:var(--card2);
-}
-.meal-hd:hover{ border-color:var(--border2); }
-.meal-nm{ font-weight:700; flex:none; }
-.meal-sum{
-  flex:1; min-width:0; font-size:11.5px; color:var(--text3);
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
-.meal-sum b{ color:var(--text2); font-weight:600; }
-.meal-cv{
-  flex:none; width:16px; text-align:center; color:var(--text3);
-  font-size:10px; transition:transform .15s;
-}
-.meal-sec.open .meal-cv{ transform:rotate(90deg); }
-.meal-add{
-  flex:none; background:none; border:0; cursor:pointer; font-family:inherit;
-  color:var(--accent-l); font-size:15px; line-height:1; padding:0 4px; border-radius:4px;
-}
-.meal-add:hover{ color:var(--accent); background:var(--card); }
-.meal-items{ display:none; flex-direction:column; gap:4px; padding:5px 2px 2px; }
-.meal-sec.open .meal-items{ display:flex; }
-.meal-food{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:5px 10px; background:var(--card2); border-radius:6px;
-  font-size:12px; border:1px solid var(--border);
-}
-.meal-food-cal{ color:var(--text2); font-size:12px; display:flex; align-items:center; gap:4px; }
-.btn-del-food{ background:none; border:none; color:var(--text3); cursor:pointer; font-size:12px; }
-.btn-del-food:hover{ color:var(--red); }
 .diet-fav-btn{ background:none; border:none; color:var(--text4); cursor:pointer; font-size:13px; padding:0 3px; transition:color 0.15s; flex-shrink:0; }
 .diet-fav-btn.is-fav{ color:var(--yellow); }
 .diet-quick-list{ display:flex; flex-direction:column; gap:4px; max-height:180px; overflow-y:auto; margin-bottom:4px; }
@@ -643,41 +511,15 @@ textarea.inp{ resize:vertical; min-height:64px; }
 
 /* 요일 탭 줄 끝의 톱니 — 요일과 같은 줄에 두되 붙여 놓지 않는다.
    요일은 '보기', 이건 '정하기' 라 성격이 다르다. 사이를 벌려 두면 잘못 누르지 않는다. */
-.fit-plan-btn{
-  margin-left:auto; display:inline-flex; align-items:center; justify-content:center;
-  padding:4px 8px; color:var(--text3);
-}
-.fit-plan-btn:hover{ color:var(--accent); }
 
 /* ── 요일별 운동 배정 ─────────────────── */
-.dp-note{
-  font-size:12px; color:var(--text3); line-height:1.5;
-  padding:9px 11px; margin-bottom:10px;
-  background:var(--card2); border-radius:var(--r-xs);
-}
 .dp-list{ display:flex; flex-direction:column; gap:7px; }
 .dp-row{ display:grid; grid-template-columns:26px 1fr; gap:10px; align-items:center; }
 /* 요일 한 글자는 폭이 제각각이라(월 vs 금) 가운데 정렬해야 셀렉트 왼쪽 선이 안 흔들린다. */
 .dp-d{ font-size:12.5px; font-weight:700; color:var(--text2); text-align:center; }
-.dp-sun{ color:var(--red); }
-.dp-sat{ color:var(--blue); }
 .dp-sel{ width:100%; min-width:0; }
 .ex-item{ display:flex; align-items:center; gap:10px; padding:7px 8px; border-radius:8px; cursor:pointer; transition:background 0.12s; }
 .ex-item:hover{ background:var(--card2); }
-.ex-item.done .ex-name{ color:var(--text3); text-decoration:line-through; }
-.ex-chk{
-  width:18px; height:18px; border-radius:4px;
-  border:2px solid var(--border2); flex-shrink:0;
-  display:flex; align-items:center; justify-content:center;
-  font-size:12px; transition:all 0.2s; background:var(--card);
-}
-.ex-item.done .ex-chk{ background:var(--accent); border-color:var(--accent); color:var(--accent-fg); }
-.ex-name{ flex:1; font-size:13px; color:var(--text); }
-.ex-sets{ font-size:12px; color:var(--text3); white-space:nowrap; }
-.fit-progress{ margin-top:10px; display:flex; align-items:center; gap:8px; }
-.progress-bar{ flex:1; height:5px; background:var(--bg); border-radius:3px; overflow:hidden; }
-.progress-fill{ height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-l)); border-radius:3px; transition:width 0.5s; }
-.progress-txt{ font-size:12px; color:var(--text2); white-space:nowrap; font-weight:500; }
 
 /* ── 메모 ────────────────────────────── */
 /* 메모 글씨 크기는 여기 한 곳에서 퍼진다(js/memo.js 의 FS 가 이 값을 바꾼다).
@@ -714,7 +556,6 @@ textarea.inp{ resize:vertical; min-height:64px; }
 .memo-preview.clamp{
   display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
 }
-.memo-more{ color:var(--text3); font-size:12px; }
 .memo-toggle{
   margin-top:5px; padding:0; background:none; border:0; cursor:pointer;
   font-family:inherit; font-size:11.5px; font-weight:600; color:var(--text3);
@@ -904,7 +745,6 @@ html.dark .btn-danger:hover{ background:rgba(220,38,38,0.24); }
   animation:dotPulse 1.5s ease-in-out infinite;
 }
 @keyframes dotPulse{ 0%,100%{transform:scale(1)} 50%{transform:scale(1.3)} }
-.jarvis-dot{ display:none!important; }
 
 .jarvis-panel{
   position:fixed; bottom:86px; right:20px;
@@ -998,7 +838,6 @@ html.dark .btn-danger:hover{ background:rgba(220,38,38,0.24); }
   .h-logo{ font-size:16px; }
   .h-date-main{ font-size:12px; }
   .h-date-sub{ font-size:12px; }
-  .h-name{ display:none; }
 
   /* 카드 헤더 */
   .card-head{ padding:11px 14px 10px; }
@@ -1026,7 +865,6 @@ html.dark .btn-danger:hover{ background:rgba(220,38,38,0.24); }
 
   /* 스탯 배너 */
   .stats-banner{ padding:6px 14px; }
-  .stats-urgent{ display:none; }
 
   /* 할일 탭 */
   .task-filter-wrap{ padding:6px 10px 0; gap:5px; }
@@ -1107,7 +945,6 @@ html.dark .card,
 html.dark .card-head,
 html.dark .modal-box,
 html.dark .modal-head { background:var(--card); }
-html.dark .task-form { background:var(--card2); }
 html.dark .j-msgs { background:var(--bg2); }
 html.dark .j-bubble { background:var(--card); border-color:var(--border); }
 html.dark .j-input-wrap { background:var(--card); }
@@ -1120,12 +957,8 @@ html.dark .habit-item { background:var(--card2); }
 html.dark .habit-item.done { background:rgba(5,150,105,0.15); }
 html.dark .cl-item { background:var(--card2); }
 html.dark .memo-item { background:var(--card2); }
-html.dark .diet-summary,
-html.dark .macro,
-html.dark .meal-food { background:var(--card2); }
 html.dark .diet-quick-item { background:var(--card2); }
 html.dark .lp-btn { background:var(--card2); }
-html.dark .login-card { background:rgba(20,20,23,0.96); }
 html.dark .modal-box { background:var(--card); }
 html.dark .task-item:hover,
 html.dark .ex-item:hover { background:var(--card2); }
@@ -1136,7 +969,6 @@ html.dark .profile-menu { background:var(--card); border-color:var(--border); }
    ═══════════════════════════════════════ */
 .h-user { cursor:pointer; border-radius:8px; padding:3px 7px; transition:background 0.15s; }
 .h-user:hover { background:var(--bg); }
-.h-chevron { font-size:12px; color:var(--text3); }
 .profile-menu {
   position:absolute; top:calc(100% + 6px); right:16px;
   background:var(--card); border:1px solid var(--border);
@@ -1275,14 +1107,6 @@ html.dark .date-picker-dropdown {
 }
 
 /* 3. 오늘 날짜 헤더 강조 */
-.h-date-today .h-date-main {
-  font-size: 16px;
-  font-weight: 900;
-  color: var(--accent);
-}
-.h-date-today .h-date-sub {
-  font-weight: 700;
-}
 
 /* 모바일 stats-banner top 조정 */
 @media (max-width: 640px) {
@@ -1328,8 +1152,6 @@ html.dark .uc-task  { background: rgba(133,77,14,0.2); color: #fcd34d; border-co
    할일 - 숨김 항목 스타일
    ═══════════════════════════════════════ */
 .task-hidden { opacity: 0.45; }
-.task-item:hover .task-hide { opacity: 0.6 !important; }
-.task-hide:hover { opacity: 1 !important; }
 
 /* ═══════════════════════════════════════
    모바일 헤더 폰트 최적화
@@ -1363,13 +1185,6 @@ html.dark .uc-task  { background: rgba(133,77,14,0.2); color: #fcd34d; border-co
 /* ═══════════════════════════════════════
    할일 - 숨김/별표 버튼 항상 살짝 표시
    ═══════════════════════════════════════ */
-.task-star {
-  opacity: 0.25 !important;
-}
-.task-star:hover,
-.task-star.starred {
-  opacity: 1 !important;
-}
 .task-hide-btn {
   background: transparent;
   border: none;
@@ -1398,44 +1213,7 @@ html.dark .h-logo { color: var(--accent-l); }
 /* ═══════════════════════════════════════
    ↑↓ 순서변경 버튼
    ═══════════════════════════════════════ */
-.reorder-btns {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  flex-shrink: 0;
-}
-.reorder-btn {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text3);
-  cursor: pointer;
-  font-size: 10px;
-  width: 20px;
-  height: 16px;
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.12s;
-  line-height: 1;
-  padding: 0;
-}
-.reorder-btn:hover:not([disabled]) {
-  background: var(--accent-bg);
-  color: var(--accent);
-  border-color: var(--accent);
-}
-.reorder-btn[disabled] { opacity: 0.2; cursor: default; }
-html.dark .reorder-btn { background: var(--card2); }
 
-.memo-reorder {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  flex-shrink: 0;
-  opacity: 0.3;
-}
-.memo-item:hover .memo-reorder { opacity: 1; }
 
 /* ═══════════════════════════════════════
    순서변경 모드
@@ -1540,11 +1318,6 @@ html.dark .reorder-dragging { background: var(--card) !important; }
 /* ═══════════════════════════════════════
    오늘 레이블 (전역)
    ═══════════════════════════════════════ */
-.today-label {
-  color: #059669;
-  font-weight: 900;
-  font-size: inherit;
-}
 
 /* ═══════════════════════════════════════
    할일 카테고리 색상 세로줄
@@ -1578,37 +1351,6 @@ html.dark .reorder-dragging { background: var(--card) !important; }
 /* ═══════════════════════════════════════
    알림 설정 UI
    ═══════════════════════════════════════ */
-.notif-section {
-  background: var(--card2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
-}
-.notif-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 4px;
-}
-.notif-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-.notif-row input[type="checkbox"] {
-  width: 18px; height: 18px;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-.notif-time-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 5px 0;
-  border-top: 1px solid var(--border);
-  margin-top: 5px;
-}
 
 /* ═══════════════════════════════════════
    할일 제목 말줄임 + 날짜 한줄
@@ -1639,10 +1381,6 @@ html.dark .reorder-dragging { background: var(--card) !important; }
    날씨 크기 60% 축소 (모바일)
    ═══════════════════════════════════════ */
 /* 오늘 레이블 강제 스타일 */
-.today-label {
-  color: #059669 !important;
-  font-weight: 900 !important;
-}
 
 
 /* ═══════════════════════════════════════
@@ -1712,41 +1450,8 @@ html.dark .reorder-dragging { background: var(--card) !important; }
 /* ═══════════════════════════════════════
    알림 모달 한줄 레이아웃
    ═══════════════════════════════════════ */
-.notif-time-lbl {
-  font-size: 12px;
-  color: var(--text2);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.notif-time-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 5px 0;
-  border-top: 1px solid var(--border);
-  margin-top: 5px;
-}
-.notif-time-inp,
-.notif-time-row input[type="time"],
-.notif-time-row select {
-  flex: 0 0 auto;
-  width: 120px !important;
-  padding: 4px 6px !important;
-  font-size: 12px !important;
-}
 /* 크론이 매시 정각에만 돈다는 제약을 모달에서 바로 보이게 하는 안내줄.
    (파일 끝에 넣으면 아래 미디어쿼리를 덮어써서 모바일이 깨진다 — 여기 유지) */
-.notif-hint {
-  margin: 10px 0 0;
-  padding: 7px 9px;
-  border-radius: 7px;
-  background: var(--bg2);
-  color: var(--text2);
-  font-size: 11px;
-  line-height: 1.5;
-}
-.notif-hint b { color: var(--text); }
 
 
 /* ═══════════════════════════════════════
@@ -1948,37 +1653,6 @@ html.dark .cat-pick-btn{ background:var(--card2); }
 html.dark .cat-pick-btn.on{ background:var(--accent-bg); }
 
 /* ── 로그인 화면: 권한 안내 + 정책 링크 ─── */
-.login-card{ max-height:calc(100vh - 40px); overflow-y:auto; }
-.login-scopes{
-  margin-top:22px; padding-top:18px; border-top:1px solid var(--border);
-  text-align:left;
-}
-.login-scopes-t{
-  font-size:12px; font-weight:700; color:var(--text3); letter-spacing:.04em;
-  text-transform:none; margin-bottom:10px; text-align:center;
-}
-.login-scope{
-  background:var(--card2); border:1px solid var(--border);
-  border-radius:var(--r-sm); padding:9px 12px; margin-bottom:6px;
-}
-.login-scope b{
-  display:flex; align-items:center; gap:6px;
-  font-size:12.5px; font-weight:700; color:var(--text); margin-bottom:2px;
-}
-.login-scope b .ic{ width:14px; height:14px; color:var(--text3); }
-.login-scope span{ display:block; font-size:12px; line-height:1.55; color:var(--text2); }
-.login-note a{ color:var(--accent); }
-.login-links{
-  margin-top:14px; display:flex; gap:8px; justify-content:center;
-  font-size:12px; color:var(--text4);
-}
-.login-links a{ color:var(--text3); text-decoration:none; }
-.login-links a:hover{ color:var(--accent); text-decoration:underline; }
-html.dark .login-card{ background:rgba(20,20,23,0.96); }
-html.dark .login-scope{ background:rgba(255,255,255,0.04); }
-@media (max-width:640px){
-  .login-card{ padding:32px 22px; }
-}
 
 /* ═══════════════════════════════════════
    경제(시세) — js/econ.js
@@ -1988,16 +1662,10 @@ html.dark .login-scope{ background:rgba(255,255,255,0.04); }
 .ec-upd{ font-size:12px; color:var(--text3); white-space:nowrap; }
 .ec-upd.ec-err{ color:var(--red); font-weight:600; }
 .ec-hint{ font-size:12px; color:var(--text3); line-height:1.6; }
-.ec-gold{ color:var(--yellow); }
 .ec-sp{ flex:1; }
 
 .ec-nm{ font-size:14px; font-weight:700; color:var(--text); }
 .ec-meta{ font-size:12px; color:var(--text3); margin-top:2px; }
-.ec-badge{
-  display:inline-block; font-size:12px; font-weight:700; color:var(--text2);
-  background:var(--card2); border:1px solid var(--border);
-  border-radius:5px; padding:1px 5px; margin-left:6px; vertical-align:middle;
-}
 .ec-price{ font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--text); }
 .ec-delta{ font-size:12px; font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums; }
 /* 한국식: 상승 빨강, 하락 파랑 */
@@ -2154,69 +1822,21 @@ html.dark .login-scope{ background:rgba(255,255,255,0.04); }
 .diet-rec-hd{ font-size:11px; font-weight:600; color:var(--text3); letter-spacing:0.2px;
   padding:10px 4px 4px; }
 /* 요일별 운동 — 받아온 루틴과 그 나이 */
-.dp-rt-list{ margin:8px 0 4px; padding:8px 10px; background:var(--bg2); border-radius:8px; }
-.dp-rt{ display:flex; align-items:center; gap:8px; padding:3px 0; font-size:12px; }
-.dp-rt-nm{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2); }
-.dp-rt-at{ flex:none; font-size:11px; color:var(--text3); font-style:normal; }
 .dp-rt-btn{ width:100%; margin-top:6px; }
 
 /* ── 운동 피드백 ────────────────────────────────────────────
    접어 둔다. 매일 보는 화면에 잔소리가 펼쳐져 있으면 곧 눈이 무시한다. */
-.coach{ margin-top:10px; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
-.coach-sum{ list-style:none; cursor:pointer; padding:9px 12px; font-size:12.5px; font-weight:600;
-  color:var(--text2); display:flex; align-items:center; gap:6px; background:var(--bg2); }
-.coach-sum::-webkit-details-marker{ display:none; }
-.coach-sum::after{ content:'▾'; margin-left:auto; font-size:11px; color:var(--text3); transition:transform .15s; }
-.coach[open] .coach-sum::after{ transform:rotate(180deg); }
-.coach-sum i{ font-style:normal; font-size:11px; font-weight:500; color:var(--text3); }
-.coach-body{ padding:4px 12px 10px; }
 .coach-item{ display:flex; gap:8px; padding:7px 0; border-top:1px solid var(--border); }
 .coach-item:first-child{ border-top:0; }
 .coach-item b{ display:block; font-size:12.5px; font-weight:600; color:var(--text1); }
 .coach-item span{ display:block; font-size:11.5px; color:var(--text3); margin-top:2px; line-height:1.5; }
-.coach-dot{ flex:none; width:16px; height:16px; border-radius:50%; margin-top:1px;
-  font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center;
-  background:var(--bg2); color:var(--text3); }
-.coach-warn .coach-dot{ background:#fee2e2; color:#b91c1c; }
-.coach-good .coach-dot{ background:#dcfce7; color:#15803d; }
-.coach-foot{ font-size:10.5px; color:var(--text3); padding-top:8px; line-height:1.5; }
 
 /* 그날 되짚기는 총평과 다른 것이다 — 펼친 채로 두고, 강조색 테두리로 갈라 준다.
    매일 보는 화면에서 알고 싶은 건 대개 '어제 그거 어땠나' 이지 28일 평균이 아니다. */
-.coach-day{ border-color:var(--accent); }
-.coach-day .coach-sum{ color:var(--text); }
-.coach-day .coach-sum i{ color:var(--accent); font-weight:600; }
-.coach-day + .coach{ margin-top:8px; }
 
 /* 다음 세션 제안. 종목마다 '왜 이 숫자인지' 를 한 줄로 달아 둔다 —
    근거 없는 숫자는 AI 가 지어낸 것과 구분이 안 되므로, 근거가 곧 이 화면의 값이다. */
-.coach-plan{ border-color:var(--accent); }
-.coach-plan .coach-sum i{ color:var(--accent); font-weight:600; }
-.plan-row{
-  display:flex; align-items:flex-start; gap:9px;
-  padding:8px 0; border-top:1px solid var(--border);
-}
-.plan-row:first-child{ border-top:0; }
-.plan-no{
-  flex:none; width:18px; height:18px; margin-top:1px; border-radius:50%;
-  font-size:10.5px; font-weight:700; line-height:18px; text-align:center;
-  color:var(--accent-fg); background:var(--accent);
-}
-.plan-main{ flex:1; min-width:0; }
-.plan-nm{ display:block; font-size:13px; font-weight:600; color:var(--text); }
-.plan-nm em{
-  font-style:normal; margin-left:5px; padding:1px 5px; border-radius:4px;
-  font-size:10px; font-weight:600; color:var(--text3); background:var(--bg2);
-}
-.plan-why{ display:block; font-size:11px; color:var(--text3); margin-top:2px; line-height:1.5; }
-.plan-set{
-  flex:none; font-size:13px; font-weight:700; color:var(--text); text-align:right;
-  white-space:nowrap; margin-top:1px;
-}
-.plan-set i{ font-style:normal; font-size:10.5px; font-weight:500; color:var(--text3); }
 /* 다크에서는 연한 파스텔이 그대로 튄다. 배경만 낮추고 글자색을 올린다. */
-html.dark .coach-warn .coach-dot{ background:rgba(220,38,38,0.18); color:#f87171; }
-html.dark .coach-good .coach-dot{ background:rgba(22,163,74,0.18); color:#4ade80; }
 
 /* 모르는 영양정보. '0' 과 눈으로 구분돼야 한다 — 0 은 없다는 뜻이고 —는 모른다는 뜻이다. */
 .macro-plus{ font-size:9px; font-weight:700; color:var(--text3); vertical-align:super; margin-left:1px; }
@@ -2281,35 +1901,9 @@ html.dark .coach-good .coach-dot{ background:rgba(22,163,74,0.18); color:#4ade80
    상단 요약 스트립 — js/topstrip.js
    카드가 아홉 개가 되면서 스크롤 없이는 상태를 못 봤다. 자주 보는 숫자만 위로 올린다.
    ═══════════════════════════════════════ */
-.top-strip{
-  display:flex; gap:10px; max-width:1440px; margin:0 auto;
-  padding:0 16px 4px; align-items:stretch;
-}
-.ts-cell{
-  flex:1; min-width:0; display:flex; flex-direction:column; gap:4px;
-  padding:9px 13px; cursor:pointer; text-align:left; font-family:inherit;
-  background:var(--card); border:1px solid var(--border);
-  border-radius:var(--r-sm); box-shadow:var(--shadow-sm);
-  transition:border-color 0.15s, box-shadow 0.15s;
-}
-.ts-cell:hover{ border-color:var(--accent); box-shadow:var(--shadow); }
-.ts-cell:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
-.ts-lbl{ font-size:12px; font-weight:700; color:var(--text3); white-space:nowrap; }
-.ts-lbl em{ font-style:normal; font-weight:500; color:var(--text4); margin-left:3px; }
 .ts-body{ display:flex; gap:12px; align-items:baseline; min-width:0; overflow:hidden; }
-.ts-v{ white-space:nowrap; font-variant-numeric:tabular-nums; }
-.ts-v b{ font-size:15px; font-weight:700; color:var(--text); }
-.ts-v i{ font-style:normal; font-size:12px; color:var(--text3); margin-left:1px; }
-.ts-v u{
-  text-decoration:none; font-size:11px; font-weight:700; color:var(--yellow);
-  background:rgba(217,119,6,0.12); border-radius:3px; padding:1px 3px; margin-left:3px;
-}
-.ts-tick{ font-size:12px; color:var(--text2); }
-.ts-tick b{ font-size:12.5px; margin-left:2px; }
 /* 한국식: 상승 빨강, 하락 파랑 */
 .ts-up{ color:var(--red) !important; } .ts-dn{ color:var(--blue) !important; }
-.ts-flat{ color:var(--text3) !important; }
-.ts-more{ font-size:12px; color:var(--text4); align-self:center; }
 
 /* 스크롤만 하면 어디로 갔는지 모른다 — 잠깐 테두리를 밝힌다 */
 @keyframes tsFlash{
@@ -2319,14 +1913,10 @@ html.dark .coach-good .coach-dot{ background:rgba(22,163,74,0.18); color:#4ade80
 .ts-flash{ animation:tsFlash 1.4s ease; }
 
 @media (max-width:860px){
-  .top-strip{ padding:0 10px 4px; gap:6px; }
-  .ts-cell{ padding:7px 10px; }
   .ts-body{ gap:8px; }
-  .ts-v b{ font-size:13.5px; }
 }
 @media (max-width:560px){
   /* 좁으면 두 칸이 나란히 있기 어렵다. 세로로 쌓되 각 칸은 여전히 한 줄. */
-  .top-strip{ flex-direction:column; }
 }
 
 /* ═══════════════════════════════════════
@@ -2384,7 +1974,6 @@ html.dark .coach-good .coach-dot{ background:rgba(22,163,74,0.18); color:#4ade80
 }
 .ex-cart-del:hover{ color:var(--red); }
 
-.ex-hint{ font-size:12px; color:var(--text3); margin:8px 0 0; text-align:center; }
 .ex-empty{ font-size:12px; color:var(--text3); padding:14px; text-align:center; }
 
 /* 보유 요약 — 시세 카드 맨 위 한 줄, 누르면 보유 탭 */
@@ -2433,8 +2022,6 @@ html.dark .ex-results,
 html.dark #dietSearchRes  { border-color:var(--border); }
 html.dark .ex-row:hover,
 html.dark .diet-food:hover{ background:var(--bg2); }
-html.dark .top-strip      { background:transparent; }
-html.dark .ts-cell:hover  { background:var(--bg2); }
 html.dark .ib-chart-box,
 html.dark .ec-chart-box   { background:var(--card2); }
 /* 위의 'html.dark .ib-periods button' 이 .ib-period.active 보다 셈이 세서
@@ -2517,7 +2104,6 @@ html.dark .ec-fav.on, html.dark .diet-food-fav.on { color:#fbbf24; }
   body[data-tab="money"] .dashboard .card[data-tab="money"]{ display:flex; }
 
   /* 맨 위 한 줄 요약은 '오늘'에서만. 다른 탭에는 그 카드가 이미 펼쳐져 있다. */
-  body[data-tab]:not([data-tab="today"]) .top-strip{ display:none !important; }
 
   /* 탭바에 마지막 카드가 가리지 않도록 */
   .dashboard{ padding-bottom:calc(var(--tabbar-h, 54px) + max(env(safe-area-inset-bottom), 6px) + 14px); }
@@ -2741,36 +2327,8 @@ html.dark[data-icons="color"] .cardset-hd .ic{
 /* ── Hevy 운동 기록 ─────────────────────
    계획 아래에 '실제로 한 것' 을 붙인다. 계획은 예정, 이건 사실이라
    테두리 하나로 구역을 갈라 둔다. */
-.hv-box{
-  margin:10px 0 4px; padding:10px 12px;
-  border:1px solid var(--border); border-radius:var(--r-sm); background:var(--card2);
-}
-.hv-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
-.hv-title{ font-size:12.5px; font-weight:700; color:var(--text2); }
-.hv-src{
-  font-size:10px; font-weight:700; letter-spacing:.03em;
-  color:var(--text3); border:1px solid var(--border2);
-  border-radius:4px; padding:1px 5px;
-}
-.hv-row{
-  display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 10px;
-  padding:5px 0; border-top:1px solid var(--border);
-}
-.hv-row:first-of-type{ border-top:0; }
-.hv-nm{ font-size:13px; color:var(--text); word-break:keep-all; }
-.hv-vol{ font-size:11.5px; color:var(--text3); font-variant-numeric:tabular-nums; white-space:nowrap; }
-.hv-sets{
-  grid-column:1/-1; font-size:11.5px; color:var(--text2);
-  font-variant-numeric:tabular-nums;
-}
-.hv-foot{
-  margin-top:7px; padding-top:6px; border-top:1px solid var(--border);
-  font-size:11.5px; color:var(--text3); text-align:right;
-  font-variant-numeric:tabular-nums;
-}
 /* 자동 체크는 손으로 누른 것과 구분한다 — 왜 켜졌는지 모르면 불안하다.
    진한 보라는 '내가 눌렀다', 연한 보라는 'Hevy 기록에서 왔다'. */
-.ex-item.ex-auto .ex-chk{ background:var(--accent-l); border-color:var(--accent-l); }
 
 /* ── 상단 통계 칩 ────────────────────────
    이모지를 걷어내고 카드 머리글과 같은 선 아이콘으로 맞춘다.
@@ -2810,7 +2368,6 @@ html.dark .stat-chip.stat-green{ background:rgba(5,150,105,0.14); border-color:r
 .hw-col.now .hw-bar{ background:var(--accent-l); }   /* 아직 안 끝난 주 */
 .hw-col.on  .hw-bar{ opacity:.65; }
 /* 쉰 주 — 막대가 아니라 바닥 눈금. 짧은 막대로 두면 '조금은 했다' 로 읽힌다. */
-.hw-col.zero .hw-bar{ height:2px !important; min-height:2px; background:var(--border2); border-radius:2px; }
 .hw-col:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
 .hw-read{
   margin-top:7px; padding-top:6px; border-top:1px solid var(--border);
@@ -2981,7 +2538,6 @@ html.dark .stat-chip.stat-green{ background:rgba(5,150,105,0.14); border-color:r
 }
 /* 약 전용 칸 */
 .med-line{ display:flex; align-items:center; gap:10px; }
-.med-chk{ display:inline-flex; align-items:center; gap:5px; font-size:12.5px; color:var(--text2); cursor:pointer; }
 .med-note{ margin-top:5px; font-size:11px; line-height:1.5; color:var(--text3); word-break:keep-all; }
 
 /* ── 목록 한 줄 조작 (js/rowui.js) ────────────────────
@@ -3024,17 +2580,6 @@ html.dark .rw-x:hover{ background:rgba(220,38,38,.18); }
    달력이 할일의 날짜 필터를 겸한다. 두 덩어리 사이에 선을 하나 둬서
    '위는 일정, 아래는 할일' 이 눈으로 갈리게 한다. */
 .cal-sep{ height:1px; background:var(--border); margin:2px 14px 4px; }
-.task-datechip{
-  display:flex; align-items:center; gap:6px; margin:0 0 8px;
-  padding:5px 10px; border-radius:20px; width:fit-content;
-  background:var(--accent-bg); border:1px solid var(--accent);
-  color:var(--accent); font-size:11.5px; font-weight:700;
-}
-.task-datechip button{
-  background:none; border:0; cursor:pointer; font-family:inherit;
-  color:inherit; font-size:12px; line-height:1; padding:0 1px;
-}
-.task-datechip button:hover{ opacity:.65; }
 
 
 /* ── 활자 규칙 (supanova redesign 체크리스트에서 골라 적용) ─────────
@@ -3082,8 +2627,6 @@ body, .empty, .card-title, .modal-lbl, .habit-name, .task-text,
 .aiu-bar-top b{ font-variant-numeric:tabular-nums; }
 .aiu-track{ height:8px; border-radius:99px; background:var(--bg2); overflow:hidden; }
 .aiu-fill{ height:100%; border-radius:99px; transition:width .4s ease; }
-.aiu-code{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11.5px; word-break:break-all;
-  padding:8px 10px; border-radius:8px; background:var(--bg2); color:var(--text); user-select:all; }
 .aiu-a{ text-decoration:none; display:inline-flex; align-items:center; justify-content:center; color:inherit; }
 /* AI 사용량 게이지 — 헤더에서는 숫자 없이 고리 + 이름 */
 .ts-row.ts-ai{ padding:0; line-height:1; }
@@ -3168,10 +2711,6 @@ body, .empty, .card-title, .modal-lbl, .habit-name, .task-text,
 /* ═══════════════════════════════════════
    홈트레이닝 플랜 모달
    ═══════════════════════════════════════ */
-.fit-guide-btn{ margin-left:auto; font-weight:600; }
-.ex-info{ flex:none; width:20px; height:20px; border-radius:50%; border:1px solid var(--border);
-  background:transparent; color:var(--text3); font:italic 700 11px/18px Georgia,serif; cursor:pointer; padding:0; }
-.ex-info:hover{ color:var(--accent); border-color:var(--accent); }
 .hp-tabs{
   display:flex; gap:6px; overflow-x:auto; padding-bottom:8px;
   -webkit-overflow-scrolling:touch; scrollbar-width:none;
@@ -3201,27 +2740,16 @@ body, .empty, .card-title, .modal-lbl, .habit-name, .task-text,
   transition:box-shadow .15s;
 }
 .hp-ex-open{box-shadow:0 2px 8px rgba(0,0,0,.08)}
-.hp-ex-head{
-  display:flex; align-items:center; gap:10px; padding:12px;
-  cursor:pointer; user-select:none;
-}
 .hp-ex-num{
   width:28px; height:28px; border-radius:50%;
   background:var(--accent); color:var(--accent-fg);
   display:flex; align-items:center; justify-content:center;
   font-size:13px; font-weight:700; flex-shrink:0;
 }
-.hp-ex-info{flex:1;min-width:0}
 .hp-ex-name{font-size:14px;font-weight:600;color:var(--text)}
 .hp-ex-en{font-size:11px;color:var(--text3);margin-top:1px}
-.hp-chev{
-  width:18px;height:18px;color:var(--text3);flex-shrink:0;
-  transition:transform .2s;
-}
-.hp-ex-open .hp-chev{transform:rotate(180deg)}
 
 /* 태그 */
-.hp-tags{display:flex;flex-wrap:wrap;gap:4px;padding:0 12px 10px}
 .hp-tag-muscle,.hp-tag-sets,.hp-tag-rest{
   font-size:11px; padding:2px 8px; border-radius:10px; font-weight:500;
 }
@@ -3234,23 +2762,9 @@ html.dark .hp-tag-rest{background:#334155;color:#94a3b8}
 
 /* 상세 열림 */
 .hp-ex-detail{padding:0 12px 14px}
-.hp-img-wrap{
-  border-radius:var(--r-sm); overflow:hidden; margin-bottom:12px;
-  background:var(--card2);
-}
-.hp-img-wrap img{width:100%;display:block;border-radius:var(--r-sm)}
 
 /* 유튜브 버튼 */
 .hp-yt-section{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
-.hp-yt-btn{
-  display:inline-flex;align-items:center;gap:6px;
-  padding:6px 12px; border-radius:var(--r-xs);
-  background:var(--card2); border:1px solid var(--border);
-  color:var(--text); font-size:12px; text-decoration:none;
-  transition:background .15s;
-}
-.hp-yt-btn:hover{background:var(--bg2)}
-.hp-yt-icon{color:#dc2626;font-size:14px}
 
 /* 정보 행 */
 .hp-info-rows{margin-bottom:10px}
@@ -3278,19 +2792,8 @@ html.dark .hp-tag-rest{background:#334155;color:#94a3b8}
 /* 스케줄 탭 */
 .hp-schedule{margin-bottom:16px}
 .hp-section-title{font-size:15px;font-weight:700;margin:16px 0 10px;color:var(--text)}
-.hp-week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-.hp-day{
-  text-align:center; padding:10px 4px; border-radius:var(--r-sm);
-  border:1px solid var(--border);
-}
-.hp-day-on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
-.hp-day-off{background:var(--card2);color:var(--text2)}
 .hp-day-d{display:block;font-size:12px;font-weight:700}
 .hp-day-t{display:block;font-size:10px;margin-top:4px;line-height:1.3}
-.hp-panel{
-  background:var(--card); border:1px solid var(--border);
-  border-radius:var(--r); padding:14px; margin-bottom:10px;
-}
 .hp-list{
   list-style:none; padding:0; margin:0;
 }
@@ -3313,8 +2816,6 @@ html.dark .hp-tag-rest{background:#334155;color:#94a3b8}
 .stats-row .stat-chip .chip-ic{ width:12px; height:12px; }
 
 /* 세션을 되살리는 동안에는 로그인 화면 대신 '불러오는 중' 만 보인다 (깜빡이며 로그인 단추가 보이지 않게) */
-body.auth-restoring .login-card > *:not(.login-emoji):not(.login-title){ visibility:hidden; }
-body.auth-restoring .login-title::after{ content:'불러오는 중…'; display:block; font-size:14px; font-weight:500; color:var(--text3); margin-top:10px; }
 
 /* 숨김 아이콘 — 감은 눈/뜬 눈 한 쌍 */
 .task-hide-btn{ display:inline-flex; align-items:center; justify-content:center; color:var(--text3); }
@@ -3455,7 +2956,6 @@ body.ob-open{ overflow:hidden; }
 .fit-empty p span{ color:var(--text3); font-size:12px; }
 .fit-empty-btns{ display:flex; gap:8px; justify-content:center; }
 .rt-box{ margin-top:14px; border-top:1px solid var(--border); padding-top:12px; }
-.rt-hd{ font-size:13px; font-weight:700; margin-bottom:8px; }
 .rt-row{ display:flex; align-items:center; gap:8px; padding:8px 10px; background:var(--card2); border-radius:10px; margin-bottom:6px; }
 .rt-nm{ flex:1; font-size:14px; font-weight:600; }
 .rt-n{ font-size:12px; color:var(--text3); }
@@ -3502,7 +3002,6 @@ html.dark .exm-media{ background:#eeeff1; }
 .fit-head-btns .btn-sm{ height:30px; padding:0 10px; font-size:12px; white-space:nowrap; }
 
 /* 홈트 플랜 그림도 전체 종목 그림과 같은 두 칸 움직임으로 */
-.hp-img-wrap.exm-media{ width:100%; max-width:240px; margin:0 auto 10px; padding:0; }
 
 /* AI 창 바깥 가림막 · 빠른 문구 (새 디자인에서만 보인다) */
 .j-scrim{ position:fixed; inset:0; z-index:900; background:transparent; }
@@ -3572,7 +3071,6 @@ html.dark .exm-media{ background:#eeeff1; }
 .hp-ex-line .hp-ex-num{ font-size:12px; color:var(--text3); font-weight:600; width:auto; height:auto; background:none; border:0; flex:none; }
 .hp-ex-line .hp-ex-name{ font-size:14px; font-weight:600; color:var(--text); white-space:nowrap; }
 .hp-ex-line .hp-ex-en{ font-size:11.5px; color:var(--text3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.hp-ex .hp-tags{ padding:0 0 8px; }
 .hp-more{ border:1px solid var(--border); background:none; color:var(--text2); border-radius:16px; height:30px; padding:0 12px;
   font:inherit; font-size:12px; cursor:pointer; margin:0 0 4px; }
 .hp-ex{ padding:12px !important; }
@@ -3727,8 +3225,6 @@ html.dark .fold-btn{ background:#1A1B1E; }
 .mcp-url{ display:flex; gap:8px; align-items:center; margin:12px 0 4px; }
 .mcp-url code{ flex:1; min-width:0; font-size:12px; padding:10px 12px; border-radius:10px; background:var(--card2); border:1px solid var(--border); word-break:break-all; user-select:all; }
 .mcp-warn{ font-size:12px; color:var(--text3); margin:0 0 8px; }
-.mcp-ol{ margin:4px 0 8px; padding-left:20px; font-size:13px; line-height:1.6; color:var(--text2); }
-.mcp-ol li{ margin:4px 0; }
 .ai-guide{ margin:8px 0; padding-left:20px; font-size:13px; line-height:1.6; color:var(--text2); }
 .ai-guide li{ margin:4px 0; } .ai-guide a{ color:var(--accent); }
 .ai-keyline{ display:flex; gap:8px; } .ai-keyline .inp{ flex:1; min-width:0; }
@@ -3747,11 +3243,8 @@ body.wk-on{ overflow:hidden; }
 .wk-clock b{ font-size:22px; font-weight:600; letter-spacing:-.01em; }
 .wk-clock span{ font-size:11px; color:#8B8F97; }
 .wk-body{ flex:1; overflow:auto; padding:16px; max-width:640px; width:100%; margin:0 auto; box-sizing:border-box; }
-.wk-ex{ display:flex; gap:16px; align-items:center; }
 .wk-pose{ width:96px; height:96px; flex:none; border-radius:16px; overflow:hidden; background:#f2f3f5; position:relative; }
 .wk-n{ font-size:13px; color:#FF6A2B; font-weight:600; } .wk-n i{ font-style:normal; color:#8B8F97; }
-.wk-ex h2{ margin:4px 0; font-size:22px; font-weight:600; letter-spacing:-.01em; }
-.wk-ex p{ margin:0; font-size:13px; color:#8B8F97; } .wk-ex em{ font-style:normal; color:#FF6A2B; }
 .wk-note{ font-size:13px; color:#8B8F97; margin:16px 0; }
 .wk-sets{ margin-top:16px; }
 .wk-sh, .wk-set{ display:grid; grid-template-columns:40px 1fr 1fr 48px; gap:8px; align-items:center; }
@@ -3792,7 +3285,6 @@ body.wk-on{ overflow:hidden; }
 .wk-dn b{ display:block; font-size:32px; font-weight:600; } .wk-dn span{ font-size:12px; color:#8B8F97; }
 .wk-done p{ font-size:13px; color:#8B8F97; line-height:1.6; margin:0 0 24px; }
 .fit-foot{ display:grid; gap:8px; }
-.fit-start{ width:100%; height:44px; }
 .sw-nm{ display:flex; flex-direction:column; } .sw-nm small{ font-size:11px; color:var(--text3); }
 .wk-pick{ display:grid; gap:8px; margin-top:8px; }
 .wk-pick .sw-row{ padding:12px 14px; } .wk-pick b{ font-weight:600; font-size:14px; }
@@ -3835,13 +3327,6 @@ body.wk-on{ overflow:hidden; }
 .wk-cf-list li span{ color:var(--text3); font-size:13px; white-space:nowrap; }
 
 /* 쉬는 시간 휠 */
-.wk-wheel-wrap{ position:relative; height:200px; margin:4px 0 12px; }
-.wk-wheel{ height:100%; overflow-y:auto; scroll-snap-type:y mandatory; scrollbar-width:none; -webkit-mask-image:linear-gradient(transparent, #000 35%, #000 65%, transparent); mask-image:linear-gradient(transparent, #000 35%, #000 65%, transparent); }
-.wk-wheel::-webkit-scrollbar{ display:none; }
-.wk-wpad{ height:80px; }
-.wk-wv{ height:40px; line-height:40px; text-align:center; scroll-snap-align:center; font-family:'Space Grotesk',sans-serif; font-size:20px; color:var(--text3); transition:color .15s, font-size .15s; }
-.wk-wv.on{ color:var(--text); font-size:26px; font-weight:600; }
-.wk-wsel{ position:absolute; left:0; right:0; top:80px; height:40px; border-top:1px solid var(--accent); border-bottom:1px solid var(--accent); pointer-events:none; }
 
 /* 운동 설정: 장소 */
 .fs-pl-acts{ display:flex; gap:16px; margin-top:8px; }
@@ -3910,7 +3395,6 @@ body.wk-on{ overflow:hidden; }
 .wk-end-del.arm{ color:#FF6A2B; border-color:#FF6A2B; }
 
 /* 운동 교체 — 원래 추천 운동 */
-.sw-orig{ display:grid; gap:4px; margin-bottom:8px; }
 .sw-h{ font-size:12px; color:var(--text3); }
 
 /* 운동 카드 — 수정 모드 */

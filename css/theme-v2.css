@@ -127,7 +127,6 @@ html[data-ui="v2"] .card-title{ font-size:15px; font-weight:600; letter-spacing:
 html[data-ui="v2"] .cal-day.today,
 html[data-ui="v2"] .cal-day.today.selected{ outline-color:var(--accent); }
 html[data-ui="v2"] .cal-day.selected{ outline-color:var(--text); }
-html[data-ui="v2"] .meal-hd{ border:0; border-bottom:1px solid var(--v2-line); border-radius:0; background:transparent; padding:12px 4px; font-size:14px; }
 
 /* ── 목록 줄: 회색 상자 대신 가는 선 ───────────────────────── */
 html[data-ui="v2"] .task-item,
@@ -215,7 +214,6 @@ html[data-ui="v2"].dark .modal-box,
 html[data-ui="v2"].dark .modal-head{ background:var(--card2); }
 
 /* ── 프로필 메뉴의 현재 디자인 표시 ─────────────────────────── */
-.ui-cur{ margin-left:auto; font-size:11px; color:var(--text3); }
 html[data-ui="v2"] .fx{ border-bottom-color:var(--v2-line); }
 html[data-ui="v2"] .modal-close{ border-radius:50%; width:40px; height:40px; border:0; background:var(--border); color:var(--text); }
 
@@ -301,7 +299,6 @@ html.dark .set-seg button.on{ background:var(--text); color:var(--card); }
 .set-sw i{ position:absolute; top:3px; left:3px; width:24px; height:24px; border-radius:50%; background:#fff; transition:left .2s; box-shadow:0 1px 3px rgba(0,0,0,.25); }
 .set-sw.on{ background:var(--accent); }
 .set-sw.on i{ left:23px; }
-.set-box{ padding:8px 0; }
 .set-page .set-item:last-child{ border-bottom:0; }
 
 /* 달력 (시안 02): 오늘은 꽉 찬 동그라미, 고른 날은 얇은 테두리 */
@@ -604,7 +601,6 @@ html[data-ui="v2"] .ec-rm{ border-color:var(--border); color:var(--text2); }
 html[data-ui="v2"] .uc-star{ color:var(--accent); font-weight:600; margin-right:2px; }
 html[data-ui="v2"] .stats-jarvis-icon{ font-family:var(--v2-num); font-size:10px; font-weight:600; color:var(--accent); letter-spacing:.06em; }
 html[data-ui="v2"] .habit-streak{ font-family:var(--v2-num); font-size:11px; color:var(--accent); }
-html[data-ui="v2"] .econ-login, html[data-ui="v2"] .ec-login-need{ color:var(--text3) !important; }
 
 /* 기기 연결: 스마트홈 방식 선택 */
 .dp-seg{ display:flex; gap:0; border:1px solid var(--border); border-radius:12px; overflow:hidden; }
