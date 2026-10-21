@@ -305,7 +305,7 @@ struct WorkoutLiveActivity: Widget {
 struct BashyWidgets: WidgetBundle {
     var body: some Widget {
         BashyWidget()
-        if #available(iOS 18.0, *) { WorkoutLiveActivityWatch() } else { WorkoutLiveActivity() }
+        WorkoutLiveActivityWatch()
     }
 }
 
