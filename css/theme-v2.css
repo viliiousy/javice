@@ -689,13 +689,12 @@ html[data-ui="v2"] .cal-ics-btns .btn-sm:not(.accent){ height:40px; padding:0 16
 .nt-fix .ez-steps{ margin:8px 0 0; }
 .aiu-btns{ display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
 
-/* 상단 칩 숫자 굴리기 — 바뀐 자리만 위아래로 */
-.stat-chip b .rl{ display:inline-flex; flex-direction:column; height:1.2em; line-height:1.2em; overflow:hidden; vertical-align:bottom; }
-.stat-chip b .rl i{ display:block; font-style:normal; height:1.2em; }
-.stat-chip b .rl-up i{ animation:rlUp .55s cubic-bezier(.2,.9,.25,1.15) both; animation-delay:inherit; }
-.stat-chip b .rl-dn{ flex-direction:column-reverse; }
-.stat-chip b .rl-dn i{ animation:rlDn .55s cubic-bezier(.2,.9,.25,1.15) both; animation-delay:inherit; }
-@keyframes rlUp{ from{ transform:translateY(0); } to{ transform:translateY(-100%); } }
-@keyframes rlDn{ from{ transform:translateY(-100%); } to{ transform:translateY(0); } }
-.stat-chip.chip-roll{ animation:chipPop .5s ease-out; }
-@media (prefers-reduced-motion:reduce){ .stat-chip b .rl i{ animation:none; } }
+/* 상단 칩 숫자 — 슬롯머신 띠 + 떠오르는 변화량 */
+.stat-chip b .sl{ display:inline-block; height:1.2em; line-height:1.2em; overflow:hidden; vertical-align:-0.24em; clip-path:inset(0); }
+.stat-chip b .sl-in{ display:block; will-change:transform; }
+.stat-chip b .sl-in i{ display:block; height:1.2em; font-style:normal; text-align:center; }
+.stat-float{ position:fixed; z-index:10030; pointer-events:none; font:700 13px 'Space Grotesk','IBM Plex Sans KR',sans-serif; font-style:normal;
+  letter-spacing:-.01em; white-space:nowrap; padding:2px 8px; border-radius:10px; color:#17181B; background:var(--accent); }
+.stat-float.dn{ background:var(--card2); color:var(--text2); }
+.stat-float.eat{ background:#E5484D; color:#fff; }
+.stat-float.burn{ background:#2FA36B; color:#fff; }

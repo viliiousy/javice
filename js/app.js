@@ -192,26 +192,99 @@ const App = {
 
   // ── 스탯 배너 (즉각 반영 + 반짝임 + 긴급 할일) ──
   _statsPrev: '{}',
-  _chipNum: {},
-  _rollAt: {},
-  _rollChips(el) {
-    const prev = this._chipNum, next = {}, now = Date.now();
-    const num = v => Number(String(v).split('/')[0].replace(/[^0-9.-]/g, '')) || 0;
-    el.querySelectorAll('.stats-row .stat-chip[data-s] b').forEach(b => {
-      const k = b.closest('[data-s]').dataset.s, txt = b.textContent;
-      next[k] = txt;
-      const old = prev[k];
-      let R = this._rollAt[k];
-      if (old != null && old !== txt) R = this._rollAt[k] = { from: old, to: txt, t0: now };
-      // 굴러가는 중에 칸이 다시 그려지면(다른 카드가 바뀌어서) 이어서 굴린다
-      if (!R || R.to !== txt || now - R.t0 > 800) return;
-      const el2 = now - R.t0, up = num(R.to) >= num(R.from);
-      const L = Math.max(R.to.length, R.from.length), a = R.from.padStart(L, ' '), c = R.to.padStart(L, ' ');
-      b.innerHTML = [...c].map((ch, i) => ch === a[i] ? (ch === ' ' ? '' : esc(ch))
-        : `<span class="rl ${up ? 'rl-up' : 'rl-dn'}" style="animation-delay:${(L - i) * 30 - el2}ms"><i>${a[i] === ' ' ? '&nbsp;' : esc(a[i])}</i><i>${ch === ' ' ? '' : esc(ch)}</i></span>`).join('');
-      clearTimeout(b._rl); b._rl = setTimeout(() => { if (b.isConnected) b.textContent = txt; }, 900 - el2);
+  // ── 상단바: 바뀐 칸만 갈아 끼운다 ─────────────────
+  // 통째로 다시 그리면 몸무게·BMI·주식처럼 안 바뀐 칸까지 새로 생겨 같이 움직였다.
+  // 칸마다 지난번 HTML(서명)을 기억해 두고, 다른 칸만 바꾼다.
+  _morph(el, html) {
+    const tmp = document.createElement('div'); tmp.innerHTML = html;
+    const sign = n => { n.querySelectorAll('*').forEach(c => { if (c.classList?.contains('stat-chip') || c.classList?.contains('sg')) c.dataset.sig = c.outerHTML; }); };
+    const keyOf = (n, i) => (n.dataset.s ? n.dataset.s + ':' + (n.className.match(/stat-(wt|bf|bmi|ms|stock|kg)\b/)?.[1] || '') : '') || (n.className.split(' ')[0] + '#' + i);
+    const sync = (oldP, newP, deep) => {
+      const olds = new Map([...oldP.children].map((n, i) => [keyOf(n, i), n]));
+      const out = [...newP.children].map((nn, i) => {
+        const k = keyOf(nn, i), on = olds.get(k), sig = nn.outerHTML;
+        if (on && on.dataset.sig === sig) return on;
+        if (on && deep && deep(nn) && on.tagName === nn.tagName) {   // 묶음(.sg)은 안쪽 칸만 맞춘다
+          on.className = nn.className; sync(on, nn, null); on.dataset.sig = sig; return on;
+        }
+        nn.dataset.sig = sig; nn.querySelectorAll('.ti-grp,.stat-chip').forEach(c => { c.dataset.sig = c.outerHTML; });
+        return nn;
+      });
+      out.forEach((n, i) => { if (oldP.children[i] !== n) oldP.insertBefore(n, oldP.children[i] || null); });
+      while (oldP.children.length > out.length) oldP.lastElementChild.remove();
+    };
+    const oRow = el.querySelector(':scope > .stats-row'), nRow = tmp.querySelector(':scope > .stats-row');
+    if (!oRow || !nRow) { el.innerHTML = html; el.querySelectorAll('.sg,.ti-grp,.stat-chip').forEach(c => { c.dataset.sig = c.outerHTML; }); return; }
+    sync(oRow, nRow, n => n.classList.contains('sg') || n.classList.contains('ti-grp'));
+    // 줄(일정·할일·AI)은 통째로 — 칩이 아니라 움직일 숫자가 없다
+    const rest = [...tmp.children].filter(n => n !== nRow);
+    [...el.children].forEach(n => { if (n !== oRow) n.remove(); });
+    rest.forEach(n => el.appendChild(n));
+  },
+
+  // ── 숫자 움직임: 슬롯머신처럼 굴러 멈추고, 바뀐 만큼 '+1' / '+520' 이 떠오른다 ──
+  _numPrev: null,
+  _animStats(el, now) {
+    const P = this._numPrev; this._numPrev = now;
+    if (!P || P.ds !== now.ds) return;          // 날짜를 바꾼 것은 변화가 아니다
+    const chip = k => el.querySelector(`.stat-chip[data-s="${k}"]`);
+    const fl = (k, txt, cls) => { const c = chip(k); if (c) this._float(c, txt, cls); };
+    const sl = (k, from, to) => { const c = chip(k), b = c && c.querySelector('b'); if (b) this._slot(b, from, to); };
+    if (now.h !== P.h) { const d = now.h - P.h; fl('habits', (d > 0 ? '+' : '−') + Math.abs(d), d > 0 ? 'up' : 'dn'); sl('habits', P.hTxt, now.hTxt); }
+    if (now.t !== P.t) { const d = now.t - P.t; fl('tasks', (d > 0 ? '+' : '−') + Math.abs(d), d > 0 ? 'up' : 'dn'); sl('tasks', String(P.t), String(now.t)); }
+    if (now.c !== P.c) { const d = now.c - P.c; fl('checklist', (d > 0 ? '+' : '−') + Math.abs(d), d > 0 ? 'up' : 'dn'); sl('checklist', P.cTxt, now.cTxt); }
+    if (now.eat !== P.eat || now.bonus !== P.bonus) {
+      const de = now.eat - P.eat, db = now.bonus - P.bonus;
+      if (de) fl('diet', (de > 0 ? '+' : '−') + Math.abs(de).toLocaleString('ko-KR') + ' kcal', de > 0 ? 'eat' : 'dn');
+      if (db) setTimeout(() => fl('diet', (db > 0 ? '운동 +' : '운동 −') + Math.abs(db).toLocaleString('ko-KR'), 'burn'), de ? 260 : 0);
+      sl('diet', P.calTxt, now.calTxt);
+    }
+  },
+  _float(chip, txt, cls) {
+    const r = chip.getBoundingClientRect(); if (!r.width) return;
+    const f = document.createElement('i'); f.className = 'stat-float ' + (cls || ''); f.textContent = txt;
+    f.style.left = (r.left + r.width / 2) + 'px'; f.style.top = (r.top) + 'px';
+    document.body.appendChild(f);
+    const a = f.animate([
+      { transform: 'translate(-50%, 4px) scale(.6)', opacity: 0 },
+      { transform: 'translate(-50%, -14px) scale(1.15)', opacity: 1, offset: .22 },
+      { transform: 'translate(-50%, -18px) scale(1)', opacity: 1, offset: .6 },
+      { transform: 'translate(-50%, -34px) scale(.95)', opacity: 0 }], { duration: 1300, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' });
+    a.onfinish = () => f.remove();
+    chip.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.08)', offset: .3 }, { transform: 'scale(1)' }], { duration: 420, easing: 'ease-out' });
+  },
+  // 자리마다 숫자 띠를 세워 위로 굴린다 — 왼쪽 자리부터 차례로 멈춘다
+  _slot(b, from, to) {
+    from = String(from ?? ''); to = String(to ?? '');
+    if (from === to) return;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { b.textContent = to; return; }
+    const L = Math.max(from.length, to.length), a = from.padStart(L, ' '), c = to.padStart(L, ' ');
+    // 숫자 덩어리(쉼표 포함)마다 처음 바뀐 자리부터 끝까지 굴린다 — '1/6' 의 6 처럼 안 바뀐 덩어리는 그대로
+    const spin = new Array(L).fill(false);
+    for (let i = 0; i < L;) {
+      if (!/[\d,]/.test(c[i])) { i++; continue; }
+      let j = i; while (j < L && /[\d,]/.test(c[j])) j++;
+      const f = [...c.slice(i, j)].findIndex((ch, q) => ch !== a[i + q]);
+      if (f >= 0) for (let q = i + f; q < j; q++) spin[q] = true;
+      i = j;
+    }
+    let k = 0;
+    b.innerHTML = [...c].map((ch, i) => {
+      if (!/\d/.test(ch) || !spin[i]) return ch === ' ' ? '' : esc(ch);
+      const st = /\d/.test(a[i]) ? +a[i] : 0, en = +ch, n = 10 + ((en - st + 10) % 10) + k * 3;
+      k++;
+      return `<span class="sl" data-n="${n}" data-k="${k}"><span class="sl-in">${Array.from({ length: n + 1 }, (_, j) => `<i>${(st + j) % 10}</i>`).join('')}</span></span>`;
+    }).join('');
+    const strips = b.querySelectorAll('.sl-in');
+    let left = strips.length;
+    strips.forEach(s => {
+      const n = +s.parentNode.dataset.n, kk = +s.parentNode.dataset.k;
+      const an = s.animate([
+        { transform: 'translateY(0)', filter: 'blur(0)' },
+        { transform: `translateY(-${n * 0.55}em)`, filter: 'blur(.6px)', offset: .45 },
+        { transform: `translateY(-${n * 1.2}em)`, filter: 'blur(0)' }], { duration: 650 + kk * 140, easing: 'cubic-bezier(.3,.05,.2,1)', fill: 'forwards' });
+      an.onfinish = () => { if (--left === 0 && b.isConnected) b.textContent = to; };
     });
-    this._chipNum = next;
   },
   _updateStatsBanner() {
     try { if(typeof Widgets!=='undefined') Widgets.push(); } catch(e){}
@@ -338,25 +411,15 @@ const App = {
       const inner=h=>h.replace(/^\s*<div[^>]*>/,'').replace(/<\/div>\s*$/,'');
       listHTML=`<div class="stats-upcoming stats-merged">${inner(upcomingHTML)}${inner(urgentHTML)}</div>`;
     }
-    el.innerHTML=`<div class="stats-row">${chipsHTML}</div>${listHTML}${jarvisHTML}`;
+    this._morph(el, `<div class="stats-row">${chipsHTML}</div>${listHTML}${jarvisHTML}`);
     // 칩 개수에 따라 글씨를 한 단계씩 줄인다(폰에서 한 줄을 지키려고) — 넘치면 줄 안에서만 옆으로 민다
     try { const row=el.querySelector('.stats-row'); const n=row.querySelectorAll('.stat-chip').length; row.dataset.n=n; row.classList.toggle('dense', n>=5); row.classList.toggle('denser', n>=7); } catch(e){}
 
     // 숫자가 바뀐 칸은 자리마다 굴러간다(늘면 아래에서 올라오고, 줄면 위에서 내려온다)
-    try { this._rollChips(el); } catch(e){}
+    try { this._animStats(el, { ds:selDateStr, h:hDone, hTxt:`${hDone}/${hList.length}`, t:pending, c:clDone, cTxt:`${clDone}/${clAll}`,
+      eat:dt.cal, bonus:calBonus, calTxt: !calGoal ? won(dt.cal) : calLeft>=0 ? won(calLeft) : '+'+won(-calLeft) }); } catch(e){ console.warn(e); }
 
-    // 칩별 반짝임
-    if(changed){
-      if(prevObj.hDone!==undefined&&prevObj.hDone!==hDone){
-        const c=el.querySelector('[data-s="habits"]'); if(c){c.classList.remove('chip-flash');void c.offsetWidth;c.classList.add('chip-flash');}
-      }
-      if(prevObj.cal!==undefined&&prevObj.cal!==dt.cal){
-        const c=el.querySelector('[data-s="diet"]'); if(c){c.classList.remove('chip-flash');void c.offsetWidth;c.classList.add('chip-flash');}
-      }
-      if(prevObj.pending!==undefined&&prevObj.pending!==pending){
-        const c=el.querySelector('[data-s="tasks"]'); if(c){c.classList.remove('chip-flash');void c.offsetWidth;c.classList.add('chip-flash');}
-      }
-    }
+    // (예전 칩 반짝임은 숫자 움직임으로 바꿨다 — _animStats)
 
     // 칩 클릭 → 섹션 스크롤
     setTimeout(()=>{
