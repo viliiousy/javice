@@ -181,7 +181,7 @@ const Diet = {
         </div>
         ${items.length?`<div class="dm-items">
           ${items.map((item,idx)=>`
-            <div class="dm-food">
+            <div class="dm-food" data-meal="${meal}" data-idx="${idx}">
               <button class="diet-fav-btn${this.isFav(item.base||item.name)?' is-fav':''}"
                 onclick="Diet._clickFav('${(item.base||item.name).replace(/'/g,'&#39;')}','${meal}','${ds}')" title="즐겨찾기" aria-label="즐겨찾기">★</button>
               <span class="dm-fn">${esc(item.name)}</span>
@@ -189,6 +189,7 @@ const Diet = {
               <button class="dm-del" onclick="Diet.remove('${meal}',${idx},'${ds}')" aria-label="${esc(item.name)} 삭제">✕</button>
             </div>`).join('')}
           <button type="button" class="dm-more" onclick="Diet.showAdd('${meal}','${ds}')">+ ${meal}에 더하기</button>
+          <div class="dm-hint">음식을 꾹 눌러 다른 끼니로 끌어 옮길 수 있어요</div>
         </div>`:''}
       </div>`;
     }).join('');
@@ -213,6 +214,7 @@ const Diet = {
         <button type="button" class="dk-act" onclick="Diet.showSettings()">목표</button>
       </div>
       <div class="dm-list">${mealsHTML}</div>`;
+    this._bindMove(ds);
 
     if(typeof App!=='undefined') App._updateStatsBanner();
   },
@@ -954,6 +956,63 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
 
   // saveFood 는 장바구니(commitCart)로 대체됐다. 호출하는 곳이 없어 지운다.
 
+  // ── 끼니 옮기기: 음식을 꾹 눌러(0.4초) 다른 끼니 위로 끌어 놓는다 ──
+  // 접힌 끼니(머리줄)에도 놓을 수 있다. 놓은 끼니는 펼쳐서 옮겨진 게 바로 보이게 한다.
+  _bindMove(ds){
+    const list=document.querySelector('#dietWrap .dm-list'); if(!list) return;
+    list.querySelectorAll('.dm-food').forEach(el=>{
+      let timer=0, sx=0, sy=0;
+      const start=(x,y)=>{ timer=setTimeout(()=>this._dragStart(el, x, y, ds), 400); sx=x; sy=y; };
+      const cancel=()=>{ clearTimeout(timer); timer=0; };
+      el.addEventListener('touchstart', e=>{ if(e.target.closest('button')) return; const t=e.touches[0]; start(t.clientX, t.clientY); }, { passive:true });
+      el.addEventListener('touchmove', e=>{ const t=e.touches[0]; if(timer && (Math.abs(t.clientX-sx)>8 || Math.abs(t.clientY-sy)>8)) cancel(); }, { passive:true });
+      el.addEventListener('touchend', cancel); el.addEventListener('touchcancel', cancel);
+      el.addEventListener('mousedown', e=>{ if(e.button || e.target.closest('button')) return; start(e.clientX, e.clientY);
+        const up=()=>{ cancel(); document.removeEventListener('mouseup', up); }; document.addEventListener('mouseup', up); });
+      el.addEventListener('mousemove', e=>{ if(timer && (Math.abs(e.clientX-sx)>8 || Math.abs(e.clientY-sy)>8)) cancel(); });
+      el.addEventListener('contextmenu', e=>{ if(this._drag) e.preventDefault(); });
+    });
+  },
+  _dragStart(el, x, y, ds){
+    const from=el.dataset.meal, idx=+el.dataset.idx, r=el.getBoundingClientRect();
+    const ghost=el.cloneNode(true); ghost.className='dm-food dm-ghost';
+    Object.assign(ghost.style, { left:r.left+'px', top:r.top+'px', width:r.width+'px' });
+    document.body.appendChild(ghost); el.classList.add('dm-lifted');
+    document.querySelectorAll('#dietWrap .dm').forEach(m=>m.classList.add('dm-drop'));
+    try{ Haptic.medium(); }catch(e){}
+    const dx=x-r.left, dy=y-r.top;
+    let over=null;
+    const target=(cx,cy)=>{ ghost.style.visibility='hidden'; const t=document.elementFromPoint(cx,cy); ghost.style.visibility=''; return t && t.closest('#dietWrap .dm'); };
+    const move=(cx,cy)=>{
+      ghost.style.left=(cx-dx)+'px'; ghost.style.top=(cy-dy)+'px';
+      const m=target(cx,cy);
+      if(m!==over){ over?.classList.remove('dm-over'); over=m; if(m){ m.classList.add('dm-over'); try{ Haptic.select(); }catch(e){} } }
+    };
+    const end=()=>{
+      document.removeEventListener('touchmove', tm, { passive:false }); document.removeEventListener('touchend', end); document.removeEventListener('touchcancel', end);
+      document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', end);
+      ghost.remove(); this._drag=false;
+      document.querySelectorAll('#dietWrap .dm').forEach(m=>m.classList.remove('dm-drop','dm-over'));
+      el.classList.remove('dm-lifted');
+      const to=over && over.querySelector('.dm-nm')?.textContent.trim();
+      if(to && to!==from && this.MEALS.includes(to)) this.moveItem(from, idx, to, ds);
+    };
+    const tm=e=>{ e.preventDefault(); const t=e.touches[0]; move(t.clientX, t.clientY); };
+    const mm=e=>move(e.clientX, e.clientY);
+    this._drag=true;
+    document.addEventListener('touchmove', tm, { passive:false }); document.addEventListener('touchend', end); document.addEventListener('touchcancel', end);
+    document.addEventListener('mousemove', mm); document.addEventListener('mouseup', end);
+  },
+  moveItem(from, idx, to, ds){
+    const date=new Date(ds+'T00:00:00'), data=this.getData(date);
+    const it=(data[from]||[]).splice(idx,1)[0]; if(!it) return;
+    (data[to]=data[to]||[]).push(it);
+    this.saveData(data,date);
+    this._open[to]=true;
+    this.render(date);
+    try{ Haptic.success(); }catch(e){}
+    App.showToast(`${it.base||it.name} → ${to}로 옮겼습니다`,'success');
+  },
   remove(meal,idx,dateStr=null){
     const date=dateStr?new Date(dateStr+'T00:00:00'):new Date();
     const data=this.getData(date);
