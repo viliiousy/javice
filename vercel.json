@@ -83,5 +83,10 @@
         }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "api/food.js": {
+      "maxDuration": 60
+    }
+  }
 }

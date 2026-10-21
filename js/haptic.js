@@ -22,6 +22,7 @@ const Haptic = {
   select()  { this._go(P => P.selectionChanged ? (P.selectionStart?.(), P.selectionChanged(), P.selectionEnd?.()) : P.impact({ style: 'LIGHT' }), 5); },
   light()   { this._go(P => P.impact({ style: 'LIGHT' }), 8); },
   medium()  { this._go(P => P.impact({ style: 'MEDIUM' }), 14); },
+  heavy()   { this._go(P => P.impact({ style: 'HEAVY' }), 24); },
   success() { this._go(P => P.notification({ type: 'SUCCESS' }), [10, 40, 14]); },
   warn()    { this._go(P => P.notification({ type: 'WARNING' }), [18, 50, 18]); },
 };

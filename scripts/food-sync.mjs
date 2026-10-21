@@ -7,9 +7,9 @@ const BASE = process.env.BASE || 'https://bashy.app';
 const SEC = process.env.CRON_SECRET;
 if (!SEC) { console.error('CRON_SECRET 없음'); process.exit(1); }
 let ROWS = Number(process.env.ROWS || 500);   // 식약처 한 쪽 최대 500
-const PAR = Number(process.env.PAR || 10);   // 34만 줄 — 쪽을 크게, 여러 개를 함께
+const PAR = Number(process.env.PAR || 6);   // 34만 줄 — 쪽을 크게, 여러 개를 함께
 
-async function page(n, tries = 4) {
+async function page(n, tries = 6) {
   for (let t = 1; t <= tries; t++) {
     try {
       const r = await fetch(`${BASE}/api/food?dump=1&page=${n}&rows=${ROWS}`, { headers: { Authorization: `Bearer ${SEC}` } });
@@ -19,7 +19,8 @@ async function page(n, tries = 4) {
     } catch (e) { console.warn('page', n, 'try', t, e.message); }
     await new Promise(r => setTimeout(r, 2000 * t));
   }
-  throw new Error('page ' + n + ' 실패');
+  console.warn('page', n, '건너뜀');   // 한 쪽이 끝내 안 오면 빼고 간다 — 다 합쳐 90% 넘으면 저장한다
+  return { ok: false, items: [], total: 0 };
 }
 
 let first = await page(1);

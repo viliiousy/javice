@@ -10,9 +10,11 @@ const AppUpdate = {
   SKIP_KEY: 'gl_apk_skip',
   get local() { return Number((window.BASHY_BUILD || {}).n) || 0; },
   get on() { try { return window.Capacitor?.getPlatform?.() === 'android' && this.local > 0; } catch (e) { return false; } },
-  async check(force) {
+  // how: 'manual'(설정에서 누름) · 'login'(로그인 직후) · 없음(앱을 열거나 돌아올 때, 30분에 한 번)
+  async check(how) {
     if (!this.on) return;
-    if (!force && Date.now() - (this._t || 0) < 6 * 3600e3) return;
+    const force = how === 'manual' || how === 'login';
+    if (!force && Date.now() - (this._t || 0) < 30 * 60e3) return;
     this._t = Date.now();
     try {
       const r = await fetch(this.API, { headers: { Accept: 'application/vnd.github+json' } });
@@ -20,8 +22,8 @@ const AppUpdate = {
       const j = await r.json();
       const m = /build=(\d+)/.exec(j.body || '') || /빌드 (\d+)/.exec(j.name || '');
       const remote = m ? Number(m[1]) : 0;
-      if (!(remote > this.local)) { if (force) App.showToast('최신 버전입니다', 'success'); return; }
-      if (!force && Number(localStorage.getItem(this.SKIP_KEY) || 0) >= remote) return;
+      if (!(remote > this.local)) { if (how === 'manual') App.showToast('최신 버전입니다', 'success'); return; }
+      if (how !== 'manual' && how !== 'login' && Number(localStorage.getItem(this.SKIP_KEY) || 0) >= remote) return;
       const asset = (j.assets || []).find(a => /\.apk$/.test(a.name));
       this.show(remote, asset ? asset.browser_download_url : this.APK, asset ? asset.updated_at : '');
     } catch (e) {}
@@ -49,5 +51,16 @@ const AppUpdate = {
     location.href = url;
   },
 };
+// 새 APK 를 깔고 처음 열었을 때: '업데이트됐습니다' 를 한 번 알린다
+AppUpdate.justUpdated = function () {
+  if (!this.on) return;
+  const seen = Number(localStorage.getItem('gl_apk_seen') || 0);
+  localStorage.setItem('gl_apk_seen', String(this.local));
+  if (seen && seen < this.local) setTimeout(() => {
+    try { Haptic.success(); } catch (e) {}
+    App.showToast(`새 버전(빌드 ${this.local})으로 업데이트됐습니다`, 'success');
+  }, 1500);
+};
+AppUpdate.justUpdated();
 setTimeout(() => AppUpdate.check(), 4000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) AppUpdate.check(); });

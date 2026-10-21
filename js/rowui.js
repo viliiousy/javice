@@ -104,7 +104,7 @@ const RowUI = {
           const arm = -x3 > w * 0.35;   // 35% 를 넘으면
           if (arm !== wrap.classList.contains('rw-arm')) {
             wrap.classList.toggle('rw-arm', arm);
-            try { arm ? Haptic.medium() : Haptic.light(); } catch {}
+            try { arm ? (Haptic.heavy ? Haptic.heavy() : Haptic.medium()) : Haptic.light(); } catch {}
           }
           return;
         }
@@ -123,13 +123,16 @@ const RowUI = {
           row.classList.remove('rw-drag');
           if (armed) {
             try { Haptic.success(); } catch {}
-            row.style.transition = 'transform .18s ease-in'; row.style.transform = 'translateX(-110%)';
-            wrap.style.setProperty('--rw-fill', '100%');
+            // 지워지는 게 분명히 보이게: 줄이 왼쪽으로 빠지고 → 빨간 칸이 꽉 찼다가 → 줄 높이가 접히며 사라진다
+            row.style.transition = 'transform .16s ease-in, opacity .16s'; row.style.transform = 'translateX(-110%)'; row.style.opacity = '0';
+            wrap.style.setProperty('--rw-fill', '100%'); wrap.classList.add('rw-gone');
+            wrap.style.height = wrap.offsetHeight + 'px';
+            setTimeout(() => { wrap.style.transition = 'height .2s ease, margin .2s ease'; wrap.style.height = '0px'; }, 140);
             setTimeout(() => {
               h.del(id);
               // 확인 창에서 '취소' 하면 줄이 그대로 남는다 — 제자리로 돌려 놓는다
-              setTimeout(() => { if (row.isConnected) { row.style.transition = ''; row.style.transform = ''; wrap.classList.remove('rw-arm', 'rw-act'); wrap.style.setProperty('--rw-fill', '0px'); } }, 60);
-            }, 170);
+              setTimeout(() => { if (row.isConnected) { row.style.transition = ''; row.style.transform = ''; row.style.opacity = ''; wrap.style.height = ''; wrap.style.transition = ''; wrap.classList.remove('rw-gone'); wrap.classList.remove('rw-arm', 'rw-act'); wrap.style.setProperty('--rw-fill', '0px'); } }, 60);
+            }, 360);
           } else {
             row.style.transform = ''; wrap.style.setProperty('--rw-fill', '0px'); wrap.classList.remove('rw-arm', 'rw-act');
           }

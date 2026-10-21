@@ -153,7 +153,7 @@ const Settings = {
       h = `${this._link('사용 도우미 다시 보기', 'App.closeModal();Onboard.open(true)', '모든 기능 안내(일정·습관·식단·운동·인바디·메모·경제·AI·스마트홈·위젯·설정)와 메뉴 위치 · 설정 도우미')}
         ${this._link('위젯 · 시리 · 홈 화면에 추가', "Settings.go('widget')", '휴대폰 홈 화면에서 바로 열기')}
         ${this._item('버전', `<span class="set-val">${this.VERSION}</span>`)}
-        ${typeof AppUpdate!=='undefined'&&AppUpdate.on ? this._link('업데이트 확인', 'AppUpdate.check(true)', `안드로이드 앱 빌드 ${AppUpdate.local} · 새 빌드가 있으면 APK 를 받습니다`) : ''}`;
+        ${typeof AppUpdate!=='undefined'&&AppUpdate.on ? this._link('업데이트 확인', "AppUpdate.check('manual')", `안드로이드 앱 빌드 ${AppUpdate.local} · 새 빌드가 있으면 APK 를 받습니다`) : ''}`;
     }
     return (this.SUB[cat] ? `<button type="button" class="set-back" onclick="Settings.go('${this.SUB[cat][1]}')">‹ ${this.CATS.find(c => c.id === this.SUB[cat][1])?.name || '설정'}</button>` : this._back()) + `<div class="set-page">${h}</div>`;
   },
