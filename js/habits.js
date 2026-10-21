@@ -145,6 +145,121 @@ const Habits = {
     return out;
   },
 
+  // ── 트래커: 월간(습관 × 날짜 격자) · 연간(습관 × 12달 달성률) ─────────────
+  // 종이 해빗 트래커처럼 한 장에 펼쳐 본다. 칸: 함 = 주황 / 할 날인데 안 함 = 빈칸 / 할 날 아님 = 점 / 아직 = 비움
+  openTracker(mode='m', y, m) {
+    const now = new Date();
+    this._trk = { mode, y: y ?? now.getFullYear(), m: m ?? now.getMonth() };
+    App.openModal('@check 습관 트래커', `<div class="trk" id="trkBox"></div>`, () => this._trkPaint());
+    this._trkPaint();
+  },
+  _trkGo(k, v) {
+    const t = this._trk; if (!t) return;
+    if (k === 'mode') t.mode = v;
+    if (k === 'm') t.m = v;
+    if (k === 'y') { t.y += v; }
+    if (k === 'step') { t.m += v; if (t.m < 0) { t.m = 11; t.y--; } if (t.m > 11) { t.m = 0; t.y++; } }
+    try { Haptic.light(); } catch (e) {}
+    this._trkPaint();
+  },
+  // 그 기간에 하루라도 할 날이 있었던 습관(지운 습관도 지우기 전 기록은 남긴다)
+  _trkRows(all, from, to) {
+    const a = this._dateStr(from), b = this._dateStr(to);
+    return all.filter(h => !(h.createdAt && h.createdAt > b) && !(h.deletedFrom && h.deletedFrom <= a));
+  },
+  _trkPaint() {
+    const box = document.getElementById('trkBox'), t = this._trk; if (!box || !t) return;
+    const all = this.getList(), today = new Date(); today.setHours(0,0,0,0);
+    const MON = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+    const name = h => `${h.emoji ? esc(h.emoji)+' ' : ''}${esc(h.name)}`;
+    const seg = `<div class="trk-seg" role="tablist">
+        <button type="button" class="${t.mode==='m'?'on':''}" onclick="Habits._trkGo('mode','m')">월간</button>
+        <button type="button" class="${t.mode==='y'?'on':''}" onclick="Habits._trkGo('mode','y')">연간</button></div>`;
+    if (t.mode === 'm') {
+      const n = new Date(t.y, t.m+1, 0).getDate(), first = new Date(t.y, t.m, 1), last = new Date(t.y, t.m, n);
+      const rows = this._trkRows(all, first, last);
+      const days = Array.from({ length:n }, (_, i) => new Date(t.y, t.m, i+1));
+      const ck = days.map(d => d > today ? null : this.getChecked(d));
+      let tDone = 0, tDue = 0;
+      const dayTot = days.map(() => [0,0]);
+      const body = rows.map(h => {
+        let dn = 0, due = 0;
+        const cells = days.map((d, i) => {
+          const sched = this._forDate([h], d).length > 0;
+          if (ck[i] === null) return `<i class="c fut${sched?'':' off'}"></i>`;
+          const on = ck[i].includes(h.id);
+          if (sched) { due++; dayTot[i][1]++; } if (on) { dn++; dayTot[i][0]++; }
+          return `<i class="c${on?' on':sched?'':' off'}"></i>`;
+        }).join('');
+        tDone += dn; tDue += due;
+        const pct = due ? Math.round(dn/due*100) : null;
+        return `<div class="trk-r"><span class="trk-n">${name(h)}</span><div class="trk-cells">${cells}</div><b class="trk-p num">${pct==null?'—':pct+'%'}</b></div>`;
+      }).join('');
+      const head = days.map((d, i) => `<span class="${d.getDay()===0?'sun':''}${this._dateStr(d)===this._dateStr(today)?' now':''}">${i+1}</span>`).join('');
+      const foot = dayTot.map(([dn, due], i) => { const r = due ? dn/due : -1; return `<i class="lv${r<0?'x':r===0?0:r<.34?1:r<.67?2:r<1?3:4}"></i>`; }).join('');
+      const pct = tDue ? Math.round(tDone/tDue*100) : 0;
+      box.innerHTML = `${seg}
+        <div class="trk-hd">
+          <button type="button" class="trk-nav" onclick="Habits._trkGo('step',-1)" aria-label="이전 달">‹</button>
+          <div class="trk-ttl"><b class="num">${t.y}.${String(t.m+1).padStart(2,'0')}</b><span>${tDue?`할 일 ${tDue}번 중 ${tDone}번`:'기록 없음'}</span></div>
+          <button type="button" class="trk-nav" onclick="Habits._trkGo('step',1)" aria-label="다음 달">›</button>
+          <div class="trk-big"><b class="num">${pct}</b><i>%</i></div>
+        </div>
+        <div class="trk-months">${MON.map((l, i) => `<button type="button" class="${i===t.m?'on':''}" onclick="Habits._trkGo('m',${i})">${i+1}</button>`).join('')}</div>
+        ${rows.length ? `<div class="trk-scroll" style="--n:${n}"><div class="trk-grid">
+          <div class="trk-r trk-h"><span class="trk-n">습관</span><div class="trk-cells trk-days">${head}</div><b class="trk-p">달성</b></div>
+          ${body}
+          <div class="trk-r trk-f"><span class="trk-n">그날</span><div class="trk-cells">${foot}</div><b class="trk-p"></b></div>
+        </div></div>
+        <div class="trk-key"><span><i class="c on"></i>했음</span><span><i class="c"></i>안 함</span><span><i class="c off"></i>쉬는 날</span></div>`
+        : '<p class="trk-empty">이 달에는 습관이 없었습니다</p>'}`;
+      // 오늘(또는 달 끝)이 보이게 가로 스크롤을 옮겨 둔다
+      const sc = box.querySelector('.trk-scroll');
+      if (sc) { const di = (t.y===today.getFullYear() && t.m===today.getMonth()) ? today.getDate() : n; sc.scrollLeft = Math.max(0, di*24 - sc.clientWidth + 160); }
+      return;
+    }
+    // 연간
+    const y0 = new Date(t.y, 0, 1), y1 = new Date(t.y, 11, 31);
+    const rows = this._trkRows(all, y0, y1);
+    const ckBy = {};                        // 날짜별 체크를 한 번만 읽는다
+    const mon = Array.from({ length:12 }, (_, m) => {
+      const n = new Date(t.y, m+1, 0).getDate(), out = [];
+      for (let d = 1; d <= n; d++) { const dt = new Date(t.y, m, d); if (dt > today) break; out.push(dt); ckBy[this._dateStr(dt)] = this.getChecked(dt); }
+      return out;
+    });
+    let tDone = 0, tDue = 0;
+    const colT = Array.from({ length:12 }, () => [0,0]);
+    const body = rows.map(h => {
+      let rd = 0, ru = 0;
+      const cells = mon.map((ds, m) => {
+        let dn = 0, due = 0;
+        ds.forEach(d => { if (this._forDate([h], d).length) { due++; if (ckBy[this._dateStr(d)].includes(h.id)) dn++; } });
+        rd += dn; ru += due; colT[m][0] += dn; colT[m][1] += due;
+        if (!due) return `<i class="ym none"></i>`;
+        const r = dn/due, lv = r===0?0:r<.34?1:r<.67?2:r<1?3:4;
+        return `<i class="ym lv${lv}" title="${MON[m]} ${dn}/${due}"><span class="num">${Math.round(r*100)}</span></i>`;
+      }).join('');
+      tDone += rd; tDue += ru;
+      return `<div class="trk-yr"><span class="trk-n">${name(h)}</span><div class="trk-ym">${cells}</div><b class="trk-p num">${ru?Math.round(rd/ru*100)+'%':'—'}</b></div>`;
+    }).join('');
+    const pct = tDue ? Math.round(tDone/tDue*100) : 0;
+    const best = colT.map(([d,u], m) => [u ? d/u : -1, m]).filter(x => x[0] >= 0).sort((a,b) => b[0]-a[0])[0];
+    box.innerHTML = `${seg}
+      <div class="trk-hd">
+        <button type="button" class="trk-nav" onclick="Habits._trkGo('y',-1)" aria-label="이전 해">‹</button>
+        <div class="trk-ttl"><b class="num">${t.y}</b><span>${tDue?`할 일 ${tDue.toLocaleString('ko-KR')}번 중 ${tDone.toLocaleString('ko-KR')}번${best?` · 가장 잘한 달 ${MON[best[1]]}`:''}`:'기록 없음'}</span></div>
+        <button type="button" class="trk-nav" onclick="Habits._trkGo('y',1)" aria-label="다음 해">›</button>
+        <div class="trk-big"><b class="num">${pct}</b><i>%</i></div>
+      </div>
+      ${rows.length ? `<div class="trk-ygrid">
+        <div class="trk-yr trk-h"><span class="trk-n">습관</span><div class="trk-ym">${MON.map((l,m)=>`<button type="button" class="ymh" onclick="Habits._trk.m=${m};Habits._trkGo('mode','m')">${m+1}</button>`).join('')}</div><b class="trk-p">연간</b></div>
+        ${body}
+        <div class="trk-yr trk-f"><span class="trk-n">전체</span><div class="trk-ym">${colT.map(([d,u]) => u ? `<i class="ym tot"><span class="num">${Math.round(d/u*100)}</span></i>` : '<i class="ym none"></i>').join('')}</div><b class="trk-p num">${pct}%</b></div>
+      </div>
+      <p class="trk-note">칸의 숫자는 그 달 달성률(%)입니다. 달 번호를 누르면 그 달 격자로 갑니다.</p>`
+      : '<p class="trk-empty">이 해에는 습관이 없었습니다</p>'}`;
+  },
+
   streak(id) {
     let n=0; const today=new Date();
     for(let i=0;i<=365;i++){
@@ -231,7 +346,7 @@ const Habits = {
           const lbl=i===0?(isToday?'오늘':this.DAYS_KO[d.getDay()]):this.DAYS_KO[d.getDay()];
           cells.push(`<div class="hw${i===0?' cur':''}"><span>${lbl}</span><i class="lv${lv}">${tot?dn:''}</i></div>`);
         }
-        foot.innerHTML=`<div class="hw-row">${cells.join('')}</div><div class="hw-sum"><b class="num">${done}</b> / ${list.length} 완료</div>`;
+        foot.innerHTML=`<div class="hw-row">${cells.join('')}</div><div class="hw-sum"><b class="num">${done}</b> / ${list.length} 완료<button type="button" class="hw-open" onclick="Habits.openTracker('m')">월간 · 연간 기록 ›</button></div>`;
       }
     }
   },

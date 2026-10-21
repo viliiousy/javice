@@ -128,3 +128,74 @@ html[data-ui="v2"] .nt .set-link:last-child{ border-bottom:0; }
 .fx-ask-btns{ display:grid; grid-template-columns:1fr 2fr; gap:8px; margin-top:24px; }
 .fx-ask-btns .mx-go{ margin:0; }
 .fx-ask-no{ height:48px; border:1px solid var(--border); border-radius:12px; background:none; color:var(--text2); font:inherit; font-size:16px; cursor:pointer; }
+
+/* ── 습관 트래커 (월간 · 연간) — 종이 트래커처럼 한 장에 펼친다 ───────────── */
+.hw-sum{ display:flex; align-items:center; gap:8px; }
+.hw-open{ margin-left:auto; height:32px; padding:0; border:0; background:none; color:var(--text2); font:inherit; font-size:13px; cursor:pointer; }
+.hw-open:active{ color:var(--accent); }
+.trk{ min-width:0; max-width:100%; overflow:hidden; --cell:20px; --gap:4px; --nm:112px; --pc:48px; }
+.trk-seg{ display:inline-grid; grid-template-columns:1fr 1fr; padding:4px; border-radius:12px; background:var(--card2); }
+.trk-seg button{ min-width:72px; height:32px; border:0; border-radius:8px; background:none; color:var(--text3); font:inherit; font-size:14px; cursor:pointer; }
+.trk-seg button.on{ background:var(--card); color:var(--text); font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.08); }
+.trk-hd{ display:grid; grid-template-columns:32px minmax(0,1fr) 32px auto; align-items:center; gap:8px; margin:24px 0 16px; }
+.trk-nav{ width:32px; height:32px; border:1px solid var(--border); border-radius:16px; background:none; color:var(--text2); font-size:18px; line-height:1; cursor:pointer; }
+.trk-ttl{ display:flex; flex-direction:column; min-width:0; }
+.trk-ttl b{ font-size:22px; font-weight:600; letter-spacing:-.01em; color:var(--text); }
+.trk-ttl span{ font-size:12px; color:var(--text3); line-height:1.4; }
+.trk-big{ justify-self:end; display:flex; align-items:baseline; gap:2px; }
+.trk-big b{ font-size:40px; font-weight:600; letter-spacing:-.03em; color:var(--accent); line-height:1; }
+.trk-big i{ font-style:normal; font-size:16px; color:var(--text3); }
+.trk-months{ display:grid; grid-template-columns:repeat(12,1fr); gap:4px; margin-bottom:16px; }
+.trk-months button{ height:28px; border:0; border-radius:6px; background:none; color:var(--text3); font:500 12px 'Space Grotesk',sans-serif; cursor:pointer; }
+.trk-months button.on{ background:var(--text); color:var(--card); }
+
+.trk-scroll{ overflow-x:auto; margin:0 -16px; padding:0 16px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+.trk-scroll::-webkit-scrollbar{ display:none; }
+.trk-grid{ display:inline-block; min-width:100%; border-top:1px solid var(--v2-line, var(--border)); }
+.trk-r{ display:flex; align-items:center; min-height:36px; border-bottom:1px solid var(--v2-line, var(--border)); }
+.trk-n{ position:sticky; left:-16px; z-index:1; flex:none; width:var(--nm); padding:0 8px 0 0; margin-left:-16px; padding-left:16px; box-sizing:content-box;
+  background:var(--card); font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.trk-cells{ display:flex; gap:var(--gap); padding:0 8px; }
+.trk-p{ position:sticky; right:-16px; flex:none; width:var(--pc); margin-left:auto; padding-right:16px; margin-right:-16px; box-sizing:content-box;
+  background:var(--card); text-align:right; font-size:13px; font-weight:600; color:var(--text); }
+.trk-h{ min-height:32px; }
+.trk-h .trk-n, .trk-h .trk-p{ font-size:11px; font-weight:500; color:var(--text3); letter-spacing:.04em; }
+.trk-days span{ width:var(--cell); text-align:center; font:500 11px 'Space Grotesk',sans-serif; color:var(--text3); }
+.trk-days span.sun{ color:#E5484D; }
+.trk-days span.now{ color:var(--card); background:var(--accent); border-radius:4px; }
+.trk .c{ display:block; flex:none; width:var(--cell); height:var(--cell); border-radius:4px; box-sizing:border-box; border:1px solid var(--border); background:none; }
+.trk .c.on{ border-color:var(--accent); background:var(--accent); }
+.trk .c.off{ border:0; background:radial-gradient(circle, var(--text3) 1.2px, transparent 1.6px); opacity:.6; }
+.trk .c.fut{ border-style:dashed; opacity:.35; }
+.trk .c.fut.off{ border:0; }
+.trk-f{ border-bottom:0; }
+.trk-f .trk-n{ font-size:11px; color:var(--text3); letter-spacing:.04em; }
+.trk-f .trk-cells i{ display:block; flex:none; width:var(--cell); height:6px; border-radius:3px; background:var(--card2); }
+.trk-f .trk-cells i.lv1{ background:color-mix(in srgb, var(--accent) 25%, var(--card2)); }
+.trk-f .trk-cells i.lv2{ background:color-mix(in srgb, var(--accent) 50%, var(--card2)); }
+.trk-f .trk-cells i.lv3{ background:color-mix(in srgb, var(--accent) 75%, var(--card2)); }
+.trk-f .trk-cells i.lv4{ background:var(--accent); }
+.trk-f .trk-cells i.lvx{ background:none; }
+.trk-key{ display:flex; gap:16px; margin-top:16px; font-size:12px; color:var(--text3); }
+.trk-key span{ display:flex; align-items:center; gap:6px; }
+.trk-key .c{ width:12px; height:12px; border-radius:3px; }
+.trk-empty, .trk-note{ font-size:13px; color:var(--text3); margin:16px 0 0; }
+
+/* 연간 */
+.trk-ygrid{ border-top:1px solid var(--v2-line, var(--border)); }
+.trk-yr{ display:grid; grid-template-columns:84px minmax(0,1fr) 36px; align-items:center; gap:8px; min-height:40px; border-bottom:1px solid var(--v2-line, var(--border)); }
+.trk-yr .trk-n{ position:static; width:auto; margin:0; padding:0; background:none; }
+.trk-yr .trk-p{ position:static; width:auto; margin:0; padding:0; background:none; }
+.trk-ym{ display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:3px; min-width:0; }
+.trk-ym .ymh{ height:24px; padding:0; border:0; background:none; color:var(--text3); font:500 11px 'Space Grotesk',sans-serif; cursor:pointer; }
+.ym{ min-width:0; overflow:hidden; display:flex; align-items:center; justify-content:center; aspect-ratio:1; border-radius:4px; background:var(--card2); font-style:normal; }
+.ym span{ font-size:9px; font-weight:600; color:var(--text2); letter-spacing:-.04em; }
+.ym.none{ background:none; border:1px dashed var(--border); opacity:.5; }
+.ym.lv0{ background:var(--card2); }
+.ym.lv1{ background:color-mix(in srgb, var(--accent) 22%, var(--card2)); }
+.ym.lv2{ background:color-mix(in srgb, var(--accent) 45%, var(--card2)); }
+.ym.lv3{ background:color-mix(in srgb, var(--accent) 72%, var(--card2)); }
+.ym.lv3 span, .ym.lv4 span{ color:#17181B; }
+.ym.lv4{ background:var(--accent); }
+.ym.tot{ background:none; }
+.ym.tot span{ font-size:10px; color:var(--text); }
