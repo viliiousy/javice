@@ -6,7 +6,7 @@ import fs from 'node:fs';
 const BASE = process.env.BASE || 'https://bashy.app';
 const SEC = process.env.CRON_SECRET;
 if (!SEC) { console.error('CRON_SECRET 없음'); process.exit(1); }
-const ROWS = Number(process.env.ROWS || 100), PAR = 4;
+let ROWS = Number(process.env.ROWS || 1000); const PAR = Number(process.env.PAR || 10);   // 34만 줄 — 쪽을 크게, 여러 개를 함께
 
 async function page(n, tries = 4) {
   for (let t = 1; t <= tries; t++) {
@@ -21,7 +21,9 @@ async function page(n, tries = 4) {
   throw new Error('page ' + n + ' 실패');
 }
 
-const first = await page(1);
+let first = await page(1);
+// 식약처가 한 쪽 최대 줄 수를 줄여 주면(예: 100) 그 크기에 맞춘다
+if (first.items.length && first.items.length < ROWS && first.total > first.items.length) { ROWS = first.items.length; console.log('쪽 크기 →', ROWS); first = await page(1); }
 const total = first.total, pages = Math.ceil(total / ROWS);
 console.log('total', total, 'pages', pages, 'rows/page', first.items.length);
 if (!total || !first.items.length) { console.error('비어 있음 — 기존 파일 유지', JSON.stringify(first).slice(0, 400)); process.exit(1); }
@@ -29,7 +31,7 @@ const all = [...first.items];
 for (let p = 2; p <= pages; p += PAR) {
   const batch = await Promise.all(Array.from({ length: Math.min(PAR, pages - p + 1) }, (_, k) => page(p + k)));
   batch.forEach(b => all.push(...b.items));
-  if (p % 20 < PAR) console.log('…', all.length);
+  if ((p - 2) % (PAR * 5) === 0) console.log('…', all.length, Math.round(all.length / total * 100) + '%');
 }
 console.log('받은 줄', all.length);
 if (all.length < total * 0.9) { console.error('너무 적게 받음 — 기존 파일 유지'); process.exit(1); }
