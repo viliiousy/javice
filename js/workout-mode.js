@@ -168,7 +168,7 @@ const WorkoutMode = {
   prefs() {
     let v = {}; try { v = JSON.parse(UserStore.get(this.PREF_KEY) || '{}') || {}; } catch {}
     const g = (PlanGen.profile() || {}).goal;
-    return { rest: v.rest >= 0 ? v.rest : (Number(localStorage.getItem('gl_rest_sec')) || this.REST[g] || 90), timer: v.timer !== false, sound: v.sound !== false };
+    return { rest: v.rest >= 0 ? v.rest : (Number(localStorage.getItem('gl_rest_sec')) || this.REST[g] || 90), timer: v.timer !== false, sound: v.sound !== false, numIn: v.numIn === 'wheel' ? 'wheel' : 'pad' };
   },
   setPrefs(patch) { UserStore.set(this.PREF_KEY, JSON.stringify({ ...this.prefs(), ...patch })); window.FirebaseSync?.scheduleSave?.(); },
   restSec() { return this.prefs().rest; },
@@ -357,6 +357,8 @@ const WorkoutMode = {
 
   paint() {
     const S = this.st, el = document.getElementById('wkMode'); if (!S || !el) return;
+    // 같은 운동 안에서 세트 체크·무게·횟수를 바꿀 때는 보던 자리 그대로(맨 위로 튀지 않게)
+    const b0 = el.querySelector('.wk-body'), keep = b0 && this._pc === S.cur ? b0.scrollTop : 0; this._pc = S.cur;
     const x = S.ex[S.cur], pf = this.prefs();
     const em = typeof ExMedia !== 'undefined' ? ExMedia.find(x.name) : null;
     let th = typeof ExMedia !== 'undefined' ? ExMedia.thumbFor(x.name) : '';
@@ -406,6 +408,7 @@ const WorkoutMode = {
           : `<button class="wk-main" onclick="WorkoutMode.setDone(${nowK})">${nowK + 1}세트 완료</button>`}
       </div>
       <div id="wkRest" class="wk-rest" hidden></div>`;
+    if (keep) { const b1 = el.querySelector('.wk-body'); if (b1) b1.scrollTop = keep; }
     this._bindSwipe(el);
     this._time();
     clearTimeout(this._lt); this._lt = setTimeout(() => this.live(), 300);
@@ -465,21 +468,13 @@ const WorkoutMode = {
     for (let j = k + 1; j < x.rows.length; j++) { if (!x.rows[j].ok) x.rows[j][f] = val; }
     this.paint(); this._persist();
   },
-  // 무게·횟수는 숫자 휠로 고른다 (무게: 정수 + 0.5 단위 두 줄, 횟수: 한 줄)
+  // 무게·횟수: 키패드(소수점 포함) 또는 자릿수별 스크롤. 고른 방식은 계정에 남아 다음에도 그 방식으로 열린다.
   pickVal(k, f) {
-    const x = this.st.ex[this.st.cur], cur = Number(x.rows[k][f]) || 0;
-    if (f === 'w') {
-      Wheel.open({ title: `${k + 1}세트 무게`, unit: 'kg',
-        cols: [{ vals: Array.from({ length: 301 }, (_, i) => i), cur: Math.floor(cur) },
-               { vals: [0, 0.5], cur: cur % 1 >= 0.5 ? 0.5 : 0, fmt: v => v ? '.5' : '.0' }],
-        note: '아래 세트도 같은 무게로 바뀝니다 (위 세트는 그대로)',
-        done: ([a, b]) => this.setVal(k, 'w', a + b) });
-    } else {
-      Wheel.open({ title: `${k + 1}세트 횟수`, unit: '회',
-        cols: [{ vals: Array.from({ length: 61 }, (_, i) => i), cur: cur || this._reps(x.sets) }],
-        note: '아래 세트도 같은 횟수로 바뀝니다 (위 세트는 그대로)',
-        done: ([a]) => this.setVal(k, 'r', a) });
-    }
+    const x = this.st.ex[this.st.cur], v = x.rows[k][f];
+    NumIn.open({ title: `${k + 1}세트 ${f === 'w' ? '무게' : '횟수'}`, unit: f === 'w' ? 'kg' : '회', dec: f === 'w',
+      cur: v !== '' && v != null ? v : (f === 'r' ? this._reps(x.sets) : ''),
+      note: `아래 세트도 같은 ${f === 'w' ? '무게' : '횟수'}로 바뀝니다 (위 세트는 그대로)`,
+      done: val => this.setVal(k, f, val) });
   },
   setDone(k) {
     const S = this.st, x = S.ex[S.cur], r = x.rows[k]; if (!r) return;
@@ -762,7 +757,21 @@ const WorkoutMode = {
   close() { const el = document.getElementById('wkMode'); if (el) { el.hidden = true; el.innerHTML = ''; } document.body.classList.remove('wk-on'); },
 };
 
-document.addEventListener('visibilitychange', () => { if (!document.hidden && WorkoutMode.st) WorkoutMode._time(); });
+// 앱을 내렸다 올리면 아이폰 웹뷰가 고정 화면(운동 모드)을 배경색만 남기고 비워 두는 일이 있다(검은 화면).
+// 돌아올 때마다 운동 화면을 다시 띄우고 다시 그린다 — 보던 자리는 그대로.
+WorkoutMode._wake = function () {
+  if (!this.st) return;
+  const el = document.getElementById('wkMode'); if (!el) return;
+  if (el.hidden) return;
+  document.body.classList.add('wk-on');
+  this.paint();
+  el.style.transform = 'translateZ(0)'; requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transform = ''; }));
+  clearInterval(this._tick); this._tick = setInterval(() => this._time(), 250);
+  try { navigator.wakeLock?.request('screen').then(l => { this._lock = l; }).catch(() => {}); } catch (e) {}
+};
+document.addEventListener('visibilitychange', () => { if (!document.hidden && WorkoutMode.st) { WorkoutMode._time(); setTimeout(() => WorkoutMode._wake(), 60); } });
+window.addEventListener('pageshow', () => setTimeout(() => WorkoutMode._wake(), 60));
+try { window.Capacitor?.Plugins?.App?.addListener?.('appStateChange', s => { if (s && s.isActive) setTimeout(() => WorkoutMode._wake(), 120); }); } catch (e) {}
 
 // 잠금 화면·다이내믹 아일랜드·애플 워치의 운동 단추 (아이폰 앱) — 세트 완료 / +30초 / 쉬는 시간 건너뛰기
 WorkoutMode.remote = function (act) {
@@ -860,5 +869,76 @@ const Wheel = {
     try { Haptic.light(); } catch (e) {}
     App.closeModal();
     try { this.o.done(vals); } catch (e) { console.warn(e); }
+  },
+};
+
+
+// ── 숫자 입력 (무게·횟수) ──────────────────────────
+// 키패드: 1~9 · 0 · 소수점 · 지우기. 처음 누르면 원래 값을 바꿔 쓴다.
+// 스크롤: 자릿수마다 따로 굴린다 — 무게는 100 · 10 · 1 · 소수점, 횟수는 10 · 1.
+// 위의 '키패드 / 스크롤' 을 바꾸면 그 사람은 다음부터 그 방식으로 열린다(계정에 저장).
+const NumIn = {
+  DEC: [0, 0.25, 0.5, 0.75],
+  open(o) {
+    this.o = o; this.s = o.cur !== '' && o.cur != null ? String(+o.cur) : ''; this.fresh = true;
+    this.mode = WorkoutMode.prefs().numIn === 'wheel' ? 'wheel' : 'pad';
+    App.openModal('@dumbbell ' + o.title, `<div class="ni">
+      <div class="ni-seg"><button type="button" data-m="pad">키패드</button><button type="button" data-m="wheel">스크롤</button></div>
+      <div class="ni-disp"><b class="num" id="niV"></b><span>${esc(o.unit || '')}</span></div>
+      <div id="niBody"></div>
+      ${o.note ? `<p class="pg-note ni-note">${esc(o.note)}</p>` : ''}
+      <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">취소</button><button class="btn-sm accent" onclick="NumIn.ok()">확인</button></div></div>`);
+    document.querySelectorAll('.ni-seg button').forEach(b => { b.onclick = () => this.setMode(b.dataset.m); });
+    this.paint();
+  },
+  setMode(m) {
+    if (m === this.mode) return;
+    this.mode = m; this.fresh = true; WorkoutMode.setPrefs({ numIn: m });
+    try { Haptic.light(); } catch (e) {}
+    this.paint();
+  },
+  _show() { const v = document.getElementById('niV'); if (v) { v.textContent = this.s === '' ? '0' : this.s; v.classList.toggle('dim', this.s === ''); } },
+  paint() {
+    document.querySelectorAll('.ni-seg button').forEach(b => b.classList.toggle('on', b.dataset.m === this.mode));
+    const box = document.getElementById('niBody'); if (!box) return;
+    this._show();
+    if (this.mode === 'pad') {
+      const K = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'];
+      box.innerHTML = `<div class="ni-pad">${K.map(k => `<button type="button" class="ni-k${k === '⌫' ? ' fn' : ''}" ${k === '.' && !this.o.dec ? 'disabled' : ''} data-k="${k}" aria-label="${k === '⌫' ? '지우기' : k === '.' ? '소수점' : k}">${k}</button>`).join('')}</div>`;
+      box.querySelectorAll('.ni-k').forEach(b => { b.onclick = () => this.key(b.dataset.k); });
+      return;
+    }
+    const v = Math.max(0, Number(this.s) || 0), I = Math.floor(v), D = v - I;
+    const dg = (n) => Array.from({ length: 10 }, (_, i) => i);
+    const cols = this.o.dec
+      ? [{ vals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cur: Math.floor(I / 100) % 10, fmt: x => x + '' },
+         { vals: dg(), cur: Math.floor(I / 10) % 10 },
+         { vals: dg(), cur: I % 10 },
+         { vals: this.DEC, cur: this.DEC.reduce((a, b) => Math.abs(b - D) < Math.abs(a - D) ? b : a, 0), fmt: x => '.' + String(x).slice(2).padEnd(1, '0') }]
+      : [{ vals: dg(), cur: Math.floor(I / 10) % 10 }, { vals: dg(), cur: I % 10 }];
+    box.innerHTML = `<div class="ni-wh${this.o.dec ? ' w4' : ''}"></div><div class="ni-lab${this.o.dec ? ' w4' : ''}">${(this.o.dec ? ['100', '10', '1', '소수점'] : ['10', '1']).map(t => `<span>${t}</span>`).join('')}</div>`;
+    Wheel.inline(box.querySelector('.ni-wh'), cols, vals => {
+      const n = this.o.dec ? vals[0] * 100 + vals[1] * 10 + vals[2] + vals[3] : vals[0] * 10 + vals[1];
+      this.s = String(+n.toFixed(2)); this._show();
+    });
+  },
+  key(k) {
+    if (k === '⌫') { this.fresh = false; this.s = this.s.slice(0, -1); this._show(); try { Haptic.select(); } catch (e) {} return; }
+    let s = this.fresh ? '' : this.s; this.fresh = false;
+    if (k === '.') { if (!this.o.dec || s.includes('.')) return; s = (s || '0') + '.'; }
+    else {
+      if (s.includes('.') && s.split('.')[1].length >= 2) return;
+      if (!s.includes('.') && s.replace(/^0/, '').length >= 3) return;
+      s = s === '0' ? k : s + k;
+    }
+    this.s = s; this._show();
+    try { Haptic.select(); } catch (e) {}
+  },
+  ok() {
+    let v = this.s.replace(/\.$/, ''); v = v === '' ? '' : Number(v);
+    if (v !== '' && !(v >= 0)) v = '';
+    App.closeModal();
+    try { Haptic.light(); } catch (e) {}
+    try { this.o.done(v); } catch (e) { console.warn(e); }
   },
 };

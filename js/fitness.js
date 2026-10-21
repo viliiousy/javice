@@ -274,7 +274,7 @@ const Fitness = {
     const DOW = ['일','월','화','수','목','금','토'];
     const OPTS = [
       ...Object.entries(R).map(([id,r]) => [id, '내 루틴 · ' + r.name]),
-      ...[['가슴'],['등'],['하체'],['어깨'],['팔'],['복근'],['가슴','어깨'],['가슴','팔'],['등','팔'],['어깨','팔'],['하체','복근']]
+      ...[['가슴'],['등'],['하체'],['어깨'],['팔'],['복근'],['가슴','어깨'],['가슴','팔'],['등','팔'],['어깨','팔'],['팔','복근'],['가슴','복근'],['등','복근'],['어깨','복근'],['하체','복근']]
         .map(ps => ['part:' + ps.join(','), '부위 · ' + ps.join(' + ')]),
       ['none','계획 없음'], ['rest','휴식'], ['cardio','유산소'],
       ['A','홈트 DAY A 푸시'],['B','홈트 DAY B 풀'],['C','홈트 DAY C 하체+코어'],
@@ -842,17 +842,24 @@ const Fitness = {
       this._ed={ ds, list:list.map(x=>({ name:x.name, sets:x.sets||this.defSets(x.name), w:x.w??'', sess:x.sess, ...(x.hp!=null?{hp:x.hp}:{}) })), dirty:false };
       this.render(new Date(ds+'T00:00:00')); return;
     }
-    const ed=this._ed;
-    if(!ed.dirty){ this._ed=null; this.render(new Date(ed.ds+'T00:00:00')); return; }
-    this.askScope(ed.ds, scope=>{
-      if(!scope) return;   // 취소 — 수정 모드 그대로
-      const msg=this.applyList(ed.ds, ed.list, scope);
-      this._ed=null; this.render(new Date(ed.ds+'T00:00:00'));
-      App.showToast(msg,'success');
-    });
+    // 바꿀 때마다 이미 저장했으므로 '완료' 는 수정 모드를 닫기만 한다
+    const ed=this._ed; this._ed=null; this.render(new Date(ed.ds+'T00:00:00'));
+    if(ed.saved) App.showToast('오늘 운동을 저장했습니다','success');
   },
-  cancelEdit(){ const ed=this._ed; this._ed=null; if(ed) this.render(new Date(ed.ds+'T00:00:00')); },
-  _edPaint(){ if(this._ed) this.render(new Date(this._ed.ds+'T00:00:00')); },
+  cancelEdit(){ this.toggleEdit(); },
+  // 교체·추가·빼기·순서·세트를 바꾸면 그 자리에서 '오늘만' 으로 저장한다(취소·저장 단추 없이)
+  _edPaint(){
+    const ed=this._ed; if(!ed) return;
+    if(ed.dirty){ try{ this.applyList(ed.ds, ed.list, 'day'); ed.saved=true; ed.dirty=false; }catch(e){ console.warn('[fit auto-save]', e); } }
+    this.render(new Date(ed.ds+'T00:00:00'));
+  },
+  // 지금 목록을 앞으로 이 요일(플랜)에도
+  edToPlan(){
+    const ed=this._ed; if(!ed) return;
+    const msg=this.applyList(ed.ds, ed.list, 'plan');
+    this._ed=null; this.render(new Date(ed.ds+'T00:00:00'));
+    App.showToast(msg,'success');
+  },
   _edSetsLabel(x){
     if(PlanGen.timed(x.name)) return x.sets||'시간';
     const n=WorkoutMode._nSets(x.sets), r=WorkoutMode._reps(x.sets);
@@ -909,7 +916,7 @@ const Fitness = {
         </div>`; }).join('') || '<p class="pg-note" style="padding:12px 0">운동이 없습니다. 아래에서 추가해 주세요.</p>'}
       </div>
       <button class="habit-add-btn" onclick="Fitness.edAdd()">+ 운동 추가</button>
-      <div class="fit-ed-btns"><button class="btn-sm" onclick="Fitness.cancelEdit()">취소</button><button class="btn-sm accent" onclick="Fitness.toggleEdit()">${ed.dirty?'저장':'완료'}</button></div>`;
+      <div class="fit-ed-btns"><span class="fit-ed-saved">${ed.saved?'바꾼 내용은 바로 저장됩니다 · 오늘만':'바꾸면 바로 저장됩니다'}</span>${ed.saved?`<button class="btn-sm" onclick="Fitness.edToPlan()">앞으로 이 요일에도</button>`:''}<button class="btn-sm accent" onclick="Fitness.toggleEdit()">완료</button></div>`;
     try { RowUI.paint(container.querySelector('.fit-list'), {
       edit: k => Fitness.edSets(+k), del: k => Fitness.edDel(+k), reorder: order => Fitness.edReorder(order),
     }); } catch(e) { console.warn('RowUI fit-ed', e); }

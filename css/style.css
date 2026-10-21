@@ -3469,3 +3469,24 @@ html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto;
 .co-note{ font-size:13px; color:var(--text-dim, #888); margin:12px 0 0; line-height:1.5; }
 .co-reset{ border:0; background:none; color:var(--accent); font-size:13px; padding:0; cursor:pointer; text-decoration:underline; }
 .cardset-row .co-mv{ margin-left:auto; }
+
+/* 무게·횟수 입력 (키패드 / 자릿수 스크롤) */
+.ni-seg{ display:flex; gap:4px; padding:4px; border-radius:12px; background:var(--card2); border:1px solid var(--border); margin-bottom:16px; }
+.ni-seg button{ flex:1; height:36px; border:0; border-radius:8px; background:none; color:var(--text3); font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+.ni-seg button.on{ background:var(--accent); color:#fff; }
+.ni-disp{ display:flex; align-items:baseline; justify-content:center; gap:8px; margin:0 0 16px; }
+.ni-disp b{ font-family:'Space Grotesk','IBM Plex Sans KR',sans-serif; font-size:48px; font-weight:600; line-height:1; letter-spacing:-.02em; color:var(--text); }
+.ni-disp b.dim{ color:var(--text3); }
+.ni-disp span{ font-size:16px; color:var(--text3); }
+.ni-pad{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px; }
+.ni-k{ height:56px; border-radius:12px; border:1px solid var(--border); background:var(--card2); color:var(--text); font-family:'Space Grotesk','IBM Plex Sans KR',sans-serif; font-size:24px; font-weight:500; cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+.ni-k:active{ background:var(--accent); color:#fff; border-color:var(--accent); }
+.ni-k.fn{ font-size:20px; color:var(--text3); }
+.ni-k:disabled{ opacity:.25; }
+.ni-wh .whl{ margin:0; }
+.ni-wh.w4 .whl-col{ max-width:80px; }
+.ni-lab{ display:flex; justify-content:center; gap:8px; margin:8px 0 16px; }
+.ni-lab span{ flex:1; max-width:132px; text-align:center; font-size:12px; color:var(--text3); }
+.ni-lab.w4 span{ max-width:80px; }
+.ni-note{ margin:0 0 8px; }
+.fit-ed-saved{ font-size:13px; color:var(--text3); margin-right:auto; align-self:center; }
