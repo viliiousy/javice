@@ -723,7 +723,7 @@ const App = {
   // 구글 Tasks 의 추가 창을 그대로 따랐다. 거기서 만든 할일이 여기로 내려오는데
   // 필드 이름이 서로 다르면(메모 vs 세부사항) 같은 칸을 다른 것으로 착각하게 된다.
   showAddTask(date) {
-    if(!Auth.isLoggedIn()){ this.showToast('로그인이 필요합니다','error'); return; }
+    if(!Auth.isLoggedIn()){ this.showToast(Auth.appleUser?'할 일은 구글 할 일에 저장됩니다 — 위에서 구글 캘린더·할 일을 먼저 연결해 주세요':'로그인이 필요합니다','error'); return; }
     const d = date ? new Date(date) : (this.S.selDate || new Date());
     const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     // 지금 보고 있는 목록으로 기본값을 맞춘다. '전체' 를 보고 있으면 첫 목록.

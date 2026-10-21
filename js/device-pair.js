@@ -13,7 +13,7 @@ const DevicePair = {
       history.replaceState(null, '', location.pathname + location.hash);
       const M = { ok: 'SmartThings 를 연결했습니다', cancel: 'SmartThings 연결을 취소했습니다', expired: '시간이 지나 다시 시도해 주세요', fail: 'SmartThings 연결에 실패했습니다 — 다시 시도해 주세요' };
       const wait = setInterval(() => {
-        if (typeof App !== 'undefined' && App.showToast && typeof Auth !== 'undefined' && Auth.isLoggedIn && Auth.isLoggedIn()) {
+        if (typeof App !== 'undefined' && App.showToast && typeof Auth !== 'undefined' && (Auth.signedIn ? Auth.signedIn() : Auth.isLoggedIn())) {
           clearInterval(wait); App.showToast(M[stRes] || M.fail, stRes === 'ok' ? 'success' : 'error');
           if (stRes === 'ok') { this._setProvider('st', true); this.open(); }
         }
@@ -24,7 +24,7 @@ const DevicePair = {
     if (!pin) return;
     history.replaceState(null, '', location.pathname + location.hash);   // 새로고침해도 다시 뜨지 않게
     const wait = setInterval(() => {
-      if (typeof Auth !== 'undefined' && Auth.isLoggedIn && Auth.isLoggedIn()) { clearInterval(wait); this.open(pin); }
+      if (typeof Auth !== 'undefined' && (Auth.signedIn ? Auth.signedIn() : Auth.isLoggedIn())) { clearInterval(wait); this.open(pin); }
     }, 700);
     setTimeout(() => clearInterval(wait), 120000);
   },

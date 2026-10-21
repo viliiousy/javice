@@ -94,7 +94,9 @@ const Settings = {
         ${this._link('ChatGPT · Claude 에 Bashy 연결', "Settings.go('connector')", 'ChatGPT Plus·Claude 구독(무료 플랜 포함)에서 “점심 김치찌개 먹었어” 하면 Bashy 에 기록됩니다')}
         <div class="set-h">앱 안 AI 비서 (API 키)</div>
         ${this._link('기본 AI · 키 설정', 'JARVIS.showKeySetup()', '무료: Groq·Gemini / 유료: ChatGPT·Claude·Grok API 키')}
-        ${this._link('AI 사용량', 'AIUsage.open()', '남은 한도와 초기화 시각 · 위쪽 고리는 디자인 › 상단바 정보에서')}`;
+        ${this._link('AI 사용량', 'AIUsage.open()', '남은 한도와 초기화 시각 · 위쪽 고리는 디자인 › 상단바 정보에서')}
+        <div class="set-h">개인정보</div>
+        ${this._link('AI 데이터 전송 동의 철회', "JARVIS.revokeConsent();App.showToast('동의를 철회했습니다 — 다음에 AI 를 쓸 때 다시 묻습니다')", 'AI 회사(Groq·OpenAI·Anthropic·Google·xAI)로 보내기 전에 받은 동의를 지웁니다')}`;
     } else if (cat === 'cal') {
       const ov = localStorage.getItem('gl_top_overdue') !== '0';
       h = `<div class="set-h">구글 캘린더</div>

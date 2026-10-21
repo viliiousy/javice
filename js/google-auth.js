@@ -28,6 +28,9 @@ const Auth = {
   init() {
     // 아이폰 앱에서는 웹 로그인(GIS)을 쓰지 않는다 — nativeLogin() 참고. 세션 복원만 한다.
     const native = typeof Platform !== 'undefined' && Platform.native;
+    // 아이폰 앱: Apple 로 로그인 (App Store 가이드라인 4.8)
+    if (this.appleAvail()) { const b = document.getElementById('btnAppleLogin'); if (b) b.hidden = false; }
+    if (this.appleAvail() && localStorage.getItem('gl_apple') === '1') { this._restoreApple(); return; }
     if (!native) {
     if (typeof google === 'undefined' || !google.accounts) return;
     if (CONFIG.GOOGLE_CLIENT_ID.startsWith('YOUR_GOOGLE')) return;
@@ -387,6 +390,92 @@ const Auth = {
     }
   },
 
+  // ── Apple 로 로그인 (아이폰 앱) ──────────────────
+  // Apple 계정으로 Firebase 에 로그인해 기록(습관·식단·운동·인바디·메모…)을 계정에 붙인다.
+  // 구글 캘린더·할 일은 나중에 '구글 연결' 로 같은 계정에 덧붙인다(Firebase 계정 연결).
+  appleUser: null,
+  appleAvail() { return typeof Platform !== 'undefined' && Platform.native && window.Capacitor?.getPlatform?.() === 'ios' && !!window.Capacitor?.Plugins?.SocialLogin; },
+  signedIn() { return this.isLoggedIn() || !!this.appleUser; },
+  async _sha256(s) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); },
+  async appleLogin() {
+    const SL = window.Capacitor?.Plugins?.SocialLogin;
+    if (!SL) { App.showToast('Apple 로그인을 쓸 수 없습니다', 'error'); return; }
+    try {
+      if (!this._slApple) { await SL.initialize({ apple: {} }); this._slApple = true; }
+      const raw = [...crypto.getRandomValues(new Uint8Array(24))].map(x => x.toString(16).padStart(2, '0')).join('');
+      const r = await SL.login({ provider: 'apple', options: { scopes: ['email', 'name'], nonce: await this._sha256(raw) } });
+      const idToken = r && r.result && r.result.idToken;
+      if (!idToken) throw new Error('Apple 에서 로그인 정보를 받지 못했습니다');
+      if (!firebase.apps.length) firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
+      const cred = new firebase.auth.OAuthProvider('apple.com').credential({ idToken, rawNonce: raw });
+      const res = await firebase.auth().signInWithCredential(cred);
+      const pf = (r.result && r.result.profile) || {};
+      const name = [pf.givenName, pf.familyName].filter(Boolean).join(' ') || res.user.displayName || '';
+      if (name) localStorage.setItem('gl_apple_name', name);
+      localStorage.setItem('gl_apple', '1');
+      await this._appleSession(res.user);
+    } catch (e) {
+      const msg = String(e && (e.message || e.code));
+      if (/cancel|1001/i.test(msg)) return;
+      console.warn('[Auth] Apple 로그인 실패', e);
+      App.showToast('Apple 로그인 실패: ' + (e.message || e), 'error');
+    }
+  },
+  async _restoreApple() {
+    try {
+      if (!firebase.apps.length) firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
+      document.body.classList.add('auth-restoring');
+      const user = await new Promise(res => {
+        let done = false;
+        const off = firebase.auth().onAuthStateChanged(u => { if (!done) { done = true; off(); res(u); } });
+        setTimeout(() => { if (!done) { done = true; res(firebase.auth().currentUser); } }, 6000);
+      });
+      if (user) await this._appleSession(user);
+      else localStorage.removeItem('gl_apple');
+    } catch (e) { console.warn('[Auth] Apple 세션 되살리기 실패', e); }
+    finally { document.body.classList.remove('auth-restoring'); }
+  },
+  async _appleSession(user) {
+    const name = localStorage.getItem('gl_apple_name') || user.displayName || 'Apple 사용자';
+    this.appleUser = { uid: user.uid, email: user.email || '', name };
+    UserStore.setUser('apple_' + user.uid);
+    if (typeof FirebaseSync !== 'undefined' && CONFIG.FIREBASE_DB_URL) {
+      FirebaseSync.init(UserStore.getUser(), CONFIG.FIREBASE_DB_URL);
+      FirebaseSync._uid = user.uid; FirebaseSync._authed = true;
+      App.showToast('데이터 불러오는 중...', '');
+      await FirebaseSync.load();
+      FirebaseSync.startPolling();
+    }
+    await App.onAuthSuccess({ name, email: this.appleUser.email });
+    // 이 Apple 계정에 구글이 이미 연결돼 있으면 서버에서 구글 토큰을 조용히 받아 캘린더·할 일도 띄운다
+    if (user.providerData.some(p => p.providerId === 'google.com') && await this.serverRefresh()) await this._attachGoogle();
+    this._paintGConnect();
+  },
+  _paintGConnect() {
+    const off = !!(this.appleUser && !this.isLoggedIn());
+    const el = document.getElementById('gConnect'); if (el) el.hidden = !off;
+    if (off) { const t = document.getElementById('tasksContainer'); if (t) t.innerHTML = ''; const e = document.getElementById('eventsWrap'); if (e) e.innerHTML = ''; }
+  },
+  // Apple 로그인 상태에서 구글 캘린더·할 일 붙이기 — 구글 로그인 후 같은 Firebase 계정에 연결한다
+  async connectGoogle() { this._wantLink = true; await this.nativeLogin(); },
+  async _attachGoogle() {
+    try {
+      const res = await this.fetch('https://www.googleapis.com/oauth2/v2/userinfo');
+      this.userInfo = await res.json();
+      const u = firebase.auth().currentUser;
+      if (this._wantLink && u && !u.providerData.some(p => p.providerId === 'google.com')) {
+        try { await u.linkWithCredential(firebase.auth.GoogleAuthProvider.credential(null, this.accessToken)); App.showToast('구글 캘린더·할 일을 연결했습니다', 'success'); }
+        catch (e) {
+          if (/already-in-use|credential-already/i.test(e.code || e.message)) App.showToast('이 구글 계정은 이미 다른 Bashy 계정에 쓰이고 있습니다 — 이번 접속에서만 일정을 보여 드립니다', 'error');
+          else console.warn('[Auth] 구글 연결 실패', e);
+        }
+      }
+      this._wantLink = false;
+    } catch (e) { console.warn('[Auth] 구글 연결 정보 실패', e); }
+    this._paintGConnect();
+    await App.sync();
+  },
+
   logout() {
     clearTimeout(this._refreshTimer);
     if (this.accessToken) {
@@ -401,8 +490,10 @@ const Auth = {
     localStorage.removeItem('gl_expiry');
     localStorage.removeItem('gl_scope');
     localStorage.removeItem('gl_offline');
+    localStorage.removeItem('gl_apple');
     try { FirebaseSync.clearSecrets(); } catch {}
-    location.reload();
+    try { if (typeof firebase !== 'undefined' && firebase.apps.length) firebase.auth().signOut().finally(() => location.reload()); else location.reload(); }
+    catch { location.reload(); }
   },
 
   // 발급된 토큰에 없는 필수 스코프 목록
@@ -415,6 +506,11 @@ const Auth = {
   // 저장된 세션을 버리고 로그인 화면으로 되돌린다
   _promptRelogin() {
     clearTimeout(this._refreshTimer);
+    if (this.appleUser) {   // Apple 로그인은 그대로 — 구글 일정만 내려 두고 다시 연결하라고 보여 준다
+      this.accessToken = null; this.tokenExpiry = null;
+      localStorage.removeItem('gl_token'); localStorage.removeItem('gl_expiry');
+      this._paintGConnect(); return;
+    }
     this.accessToken  = null;
     this.tokenExpiry  = null;
     this.grantedScope = '';
@@ -453,6 +549,7 @@ const Auth = {
   },
 
   async _fetchUserInfo(silent = false) {
+    if (this.appleUser) return this._attachGoogle();
     try {
       const res     = await this.fetch('https://www.googleapis.com/oauth2/v2/userinfo');
       this.userInfo = await res.json();

@@ -691,10 +691,41 @@ const JARVIS = {
   },
 
   // 모든 Groq 호출은 여기를 지난다. 모델이 없다고 하면 목록을 새로 받아 한 번만 다시 시도한다.
+  // ── AI 로 보내기 전 동의 (App Store 5.1.1·5.1.2) ─────────────
+  // 회사마다 처음 한 번: 무엇을, 누구에게 보내는지 알리고 허락을 받는다. 거절하면 보내지 않는다.
+  CONSENT_KEY:'gl_ai_consent',
+  COMPANY:{ groq:'Groq, Inc. (미국)', openai:'OpenAI (미국)', anthropic:'Anthropic (미국)', gemini:'Google (미국)', xai:'xAI (미국)' },
+  _consented(p){ try{ return !!(JSON.parse(UserStore.get(this.CONSENT_KEY)||'{}')||{})[p]; }catch{ return false; } },
+  revokeConsent(){ UserStore.set(this.CONSENT_KEY,'{}'); window.FirebaseSync?.scheduleSave?.(); },
+  _askConsent(p){
+    if(this._consented(p)) return Promise.resolve(true);
+    if(this._consentP) return this._consentP;
+    const P=this.PROVIDERS[p]||{}, co=this.COMPANY[p]||P.name||p;
+    this._consentP=new Promise(res=>{
+      const el=document.createElement('div'); el.className='ai-cs';
+      el.innerHTML=`<div class="ai-cs-bg"></div><div class="ai-cs-sh" role="dialog" aria-label="AI 데이터 전송 동의">
+        <div class="ai-cs-t">AI 에 내용을 보내도 될까요?</div>
+        <dl class="ai-cs-dl">
+          <dt>보내는 곳</dt><dd><b>${esc(P.short||p)}</b> · ${esc(co)} — 사용자가 넣은 API 키로 그 회사 서버에 바로 보냅니다(Bashy 서버를 거치지 않음)</dd>
+          <dt>보내는 내용</dt><dd>입력한 질문·사진, 그리고 답하는 데 필요한 범위의 오늘 일정·할 일·습관·식단·운동·인바디 요약</dd>
+          <dt>쓰임</dt><dd>질문에 대한 답, 식단 사진 분석, 운동 플랜 만들기에만 씁니다. 처리 방식은 그 회사의 개인정보 정책을 따릅니다</dd>
+        </dl>
+        <p class="ai-cs-n">동의하지 않으면 AI 기능만 쓰지 않고 나머지는 그대로 쓸 수 있습니다. 설정 › AI 에서 언제든 철회할 수 있습니다.</p>
+        <div class="ai-cs-b"><button class="btn-sm" data-v="0">동의 안 함</button><button class="btn-sm accent" data-v="1">동의하고 보내기</button></div></div>`;
+      el.addEventListener('click',e=>{ const b=e.target.closest('[data-v]'); if(!b) return;
+        const ok=b.dataset.v==='1';
+        if(ok){ let m={}; try{ m=JSON.parse(UserStore.get(this.CONSENT_KEY)||'{}')||{}; }catch{} m[p]=new Date().toISOString(); UserStore.set(this.CONSENT_KEY, JSON.stringify(m)); window.FirebaseSync?.scheduleSave?.(); }
+        el.remove(); this._consentP=null; res(ok); });
+      document.body.appendChild(el);
+    });
+    return this._consentP;
+  },
+
   async chat(body, kind='text') {
     const p=this._active();
     const key=this._keyOf(p);
     if(!key) throw new Error('AI 키가 없습니다 — AI 창의 열쇠 단추에서 설정해 주세요');
+    if(!(await this._askConsent(p))) throw new Error('AI 로 보내는 데 동의하지 않아 보내지 않았습니다');
     if(p!=='groq') return this._chatOther(p, body, kind);
     // 지금 쓰는 모델(gpt-oss)은 답하기 전에 속으로 생각하고, 그 생각도 max_tokens 를 먹는다.
     // 조금 어려운 질문이면 생각만 하다 예산이 끝나 본문이 빈 채로 돌아온다

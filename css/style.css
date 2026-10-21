@@ -3933,3 +3933,27 @@ body.wk-on{ overflow:hidden; }
 .wh-ex{ display:flex; justify-content:space-between; gap:12px; padding:8px 0; border:0; background:none; color:var(--text); font:inherit; font-size:14px; text-align:left; cursor:pointer; }
 .wh-ex em{ font-style:normal; font-size:12.5px; color:var(--text3); text-align:right; }
 .po-list{ max-height:52vh; overflow:auto; margin-top:8px; }
+
+/* Apple 로 계속하기 — 구글 버튼과 같은 크기·자리 (Apple 가이드: 검정 바탕 + 흰 로고·글자) */
+.ln-google.ln-apple{ margin-top:8px; background:#000; color:#fff; border:1px solid #3A3D44; }
+.ln-google.ln-apple:active{ background:#111; }
+.ln-google.ln-apple[hidden]{ display:none; }
+/* Apple 로그인만 한 상태: 캘린더 카드에 구글 연결 안내 */
+.g-connect{ display:grid; gap:12px; padding:16px 0; border-top:1px solid var(--border); }
+.g-connect[hidden]{ display:none; }
+.g-connect p{ margin:0; display:grid; gap:4px; font-size:14px; color:var(--text); }
+.g-connect span{ font-size:12.5px; color:var(--text3); line-height:1.55; }
+.g-connect .btn-sm{ justify-self:start; }
+
+/* AI 전송 동의 */
+.ai-cs{ position:fixed; inset:0; z-index:2000; display:flex; align-items:flex-end; justify-content:center; }
+.ai-cs-bg{ position:absolute; inset:0; background:rgba(0,0,0,.5); }
+.ai-cs-sh{ position:relative; width:100%; max-width:480px; background:var(--card,#17181B); color:var(--text); border-radius:16px 16px 0 0;
+  padding:24px 16px calc(16px + env(safe-area-inset-bottom)); display:grid; gap:16px; }
+@media (min-width:700px){ .ai-cs{ align-items:center; } .ai-cs-sh{ border-radius:16px; } }
+.ai-cs-t{ font-size:18px; font-weight:600; }
+.ai-cs-dl{ margin:0; display:grid; grid-template-columns:72px 1fr; gap:8px 12px; font-size:13.5px; line-height:1.55; }
+.ai-cs-dl dt{ color:var(--text3); } .ai-cs-dl dd{ margin:0; }
+.ai-cs-n{ margin:0; font-size:12px; color:var(--text3); line-height:1.55; }
+.ai-cs-b{ display:grid; grid-template-columns:1fr 1.4fr; gap:8px; }
+.ai-cs-b .btn-sm{ height:44px; }
