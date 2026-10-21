@@ -527,7 +527,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     document.querySelector('.dq-tabs')?.classList.remove('dq-dim');
     this._hits=list;
     box.innerHTML = list.length
-      ? `<div class="diet-rec-hd">${tab==='fav'?'즐겨찾기 · 최근에 먹은 순':'최근 먹은 것 · 즐겨찾기 먼저'}<i>왼쪽으로 반 넘게 밀면 ${tab==='fav'?'즐겨찾기 해제':'삭제'}</i></div>
+      ? `<div class="diet-rec-hd">${tab==='fav'?'즐겨찾기 · 최근에 먹은 순':'최근 먹은 것 · 즐겨찾기 먼저'}<i>왼쪽으로 3분의 1쯤 밀면 ${tab==='fav'?'즐겨찾기 해제':'삭제'}</i></div>
          <div class="dq-list">${list.map((f,i)=>this._foodRowHtml(f,i,meal,ds,favs).replace('<div class="diet-food">', `<div class="diet-food" data-row data-i="${i}" data-label="${esc(f.n)}">`)).join('')}</div>`
       : `<div class="diet-empty-hint">${tab==='fav'?'즐겨찾기한 음식이 없습니다. 검색 결과의 ☆ 를 누르면 여기에 모입니다.':'아직 먹은 기록이 없습니다. 위에서 검색해 담아 보세요.'}</div>`;
     try{ RowUI.paint(box.querySelector('.dq-list'), { full:true, edit:()=>{}, del:k=>this._listDel(+k, tab, meal, ds) }); }catch(e){}

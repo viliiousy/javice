@@ -96,12 +96,12 @@ const RowUI = {
         if (!sliding) return;
         e.preventDefault();
         row.classList.add('rw-drag');
-        // 끝까지 밀어 지우기(h.full): 오른쪽에서부터 빨갛게 차오르고, 줄 너비의 절반을 넘으면 진동 한 번 — 놓으면 지워진다
+        // 끝까지 밀어 지우기(h.full): 오른쪽에서부터 빨갛게 차오르고, 줄 너비의 35% 를 넘으면 진동 한 번 — 놓으면 지워진다
         if (h.full) {
           const w = wrap.offsetWidth || 1, x3 = Math.min(0, dx);
           row.style.transform = `translateX(${x3}px)`;
           wrap.classList.add('rw-act'); wrap.style.setProperty('--rw-fill', `${-x3}px`);
-          const arm = -x3 > w * 0.5;
+          const arm = -x3 > w * 0.35;   // 35% 를 넘으면
           if (arm !== wrap.classList.contains('rw-arm')) {
             wrap.classList.toggle('rw-arm', arm);
             try { arm ? Haptic.medium() : Haptic.light(); } catch {}
