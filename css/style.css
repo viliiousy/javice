@@ -3523,7 +3523,7 @@ html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto;
 .wt-er .wt-d{ font-size:13px; text-align:right; margin:0; }
 /* 오늘의 운동 카드: 총 볼륨 · 세트 · 열량 */
 .fit-tot{ display:flex !important; align-items:flex-end; gap:16px; width:100%; border:0; border-top:1px solid var(--border); background:none; padding:12px 0 0 !important; margin-top:8px; font:inherit; color:var(--text3); text-align:left; cursor:pointer; }
-.fit-tot .ft-c{ display:grid; grid-template-columns:auto auto; column-gap:3px; align-items:baseline; flex:none !important; }
+.fit-tot .ft-c{ display:grid; grid-template-columns:auto 1fr; justify-items:start; column-gap:3px; align-items:baseline; flex:none !important; }
 .fit-tot .ft-c b{ font-size:17px; font-weight:600; color:var(--text); }
 .fit-tot .ft-c i{ font-style:normal; font-size:12px; color:var(--text3); }
 .fit-tot .ft-c small{ grid-column:1 / -1; font-size:11px; color:var(--text3); }

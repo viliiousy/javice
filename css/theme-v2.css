@@ -747,3 +747,32 @@ a.ob-path{ color:var(--accent); }
 .ob-foot .ob-btn{ min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 10px; }
 html[data-ui="v2"] .ob-gi{ border-bottom-color:var(--v2-line); }
 html[data-ui="v2"] .ob-gc{ border-bottom-color:var(--v2-line); }
+
+/* ── 디자인 점검(10/21) 손질 ─────────────────── */
+/* PC: 카드를 줄 높이만큼 억지로 늘리지 않는다(빈 카드 면이 크게 남던 것). 달력만 두 줄을 채운다. */
+@media (min-width:901px){
+  html[data-ui="v2"] .dashboard{ align-items:start !important; }
+  html[data-ui="v2"] .dashboard .card{ height:auto !important; }
+  html[data-ui="v2"] .dashboard .card-calendar{ align-self:stretch; height:auto !important; }
+  html[data-ui="v2"] .card-head .card-title{ gap:8px; }
+  html[data-ui="v2"] .card-fitness .card-title + .badge, html[data-ui="v2"] #fitBadge{ margin-left:8px; }
+}
+/* 비어 있는 배지는 테두리만 남지 않게 */
+.badge:empty{ display:none !important; }
+/* 창이 떠 있을 때 PC 의 AI 단추는 숨긴다(창 위로 떠 보이던 것) */
+body:has(#modal:not(.hidden)) .jarvis-btn{ display:none !important; }
+/* 알림 토스트: 긴 문장은 왼쪽 정렬, 점은 첫 줄에 */
+html[data-ui="v2"] .toast{ text-align:left; align-items:flex-start; }
+/* 달력 주말·공휴일 칸: 어두운 화면에서 탁한 붉은 바탕이 되던 것 — 글자색만 남긴다 */
+html.dark .cal-day.day-red:not(.cal-hb){ background:transparent; }
+html.dark .cal-day.day-red:not(.cal-hb):hover{ background:var(--card2); }
+/* 카드 아래 이동 단추(부위 바꾸기·기록 보기)는 점선 '추가' 모양이 아니라 실선 */
+html[data-ui="v2"] .fit-foot .habit-add-btn{ border-style:solid; }
+/* 경제 새로고침: 글자 기호 대신 선 아이콘, 오류 문구는 머리줄에서 흐린 작은 글씨 */
+.ec-rf{ display:inline-flex; align-items:center; justify-content:center; padding:0; width:36px; }
+html[data-ui="v2"] .ec-upd.ec-err{ color:var(--text3); font-weight:500; font-size:12px; }
+/* 메모 글씨 작게·크게 단추 구분 */
+html[data-ui="v2"] .memo-fs .mfs-s{ font-size:11px !important; }
+html[data-ui="v2"] .memo-fs .mfs-l{ font-size:17px !important; }
+html[data-ui="v2"] .toast::before{ margin-top:6px; }
+.ec-rf svg{ width:16px !important; height:16px !important; flex:none; }

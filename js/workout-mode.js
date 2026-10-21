@@ -572,6 +572,7 @@ const WorkoutMode = {
   },
   // 무게·횟수: 키패드(소수점 포함) 또는 자릿수별 스크롤. 고른 방식은 계정에 남아 다음에도 그 방식으로 열린다.
   pickVal(k, f) {
+    if (!this.st) return;
     const x = this.st.ex[this.st.cur], v = x.rows[k][f];
     NumIn.open({ title: `${k + 1}세트 ${f === 'w' ? '무게' : '횟수'}`, unit: f === 'w' ? 'kg' : '회', dec: f === 'w',
       cur: v !== '' && v != null ? v : (f === 'r' ? this._reps(x.sets) : ''),
