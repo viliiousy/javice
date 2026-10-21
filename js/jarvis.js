@@ -286,46 +286,41 @@ const JARVIS = {
     try {
       switch(action.type) {
         case 'add_task': {
-          if(!Auth.isLoggedIn()) break;
-          const lid=action.listId||App.S.lists[0]?.id; if(!lid) break;
-          const t=await GoogleTasks.createTask(lid,action.title,action.due||null,action.notes||'');
+          const lid=action.listId||(Auth.isLoggedIn()?App.S.lists[0]?.id:BashyCal.LIST_ID)||BashyCal.LIST_ID;
+          const t=await TaskStore.createTask(lid,action.title,action.due||null,action.notes||'');
           t.starred=false;
           if(!App.S.tasks[lid]) App.S.tasks[lid]=[];
           App.S.tasks[lid].unshift(t);
-          App._renderTasks();
+          App._buildTaskFilters(); App._renderTasks();
           CalendarUI.render(document.getElementById('miniCal'),App.S.calDate,App.S.events,App.S.selDate);
           App.showToast(`할일: ${action.title}`,'success');
           break;
         }
         case 'edit_task': {
-          if(!Auth.isLoggedIn()) break;
           const lid=action.listId||App.S.lists[0]?.id; if(!lid||!action.taskId) break;
-          const updated=await GoogleTasks.updateTask(lid,action.taskId,{title:action.title,notes:action.notes,due:action.due});
+          const updated=await TaskStore.updateTask(lid,action.taskId,{title:action.title,notes:action.notes,due:action.due});
           const t=App.S.tasks[lid]?.find(x=>x.id===action.taskId);
           if(t) Object.assign(t,{title:updated.title,notes:updated.notes||'',due:updated.due||null});
           App._renderTasks(); App.showToast(`할일 수정됨`,'success'); break;
         }
         case 'delete_task': {
-          if(!Auth.isLoggedIn()) break;
           let lid=action.listId, tid=action.taskId;
           if(!tid&&action.title){ for(const [lId,list] of Object.entries(App.S.tasks||{})){ const found=list.find(t=>t.title.includes(action.title)&&t.status==='needsAction'); if(found){tid=found.id;lid=lId;break;} } }
           if(!lid||!tid) break;
-          await GoogleTasks.deleteTask(lid,tid);
+          await TaskStore.deleteTask(lid,tid);
           App.S.tasks[lid]=App.S.tasks[lid]?.filter(t=>t.id!==tid);
           App._renderTasks(); App.showToast(`할일 삭제됨`,'success'); break;
         }
         case 'add_event': {
-          if(!Auth.isLoggedIn()) break;
-          const ev=await GoogleCalendar.createEvent(action.summary,action.start,action.end,action.description||'',action.location||'');
-          App.S.events.push(ev);
-          App.S.events.sort((a,b)=>new Date(a.start?.dateTime||a.start?.date)-new Date(b.start?.dateTime||b.start?.date));
+          // 새 일정 기본 저장 위치(구글 › 아이폰 캘린더 › Bashy)로 넣는다
+          const ev=await CalSources.createEvent(CalSources.defaultDest(),{title:action.summary,start:new Date(action.start),end:new Date(action.end||action.start),description:action.description||'',location:action.location||''});
+          (App._srcEv[ev._src]=App._srcEv[ev._src]||[]).push(ev); App._mergeEvents();
           CalendarUI.render(document.getElementById('miniCal'),App.S.calDate,App.S.events,App.S.selDate);
           App._renderCalPanel(); App.showToast(`일정: ${action.summary}`,'success'); break;
         }
         case 'delete_event': {
-          if(!Auth.isLoggedIn()) break;
-          const ev=App.S.events.find(e=>e.id===action.eventId||(action.title&&e.summary?.includes(action.title)));
-          if(ev){ await GoogleCalendar.deleteEvent(ev.id,ev._calId||'primary'); App.S.events=App.S.events.filter(e=>e.id!==ev.id); App._renderCalPanel(); App.showToast('일정 삭제됨','success'); } break;
+          const ev=App.S.events.find(e=>!e._readOnly&&(e.id===action.eventId||(action.title&&e.summary?.includes(action.title))));
+          if(ev){ await CalSources.deleteEvent(ev); Object.keys(App._srcEv).forEach(k=>{ App._srcEv[k]=App._srcEv[k].filter(e=>e.id!==ev.id); }); App._mergeEvents(); App._renderCalPanel(); App.showToast('일정 삭제됨','success'); } break;
         }
         case 'add_checklist': {
           const items=Checklist.getItems();

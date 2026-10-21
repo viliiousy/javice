@@ -270,7 +270,7 @@ const PlanGen = {
     const p = this._p;
     if (!JARVIS._getKey()) { App.showToast('AI 키가 필요합니다 — 설정 › AI 에서 무료 키를 넣어 주세요', 'error'); return; }
     const base = this.generate(p);
-    const allowed = Object.values(EX_DB).flat().filter(n => this.allowed(n, p));
+    const allowed = Object.entries(EX_DB).filter(([k]) => k !== '스포츠' && k !== '내 운동').flatMap(([, v]) => v).filter(n => this.allowed(n, p));
     const logs = this.recentLogs();
     App.showToast('AI 가 플랜을 짜는 중…');
     const prompt = `당신은 근력 운동 코치입니다. 아래 조건과 지난 기록으로 주간 루틴을 짜 주세요.
@@ -381,6 +381,8 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
   // 이름 → 자극 부위. 목록에 없는 이름(홈트 플랜·직접 쓴 이름)도 낱말로 짐작한다.
   partOf(name) {
     const n = String(name || '');
+    const my = typeof Fitness !== 'undefined' && Fitness.myPart ? Fitness.myPart(n) : null;   // 직접 만든 운동은 고른 종류 그대로
+    if (my) return my;
     const slot = Object.keys(this.POOL).find(k => this.POOL[k].includes(n));
     if (slot) return this.PART_OF[slot];
     const hit = Object.keys(EX_DB).find(k => EX_DB[k].includes(n));
@@ -397,6 +399,8 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
     const m = R.find(([re]) => re.test(n));
     return m ? m[1] : null;
   },
+  // 시간으로 하는 운동(유산소·스포츠) — 세트·무게 대신 '몇 분'
+  timed(name) { return ['유산소', '스포츠'].includes(this.partOf(name)); },
   // 교체 후보: ① 같은 동작 칸 → ② 같은 동작 이름 → ③ 같은 부위. 가진 기구로 먼저 고르고,
   // 그래도 없으면 기구를 따지지 않고(대신 '기구 필요' 표시) 같은 부위에서 고른다 — 빈 목록은 보이지 않는다.
   alternatives(name) {

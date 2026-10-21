@@ -18,8 +18,11 @@
 //           u_<sub>_gl_* 키를 읽기만 한다(쓰지 않는다).
 //   taskDone : 허브에서 체크한 할일을 구글 할일에서 완료(또는 되돌림) 처리한다.
 //   taskAdd  : 허브에 말로 한 할일을 구글 기본 목록에 넣는다.
+//   ics      : 캘린더 구독 주소(.ics)를 대신 받아 원문을 돌려준다 (Firebase ID 토큰 필요, 연결 코드 아님).
 
 const crypto = require('crypto');
+const dns = require('dns').promises;
+const net = require('net');
 const { fbFetch, fbGet } = require('../lib/fb-admin');
 const { accessTokenFor } = require('../lib/google-oauth');
 
@@ -629,6 +632,74 @@ async function mcpHandle(req, res, code) {
   res.status(200).json(r);
 }
 
+// ── 캘린더 구독 주소(ICS) 대신 받기 ─────────────────────
+// 브라우저는 네이버·아이클라우드·아웃룩의 .ics 주소를 직접 못 읽는다(CORS). 로그인한 사용자(Firebase ID 토큰)만
+// 이 서버가 대신 받아 원문을 돌려준다. 해석은 화면(js/cal-sources.js)이 한다.
+// 남의 서버를 두드리는 통로가 되지 않게: http(s)·webcal 만, 내부망·루프백 주소 거절, 2MB·10초 제한, 리다이렉트도 다시 검사.
+const ICS_MAX = 2 * 1024 * 1024;
+const ICS_TIMEOUT = 10000;
+function privateIp(ip) {
+  if (net.isIPv4(ip)) {
+    const [a, b] = ip.split('.').map(Number);
+    return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 192 && b === 0) || (a === 198 && (b === 18 || b === 19)) || a >= 224;
+  }
+  if (net.isIPv6(ip)) {
+    const x = ip.toLowerCase();
+    const m = x.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (m) return privateIp(m[1]);
+    return x === '::' || x === '::1' || /^f[cd]/.test(x) || /^fe[89ab]/.test(x) || /^ff/.test(x) || x.startsWith('::ffff:') || x.startsWith('64:ff9b:');
+  }
+  return true;
+}
+async function publicHost(host) {
+  const h = String(host || '').replace(/^\[|\]$/g, '').toLowerCase();
+  if (!h || h === 'localhost' || /\.(localhost|local|internal|lan|home|arpa)$/.test(h)) return false;
+  if (net.isIP(h)) return !privateIp(h);
+  try {
+    const addrs = await dns.lookup(h, { all: true, verbatim: true });
+    return addrs.length > 0 && addrs.every(a => !privateIp(a.address));
+  } catch { return false; }
+}
+async function icsFetch(idToken, raw) {
+  const uid = await uidFromIdToken(idToken);
+  if (!uid) return { status: 401, error: '로그인이 필요합니다' };
+  let s = String(raw || '').trim();
+  if (s.length > 2000) return { status: 400, error: '주소가 너무 깁니다' };
+  s = s.replace(/^webcals?:\/\//i, 'https://');
+  let url;
+  try { url = new URL(s); } catch { return { status: 400, error: '주소 형식이 맞지 않습니다' }; }
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ICS_TIMEOUT);
+  try {
+    for (let hop = 0; hop < 4; hop++) {
+      if (!/^https?:$/.test(url.protocol) || url.username || url.password) return { status: 400, error: 'http(s)·webcal 주소만 쓸 수 있습니다' };
+      if (url.port && !['80', '443', '8080', '8443'].includes(url.port)) return { status: 400, error: '쓸 수 없는 포트입니다' };
+      if (!(await publicHost(url.hostname))) return { status: 400, error: '공개된 인터넷 주소만 쓸 수 있습니다' };
+      const r = await fetch(url, { redirect: 'manual', signal: ctl.signal,
+        headers: { 'User-Agent': 'BashyCalendar/1.0 (+https://bashy.app)', Accept: 'text/calendar, text/plain;q=0.9, */*;q=0.5' } });
+      if (r.status >= 300 && r.status < 400 && r.headers.get('location')) { url = new URL(r.headers.get('location'), url); continue; }
+      if (!r.ok) return { status: 502, error: `캘린더 주소가 응답하지 않습니다(HTTP ${r.status})` };
+      if (Number(r.headers.get('content-length') || 0) > ICS_MAX) return { status: 413, error: '캘린더가 너무 큽니다(2MB 초과)' };
+      const reader = r.body.getReader(), parts = [];
+      let n = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        n += value.length;
+        if (n > ICS_MAX) { try { await reader.cancel(); } catch {} return { status: 413, error: '캘린더가 너무 큽니다(2MB 초과)' }; }
+        parts.push(Buffer.from(value));
+      }
+      const text = Buffer.concat(parts).toString('utf8').replace(/^\uFEFF/, '');
+      if (!/BEGIN:VCALENDAR/i.test(text.slice(0, 4000))) return { status: 422, error: '캘린더(ICS) 주소가 아닙니다' };
+      return { status: 200, ok: true, text };
+    }
+    return { status: 502, error: '리다이렉트가 너무 많습니다' };
+  } catch (e) {
+    return { status: 502, error: e.name === 'AbortError' ? '캘린더 주소가 너무 느립니다' : '캘린더를 받지 못했습니다' };
+  } finally { clearTimeout(timer); }
+}
+
 const send = (res, r) => { const { status, ...rest } = r; res.status(status || 200).json(rest); };
 
 module.exports = async (req, res) => {
@@ -649,6 +720,7 @@ module.exports = async (req, res) => {
     if (body.act === 'pairPoll')    { send(res, await pairPoll(body.pin, body.pairId)); return; }
     if (body.act === 'stStart')     { send(res, await stStart(body.idToken)); return; }
     if (body.act === 'stStatus')    { send(res, await stStatus(body.idToken, !!body.unlink)); return; }
+    if (body.act === 'ics')         { send(res, await icsFetch(body.idToken, body.url)); return; }
     const uid  = await verify(body.code);
     if (!uid) { res.status(401).json({ error: '연결 코드가 맞지 않습니다 — bashy.app 설정에서 다시 확인해 주세요' }); return; }
 
@@ -671,4 +743,4 @@ module.exports = async (req, res) => {
 };
 
 // 테스트용
-module.exports._t = { parseCode, clean, slotKey, sameSecret, cleanCfg };
+module.exports._t = { parseCode, clean, slotKey, sameSecret, cleanCfg, privateIp, publicHost };

@@ -28,6 +28,7 @@
 <link rel="stylesheet" href="css/v2-econ.css">
 <link rel="stylesheet" href="css/v2-fitness.css">
 <link rel="stylesheet" href="css/v2-inbody.css">
+<link rel="stylesheet" href="css/v2-calendar.css">
   <script>
     // 테마는 첫 페인트 전에 정해야 한다. 스크립트가 늦게 돌면 흰 화면이 한 번 번쩍인다.
     (function(){
@@ -147,8 +148,8 @@
         <div class="cal-sep"></div>
         <div id="taskFilters" class="task-filter-wrap"></div>
         <div id="gConnect" class="g-connect" hidden>
-          <p><b>구글 캘린더·할 일은 아직 연결되지 않았습니다</b><span>Apple 로 로그인한 상태에서도 구글 계정을 연결하면 일정과 할 일을 여기서 함께 봅니다. 연결하지 않아도 습관·식단·운동·인바디·메모는 그대로 씁니다.</span></p>
-          <button class="btn-sm accent" onclick="Auth.connectGoogle()">구글 캘린더·할 일 연결</button>
+          <p><b>일정과 할일은 구글 없이도 씁니다</b><span>여기서 추가한 일정과 할일은 Bashy 계정에 저장됩니다. 구글 캘린더, 캘린더 구독 주소도 함께 볼 수 있습니다.</span></p>
+          <div class="g-connect-acts"><button class="btn-sm accent" onclick="Auth.connectGoogle()">구글 연결</button><button class="btn-sm" onclick="Settings.open('cal')">다른 캘린더</button></div>
         </div>
         <div id="tasksContainer" class="tasks-wrap"><p class="empty">불러오는 중…</p></div>
       </section>
@@ -261,6 +262,7 @@
 <script src="js/google-auth.js"></script>
 <script src="js/google-calendar.js"></script>
 <script src="js/google-tasks.js"></script>
+<script src="js/cal-sources.js"></script>
 <script src="js/firebase-sync.js"></script>
 <script src="js/calendar-ui.js"></script>
 <script src="js/exercise-db.js"></script>
@@ -270,6 +272,7 @@
 <script src="js/barcode.js"></script>
 <script src="js/haptic.js"></script>
   <script src="js/rowui.js"></script>
+<script src="js/fx.js"></script>
 <script src="js/habits.js"></script>
 <script src="js/checklist.js"></script>
 <script src="js/memo.js"></script>

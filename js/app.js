@@ -100,35 +100,88 @@ const App = {
   // (승계는 UserStore.adoptOffline() 이 로그인할 때 한 번 해 준다.)
 
   // ── 동기화 ────────────────────────────
+  // 출처 넷을 합친다: 구글(연결돼 있으면) · 아이폰 캘린더(켰으면) · 구독 주소(있으면) · Bashy(항상).
+  // 화면은 출처를 모른다 — 모두 구글 모양으로 들어오고 `_src` 만 다르다 (js/cal-sources.js).
+  _srcEv: { google: [], device: [], ics: [], bashy: [] },
+  _range() {
+    const tMin=new Date(); tMin.setMonth(tMin.getMonth()-1); tMin.setHours(0,0,0,0);
+    const tMax=new Date(); tMax.setMonth(tMax.getMonth()+3); tMax.setHours(23,59,59,999);
+    return [tMin,tMax];
+  },
+  _evSort(a,b){ return new Date(a.start?.dateTime||a.start?.date+'T00:00:00')-new Date(b.start?.dateTime||b.start?.date+'T00:00:00'); },
+  _mergeEvents() {
+    const S=this._srcEv;
+    this.S.events=[...S.google,...S.device,...S.ics,...S.bashy].sort((a,b)=>this._evSort(a,b));
+  },
+  _bashyTasks() {
+    return BashyCal.tasks().map(t=>{ t.starred=UserStore.get('gl_star_'+t.id)==='1'; t._hidden=UserStore.get('gl_hidden_'+t.id)==='1'; return t; });
+  },
+  // 계정에 저장된 Bashy 일정·할일만 다시 읽어 그린다 (다른 기기에서 바뀐 걸 받았을 때, 동기화 시작할 때)
+  refreshLocal() {
+    const [tMin,tMax]=this._range();
+    this._srcEv.bashy=BashyCal.events(tMin,tMax);
+    this._mergeEvents();
+    if(!this.S.lists.some(l=>l.id===BashyCal.LIST_ID)) this.S.lists=[...this.S.lists,BashyCal.list()];
+    this.S.tasks[BashyCal.LIST_ID]=this._bashyTasks();
+    this._renderAllCal();
+  },
+  _renderAllCal() {
+    this._buildTaskFilters();
+    this._renderTasks();
+    CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,this.S.selDate);
+    this._renderCalPanel();
+    this._updateStatsBanner();
+    this._updateHeaderDate(this.S.selDate); // 동기화 후 할일 뱃지 즉시 반영
+  },
+  // 구글 연결이 끊겼을 때(Apple 로그인 사용자의 토큰 만료 등) 구글 것만 내린다
+  dropGoogle() {
+    this._srcEv.google=[];
+    this.S.lists=this.S.lists.filter(l=>l.id===BashyCal.LIST_ID);
+    Object.keys(this.S.tasks).forEach(k=>{ if(k!==BashyCal.LIST_ID) delete this.S.tasks[k]; });
+    if(this.S.taskFilter!=='all'&&!this.S.lists.some(l=>l.id===this.S.taskFilter)) this.S.taskFilter='all';
+    this._mergeEvents(); this._renderAllCal();
+  },
   async sync() {
-    if(!Auth.isLoggedIn()) return;
-    this.showToast('동기화 중...','');
-    try {
-      this.S.lists=await GoogleTasks.fetchTaskLists();
-      this.S.tasks={};
-      await Promise.all(this.S.lists.map(async l=>{
-        this.S.tasks[l.id]=await GoogleTasks.fetchTasks(l.id);
-        this.S.tasks[l.id].forEach(t=>{
+    if(!Auth.signedIn() && !UserStore._uid) return;
+    const google=Auth.isLoggedIn(), remote=google||DeviceCal.on()||IcsCal.sources().length>0;
+    if(remote) this.showToast('동기화 중...','');
+    // 계정에 있는 것부터 바로 보인다 — 바깥 캘린더를 기다리지 않는다
+    try { this.refreshLocal(); } catch(e){ console.warn('[Sync] local',e); }
+    const [tMin,tMax]=this._range();
+    const errs=[];
+    const pGoogle=google?(async()=>{
+      const lists=await GoogleTasks.fetchTaskLists();
+      const tasks={};
+      await Promise.all(lists.map(async l=>{
+        tasks[l.id]=await GoogleTasks.fetchTasks(l.id);
+        tasks[l.id].forEach(t=>{
           // API notes 마커 기반 starred OR 로컬 localStorage starred 둘 중 하나라도 true면 starred
           const localStar = UserStore.get('gl_star_'+t.id)==='1';
           t.starred = !!(t._apiStarred || localStar);
           t._hidden=UserStore.get('gl_hidden_'+t.id)==='1';
         });
       }));
-      this._buildTaskFilters();
-      this._renderTasks();
-
-      const tMin=new Date(); tMin.setMonth(tMin.getMonth()-1); tMin.setHours(0,0,0,0);
-      const tMax=new Date(); tMax.setMonth(tMax.getMonth()+3); tMax.setHours(23,59,59,999);
-      this.S.events=await GoogleCalendar.fetchEvents(tMin,tMax);
-      CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,this.S.selDate);
-      this._renderCalPanel();
-      this._updateStatsBanner();
-      this._updateHeaderDate(this.S.selDate); // 동기화 후 할일 뱃지 즉시 반영
-      this.showToast(`동기화 완료 (일정 ${this.S.events.length}개)`,'success');
-    } catch(err){
-      console.error('[Sync]',err);
-      this.showToast('동기화 실패: '+err.message,'error');
+      // 할일은 일정보다 먼저 그린다(예전과 같이)
+      Object.keys(this.S.tasks).forEach(k=>{ if(k!==BashyCal.LIST_ID) delete this.S.tasks[k]; });
+      Object.assign(this.S.tasks,tasks);
+      this.S.lists=[...lists,BashyCal.list()];
+      this._buildTaskFilters(); this._renderTasks();
+      this._srcEv.google=(await GoogleCalendar.fetchEvents(tMin,tMax)).map(e=>({...e,_src:'google'}));
+    })().catch(e=>{ errs.push(e); }):Promise.resolve();
+    const pDev=DeviceCal.on()?DeviceCal.fetch(tMin,tMax).then(v=>{ this._srcEv.device=v; }).catch(e=>{ console.warn('[Sync] 아이폰 캘린더',e); errs.push(e); })
+      :Promise.resolve(this._srcEv.device=[]);
+    const pIcs=IcsCal.sources().length?IcsCal.fetch(tMin,tMax).then(v=>{ this._srcEv.ics=v; })
+      :Promise.resolve(this._srcEv.ics=[]);
+    if(!google) this._srcEv.google=[];
+    await Promise.all([pGoogle,pDev,pIcs]);
+    this._mergeEvents();
+    this._renderAllCal();
+    if(errs.length){
+      console.error('[Sync]',errs);
+      this.showToast('동기화 실패: '+errs[0].message,'error');
+    } else if(remote){
+      const bad=Object.keys(IcsCal.errors).length;
+      this.showToast(bad?`동기화 완료 — 구독 캘린더 ${bad}개를 받지 못했습니다`:`동기화 완료 (일정 ${this.S.events.length}개)`, bad?'error':'success');
     }
   },
 
@@ -533,20 +586,28 @@ const App = {
     </div>`).join('');
 
     // 캘린더 이벤트
-    const evH=evs.map(e=>{
-      const allDay=!e.start?.dateTime; const s=allDay?null:new Date(e.start.dateTime);
-      const col=e._calColor||_evColor(e.colorId);
-      return `<div class="event-item" style="border-color:${col}" onclick="App._showEvDetail('${e.id}')">
+    const evH=evs.map(e=>this._evRow(e,true)).join('');
+
+    wrap.innerHTML=`<div class="day-sum-hd">${label}</div>${sum}${clH}${evH}`;
+  },
+
+  // 일정 한 줄. 출처가 여럿이면 캘린더 이름과 색 점으로 어디 것인지 보인다.
+  // 구글 일정은 예전 그대로 — '주요 일정'(기본 캘린더)이 아닐 때만 이름을 적는다.
+  _evRow(e, full) {
+    const allDay=!e.start?.dateTime; const s=allDay?null:new Date(e.start.dateTime);
+    const col=e._calColor||_evColor(e.colorId);
+    const multi=new Set((this.S.events||[]).map(x=>x._calId||'primary')).size>1;
+    const showCal=e._calName && (e._src&&e._src!=='google' ? multi : e._calName!=='주요 일정');
+    const dot=e._src&&e._src!=='google'?`<i class="ev-dot" style="background:${col}"></i>`:'';
+    if(!full) return `<div class="event-item" style="border-color:${col}" onclick="App._showEvDetail('${e.id}')"><div class="event-time" style="color:${col}">${allDay?'종일':_fmtTime(s)}</div><div class="event-title">${dot}${esc(e.summary||'(제목 없음)')}</div></div>`;
+    return `<div class="event-item" style="border-color:${col}" onclick="App._showEvDetail('${e.id}')">
         <div class="event-time" style="color:${col}">${allDay?'종일':_fmtTime(s)}</div>
         <div>
-          <div class="event-title">${esc(e.summary||'(제목 없음)')}</div>
-          ${e._calName&&e._calName!=='주요 일정'?`<div class="event-loc" style="color:${col}">${esc(e._calName)}</div>`:''}
+          <div class="event-title">${dot}${esc(e.summary||'(제목 없음)')}</div>
+          ${showCal?`<div class="event-loc" style="color:${col}">${esc(e._calName)}</div>`:''}
           ${e.location?`<div class="event-loc">${esc(e.location)}</div>`:''}
         </div>
       </div>`;
-    }).join('');
-
-    wrap.innerHTML=`<div class="day-sum-hd">${label}</div>${sum}${clH}${evH}`;
   },
 
   // ── 그 날 하루 요약 ────────────────────
@@ -624,8 +685,7 @@ const App = {
       <div class="ev-group-hd">${day}</div>
       ${groups[day].map(e=>{
         if(e._isTask) return `<div class="event-item" style="border-color:var(--yellow)"><div class="event-time" style="color:var(--yellow)">할일</div><div class="event-title">${esc(e.title)}</div></div>`;
-        const allDay=!e.start?.dateTime; const s=allDay?null:new Date(e.start.dateTime); const col=e._calColor||_evColor(e.colorId);
-        return `<div class="event-item" style="border-color:${col}" onclick="App._showEvDetail('${e.id}')"><div class="event-time" style="color:${col}">${allDay?'종일':_fmtTime(s)}</div><div class="event-title">${esc(e.summary||'(제목 없음)')}</div></div>`;
+        return this._evRow(e,false);
       }).join('')}`).join('');
   },
 
@@ -647,8 +707,7 @@ const App = {
         <div class="ev-group-hd">${day}</div>
         ${groups[day].map(e=>{
           if(e._isTask) return `<div class="event-item" style="border-color:var(--yellow)"><div class="event-time" style="color:var(--yellow)">할일</div><div class="event-title">${esc(e.title)}</div></div>`;
-          const allDay=!e.start?.dateTime; const s=allDay?null:new Date(e.start.dateTime); const col=e._calColor||_evColor(e.colorId);
-          return `<div class="event-item" style="border-color:${col}" onclick="App._showEvDetail('${e.id}')"><div class="event-time" style="color:${col}">${allDay?'종일':_fmtTime(s)}</div><div class="event-title">${esc(e.summary||'(제목 없음)')}</div></div>`;
+          return this._evRow(e,false);
         }).join('')}`).join('');
   },
 
@@ -660,56 +719,77 @@ const App = {
     const calOptions=GoogleCalendar._allCalendars.length
       ?GoogleCalendar._allCalendars.map(c=>`<option value="${c.id}"${c.id===defCal?' selected':''}>${esc(c.summary)}</option>`).join('')
       :`<option value="primary">기본 캘린더</option>`;
+    const gDef=Auth.isLoggedIn()?`<div style="margin-top:14px"><label class="modal-lbl">기본 캘린더</label>
+        <select id="lpDefCal" class="inp inp-sm" onchange="GoogleCalendar.saveSettings({...GoogleCalendar.getSettings(),default:this.value})">${calOptions}</select>
+      </div>`:'';
     this.openModal(`@plus ${ds}`,`
       <div class="lp-menu">
         <button class="lp-btn" onclick="App.closeModal();App._showAddEventModalForDate(new Date('${d.toDateString()}'))">일정 추가</button>
         <button class="lp-btn" onclick="App.closeModal();App._showAddTaskForDate(new Date('${d.toDateString()}'))">할일 추가</button>
         <button class="lp-btn" onclick="App.closeModal();App._showAddChecklistForDate(new Date('${d.toDateString()}'))">체크리스트 추가</button>
-      </div>
-      <div style="margin-top:14px"><label class="modal-lbl">기본 캘린더</label>
-        <select id="lpDefCal" class="inp inp-sm" onchange="GoogleCalendar.saveSettings({...GoogleCalendar.getSettings(),default:this.value})">${calOptions}</select>
-      </div>`);
+      </div>${gDef}`);
   },
 
-  _showAddEventModalForDate(date) {
+  // 저장할 곳: 구글 캘린더(연결돼 있으면) · 쓸 수 있는 아이폰 캘린더 · Bashy. 구독 주소는 읽기 전용이라 없다.
+  _destSelect(cur) {
+    const ds=CalSources.destinations(), groups=[];
+    ds.forEach(d=>{ let g=groups.find(x=>x.name===d.group); if(!g) groups.push(g={name:d.group,items:[]}); g.items.push(d); });
+    const opt=d=>`<option value="${esc(d.key)}"${d.key===cur?' selected':''}>${esc(d.label)}</option>`;
+    return groups.length===1&&groups[0].items.length===1
+      ? groups[0].items.map(opt).join('')
+      : groups.map(g=>`<optgroup label="${esc(g.name)}">${g.items.map(opt).join('')}</optgroup>`).join('');
+  },
+  _showAddEventModalForDate(date, editId) {
     const d=date||this.S.selDate;
-    const base=new Date(d.getFullYear(),d.getMonth(),d.getDate(),new Date().getHours()+1,0);
-    const end=new Date(base.getTime()+3600000);
+    const ed=editId?this.S.events.find(e=>e.id===editId):null;
+    let base=new Date(d.getFullYear(),d.getMonth(),d.getDate(),new Date().getHours()+1,0);
+    let end=new Date(base.getTime()+3600000);
+    if(ed&&ed.start?.dateTime){ base=new Date(ed.start.dateTime); end=new Date(ed.end?.dateTime||base); }
+    else if(ed&&ed.start?.date){ base=new Date(ed.start.date+'T09:00:00'); end=new Date(base.getTime()+3600000); }
     const fmt=x=>new Date(x.getTime()-x.getTimezoneOffset()*60000).toISOString().slice(0,16);
-    const defCal=GoogleCalendar.getDefaultCalendar();
-    const calOptions=GoogleCalendar._allCalendars.length
-      ?GoogleCalendar._allCalendars.map(c=>`<option value="${c.id}"${c.id===defCal?' selected':''}>${esc(c.summary)}</option>`).join('')
-      :`<option value="primary">기본 캘린더</option>`;
-    this.openModal('@calendar 일정 추가',`
-      <div class="modal-row"><label class="modal-lbl">제목 *</label><input id="evT" type="text" class="inp"></div>
+    const cur=CalSources.defaultDest();
+    const dests=CalSources.destinations();
+    const destRow=ed?'':`<div class="modal-row"><label class="modal-lbl">저장할 곳</label><select id="evDest" class="inp inp-sm ev-dest">${this._destSelect(cur)}</select>${
+      dests.length===1?`<p class="ev-dest-hint">Bashy 계정에 저장됩니다. ${DeviceCal.avail()?'구글·아이폰 캘린더':'구글 캘린더'}는 설정 › 일정과 할일에서 연결합니다.</p>`:''}</div>`;
+    this.openModal(ed?'@calendar 일정 수정':'@calendar 일정 추가',`
+      <div class="modal-row"><label class="modal-lbl">제목 *</label><input id="evT" type="text" class="inp" value="${esc(ed?.summary||'')}"></div>
       <div class="modal-grid2">
         <div><label class="modal-lbl">시작</label><input id="evS" type="datetime-local" value="${fmt(base)}" class="inp inp-sm"></div>
         <div><label class="modal-lbl">종료</label><input id="evE" type="datetime-local" value="${fmt(end)}" class="inp inp-sm"></div>
       </div>
-      <div class="modal-row"><label class="modal-lbl">캘린더</label><select id="evCal" class="inp inp-sm">${calOptions}</select></div>
-      <div class="modal-row"><label class="modal-lbl">장소</label><input id="evL" type="text" placeholder="(선택)" class="inp"></div>
-      <div class="modal-row"><label class="modal-lbl">설명</label><textarea id="evD" class="inp" rows="2" placeholder="(선택)"></textarea></div>
+      ${destRow}
+      <div class="modal-row"><label class="modal-lbl">장소</label><input id="evL" type="text" placeholder="(선택)" class="inp" value="${esc(ed?.location||'')}"></div>
+      <div class="modal-row"><label class="modal-lbl">설명</label><textarea id="evD" class="inp" rows="2" placeholder="(선택)">${esc(ed?.description||'')}</textarea></div>
       <div class="modal-btns">
-        <button onclick="App._createEvent()" class="btn-sm accent">저장</button>
+        <button onclick="App._createEvent(${ed?`'${ed.id}'`:''})" class="btn-sm accent">저장</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
       </div>`);
     setTimeout(()=>document.getElementById('evT')?.focus(),50);
   },
 
-  async _createEvent() {
+  async _createEvent(editId) {
     const title=document.getElementById('evT').value.trim();
     const start=document.getElementById('evS').value;
     const end  =document.getElementById('evE').value;
-    const calId=document.getElementById('evCal')?.value||'primary';
     if(!title||!start||!end){ this.showToast('제목과 날짜를 입력해주세요','error'); return; }
+    const f={ title, start:new Date(start), end:new Date(end),
+      description:document.getElementById('evD').value.trim(), location:document.getElementById('evL').value.trim() };
+    if(f.end<f.start) f.end=new Date(f.start);
     try{
-      const ev=await GoogleCalendar.createEvent(title,new Date(start).toISOString(),new Date(end).toISOString(),
-        document.getElementById('evD').value.trim(),document.getElementById('evL').value.trim(),calId);
-      this.S.events.push(ev);
-      this.S.events.sort((a,b)=>new Date(a.start?.dateTime||a.start?.date)-new Date(b.start?.dateTime||b.start?.date));
+      if(editId){   // 수정은 Bashy 일정만 (구글·아이폰 일정은 그 앱에서 고친다)
+        const ev=BashyCal.updateEvent(editId,f);
+        this._srcEv.bashy=this._srcEv.bashy.map(e=>e.id===editId?ev:e);
+      } else {
+        const key=document.getElementById('evDest')?.value||CalSources.defaultDest();
+        const ev=await CalSources.createEvent(key,f);
+        CalSources.remember(key);
+        const src=ev._src||'google';
+        (this._srcEv[src]=this._srcEv[src]||[]).push(ev);
+      }
+      this._mergeEvents();
       CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,this.S.selDate);
-      this._renderCalPanel(); this.closeModal(); this.showToast('일정 추가됨','success');
-    }catch{ this.showToast('일정 추가 실패','error'); }
+      this._renderCalPanel(); this._updateStatsBanner(); this.closeModal(); this.showToast(editId?'일정 수정됨':'일정 추가됨','success');
+    }catch(e){ console.warn('[Event]',e); this.showToast('일정 '+(editId?'수정':'추가')+' 실패'+(e?.message?': '+e.message:''),'error'); }
   },
 
   // 시간은 30분 단위로만 고른다. type="time" 은 1분 단위라 스물네 번을 눌러야
@@ -729,12 +809,13 @@ const App = {
   // 구글 Tasks 의 추가 창을 그대로 따랐다. 거기서 만든 할일이 여기로 내려오는데
   // 필드 이름이 서로 다르면(메모 vs 세부사항) 같은 칸을 다른 것으로 착각하게 된다.
   showAddTask(date) {
-    if(!Auth.isLoggedIn()){ this.showToast(Auth.appleUser?'할 일은 구글 할 일에 저장됩니다 — 위에서 구글 캘린더·할 일을 먼저 연결해 주세요':'로그인이 필요합니다','error'); return; }
+    // 구글이 없으면 Bashy 목록에 넣는다 — 할일 카드는 구글 없이도 쓴다
+    if(!this.S.lists.some(l=>l.id===BashyCal.LIST_ID)) this.S.lists=[...this.S.lists,BashyCal.list()];
     const d = date ? new Date(date) : (this.S.selDate || new Date());
     const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     // 지금 보고 있는 목록으로 기본값을 맞춘다. '전체' 를 보고 있으면 첫 목록.
     const cur = this.S.taskFilter !== 'all' && this.S.lists.some(l=>l.id===this.S.taskFilter)
-      ? this.S.taskFilter : (this.S.lists[0]?.id || '');
+      ? this.S.taskFilter : (Auth.isLoggedIn() ? (this.S.lists[0]?.id || BashyCal.LIST_ID) : BashyCal.LIST_ID);
     this.openModal('@tasks 할일 추가',`
       <div class="modal-row"><label class="modal-lbl">제목 *</label>
         <input id="qtTitle" type="text" class="inp" placeholder="할 일"></div>
@@ -773,7 +854,7 @@ const App = {
     const time=document.getElementById('qtTime')?.value||'';
     if(!title){ this.showToast('제목을 입력해주세요','error'); return; }
     try{
-      const task=await GoogleTasks.createTask(listId,title,due||null,notes);
+      const task=await TaskStore.createTask(listId,title,due||null,notes);
       task.starred=false;
       // 구글 Tasks 의 due 는 날짜만 받는다(시각은 버려진다). 시간은 세부정보 창과
       // 같은 자리에 따로 둔다 — 두 곳이 다른 데 저장하면 한쪽에서 넣은 시간이 안 보인다.
@@ -781,7 +862,7 @@ const App = {
         JSON.stringify({ ...(JSON.parse(UserStore.get('gl_task_extra_'+task.id)||'{}')), time }));
       if(!this.S.tasks[listId]) this.S.tasks[listId]=[];
       this.S.tasks[listId].unshift(task);
-      this._renderTasks();
+      this._buildTaskFilters(); this._renderTasks();
       CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,this.S.selDate);
       this.closeModal(); this.showToast('할일 추가됨','success');
       this._updateStatsBanner();
@@ -817,24 +898,32 @@ const App = {
     const allDay=!e.start?.dateTime; const s=allDay?null:new Date(e.start.dateTime);
     const en=e.end?.dateTime?new Date(e.end.dateTime):null;
     const col=e._calColor||_evColor(e.colorId);
+    const src=e._src&&e._src!=='google'?CalSources.srcName(e):'';
+    const where=[e._calName, src&&src!==e._calName&&e._src!=='bashy'?src:''].filter(Boolean).join(' · ');
+    const ro=e._readOnly||e._src==='ics';
+    const btnDel='width:100%;padding:9px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:8px;color:var(--red);cursor:pointer;font-family:inherit;font-size:13px';
     this.openModal('@calendar 일정',`
       <h4 style="font-size:16px;font-weight:700;margin-bottom:12px">${esc(e.summary||'(제목 없음)')}</h4>
-      ${e._calName?`<p style="font-size:12px;color:${col};margin-bottom:8px">${esc(e._calName)}</p>`:''}
+      ${where?`<p class="ev-src" style="font-size:12px;color:${col};margin-bottom:8px">${e._src&&e._src!=='google'?`<i class="ev-dot" style="background:${col}"></i>`:''}${esc(where)}</p>`:''}
       <p style="color:var(--text2);font-size:13px;margin-bottom:8px">${e.start?.date||_fmtFull(s)}<br>${allDay?'종일':_fmtTime(s)+(en?' — '+_fmtTime(en):'')}</p>
       ${e.location?`<p style="color:var(--text2);font-size:13px;margin-bottom:8px">${esc(e.location)}</p>`:''}
       ${e.description?`<div style="color:var(--text2);font-size:13px;padding:10px;background:var(--card2);border-radius:8px;white-space:pre-wrap;margin-bottom:12px">${esc(e.description)}</div>`:''}
-      <button onclick="App._delEvent('${e.id}','${e._calId||''}')" style="width:100%;padding:9px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:8px;color:var(--red);cursor:pointer;font-family:inherit;font-size:13px">🗑 일정 삭제</button>
+      ${ro?`<p class="ev-ro">${e._src==='ics'?'구독한 캘린더라 여기서는 고치거나 지울 수 없습니다.':'읽기 전용 캘린더입니다.'}</p>`
+        :`${e._src==='bashy'?`<div class="modal-btns" style="margin-bottom:8px"><button class="btn-sm" onclick="App._showAddEventModalForDate(null,'${e.id}')">수정</button></div>`:''}
+      <button onclick="App._delEvent('${e.id}','${e._calId||''}')" style="${btnDel}">일정 삭제${e._recurring?' (이 회차만)':''}</button>`}
     `);
   },
 
   async _delEvent(id,calId='') {
     if(!confirm('삭제하시겠습니까?')) return;
+    const ev=this.S.events.find(e=>e.id===id)||{id,_calId:calId||'primary',_src:'google'};
     try{
-      await GoogleCalendar.deleteEvent(id,calId||'primary');
-      this.S.events=this.S.events.filter(e=>e.id!==id);
+      await CalSources.deleteEvent(ev);
+      Object.keys(this._srcEv).forEach(k=>{ this._srcEv[k]=this._srcEv[k].filter(e=>e.id!==id); });
+      this._mergeEvents();
       CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,this.S.selDate);
-      this._renderCalPanel(); this.closeModal(); this.showToast('삭제됨','success');
-    }catch{ this.showToast('삭제 실패','error'); }
+      this._renderCalPanel(); this._updateStatsBanner(); this.closeModal(); this.showToast('삭제됨','success');
+    }catch(e){ this.showToast('삭제 실패'+(e?.message?': '+e.message:''),'error'); }
   },
 
   // ── 할일 ─────────────────────────────
@@ -866,7 +955,7 @@ const App = {
   _buildTaskFilters() {
     const wrap=document.getElementById('taskFilters'); if(!wrap) return;
     // 별표는 손대도 아무 일이 안 일어나던 필터라 뺐다. 안 되는 버튼은 없는 버튼보다 나쁘다.
-    const tabs=[{id:'all',label:'전체'},...this.S.lists.map(l=>({id:l.id,label:l.title}))];
+    const tabs=[{id:'all',label:'전체'},...this.S.lists.filter(l=>l.id!==BashyCal.LIST_ID||!Auth.isLoggedIn()||(this.S.tasks[l.id]||[]).length).map(l=>({id:l.id,label:l.title}))];
     const catColors=JSON.parse(localStorage.getItem('gl_cat_colors')||'{}');
     const on=this.showOverdue(), n=this._overdueCount();
     const ic=(typeof Icons!=='undefined')?Icons.svg('clock','tf-ic'):'';
@@ -1052,7 +1141,7 @@ const App = {
     UserStore.set('gl_task_extra_'+taskId, JSON.stringify({time,repeat}));
     try{
       if(newListId!==listId){
-        const created=await GoogleTasks.moveTask(listId,newListId,taskId,title,notes,due);
+        const created=await TaskStore.moveTask(listId,newListId,taskId,title,notes,due);
         created.starred=UserStore.get('gl_star_'+taskId)==='1';
         // 목록을 옮기면 할 일 번호가 새로 생긴다 — 시간·반복·별표도 새 번호로 옮긴다
         UserStore.set('gl_task_extra_'+created.id, JSON.stringify({time,repeat}));
@@ -1062,7 +1151,7 @@ const App = {
         this.S.tasks[newListId].unshift(created);
         this.S.tasks[listId]=this.S.tasks[listId]?.filter(t=>t.id!==taskId);
       } else {
-        const updated=await GoogleTasks.updateTask(listId,taskId,{title,notes,due:due||null});
+        const updated=await TaskStore.updateTask(listId,taskId,{title,notes,due:due||null});
         const t=this.S.tasks[listId]?.find(x=>x.id===taskId);
         // updated.due는 RFC3339 형식 (UTC) → 로컬 표시 시 날짜 부분만 사용
         const newDue = updated.due ? updated.due.split('T')[0]+'T00:00:00.000Z' : null;
@@ -1078,7 +1167,7 @@ const App = {
   async _toggle(taskId,listId,done){
     try{
       try { Haptic.light(); } catch(e){}
-      await GoogleTasks.toggleTask(listId,taskId,!done);
+      await TaskStore.toggleTask(listId,taskId,!done);
       const t=this.S.tasks[listId]?.find(x=>x.id===taskId);
       if(t){ t.status=!done?'completed':'needsAction'; t.completed=!done?new Date().toISOString():null; }
       this._renderTasks();
@@ -1094,7 +1183,7 @@ const App = {
     // 로컬 스토리지 업데이트
     t.starred?UserStore.set('gl_star_'+taskId,'1'):UserStore.remove('gl_star_'+taskId); FirebaseSync?.scheduleSave?.();
     // Google Tasks API notes 필드에 별표 상태 동기화 (fire-and-forget)
-    if(Auth.isLoggedIn()){
+    if(Auth.isLoggedIn()&&!TaskStore.isB(listId)){
       GoogleTasks.setTaskStar(listId, taskId, t.starred, t.notes||'');
       // API 마커 상태도 로컬에 반영
       t._apiStarred = t.starred;
@@ -1106,7 +1195,7 @@ const App = {
   async _delTask(taskId,listId){
     if(!confirm('삭제하시겠습니까?')) return;
     try{
-      await GoogleTasks.deleteTask(listId,taskId);
+      await TaskStore.deleteTask(listId,taskId);
       this.S.tasks[listId]=this.S.tasks[listId]?.filter(t=>t.id!==taskId);
       this._renderTasks();
       CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,this.S.selDate);

@@ -289,6 +289,7 @@ const FirebaseSync = {
       // 이 폴링이 유일한 도착 신호다. 여기 없으면 앱을 껐다 켜야 보였다.
       try { Fitness.render(date); } catch {}
       try { InBody.render(); } catch {}
+      try { App.refreshLocal(); } catch {}   // Bashy 일정·할일 (계정에 저장된 것)
       try { App._updateStatsBanner(); } catch {}
     });
     // 동기화 알림 토스트

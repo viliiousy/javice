@@ -1,0 +1,59 @@
+/* v2 정리 — 일정과 할일: 구글 말고도 쓰는 캘린더 (2026-10-21)
+   ───────────────────────────────────────────────────────────────
+   출처가 여럿이 되면서 생긴 것: 일정 줄의 색 점, 일정 추가 창의 '저장할 곳',
+   설정 › 일정과 할일의 아이폰 캘린더·구독 주소 목록, 구글 없이 쓰는 사람에게 보이는 안내.
+   규칙은 8px 격자, 줄은 가는 선, 주인공 단추는 한 화면에 하나(주황). */
+
+/* ── 색 점: 어느 캘린더 일정인지 ──────────────────────────── */
+.ev-dot{ display:inline-block; flex:none; width:8px; height:8px; border-radius:50%; margin-right:8px; vertical-align:1px; }
+.event-title .ev-dot{ margin-right:6px; }
+.ev-src{ display:flex; align-items:center; }
+.ev-ro{ margin:4px 0 0; font-size:12.5px; line-height:1.5; color:var(--text3); }
+
+/* ── 일정 추가: 저장할 곳 ─────────────────────────────────── */
+.ev-dest{ width:100%; }
+.ev-dest-hint{ margin:8px 0 0; font-size:12px; line-height:16px; color:var(--text3); }
+
+/* ── 구글 없이 쓰는 안내 (카드 안) ────────────────────────── */
+.g-connect-acts{ display:flex; flex-wrap:wrap; gap:8px; }
+.g-connect-acts .btn-sm{ justify-self:auto; }
+.g-connect{ position:relative; }
+.g-connect > p{ padding-right:48px; }
+.g-connect .g-x{ position:absolute; top:12px; right:0; height:32px; padding:0 4px; border:0; background:none; color:var(--text3); font:inherit; font-size:13px; cursor:pointer; }
+
+/* ── 설정 › 일정과 할일 ───────────────────────────────────── */
+.cal-row .ev-dot{ width:10px; height:10px; margin-right:0; }
+.cal-row .set-tx small{ white-space:nowrap; }
+.cal-row .set-tx small.cal-err{ color:var(--red); white-space:normal; }
+.cal-del{ flex:none; }
+.cal-sel{ flex:none; max-width:46%; }
+.cal-ics-add{ display:grid; gap:8px; padding:16px 0 8px; }
+.cal-ics-line{ display:flex; gap:8px; align-items:center; }
+.cal-ics-line .inp{ flex:1; min-width:0; }
+.cal-ics-add .btn-sm.accent{ justify-self:start; }
+.cal-ics-add .set-note{ margin:0; }
+.cal-sw{ display:flex; gap:8px; flex:none; }
+.cal-sw button{ width:24px; height:24px; padding:0; border-radius:50%; border:0; background:var(--c); cursor:pointer;
+  box-shadow:0 0 0 2px var(--card), 0 0 0 2px transparent; transition:box-shadow .15s; }
+.cal-sw button.on{ box-shadow:0 0 0 2px var(--card), 0 0 0 4px var(--text); }
+
+/* ── v2 다듬기 ────────────────────────────────────────────── */
+html[data-ui="v2"] .event-item .ev-dot{ margin-top:-1px; }
+html[data-ui="v2"] .ev-dest-hint{ color:var(--text3); }
+html[data-ui="v2"] .modal-box .inp.ev-dest,
+html[data-ui="v2"] .modal-box .inp.cal-sel{ height:44px; border-radius:12px; font-size:15px; }
+html[data-ui="v2"] .modal-box .cal-ics-add .inp{ height:44px; min-height:44px; box-sizing:border-box; border-radius:12px; border:1px solid var(--border);
+  background:var(--card2); color:var(--text); font:inherit; font-size:16px; padding:0 14px; width:100%; }
+html[data-ui="v2"].dark .modal-box .cal-ics-add .inp{ background:var(--card); color-scheme:dark; }
+html[data-ui="v2"] .modal-box .cal-ics-add .inp:focus{ border-color:var(--text3); outline:none; box-shadow:none; }
+html[data-ui="v2"] .modal-box .cal-ics-add .inp::placeholder{ color:var(--text4); }
+html[data-ui="v2"] .cal-ics-add .btn-sm.accent{ background:var(--accent); border-color:var(--accent); color:var(--accent-fg); height:40px; padding:0 16px; border-radius:20px; font-weight:600; }
+html[data-ui="v2"] .cal-del{ height:32px; padding:0 12px; border-radius:16px; border:1px solid var(--border); background:none; color:var(--text2); font-size:13px; }
+html[data-ui="v2"] .g-connect .g-x{ height:32px; }
+html[data-ui="v2"] .g-connect-acts .btn-sm{ height:36px; padding:0 14px; border-radius:18px; font-size:13px; }
+html[data-ui="v2"] .g-connect-acts .btn-sm.accent{ background:var(--accent); border-color:var(--accent); color:var(--accent-fg); font-weight:600; }
+
+@media (max-width:420px){
+  .cal-ics-line{ flex-wrap:wrap; }
+  .cal-ics-line .inp{ flex-basis:100%; }
+}

@@ -26,6 +26,10 @@
 	<string>인바디 앱 등이 건강 앱에 기록한 키·체중·체지방률·제지방량·BMI 를 읽어 Bashy 인바디 기록과 상단바 수치를 자동으로 채웁니다. 건강 데이터는 쓰거나 광고에 쓰지 않습니다.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Bashy 는 건강 앱에 데이터를 쓰지 않습니다. 인바디 기록을 채우려고 키·체중·체지방률·제지방량·BMI 를 읽기만 합니다.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>아이폰 캘린더(iCloud·네이버·아웃룩 등 아이폰에 추가한 계정)의 일정을 Bashy 의 일정과 할일 카드에 보여 주고, 고른 캘린더에 새 일정을 넣거나 지우는 데 씁니다.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>아이폰 캘린더(iCloud·네이버·아웃룩 등 아이폰에 추가한 계정)의 일정을 Bashy 의 일정과 할일 카드에 보여 주고, 고른 캘린더에 새 일정을 넣거나 지우는 데 씁니다.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Bashy 잠금을 켰을 때 본인 확인에 Face ID 를 씁니다.</string>
 	<key>NSCameraUsageDescription</key>

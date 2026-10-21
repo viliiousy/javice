@@ -8,10 +8,10 @@
 const Settings = {
   CATS: [
     { id:'design', ic:'palette', name:'디자인',      sub:() => `${Settings._uiName()} · ${Settings._themeName()}` },
-    { id:'voice',  ic:'volume',  name:'음성 · 소리 · 진동', sub:() => `답 읽기 ${Settings._on(JARVIS?._ttsEnabled)} · 효과음 ${Settings._on(Sounds?.enabled)} · 진동 ${Settings._on(Haptic.on)}` },
+    { id:'voice',  ic:'volume',  name:'소리 · 진동 · 효과', sub:() => `답 읽기 ${Settings._on(JARVIS?._ttsEnabled)} · 효과음 ${Settings._on(Sounds?.enabled)} · 진동 ${Settings._on(Haptic.on)} · 애니메이션 ${Settings._on(typeof Fx!=='undefined' && Fx.on)}` },
     { id:'notify', ic:'bell',    name:'알림',        sub:() => { try { return Notifications.getSettings().enabled ? '켜짐 · 습관·식단·할일·일정' : '꺼짐'; } catch(e){ return ''; } } },
     { id:'ai',     ic:'sparkle', name:'AI',          sub:() => { try { const P = JARVIS.PROVIDERS[JARVIS._active()]; return `기본 ${P ? (P.short || P.name) : '미설정'} · 사용량 추적`; } catch(e){ return 'AI 비서 · 사용량 추적'; } } },
-    { id:'cal',    ic:'calendar', name:'일정과 할일', sub:() => `보일 캘린더 · 상단 지난 할일 ${localStorage.getItem('gl_top_overdue')==='0'?'숨김':'보임'}` },
+    { id:'cal',    ic:'calendar', name:'일정과 할일', sub:() => { try { return `${CalSources.summary()} · 상단 지난 할일 ${localStorage.getItem('gl_top_overdue')==='0'?'숨김':'보임'}`; } catch(e){ return '캘린더 · 할일'; } } },
     { id:'econ',   ic:'trend',   name:'경제 · 증권', sub:() => '증권사 연동 · 보유 종목 · 관심 종목' },
     { id:'device', ic:'monitor', name:'스마트홈 허브', sub:() => `허브 모드 ${localStorage.getItem('gl_hub_mode')==='1'?'켜짐':'꺼짐'} · SmartThings · 구글 홈 · Home Assistant` },
     { id:'secure', ic:'key',     name:'보안 · 계정', sub:() => '저장된 키 · 로그아웃 · 계정 삭제' },
@@ -85,7 +85,9 @@ const Settings = {
         ${this._item('답을 소리로 읽기', this._sw(JARVIS?._ttsEnabled, 'Settings.toggleTTS()'), 'AI 답을 음성으로 들려 줍니다')}
         <div class="set-h">앱</div>
         ${this._item('효과음', this._sw(Sounds?.enabled, 'Settings.toggleSound()'), '체크·완료할 때 짧은 소리')}
-        ${this._item('진동(햅틱)', this._sw(Haptic.on, 'Settings.toggleHaptic()'), '체크·순서 바꾸기·탭 전환 때 손끝 진동')}`;
+        ${this._item('진동(햅틱)', this._sw(Haptic.on, 'Settings.toggleHaptic()'), '체크·순서 바꾸기·탭 전환 때 손끝 진동')}
+        <div class="set-h">효과</div>
+        ${this._item('체크 애니메이션', this._sw(typeof Fx!=='undefined' && Fx.on, 'Settings.toggleFx()'), '습관을 체크하면 터지는 효과 · 다 채우면 올클리어')}`;
     } else if (cat === 'notify') {
       h = `<div id="setNotify" class="set-loading">불러오는 중…</div>`;
       setTimeout(async () => { const el = document.getElementById('setNotify'); if (el) { el.className=''; el.innerHTML = await Notifications.pageHtml(); } }, 0);
@@ -99,9 +101,18 @@ const Settings = {
         ${this._link('AI 데이터 전송 동의 철회', "JARVIS.revokeConsent();App.showToast('동의를 철회했습니다 — 다음에 AI 를 쓸 때 다시 묻습니다')", 'AI 회사(Groq·OpenAI·Anthropic·Google·xAI)로 보내기 전에 받은 동의를 지웁니다')}`;
     } else if (cat === 'cal') {
       const ov = localStorage.getItem('gl_top_overdue') !== '0';
+      const g = Auth.isLoggedIn();
+      const bev = BashyCal._read(BashyCal.EV_KEY).length, btk = BashyCal._read(BashyCal.TASK_KEY).filter(t => t.status !== 'completed').length;
       h = `<div class="set-h">구글 캘린더</div>
-        ${this._link('보일 캘린더 · 기본 캘린더', 'App.closeModal();GoogleCalendar.showSettings()', '어떤 캘린더 일정을 보일지, 새 일정을 어디에 넣을지')}
-        ${this._link('지금 다시 불러오기', 'App.closeModal();App.sync()', '구글 캘린더·할 일을 새로 받아 옵니다')}
+        ${g ? this._link('보일 캘린더 · 기본 캘린더', 'App.closeModal();GoogleCalendar.showSettings()', '어떤 캘린더 일정을 보일지, 새 일정을 어디에 넣을지')
+            : Auth.appleUser ? this._link('구글 캘린더·할 일 연결', 'App.closeModal();Auth.connectGoogle()', '구글 계정의 일정과 할 일을 함께 봅니다')
+            : this._item('구글 캘린더', '<span class="set-val">연결 안 됨</span>', '다시 로그인하면 구글 일정과 할 일이 보입니다')}
+        ${DeviceCal.avail() ? `<div class="set-h">아이폰 캘린더</div><div id="setDevCal">${this._devCalHtml()}</div>` : ''}
+        <div class="set-h">캘린더 구독 주소</div>
+        <div id="setIcs">${this._icsHtml()}</div>
+        <div class="set-h">Bashy 캘린더</div>
+        ${this._item('Bashy 캘린더 · 할일', '<span class="set-val">항상 켜짐</span>', `일정 ${bev}개 · 할일 ${btk}개 · 다른 기기에서도 보입니다`)}
+        ${this._link('지금 다시 불러오기', 'App.closeModal();App.sync()', '연결한 캘린더를 모두 새로 받아 옵니다')}
         <div class="set-h">상단 요약</div>
         ${this._item('기한 지난 할일도 보이기', this._sw(ov, 'Settings.toggleOverdue()'), ov ? '위쪽 급한 할일 줄에 기한이 지난 것도 함께 보입니다' : '기한이 지나지 않은 할일만 위쪽에 보입니다')}`;
     } else if (cat === 'econ') {
@@ -144,6 +155,7 @@ const Settings = {
   setIcons(v) { Icons.mode = v; Icons.applyMode(); Icons.updateModeLabel?.(); this._re('design'); },
   toggleTTS() { JARVIS.toggleTTS(); this._re('voice'); },
   toggleHaptic() { Haptic.on = !Haptic.on; if (Haptic.on) Haptic.light(); this._re('voice'); },
+  toggleFx() { Fx.on = !Fx.on; if (Fx.on) setTimeout(() => { Fx.check(document.querySelector('.set-sw[onclick*="toggleFx"]'), true); }, 60); this._re('voice'); },
   toggleSound() { Sounds.enabled = !Sounds.enabled; if (Sounds.enabled) Sounds.click?.(); App._updateSoundLabel?.(); this._re('voice'); },
   // 계정 삭제 — Apple 심사 지침 5.1.1(v). 두 번 확인한 뒤 서버(/api/delete-account)가 지운다.
   deleteAccount() {
@@ -247,6 +259,93 @@ const Settings = {
   async mcpCopy() {
     try { await navigator.clipboard.writeText(this._mcp || ''); App.showToast('복사했습니다', 'success'); }
     catch { App.showToast('복사 실패 — 주소를 길게 눌러 복사해 주세요', 'error'); }
+  },
+
+  // ── 일정과 할일: 아이폰 캘린더 · 구독 주소 ─────────────
+  _devCalHtml() {
+    const on = DeviceCal.on();
+    let h = this._item('아이폰 캘린더 보기', this._sw(on, `Settings.deviceCal(${!on})`),
+      on ? '아이폰에 추가한 계정의 일정을 함께 보여 줍니다' : 'iCloud·네이버·아웃룩 등 아이폰 설정에 추가한 계정의 일정을 함께 봅니다');
+    if (!on) return h;
+    const cals = DeviceCal._cals;
+    if (!cals) { setTimeout(() => DeviceCal.calendars().then(() => this._paintDevCal()).catch(e => App.showToast(e.message, 'error')), 0); return h + '<div class="set-loading">캘린더를 불러오는 중…</div>'; }
+    if (!cals.length) return h + '<p class="set-note">이 아이폰에 캘린더가 없습니다.</p>';
+    const hide = new Set(DeviceCal.cfg().hide || []), dest = DeviceCal.dest();
+    h += cals.map((c, i) => `<div class="set-item cal-row"><i class="ev-dot" style="background:${esc(c.color)}"></i>
+        <span class="set-tx"><b>${esc(c.title)}</b><small>${esc(c.source || '')}${c.allowsModify ? '' : ' · 읽기 전용'}</small></span>
+        ${this._sw(!hide.has(c.id), `Settings.devCalShow(${i})`)}</div>`).join('');
+    const w = DeviceCal.writable();
+    if (w.length) h += this._item('새 일정 기본 저장', `<select class="inp inp-sm cal-sel" onchange="Settings.devCalDest(this.value)">${
+      w.map((c) => `<option value="${cals.indexOf(c)}"${dest && dest.id === c.id ? ' selected' : ''}>${esc(c.title)}</option>`).join('')}</select>`, '추가 창에서 바꿀 수 있습니다');
+    return h;
+  },
+  _paintDevCal() { const el = document.getElementById('setDevCal'); if (el) el.innerHTML = this._devCalHtml(); },
+  async deviceCal(on) {
+    try {
+      await DeviceCal.enable(on);
+      if (on) await DeviceCal.calendars(true);
+      App.showToast(on ? '아이폰 캘린더를 함께 봅니다' : '아이폰 캘린더를 껐습니다', 'success');
+    } catch (e) { App.showToast(e.message || String(e), 'error'); }
+    try { Auth._paintGConnect(); } catch (e) {}
+    this._paintDevCal();
+    App.sync();
+  },
+  devCalShow(i) {
+    const c = (DeviceCal._cals || [])[i]; if (!c) return;
+    const hide = new Set(DeviceCal.cfg().hide || []);
+    DeviceCal.setVisible(c.id, hide.has(c.id));
+    this._paintDevCal(); App.sync();
+  },
+  devCalDest(i) { const c = (DeviceCal._cals || [])[+i]; if (c) { DeviceCal.setDest(c.id); CalSources.remember('device:' + c.id); } },
+
+  _icsColor: null,
+  _icsHtml() {
+    const list = IcsCal.sources();
+    const cur = this._icsColor || IcsCal.COLORS[list.length % IcsCal.COLORS.length];
+    const host = u => { try { return new URL(u).host; } catch (e) { return u; } };
+    return list.map(s => `<div class="set-item cal-row"><i class="ev-dot" style="background:${esc(s.color)}"></i>
+        <span class="set-tx"><b>${esc(s.name)}</b><small${IcsCal.errors[s.id] ? ' class="cal-err"' : ''}>${IcsCal.errors[s.id] ? '받지 못함 · ' + esc(IcsCal.errors[s.id]) : esc(host(s.url)) + ' · 읽기 전용'}</small></span>
+        <button type="button" class="btn-sm cal-del" onclick="Settings.icsRemove('${s.id}')">삭제</button></div>`).join('')
+      + `<div class="cal-ics-add">
+        <input id="icsUrl" class="inp" type="url" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="https:// 또는 webcal:// 로 시작하는 주소">
+        <div class="cal-ics-line">
+          <input id="icsName" class="inp" type="text" maxlength="30" placeholder="이름 (비우면 캘린더 이름)">
+          <div class="cal-sw" role="radiogroup" aria-label="색">${IcsCal.COLORS.map(c => `<button type="button" role="radio" aria-checked="${c === cur}" class="${c === cur ? 'on' : ''}" style="--c:${c}" onclick="Settings.icsPick('${c}')"></button>`).join('')}</div>
+        </div>
+        <button type="button" id="icsGo" class="btn-sm accent" onclick="Settings.icsAdd()">구독 추가</button>
+        <p class="set-note">네이버·iCloud·아웃룩 캘린더의 공유(공개) 설정에서 iCal(ICS) 주소를 복사해 붙여 넣으세요. 구독한 일정은 읽기만 하고, 15분마다 새로 받습니다.</p>
+      </div>`;
+  },
+  _paintIcs() { const el = document.getElementById('setIcs'); if (el) el.innerHTML = this._icsHtml(); },
+  icsPick(c) {
+    this._icsColor = c;
+    document.querySelectorAll('.cal-sw button').forEach(b => { const on = b.style.getPropertyValue('--c') === c; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+  },
+  async icsAdd() {
+    const url = IcsCal.normUrl(document.getElementById('icsUrl')?.value);
+    const name = (document.getElementById('icsName')?.value || '').trim();
+    if (!url) { App.showToast('http(s):// 또는 webcal:// 로 시작하는 주소를 넣어 주세요', 'error'); return; }
+    const btn = document.getElementById('icsGo'); if (btn) { btn.disabled = true; btn.textContent = '확인하는 중…'; }
+    try {
+      const t = await IcsCal.test(url);
+      IcsCal.add(name || t.name, url, this._icsColor);
+      this._icsColor = null;
+      App.showToast(`구독했습니다 — 일정 ${t.count}개`, 'success');
+      try { Auth._paintGConnect(); } catch (e) {}
+      this._paintIcs();
+      App.sync();
+    } catch (e) {
+      App.showToast('추가하지 못했습니다: ' + (e.message || e), 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '구독 추가'; }
+    }
+  },
+  icsRemove(id) {
+    const s = IcsCal.sources().find(x => x.id === id); if (!s) return;
+    if (!confirm(`'${s.name}' 구독을 지울까요?`)) return;
+    IcsCal.remove(id);
+    App._srcEv.ics = App._srcEv.ics.filter(e => e._calId !== id);
+    App._mergeEvents(); App._renderAllCal();
+    this._paintIcs();
   },
 
   toggleOverdue() {

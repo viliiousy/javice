@@ -451,11 +451,32 @@ const Auth = {
     if (user.providerData.some(p => p.providerId === 'google.com') && await this.serverRefresh()) await this._attachGoogle();
     this._paintGConnect();
   },
+  // Apple 로 로그인했고 구글이 없을 때 '일정과 할일' 카드에 한 번 보이는 안내.
+  // 예전엔 '구글을 연결해야 쓴다' 였다 — 이제 일정·할일은 Bashy 계정에 저장되고, 아이폰 캘린더·구독 주소도 볼 수 있다.
   _paintGConnect() {
-    const off = !!(this.appleUser && !this.isLoggedIn());
-    const el = document.getElementById('gConnect'); if (el) el.hidden = !off;
-    if (off) { const t = document.getElementById('tasksContainer'); if (t) t.innerHTML = ''; const e = document.getElementById('eventsWrap'); if (e) e.innerHTML = ''; }
+    const noG = !!(this.appleUser && !this.isLoggedIn());
+    const el = document.getElementById('gConnect');
+    let other = false, closed = false;
+    try { other = DeviceCal.on() || IcsCal.sources().length > 0; } catch (e) {}
+    try { closed = localStorage.getItem('gl_gconnect_off') === '1'; } catch (e) {}
+    const show = noG && !other && !closed;
+    if (el) {
+      el.hidden = !show;
+      if (show) {
+        const dev = typeof DeviceCal !== 'undefined' && DeviceCal.avail();
+        el.innerHTML = `<p><b>일정과 할일은 구글 없이도 씁니다</b><span>여기서 추가한 일정과 할일은 Bashy 계정에 저장됩니다. ${dev ? '아이폰 캘린더(iCloud·네이버·아웃룩 등), ' : ''}구글 캘린더, 캘린더 구독 주소도 함께 볼 수 있습니다.</span></p>
+          <div class="g-connect-acts">
+            ${dev ? '<button class="btn-sm accent" onclick="Settings.deviceCal(true)">아이폰 캘린더 보기</button>' : ''}
+            <button class="btn-sm${dev ? '' : ' accent'}" onclick="Auth.connectGoogle()">구글 연결</button>
+            <button class="btn-sm" onclick="Settings.open('cal')">다른 캘린더</button>
+          </div>
+          <button type="button" class="g-x" onclick="Auth.hideGConnect()" aria-label="안내 닫기">닫기</button>`;
+      }
+    }
+    // 구글이 끊겼으면 구글 일정·할일만 내린다 (Bashy 것은 그대로 둔다)
+    if (noG) { try { if (App._srcEv.google.length || App.S.lists.some(l => l.id !== BashyCal.LIST_ID)) App.dropGoogle(); } catch (e) {} }
   },
+  hideGConnect() { try { localStorage.setItem('gl_gconnect_off', '1'); } catch (e) {} this._paintGConnect(); },
   // Apple 로그인 상태에서 구글 캘린더·할 일 붙이기 — 구글 로그인 후 같은 Firebase 계정에 연결한다
   async connectGoogle() { this._wantLink = true; await this.nativeLogin(); },
   async _attachGoogle() {

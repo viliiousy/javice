@@ -274,7 +274,9 @@ const Habits = {
       // 퍼펙트 달성 체크
       const newChk=this.getChecked(date);
       const todayList=this.getHabitsForDate(date);
-      if(todayList.length>0&&todayList.every(h=>newChk.includes(h.id))) { setTimeout(()=>Sounds?.achieve(),200); setTimeout(()=>{ try{ Haptic.success(); }catch(e){} },120); }
+      const all=todayList.length>0&&todayList.every(h=>newChk.includes(h.id));
+      this._fx(id, all, todayList.length);
+      if(all) { setTimeout(()=>Sounds?.achieve(),200); setTimeout(()=>{ try{ Haptic.success(); }catch(e){} },120); }
     } else { Sounds?.uncheck(); }
   },
 
@@ -292,8 +294,18 @@ const Habits = {
       // 퍼펙트 달성 체크
       const newChk=this.getChecked(date);
       const todayList=this.getHabitsForDate(date);
-      if(todayList.length>0&&todayList.every(h=>newChk.includes(h.id))) setTimeout(()=>Sounds?.achieve(),200);
+      const all=todayList.length>0&&todayList.every(h=>newChk.includes(h.id));
+      this._fx(id, all, todayList.length);
+      if(all) setTimeout(()=>Sounds?.achieve(),200);
     } else { Sounds?.uncheck(); }
+  },
+  // 체크 애니메이션(설정에서 켰을 때만) — 다시 그린 뒤의 체크칸을 찾아 터뜨린다
+  _fx(id, all, n) {
+    if (typeof Fx==='undefined' || !Fx.on) return;
+    try {
+      Fx.check(document.querySelector(`#habitsWrap .habit-item[data-reorderable="${id}"] .habit-chk`));
+      if (all) setTimeout(()=>Fx.perfect(document.querySelector('.card-habits'), n), 260);
+    } catch(e) { console.warn('fx', e); }
   },
 
   // 화면에 보이는 순서대로 세운다.

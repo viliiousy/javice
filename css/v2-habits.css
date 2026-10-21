@@ -109,3 +109,16 @@ html[data-ui="v2"] .nt .set-time::-webkit-calendar-picker-indicator{ display:non
 html[data-ui="v2"] .nt .set-note{ font-size:12px; line-height:18px; margin:12px 0 0; }
 html[data-ui="v2"] .nt .set-link{ border-bottom:1px solid var(--v2-line); }
 html[data-ui="v2"] .nt .set-link:last-child{ border-bottom:0; }
+
+/* ── 체크 애니메이션 (js/fx.js) — 화면 위 고정 레이어 ───────────── */
+#fxLayer{ position:fixed; inset:0; z-index:10040; pointer-events:none; overflow:hidden; }
+#fxLayer i{ position:fixed; display:block; pointer-events:none; will-change:transform,opacity; }
+#fxLayer .fx-ring{ width:24px; height:24px; border:3px solid var(--accent); border-radius:50%; box-sizing:border-box; }
+#fxLayer .fx-ray{ width:14px; height:3px; margin:-1.5px 0 0; border-radius:2px; background:var(--accent); transform-origin:0 50%; }
+#fxLayer .fx-bit{ border-radius:1px; }
+#fxLayer .fx-sweep{ border-radius:12px; background:linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--accent) 22%, transparent) 50%, transparent 70%) no-repeat; background-size:60% 100%; }
+#fxLayer .fx-frame{ border:2px solid var(--accent); border-radius:16px; box-sizing:border-box; }
+#fxLayer .fx-stamp{ display:flex; align-items:baseline; gap:8px; padding:8px 16px; border:3px solid var(--accent); border-radius:8px;
+  color:var(--accent); background:color-mix(in srgb, var(--card) 88%, transparent); white-space:nowrap; font-style:normal; }
+#fxLayer .fx-stamp b{ font-size:26px; font-weight:800; letter-spacing:-.02em; }
+#fxLayer .fx-stamp span{ font-size:18px; font-weight:700; }

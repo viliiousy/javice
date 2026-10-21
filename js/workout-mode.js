@@ -232,10 +232,10 @@ const WorkoutMode = {
     return list.map((x, i) => {
       const prev = PlanGen.last(x.name, ds);
       const n = Math.max(this._nSets(x.sets), (log[x.name] || []).length);
-      const cardio = PlanGen.partOf(x.name) === '유산소';
+      const cardio = PlanGen.timed(x.name);
       const nw = x.w !== '' && x.w != null && Number(x.w) > 0 ? Number(x.w) : PlanGen.nextWeight(x.name, x.sets, ds);
       let th = ''; try { th = Fitness._thumb(x, plan || {}); } catch (e) {}
-      return { name: x.name, sets: x.sets, key: x.key, th, cardio, done: done.includes(i), sug: PlanGen.suggest(x.name, x.sets, ds),
+      return { name: x.name, sets: x.sets, key: x.key, sess: x.sess, th, cardio, done: done.includes(i), sug: PlanGen.suggest(x.name, x.sets, ds),
         rows: Array.from({ length: cardio ? 1 : n }, (_, k) => {
           const L = (log[x.name] || [])[k], P = prev && prev.sets[Math.min(k, prev.sets.length - 1)];
           return L ? { w: L.w, r: L.r, ok: true } : { w: nw ?? (P ? P.w : ''), r: nw != null ? this._reps(x.sets) : (P ? P.r : this._reps(x.sets)), ok: false };
@@ -248,7 +248,7 @@ const WorkoutMode = {
     if (!ex.length) { App.showToast('계획된 운동이 없습니다 — ‘+ 운동 추가’ 나 루틴을 먼저 정해 주세요'); return; }
     const todo = ex.filter(e => !e.done);
     const sets = todo.reduce((t, e) => t + (e.cardio ? 0 : e.rows.length), 0);
-    const cardioMin = todo.filter(e => e.cardio).length * 30;
+    const cardioMin = todo.filter(e => e.cardio).reduce((t, e) => t + (+(String(e.sets || '').match(/(\d+)\s*분/) || [])[1] || 30), 0);
     const pf = this.prefs();
     const mins = Math.round((sets * 45 + Math.max(0, sets - 1) * (pf.timer ? pf.rest : 30)) / 60) + cardioMin;
     const vol = todo.reduce((t, e) => t + e.rows.reduce((a, r) => a + (Number(r.w) || 0) * (Number(r.r) || 0), 0), 0);
@@ -260,7 +260,7 @@ const WorkoutMode = {
         <div><b class="num">${mins}</b><span>예상 분</span></div>
         <div><b class="num">${vol ? k(vol) : '—'}</b><span>예상 볼륨 kg</span></div>
       </div>
-      <ol class="wk-cf-list">${todo.map(e => `<li><b>${esc(e.name)}</b><span>${e.cardio ? '유산소' : `${e.rows.length}세트 · ${e.rows[0].w ? e.rows[0].w + 'kg × ' : ''}${e.rows[0].r}회`}</span></li>`).join('')}</ol>
+      <ol class="wk-cf-list">${todo.map(e => `<li><b>${esc(e.name)}</b><span>${e.cardio ? esc(e.sets || '시간') : `${e.rows.length}세트 · ${e.rows[0].w ? e.rows[0].w + 'kg × ' : ''}${e.rows[0].r}회`}</span></li>`).join('')}</ol>
       <p class="pg-note">쉬는 시간 ${pf.timer ? this._fmt(pf.rest) : '타이머 끔'} · 소리 ${pf.sound ? '켬' : '끔'} — 운동 중 위쪽 단추에서 바꿀 수 있습니다.</p>
       <div class="modal-btns"><button class="btn-sm accent" onclick="WorkoutMode.start('${ds}')">예, 시작</button><button class="btn-sm" onclick="App.closeModal()">아니오</button></div>`);
   },
@@ -327,7 +327,7 @@ const WorkoutMode = {
             ${em ? `<button class="wk-tool" onclick="ExMedia.open('${A(x.name)}')">자세 요령</button>` : ''}
           </div>
         </div>
-        ${x.cardio ? `<p class="wk-note">유산소는 시간만 재면 됩니다. 끝나면 아래 ‘완료’ 를 눌러 주세요.</p>` : `
+        ${x.cardio ? `<p class="wk-note">${esc(x.sets || '시간')} — 세트 없이 시간으로 합니다. 끝나면 아래 ‘완료’ 를 눌러 주세요.</p>` : `
         <div class="wk-sets">
           <div class="wk-sh"><span>세트</span><span>kg</span><span>회</span><span></span></div>
           ${x.rows.map((r, k) => `<div class="wk-sw" data-k="${k}"><div class="wk-set${r.ok ? ' ok' : ''}${k === nowK ? ' now' : ''}">
@@ -578,7 +578,8 @@ const WorkoutMode = {
     const back = n === x.orig;
     const nw = PlanGen.nextWeight(n, x.sets, S.ds), prev = PlanGen.last(n, S.ds);
     { const L = PlanGen.log(S.ds); if (L[x.name] && !(S.snapLog || {})[x.name]) { delete L[x.name]; PlanGen.saveLog(S.ds, L); } }   // 바꾸기 전 이름으로 남은 기록은 지운다(새 이름으로 다시 저장)
-    x.name = n; x.th = ''; x.sug = PlanGen.suggest(n, x.sets, S.ds); x.cardio = PlanGen.partOf(n) === '유산소';
+    const wasT = !!x.cardio; x.cardio = PlanGen.timed(n); if (x.cardio !== wasT) { x.sets = Fitness.defSets(n); x.rows = x.cardio ? x.rows.slice(0, 1) : Array.from({ length: this._nSets(x.sets) }, () => ({ w: '', r: this._reps(x.sets), ok: false })); }
+    x.name = n; x.th = ''; x.sug = PlanGen.suggest(n, x.sets, S.ds);
     x.rows = x.rows.map(r => r.ok ? r : { w: nw ?? (prev ? prev.sets[0].w : ''), r: r.r, ok: false });
     if (back) delete x.orig;
     this._saveLog();
@@ -589,9 +590,9 @@ const WorkoutMode = {
   addEx() {
     const favs = Fitness.getFavs();
     Fitness.pickOne({ title: '운동 추가', recLabel: favs.length ? '즐겨찾기' : '', recommend: favs.map(n => ({ n })), onPick: n => {
-      const S = this.st, ds = S.ds, sets = Fitness.DEFAULT_SETS;
-      const prev = PlanGen.last(n, ds), nw = PlanGen.nextWeight(n, sets, ds), cardio = PlanGen.partOf(n) === '유산소';
-      const e = { name: n, sets, key: 'n' + Date.now().toString(36), th: '', cardio, done: false, sug: PlanGen.suggest(n, sets, ds),
+      const S = this.st, ds = S.ds, sets = Fitness.defSets(n);
+      const prev = PlanGen.last(n, ds), nw = PlanGen.nextWeight(n, sets, ds), cardio = PlanGen.timed(n);
+      const e = { name: n, sets, key: 'n' + Date.now().toString(36), sess: S.ex[S.cur]?.sess, th: '', cardio, done: false, sug: PlanGen.suggest(n, sets, ds),
         rows: Array.from({ length: cardio ? 1 : this._nSets(sets) }, (_, k) => { const P = prev && prev.sets[Math.min(k, prev.sets.length - 1)];
           return { w: nw ?? (P ? P.w : ''), r: nw != null ? this._reps(sets) : (P ? P.r : this._reps(sets)), ok: false }; }) };
       S.ex.splice(S.cur + 1, 0, e);
@@ -674,7 +675,7 @@ const WorkoutMode = {
       Fitness.askScope(S.ds, scope => {
         if (!scope) return;   // 취소 — 운동 화면 그대로
         S._scoped = true;
-        App.showToast(Fitness.applyList(S.ds, S.ex.map(e => ({ name: e.name, sets: e.sets })), scope), 'success');
+        App.showToast(Fitness.applyList(S.ds, S.ex.map(e => ({ name: e.name, sets: e.sets, sess: e.sess })), scope), 'success');
         this._finishSave();
       });
       return;

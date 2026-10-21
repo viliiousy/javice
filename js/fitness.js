@@ -59,10 +59,35 @@ const Fitness = {
   // 새 사용자(도우미가 표시)는 기본 배정이 '계획 없음' 이다.
   _defaultFor(dow) { return UserStore.get('gl_fit_blank') === '1' ? 'none' : this.DEFAULT_DAY[dow]; },
 
+  // 하루에 여러 번: 요일 값이 문자열이면 한 번, 배열이면 여러 번(예: ['r_웨이트','r_주짓수']).
+  picks(dow) {
+    const v = this.dayPlan()[dow], R = this.routines();
+    const ok = p => ['A','B','C','cardio','rest','none'].includes(p) || R[p];   // 예전 Hevy 루틴 id 는 무시
+    let a = (Array.isArray(v) ? v : [v]).filter(p => p && ok(p));
+    if (a.length > 1) a = a.filter(p => p !== 'rest' && p !== 'none');
+    return a.length ? a : [this._defaultFor(dow)];
+  },
+  // 요일 값 고치기 — 하나면 문자열, 여럿이면 배열로 저장(예전 데이터와 그대로 맞물린다)
+  _setPicks(dp, dow, arr) {
+    let a = [...new Set((arr || []).filter(Boolean))];
+    if (a.length > 1) a = a.filter(p => p !== 'rest' && p !== 'none');
+    dp[dow] = !a.length ? 'none' : a.length === 1 ? a[0] : a;
+  },
   planFor(dow) {
-    let pick = this.dayPlan()[dow];
+    const ps = this.picks(dow);
+    if (ps.length === 1) return this._planOne(ps[0], dow);
+    const ss = ps.map(p => this._planOne(p, dow));
+    return { name: ss.map(x => x.name).join(' + '), src:'multi',
+      sessions: ss.map(x => ({ name:x.name, src:x.src, rid:x.rid, day:x.day, pick:x.pick })),
+      exercises: ss.flatMap((x, si) => x.exercises.map(e => ({ ...e, sess:si }))) };
+  },
+  // 한 회차의 계획
+  _planOne(pick, dow) {
     const R = this.routines();
-    if (!['A','B','C','cardio','rest','none'].includes(pick) && !R[pick]) pick = this._defaultFor(dow);   // 예전 Hevy 루틴 id 는 무시
+    if (!['A','B','C','cardio','rest','none'].includes(pick) && !R[pick]) pick = this._defaultFor(dow);
+    const P = this._planOne0(pick, R); P.pick = pick; return P;
+  },
+  _planOne0(pick, R) {
     if (R[pick]) return { name:R[pick].name, exercises:(R[pick].exercises||[]).map(x=>({ name:x.name, sets:x.sets||'', ...(x.w?{w:x.w}:{}) })), src:'routine', rid:pick };
     if (pick === 'none')   return { name:'계획 없음', exercises:[], src:'none' };
     if (pick === 'rest')   return { name:'휴식', exercises:[], src:'day' };
@@ -94,10 +119,10 @@ const Fitness = {
     const badge = document.getElementById('fitBadge');
     if (badge) {
       // 배지에 있던 이모지는 뺐다. 바로 옆 머리글이 이미 선 아이콘이라 둘이 부딪혔다.
-      badge.textContent=plan.name;
+      badge.textContent=plan.src==='multi' ? `하루 ${plan.sessions.length}회` : plan.name;
       // 배지를 누르면 그날 플랜의 자세·중량 가이드가 열린다.
       badge.style.cursor='pointer'; badge.title='자세·추천 중량 가이드';
-      badge.onclick=()=> plan.src==='home' ? HomePlan.open(plan.day) : plan.src==='routine' ? Fitness.showRoutineEdit(plan.rid) : Fitness.showDayPlan();
+      badge.onclick=()=> plan.src==='multi' ? Fitness.showDayPlan() : plan.src==='home' ? HomePlan.open(plan.day) : plan.src==='routine' ? Fitness.showRoutineEdit(plan.rid) : Fitness.showDayPlan();
       if(plan.src!=='home') badge.title='루틴 보기·바꾸기';
       badge.className=allEx.length?'badge badge-accent':'badge';
     }
@@ -111,7 +136,7 @@ const Fitness = {
     // 월요일 계획이 뜨는데 아래 실제 운동 기록과 체크는 화요일 것이었다 —
     // 제목도 '오늘의 운동' 그대로여서, 지금 보고 있는 게 언제인지 알 수가 없었다.
     // 요일 줄: 요일 아래에 그날 루틴 이름을 작게 적는다 (시안 06)
-    const shortNm = p => p.src==='none' ? '—' : String(p.name||'').replace(/^DAY\s*[ABC]\s*/,'').replace(/^내 루틴 · /,'').slice(0,4) || '—';
+    const shortNm = p => p.src==='multi' ? `${p.sessions.length}회` : p.src==='none' ? '—' : String(p.name||'').replace(/^DAY\s*[ABC]\s*/,'').replace(/^내 루틴 · /,'').slice(0,4) || '—';
     const tabs = DOW.map((dn,i)=>`<button class="fit-day${i===dow?' on':''}${i===0?' sun':''}" onclick="Fitness.pickDay(${i}, '${Fitness._dateStr(date)}')"><b>${dn}</b><span>${esc(shortNm(this.planFor(i)))}</span></button>`).join('');
     const container = document.getElementById('fitnessWrap');
     const ds = Fitness._dateStr(date);
@@ -153,19 +178,21 @@ const Fitness = {
       <div class="fit-days">${tabs}</div>
       <div class="fit-prog"><div class="fit-prog-bar"><i style="width:${pct}%"></i></div><span class="num">${done} / ${allEx.length}</span></div>
       <div class="fit-list">
-      ${allEx.map((ex,i)=>{
+      ${(()=>{ var prevS=-1; return allEx.map((ex,i)=>{
         const A = v => esc(v).replace(/'/g,'&#39;');
         const src = this._thumb(ex, plan);
-        const info = ex.hp!=null&&plan.src==='home' ? `HomePlan.open(${plan.day},${ex.hp})`
+        const sp = this._sessOf(ex, plan);
+        const head = plan.src==='multi' && ex.sess!==prevS ? (prevS=ex.sess, `<div class="fx-sess"><span class="num">${ex.sess!=null?ex.sess+1:'+'}</span><b>${esc(ex.sess!=null?(plan.sessions[ex.sess]?.name||''):'추가한 운동')}</b></div>`) : '';
+        const info = ex.hp!=null&&sp.src==='home' ? `HomePlan.open(${sp.day},${ex.hp})`
                    : (typeof ExMedia!=='undefined'&&ExMedia.find(ex.name)) ? `ExMedia.open('${esc(ex.name).replace(/'/g,'&#39;')}')` : '';
         const custom = ex.ci!=null;
-        return `<div class="fx${on(i)?' done':''}${i===nextI&&(isToday||isPast)&&!on(i)?' next':''}" data-row data-i="${ex.key}" data-label="${esc(ex.name)}" onclick="Fitness.toggle(${i},'${dsx}')">
+        return head + `<div class="fx${on(i)?' done':''}${i===nextI&&(isToday||isPast)&&!on(i)?' next':''}" data-row data-i="${ex.key}" data-label="${esc(ex.name)}" onclick="Fitness.toggle(${i},'${dsx}')">
           <button type="button" class="fx-th${src?'':' none'}" ${info?`onclick="event.stopPropagation();${info}"`:'tabindex="-1"'} aria-label="${esc(ex.name)} 자세 보기">
             ${typeof Icons!=='undefined'?Icons.svg('dumbbell','fx-ic'):''}${src?`<span class="fx-img">${ExMedia.poseHtml(src)}</span>`:''}
           </button>
           <div class="fx-tx"><div class="fx-nm">${esc(ex.name)}</div><div class="fx-sets num">${esc(ex.sets||'')}</div>${this._logLine(ex, dsx)}</div>
           <button type="button" class="fx-act" onclick="event.stopPropagation();PlanGen.openLog('${A(ex.name)}','${A(ex.sets||'')}','${dsx}')" aria-label="무게 기록">${typeof Icons!=='undefined'?Icons.svg('pen','fx-aic'):'기록'}</button>
-        </div>`;}).join('')}
+        </div>`;}).join(''); })()}
       </div>
       ${plan.from ? `<p class="fit-from">${plan.from.slice(5).replace('-','/')} 계획을 오늘 하는 중 · <a href="javascript:Fitness.undoFrom('${dsx}')">되돌리기</a></p>` : ''}
       <div class="fit-foot">
@@ -195,7 +222,9 @@ const Fitness = {
   },
 
   // 운동 줄 썸네일: 홈트 플랜 그림 → 전체 종목 그림 순으로 찾는다
+  _sessOf(ex, plan) { return plan && plan.src==='multi' ? (plan.sessions[ex.sess] || {}) : (plan || {}); },
   _thumb(ex, plan) {
+    plan = this._sessOf(ex, plan);
     try {
       if (ex.hp!=null && plan.src==='home' && typeof HomePlan!=='undefined') {
         const x = HomePlan.EX?.[plan.day]?.[ex.hp];
@@ -223,21 +252,19 @@ const Fitness = {
       ['none','계획 없음'], ['rest','휴식'], ['cardio','유산소'],
       ['A','홈트 DAY A 푸시'],['B','홈트 DAY B 풀'],['C','홈트 DAY C 하체+코어'],
     ];
-    const rows = DOW.map((d,i) => {
-      let cur = dp[i]; if (!cur || (!R[cur] && !OPTS.some(o=>o[0]===cur))) cur = this._defaultFor(i);
-      const opts = OPTS.map(([v,l]) => `<option value="${v}"${cur===v?' selected':''}>${esc(l)}</option>`);
-      return `<label class="dp-row${i===new Date().getDay()?' dp-today':''}">
+    this._dpOpts = OPTS;
+    const rows = DOW.map((d,i) => `<div class="dp-row${i===new Date().getDay()?' dp-today':''}" data-dow="${i}">
         <span class="dp-d">${d}</span>
-        <select class="inp inp-sm dp-sel" data-dow="${i}">${opts.join('')}</select>
-        ${this._ic('down','dp-chev')}
-      </label>`;
-    }).join('');
+        <div class="dp-ss">${this.picks(i).map((cur,k)=>this._dpSel(cur,k)).join('')}
+          <button type="button" class="dp-add" onclick="Fitness._dpAdd(this)">${this._ic('plus')}<span>한 번 더</span></button>
+        </div>
+      </div>`).join('');
     const rlist = Object.entries(R).map(([id,r]) => `<div class="rt-row">
         <span class="rt-nm">${esc(r.name)}</span><span class="rt-n"><span class="num">${(r.exercises||[]).length}</span>종목</span>
         <button class="rt-ed" onclick="Fitness.showRoutineEdit('${id}')">편집</button>
       </div>`).join('');
     App.openModal('@dumbbell 요일별 운동', `<div class="fz fz-dp">
-      <p class="fz-note">요일마다 할 루틴을 고릅니다. 홈트 3분할 플랜도 고를 수 있습니다.</p>
+      <p class="fz-note">요일마다 할 루틴을 고릅니다. 웨이트 + 주짓수처럼 하루에 두 번 이상 하면 ‘한 번 더’ 를 눌러 주세요.</p>
       <div class="dp-list">${rows}</div>
       <div class="rt-box">
         <div class="fz-lbl">내 루틴</div>
@@ -249,14 +276,37 @@ const Fitness = {
         <button onclick="Fitness._saveDayPlan()" class="btn-sm accent">저장</button>
         <button onclick="App.closeModal()" class="btn-sm">취소</button>
       </div></div>`);
+    setTimeout(()=>document.querySelectorAll('.dp-ss').forEach(b=>this._dpNum(b)), 0);
+  },
+  _dpSel(cur, k) {
+    const opts = (this._dpOpts||[]).map(([v,l]) => `<option value="${v}"${cur===v?' selected':''}>${esc(l)}</option>`).join('');
+    return `<div class="dp-s"><span class="dp-n num">${k+1}</span><label class="dp-sw"><select class="inp inp-sm dp-sel">${opts}</select>${this._ic('down','dp-chev')}</label>`
+      + `<button type="button" class="dp-x" onclick="Fitness._dpDel(this)" aria-label="이 회차 빼기">${this._ic('x') || '✕'}</button></div>`;
+  },
+  _dpNum(box) {
+    const ss = box.querySelectorAll('.dp-s');
+    box.classList.toggle('multi', ss.length > 1);
+    ss.forEach((el,k)=>{ el.querySelector('.dp-n').textContent = k+1; });
+  },
+  _dpAdd(btn) {
+    const box = btn.closest('.dp-ss'); if (box.querySelectorAll('.dp-s').length >= 4) { App.showToast('하루 4회까지 넣을 수 있습니다'); return; }
+    const R = this.routines(), used = [...box.querySelectorAll('.dp-sel')].map(x=>x.value);
+    const next = Object.keys(R).find(id => !used.includes(id)) || 'cardio';
+    btn.insertAdjacentHTML('beforebegin', this._dpSel(next, 0)); this._dpNum(box);
+  },
+  _dpDel(btn) {
+    const box = btn.closest('.dp-ss'), ss = box.querySelectorAll('.dp-s');
+    if (ss.length <= 1) { const sel = ss[0]?.querySelector('select'); if (sel) sel.value = 'none'; return; }
+    btn.closest('.dp-s').remove(); this._dpNum(box);
   },
   _ic(n, c){ return typeof ExMedia!=='undefined' && ExMedia.ic ? ExMedia.ic(n, c) : ''; },
 
   _saveDayPlan() {
     const dp = {};
-    document.querySelectorAll('.dp-sel').forEach(sel => {
-      const v = sel.value;
-      if (v && v !== this._defaultFor(sel.dataset.dow)) dp[sel.dataset.dow] = v;   // 기본과 같으면 저장하지 않는다
+    document.querySelectorAll('.dp-row').forEach(row => {
+      const dow = row.dataset.dow, vals = [...row.querySelectorAll('.dp-sel')].map(x => x.value);
+      this._setPicks(dp, dow, vals);
+      if (dp[dow] === this._defaultFor(dow)) delete dp[dow];   // 기본과 같으면 저장하지 않는다
     });
     this.saveDayPlan(dp);
     App.closeModal();
@@ -272,18 +322,23 @@ const Fitness = {
     this._cart = r ? (r.exercises||[]).map(x => ({ name:x.name, sets:x.sets||this.DEFAULT_SETS, ...(x.w?{w:x.w}:{}) })) : [];
     const dp = this.dayPlan();
     const DOW = ['일','월','화','수','목','금','토'];
-    const days = DOW.map((d,i) => `<label class="day-pick-btn"><input type="checkbox" class="rt-day" value="${i}" ${id && dp[i]===id?'checked':''}><span>${d}</span></label>`).join('');
+    const days = DOW.map((d,i) => `<label class="day-pick-btn"><input type="checkbox" class="rt-day" value="${i}" ${id && this.picks(i).includes(id)?'checked':''}><span>${d}</span></label>`).join('');
+    this._rtMode = 'add';
     this._openPicker(r ? '루틴 편집' : '새 루틴', `
       <div class="modal-row"><label class="modal-lbl" for="rtName">루틴 이름</label>
         <input id="rtName" class="inp" placeholder="예: 상체 A, 하체 데이" value="${r?esc(r.name):''}"></div>
-      <div class="modal-row"><label class="modal-lbl">하는 요일</label><div class="day-picker">${days}</div></div>
+      <div class="modal-row"><label class="modal-lbl">하는 요일</label><div class="day-picker">${days}</div>
+        <div class="rt-mode"><span>그 요일에 다른 운동이 있으면</span>
+          <button type="button" class="rt-m on" data-m="add" onclick="Fitness._rtSetMode('add')">같은 날 한 번 더</button>
+          <button type="button" class="rt-m" data-m="replace" onclick="Fitness._rtSetMode('replace')">바꾸기</button></div></div>
       <div class="fz-lbl fz-lbl-sec">운동</div>`,
       r ? `<button onclick="Fitness.delRoutine('${id}')" class="btn-danger">루틴 삭제</button>` : '');
   },
+  _rtSetMode(m) { this._rtMode = m; document.querySelectorAll('.rt-m').forEach(b => b.classList.toggle('on', b.dataset.m === m)); },
   delRoutine(id) {
     if (!confirm('이 루틴을 삭제할까요? 배정된 요일은 계획 없음이 됩니다.')) return;
     const R = this.routines(); delete R[id]; this.saveRoutines(R);
-    const dp = this.dayPlan(); Object.keys(dp).forEach(k => { if (dp[k] === id) dp[k] = 'none'; }); this.saveDayPlan(dp);
+    const dp = this.dayPlan(); for (let i=0;i<7;i++) { const a = this.picks(i); if (a.includes(id)) this._setPicks(dp, i, a.filter(x => x !== id)); } this.saveDayPlan(dp);
     App.closeModal(); this.render(App?.S?.selDate || new Date());
     App.showToast('루틴 삭제됨', 'success');
   },
@@ -294,13 +349,17 @@ const Fitness = {
     if (!cart.length) { App.showToast('운동을 하나 이상 골라 주세요', 'error'); return; }
     const R = this.routines();
     const id = this._rid || ('r_' + Date.now().toString(36));
-    R[id] = { name, exercises: cart.map(x => ({ name:x.name, sets:x.sets||this.DEFAULT_SETS, ...(x.w?{w:x.w}:{}) })) };
+    R[id] = { name, exercises: cart.map(x => ({ name:x.name, sets:x.sets||this.defSets(x.name), ...(x.w?{w:x.w}:{}) })) };
     this.saveRoutines(R);
     const dp = this.dayPlan();
     const picked = [...document.querySelectorAll('.rt-day:checked')].map(c => c.value);
     for (let i=0;i<7;i++) {
-      if (picked.includes(String(i))) dp[i] = id;
-      else if (dp[i] === id) dp[i] = 'none';
+      const a = this.picks(i), has = a.includes(id);
+      if (picked.includes(String(i))) {
+        if (has) continue;
+        const real = a.filter(x => x !== 'rest' && x !== 'none');   // 휴식·계획 없음이면 그냥 바꾼다
+        this._setPicks(dp, i, this._rtMode === 'replace' || !real.length ? [id] : [...real, id]);
+      } else if (has) this._setPicks(dp, i, a.filter(x => x !== id));
     }
     this.saveDayPlan(dp);
     this._cart = []; this._rid = null;
@@ -408,9 +467,10 @@ const Fitness = {
     FirebaseSync?.scheduleSave();
     this._paintPick();
   },
-  _parts(){ return Object.keys(typeof EX_DB!=='undefined' ? EX_DB : {}); },
+  _parts(){ this._syncMyEx(); const k=Object.keys(typeof EX_DB!=='undefined' ? EX_DB : {}); return k.includes('내 운동') ? ['내 운동', ...k.filter(x=>x!=='내 운동')] : k; },
   _search(part, q){
     if(typeof EX_DB==='undefined') return [];
+    this._syncMyEx();
     let src = part && EX_DB[part] ? EX_DB[part].map(n=>[part,n])
               : Object.entries(EX_DB).flatMap(([p,ns])=>ns.map(n=>[p,n]));
     q=String(q||'').trim();
@@ -465,7 +525,7 @@ const Fitness = {
     const q=String(this._q||'').trim();
     // 목록에 없는 운동도 이름만 쳐서 바로 넣을 수 있다.
     const own = q && !hits.some(h=>h[1].replace(/\s+/g,'')===q.replace(/\s+/g,''))
-      ? `<div class="ex-row ex-own" onclick="Fitness.pickOwn()"><span class="ex-th ex-th-own">${this._ic('plus')}</span><span class="ex-row-main"><span class="ex-row-nm">'${esc(q)}' 직접 추가</span><span class="ex-row-part">목록에 없는 운동</span></span></div>` : '';
+      ? `<div class="ex-row ex-own" onclick="Fitness.pickOwn()"><span class="ex-th ex-th-own">${this._ic('plus')}</span><span class="ex-row-main"><span class="ex-row-nm">'${esc(q)}' 직접 만들기</span><span class="ex-row-part">목록에 없는 운동</span></span></div>` : '';
     if(!hits.length) return own || '<div class="ex-empty">결과가 없습니다</div>';
     const favs=this.getFavs(), inCart=new Set((this._cart||[]).map(x=>x.name));
     return own + hits.map(([p,n],i)=>{
@@ -499,15 +559,83 @@ const Fitness = {
     const name=hit[1];
     if(!this._cart) this._cart=[];
     if(this._cart.some(x=>x.name===name)){ App.showToast('이미 골랐어요'); return; }
-    this._cart.push({ name, sets:this.DEFAULT_SETS });
+    this._cart.push({ name, sets:this.defSets(name) });
     this._paintPick();
   },
-  pickOwn(){
-    const name=String(this._q||'').trim().slice(0,40); if(!name) return;
-    if(!this._cart) this._cart=[];
-    if(this._cart.some(x=>x.name===name)){ App.showToast('이미 골랐어요'); return; }
-    this._cart.push({ name, sets:this.DEFAULT_SETS });
-    this._paintPick();
+  pickOwn(prefill){
+    const q = prefill!=null ? prefill : String(this._q||'').trim().slice(0,40);
+    this.makeEx(q, name=>{
+      if(!this._cart) this._cart=[];
+      if(this._cart.some(x=>x.name===name)){ App.showToast('이미 골랐어요'); return; }
+      this._cart.push({ name, sets:this.defSets(name) });
+      this._paintPick();
+    });
+  },
+
+  // ── 직접 만든 운동 ─────────────────────
+  // 목록에 없는 운동을 이름 + 종류(근력 부위 / 유산소 / 스포츠)로 저장해 두고, 다음부터 검색·교체·추가에 같이 나온다.
+  MYEX_KEY: 'gl_fit_myex',   // [{ n:'주짓수 드릴', p:'스포츠' }]
+  myEx(){ try{ const v=JSON.parse(UserStore.get(this.MYEX_KEY)||'[]'); return Array.isArray(v)?v.filter(x=>x&&x.n):[]; }catch{ return []; } },
+  myPart(n){ const x=this.myEx().find(e=>e.n===n); return x ? x.p : null; },
+  _syncMyEx(){
+    if(typeof EX_DB==='undefined') return;
+    const l=this.myEx(); if(l.length) EX_DB['내 운동']=l.map(x=>x.n); else delete EX_DB['내 운동'];
+  },
+  saveMyEx(n, p){
+    const l=this.myEx().filter(x=>x.n!==n); l.unshift({ n, p }); UserStore.set(this.MYEX_KEY, JSON.stringify(l.slice(0,200)));
+    FirebaseSync?.scheduleSave(); this._syncMyEx();
+  },
+  delMyEx(n){ UserStore.set(this.MYEX_KEY, JSON.stringify(this.myEx().filter(x=>x.n!==n))); FirebaseSync?.scheduleSave(); this._syncMyEx(); },
+  defSets(n){ const p=typeof PlanGen!=='undefined'?PlanGen.partOf(n):null; return p==='스포츠' ? '60분' : p==='유산소' ? '30분' : this.DEFAULT_SETS; },
+  // 운동 만들기 시트 — 지금 열린 창(고르기·교체) 위에 얹어서, 고르던 목록이 날아가지 않게 한다
+  makeEx(name, done){
+    document.getElementById('myExSheet')?.remove();
+    const PARTS=['가슴','등','어깨','하체','이두','삼두','복근','전완근','전신'];
+    this._mx={ done, kind:'str', part:'전신' };
+    const old = name ? this.myEx().find(x=>x.n===name) : null;
+    if(old){ this._mx.kind = old.p==='스포츠'?'sport':old.p==='유산소'?'cardio':'str'; if(this._mx.kind==='str') this._mx.part=old.p; }
+    else if(name && typeof PlanGen!=='undefined'){ const g=(EX_DB['스포츠']||[]).some(x=>name.includes(x)) ? '스포츠' : PlanGen.partOf(name); if(g==='스포츠') this._mx.kind='sport'; else if(g==='유산소') this._mx.kind='cardio'; else if(PARTS.includes(g)) this._mx.part=g; }
+    const el=document.createElement('div'); el.id='myExSheet'; el.className='mx-ov';
+    el.innerHTML=`<div class="mx-sh" role="dialog" aria-label="운동 직접 만들기">
+      <div class="mx-hd"><b>운동 직접 만들기</b><button class="mx-x" onclick="Fitness._mxClose()" aria-label="닫기">${this._ic('x')||'✕'}</button></div>
+      <label class="mx-lbl" for="mxName">이름</label>
+      <input id="mxName" class="inp" maxlength="40" placeholder="예: 주짓수 드릴, 케이블 크로스오버" value="${esc(name||'')}">
+      <div class="mx-lbl">어떻게 하나요</div>
+      <div class="mx-seg">
+        <button type="button" data-k="str">근력<small>세트 · 횟수 · 무게</small></button>
+        <button type="button" data-k="cardio">유산소<small>분</small></button>
+        <button type="button" data-k="sport">스포츠<small>분</small></button>
+      </div>
+      <div class="mx-parts"><div class="mx-lbl">주로 쓰는 부위</div><div class="mx-chips">${PARTS.map(p=>`<button type="button" data-p="${p}">${p}</button>`).join('')}</div></div>
+      <button class="mx-go" onclick="Fitness._mxSave()">추가</button>
+    </div>`;
+    document.body.appendChild(el);
+    el.addEventListener('click', e=>{
+      if(e.target===el) return this._mxClose();
+      const k=e.target.closest('[data-k]'), p=e.target.closest('[data-p]');
+      if(k){ this._mx.kind=k.dataset.k; this._mxPaint(); }
+      if(p){ this._mx.part=p.dataset.p; this._mxPaint(); }
+    });
+    this._mxPaint();
+    requestAnimationFrame(()=>{ el.classList.add('on'); if(!name) document.getElementById('mxName')?.focus(); });
+  },
+  _mxPaint(){
+    const el=document.getElementById('myExSheet'), m=this._mx; if(!el||!m) return;
+    el.querySelectorAll('[data-k]').forEach(b=>b.classList.toggle('on', b.dataset.k===m.kind));
+    el.querySelectorAll('[data-p]').forEach(b=>b.classList.toggle('on', b.dataset.p===m.part));
+    el.querySelector('.mx-parts').hidden = m.kind!=='str';
+  },
+  _mxClose(){ const el=document.getElementById('myExSheet'); if(el){ el.classList.remove('on'); setTimeout(()=>el.remove(), 200); } this._mx=null; },
+  _mxSave(){
+    const m=this._mx, n=(document.getElementById('mxName')?.value||'').trim().replace(/\s+/g,' ').slice(0,40);
+    if(!m) return;
+    if(!n){ App.showToast('운동 이름을 입력해 주세요','error'); return; }
+    const p = m.kind==='sport' ? '스포츠' : m.kind==='cardio' ? '유산소' : m.part;
+    const inDb = typeof EX_DB!=='undefined' && Object.entries(EX_DB).some(([k,v])=>k!=='내 운동' && v.includes(n));
+    if(!inDb) this.saveMyEx(n, p);
+    const done=m.done; this._mxClose();
+    App.showToast(inDb ? `${n} 을(를) 넣었습니다` : `'${n}' 을(를) 내 운동에 저장했습니다`, 'success');
+    try{ done && done(n); }catch(e){ console.warn(e); }
   },
   cartSets(i,v){ const x=(this._cart||[])[i]; if(x) x.sets=String(v||'').trim(); },
   cartRemove(i){ if(this._cart){ this._cart.splice(i,1); this._paintPick(); } },
@@ -531,6 +659,7 @@ const Fitness = {
       <div class="ex-parts">
         ${parts.map(p=>`<button class="ex-part" data-part="${p}" onclick="Fitness.setPart('${p}')">${p}</button>`).join('')}
       </div>
+      <button type="button" class="ex-make" onclick="Fitness.pickOwn('')">${this._ic('plus')}<span>목록에 없는 운동 직접 만들기</span></button>
       <div id="exCart"></div>
       <div id="exResults" class="ex-results"></div>
       <div class="modal-btns">
@@ -560,6 +689,7 @@ const Fitness = {
     this._po = o;
     App.openModal('@dumbbell ' + o.title, `<div class="fz fz-po">${o.head||''}
       <input id="poQ" class="inp" type="search" autocomplete="off" placeholder="운동 검색 · 초성 가능" oninput="Fitness._poPaint()">
+      <button type="button" class="ex-make" onclick="Fitness._poMake('')">${this._ic('plus')}<span>목록에 없는 운동 직접 만들기</span></button>
       <div id="poList" class="sw-list po-list"></div>
       <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div></div>`);
     setTimeout(()=>this._poPaint(), 0);
@@ -573,23 +703,30 @@ const Fitness = {
     const q=(document.getElementById('poQ')?.value||'').trim();
     if(!q){
       const rec=o.recommend||[];
-      this._poNames=rec.map(r=>r.n);
+      this._poOwn=-1; this._poNames=rec.map(r=>r.n);
       box.innerHTML = rec.length ? (o.recLabel?`<div class="sw-h">${esc(o.recLabel)}</div>`:'') + rec.map((r,i)=>this._poRow(r.n,i,r.small||'')).join('')
         : '<p class="pg-note">위에 운동 이름을 검색해 주세요.</p>';
       return;
     }
     const hits=this._search(null,q).filter(([,n])=>!(o.exclude||[]).includes(n)).slice(0,40);
     this._poNames=hits.map(h=>h[1]);
-    const own = !hits.some(h=>h[1].replace(/\s+/g,'')===q.replace(/\s+/g,'')) ? (this._poNames.push(q.slice(0,40)), this._poRow(q.slice(0,40), this._poNames.length-1, '목록에 없는 운동 · 직접 추가')) : '';
+    this._poOwn=-1;
+    const own = !hits.some(h=>h[1].replace(/\s+/g,'')===q.replace(/\s+/g,'')) ? (this._poNames.push(q.slice(0,40)), this._poOwn=this._poNames.length-1, this._poRow(q.slice(0,40), this._poNames.length-1, '목록에 없는 운동 · 직접 만들기')) : '';
     box.innerHTML = hits.map(([p,n],i)=>this._poRow(n,i,esc(p))).join('') + own || '<p class="pg-note">결과가 없습니다</p>';
   },
-  _poPick(i) { const n=(this._poNames||[])[i], o=this._po; if(!n||!o) return; App.closeModal(); this._po=null; o.onPick(n); },
+  _poPick(i) {
+    const n=(this._poNames||[])[i], o=this._po; if(!n||!o) return;
+    if(this._poOwn===i) return this._poMake(n);   // 목록에 없는 이름 → 종류를 묻고 저장
+    App.closeModal(); this._po=null; o.onPick(n);
+  },
+  _poMake(name) { const o=this._po; if(!o) return; this.makeEx(name, n=>{ App.closeModal(); this._po=null; o.onPick(n); }); },
 
   // ── 그날만 바꾼 목록 / 플랜에 적용 ─────────────
   // 수정(카드)이나 운동 모드에서 목록을 바꾸면 '오늘만' 또는 '앞으로 이 플랜에도' 중 하나로 저장한다.
   _dayKey(ds){ return 'gl_fit_day_'+ds; },
   dayOverride(ds){ try{ const v=JSON.parse(UserStore.get(this._dayKey(ds))||'null'); return Array.isArray(v)?v:null; }catch{ return null; } },
-  _clean(list){ return list.map(x=>{ const o={ name:x.name, sets:x.sets||this.DEFAULT_SETS }; if(x.w!==''&&x.w!=null) o.w=x.w; return o; }); },
+  _clean(list){ return list.map(x=>{ const o={ name:x.name, sets:x.sets||this.defSets(x.name) }; if(x.w!==''&&x.w!=null) o.w=x.w; if(x.sess!=null) o.sess=x.sess; return o; }); },
+  _noSess(list){ return list.map(({ sess, ...o })=>o); },
   applyList(ds, list, scope) {
     const d=new Date(ds+'T00:00:00'), before=this.exercisesFor(d).list;
     const doneNames=new Set(this._checked(d).map(i=>before[i]?.name).filter(Boolean));
@@ -598,11 +735,24 @@ const Fitness = {
     if(scope==='plan'){
       const plan=this.planOn(d), dow=plan.from ? new Date(plan.from+'T00:00:00').getDay() : d.getDay();
       const R=this.routines();
-      if(plan.src==='routine' && R[plan.rid]){ R[plan.rid].exercises=items; this.saveRoutines(R); msg=`'${R[plan.rid].name}' 플랜에 적용했습니다`; }
+      if(plan.src==='multi'){
+        // 하루 여러 번: 회차마다 그 회차 루틴에 넣는다(새로 넣은 운동은 마지막 회차로)
+        const ss=plan.sessions, ids=[], DOWn='일월화수목금토';
+        ss.forEach((x,si)=>{
+          const its=this._noSess(items.filter(e=>(e.sess??ss.length-1)===si));
+          if(!its.length) return;
+          if(x.src==='routine' && R[x.rid]){ R[x.rid].exercises=its; ids.push(x.rid); }
+          else { const id='r_'+Date.now().toString(36)+si; R[id]={ name: x.name&&x.name!=='휴식'&&x.name!=='계획 없음' ? x.name : `${DOWn[dow]}요일 ${si+1}회차`, exercises:its }; ids.push(id); }
+        });
+        this.saveRoutines(R);
+        const dp=this.dayPlan(); this._setPicks(dp, dow, ids); this.saveDayPlan(dp);
+        msg=`앞으로 ${DOWn[dow]}요일 ${ids.length}회 운동에 적용했습니다`;
+      }
+      else if(plan.src==='routine' && R[plan.rid]){ R[plan.rid].exercises=this._noSess(items); this.saveRoutines(R); msg=`'${R[plan.rid].name}' 플랜에 적용했습니다`; }
       else {
         const id='r_'+Date.now().toString(36), DOW='일월화수목금토';
         const name = plan.src==='none'||!plan.name||plan.name==='휴식' ? `${DOW[dow]}요일 운동` : plan.name;
-        R[id]={ name, exercises:items }; this.saveRoutines(R);
+        R[id]={ name, exercises:this._noSess(items) }; this.saveRoutines(R);
         const dp=this.dayPlan(); dp[dow]=id; this.saveDayPlan(dp);
         msg=`앞으로 ${DOW[dow]}요일에 '${name}' 으로 합니다`;
       }
@@ -638,7 +788,7 @@ const Fitness = {
     const ds=this._dateStr(App?.S?.selDate||new Date());
     if(!this._ed){
       const { list }=this.exercisesFor(new Date(ds+'T00:00:00'));
-      this._ed={ ds, list:list.map(x=>({ name:x.name, sets:x.sets||this.DEFAULT_SETS, w:x.w??'' })), dirty:false };
+      this._ed={ ds, list:list.map(x=>({ name:x.name, sets:x.sets||this.defSets(x.name), w:x.w??'', sess:x.sess })), dirty:false };
       this.render(new Date(ds+'T00:00:00')); return;
     }
     const ed=this._ed;
@@ -653,11 +803,19 @@ const Fitness = {
   cancelEdit(){ const ed=this._ed; this._ed=null; if(ed) this.render(new Date(ed.ds+'T00:00:00')); },
   _edPaint(){ if(this._ed) this.render(new Date(this._ed.ds+'T00:00:00')); },
   _edSetsLabel(x){
+    if(PlanGen.timed(x.name)) return x.sets||'시간';
     const n=WorkoutMode._nSets(x.sets), r=WorkoutMode._reps(x.sets);
     return `${n}세트 × ${r}회${x.w!==''&&x.w!=null&&Number(x.w)>0?` · ${x.w}kg`:''}`;
   },
   edSets(i){
     const x=this._ed?.list[i]; if(!x) return;
+    if(PlanGen.timed(x.name)){
+      const M=[]; for(let v=5; v<=240; v+=5) M.push(v);
+      const cm=+(String(x.sets).match(/(\d+)\s*분/)||[])[1]||60;
+      Wheel.open({ title:x.name, cols:[{ vals:M, cur:M.reduce((a,b)=>Math.abs(b-cm)<Math.abs(a-cm)?b:a,60), fmt:v=>v+'분' }],
+        done:([m])=>{ x.sets=`${m}분`; x.w=''; this._ed.dirty=true; this._edPaint(); } });
+      return;
+    }
     const W=[]; for(let v=0; v<=200; v+=2.5) W.push(v);
     const cw=Number(x.w)||0;
     Wheel.open({ title:x.name, cols:[
@@ -675,13 +833,13 @@ const Fitness = {
       head: orig ? `<p class="pg-note">원래 추천 운동은 <b>${esc(orig)}</b> 입니다. 맨 위에서 되돌릴 수 있습니다.</p>` : '',
       recommend: [...(orig?[{ n:orig, small:'원래 추천 운동 · 되돌리기' }]:[]), ...alts.map(a=>({ n:a.n, small:a.need?eqn(a):'' }))],
       exclude:[x.name],
-      onPick:n=>{ if(!x.orig) x.orig=x.name; if(n===x.orig) delete x.orig; x.name=n; this._ed.dirty=true; this._edPaint(); } });
+      onPick:n=>{ if(!x.orig) x.orig=x.name; if(n===x.orig) delete x.orig; if(PlanGen.timed(n)!==PlanGen.timed(x.name)) { x.sets=this.defSets(n); x.w=''; } x.name=n; this._ed.dirty=true; this._edPaint(); } });
   },
   edDel(i){ if(!this._ed) return; this._ed.list.splice(i,1); this._ed.dirty=true; this._edPaint(); },
   edAdd(){
     const favs=this.getFavs();
     this.pickOne({ title:'운동 추가', recLabel: favs.length?'즐겨찾기':'', recommend:favs.map(n=>({ n })),
-      onPick:n=>{ this._ed.list.push({ name:n, sets:this.DEFAULT_SETS, w:'' }); this._ed.dirty=true; this._edPaint(); } });
+      onPick:n=>{ this._ed.list.push({ name:n, sets:this.defSets(n), w:'' }); this._ed.dirty=true; this._edPaint(); } });
   },
   edReorder(keys){ const L=this._ed.list; this._ed.list=keys.map(k=>L[+k]).filter(Boolean); this._ed.dirty=true; this._edPaint(); },
   _renderEdit(container, tabs, plan){

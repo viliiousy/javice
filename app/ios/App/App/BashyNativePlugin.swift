@@ -4,6 +4,7 @@ import LocalAuthentication
 import WidgetKit
 import AVFoundation
 import HealthKit
+import EventKit
 import AppIntents
 #if canImport(ActivityKit)
 import ActivityKit
@@ -30,6 +31,11 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "restCancel", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "healthRead", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "healthWatch", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "calAccess", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "calList", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "calEvents", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "calAdd", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "calDelete", returnType: CAPPluginReturnPromise),
     ]
 
     // ── 효과음 (쉬는 시간 째깍·끝 알림) ─────────────
@@ -111,6 +117,128 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
         if call.getBool("on") ?? true { BashyHealthWatch.enabled = true; BashyHealthWatch.startIfEnabled() }
         else { BashyHealthWatch.stop() }
         call.resolve(["ok": true])
+    }
+
+    // ── 아이폰 캘린더(EventKit) ─────────────
+    // 아이폰 설정에 넣어 둔 계정(iCloud·네이버·아웃룩·구글 등)의 캘린더를 그대로 읽고, 고른 캘린더에 일정을 넣고 지운다.
+    // 반복 일정은 events(matching:) 가 회차별로 펼쳐 준다 — 회차는 eventIdentifier + 시작 시각으로 구별한다.
+    private lazy var ekStore = EKEventStore()
+    private func calStatus() -> String {
+        let st = EKEventStore.authorizationStatus(for: .event)
+        switch st {
+        case .notDetermined: return "notDetermined"
+        case .restricted: return "restricted"
+        case .denied: return "denied"
+        default: break
+        }
+        if #available(iOS 17.0, *) {
+            if st == .fullAccess { return "granted" }
+            if st == .writeOnly { return "writeOnly" }
+        }
+        if st == .authorized { return "granted" }
+        return "unknown"
+    }
+    private func calHex(_ cg: CGColor?) -> String {
+        guard let cg = cg else { return "#8E8E93" }
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard UIColor(cgColor: cg).getRed(&r, green: &g, blue: &b, alpha: &a) else { return "#8E8E93" }
+        let c = { (v: CGFloat) -> Int in Int((min(1, max(0, v)) * 255).rounded()) }
+        return String(format: "#%02X%02X%02X", c(r), c(g), c(b))
+    }
+    @objc func calAccess(_ call: CAPPluginCall) {
+        let cur = calStatus()
+        if cur == "granted" { call.resolve(["granted": true, "status": cur]); return }
+        if cur == "denied" || cur == "restricted" { call.resolve(["granted": false, "status": cur]); return }
+        let done: (Bool, Error?) -> Void = { ok, err in
+            DispatchQueue.main.async {
+                if ok { self.ekStore = EKEventStore() }   // 허락 전에 만든 저장소는 캘린더 목록이 비어 보일 수 있다
+                call.resolve(["granted": ok && self.calStatus() == "granted", "status": self.calStatus(), "error": err?.localizedDescription ?? ""])
+            }
+        }
+        if #available(iOS 17.0, *) { ekStore.requestFullAccessToEvents(completion: done) }
+        else { ekStore.requestAccess(to: .event, completion: done) }
+    }
+    @objc func calList(_ call: CAPPluginCall) {
+        guard calStatus() == "granted" else { call.resolve(["ok": false, "status": calStatus(), "calendars": [] as [Any]]); return }
+        let def = ekStore.defaultCalendarForNewEvents?.calendarIdentifier ?? ""
+        let cals: [[String: Any]] = ekStore.calendars(for: .event).map { (c: EKCalendar) -> [String: Any] in
+            [
+                "id": c.calendarIdentifier,
+                "title": c.title,
+                "color": calHex(c.cgColor),
+                "allowsModify": c.allowsContentModifications,
+                "source": c.source?.title ?? "",
+                "isDefault": c.calendarIdentifier == def,
+            ]
+        }
+        call.resolve(["ok": true, "status": "granted", "calendars": cals])
+    }
+    @objc func calEvents(_ call: CAPPluginCall) {
+        guard calStatus() == "granted" else { call.resolve(["ok": false, "status": calStatus(), "events": [] as [Any]]); return }
+        let nowMs = Date().timeIntervalSince1970 * 1000
+        let from = Date(timeIntervalSince1970: (call.getDouble("from") ?? (nowMs - 30 * 86400000)) / 1000)
+        let to = Date(timeIntervalSince1970: (call.getDouble("to") ?? (nowMs + 90 * 86400000)) / 1000)
+        let ids = call.getArray("ids", String.self)
+        let store = ekStore
+        DispatchQueue.global(qos: .userInitiated).async {
+            var cals = store.calendars(for: .event)
+            if let ids = ids { let want = Set(ids); cals = cals.filter { want.contains($0.calendarIdentifier) } }
+            guard !cals.isEmpty, to > from else { DispatchQueue.main.async { call.resolve(["ok": true, "events": [] as [Any]]) }; return }
+            let pred = store.predicateForEvents(withStart: from, end: to, calendars: cals)
+            let rows: [[String: Any]] = store.events(matching: pred).prefix(3000).map { (e: EKEvent) -> [String: Any] in
+                let s = e.startDate ?? Date(), en = e.endDate ?? s
+                return [
+                    "id": e.eventIdentifier ?? "",
+                    "calendarId": e.calendar?.calendarIdentifier ?? "",
+                    "calendarTitle": e.calendar?.title ?? "",
+                    "color": self.calHex(e.calendar?.cgColor),
+                    "title": e.title ?? "",
+                    "start": s.timeIntervalSince1970 * 1000,
+                    "end": en.timeIntervalSince1970 * 1000,
+                    "allDay": e.isAllDay,
+                    "location": e.location ?? "",
+                    "notes": String((e.notes ?? "").prefix(2000)),
+                    "recurring": e.hasRecurrenceRules,
+                ]
+            }
+            DispatchQueue.main.async { call.resolve(["ok": true, "events": rows]) }
+        }
+    }
+    @objc func calAdd(_ call: CAPPluginCall) {
+        guard calStatus() == "granted" else { call.reject("캘린더 접근이 허락되지 않았습니다"); return }
+        guard let title = call.getString("title"), !title.isEmpty, let sMs = call.getDouble("start"), let eMs = call.getDouble("end") else { call.reject("제목과 시간이 필요합니다"); return }
+        let ev = EKEvent(eventStore: ekStore)
+        ev.title = title
+        ev.startDate = Date(timeIntervalSince1970: sMs / 1000)
+        ev.endDate = Date(timeIntervalSince1970: max(sMs, eMs) / 1000)
+        ev.isAllDay = call.getBool("allDay") ?? false
+        if let l = call.getString("location"), !l.isEmpty { ev.location = l }
+        if let n = call.getString("notes"), !n.isEmpty { ev.notes = n }
+        let cal = call.getString("calendarId").flatMap { ekStore.calendar(withIdentifier: $0) } ?? ekStore.defaultCalendarForNewEvents
+        guard let target = cal, target.allowsContentModifications else { call.reject("이 캘린더에는 일정을 넣을 수 없습니다"); return }
+        ev.calendar = target
+        do {
+            try ekStore.save(ev, span: .thisEvent, commit: true)
+            call.resolve(["ok": true, "id": ev.eventIdentifier ?? "", "calendarId": target.calendarIdentifier])
+        } catch { call.reject(error.localizedDescription) }
+    }
+    @objc func calDelete(_ call: CAPPluginCall) {
+        guard calStatus() == "granted" else { call.reject("캘린더 접근이 허락되지 않았습니다"); return }
+        guard let id = call.getString("id"), !id.isEmpty else { call.reject("일정 id 가 없습니다"); return }
+        var target: EKEvent? = nil
+        // 반복 일정은 같은 id 를 여러 회차가 같이 쓴다 — 시작 시각으로 그 회차를 찾는다
+        if let sMs = call.getDouble("start"), let first = ekStore.event(withIdentifier: id), let cal = first.calendar {
+            let s = Date(timeIntervalSince1970: sMs / 1000)
+            let pred = ekStore.predicateForEvents(withStart: s.addingTimeInterval(-86400), end: s.addingTimeInterval(86400), calendars: [cal])
+            target = ekStore.events(matching: pred).first(where: { (x: EKEvent) -> Bool in x.eventIdentifier == id && abs((x.startDate ?? .distantPast).timeIntervalSince(s)) < 1 })
+        }
+        if target == nil { target = ekStore.event(withIdentifier: id) }
+        guard let ev = target else { call.reject("일정을 찾지 못했습니다"); return }
+        guard ev.calendar?.allowsContentModifications ?? false else { call.reject("이 캘린더의 일정은 지울 수 없습니다"); return }
+        do {
+            try ekStore.remove(ev, span: (call.getBool("all") ?? false) ? .futureEvents : .thisEvent, commit: true)
+            call.resolve(["ok": true])
+        } catch { call.reject(error.localizedDescription) }
     }
 
     // ── 쉬는 시간 타이머(앱을 내려 둬도) ─────────────

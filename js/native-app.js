@@ -28,7 +28,7 @@ const NativeApp = {
   // 로그인·첫 동기화 전에 들어온 요청은 기다렸다가 처리한다.
   async run() {
     if (!this._queue.length) return;
-    const ready = typeof Auth !== 'undefined' && Auth.accessToken && App.S && Array.isArray(App.S.lists) && App.S.lists.length;
+    const ready = typeof Auth !== 'undefined' && Auth.signedIn() && App.S && Array.isArray(App.S.lists) && App.S.lists.length;
     if (!ready) { clearTimeout(this._wait); this._wait = setTimeout(() => this.run(), 1500); return; }
     while (this._queue.length) {
       const it = this._queue.shift();
@@ -39,8 +39,9 @@ const NativeApp = {
   async handle(it) {
     if (it.action === 'today') { App._gotoCard('calendar'); return; }
     if (it.action === 'addTask' && it.title) {
-      const listId = App.S.lists[0].id;
-      const task = await GoogleTasks.createTask(listId, String(it.title).slice(0, 200), null, '');
+      // 구글이 없으면 Bashy 목록으로
+      const listId = Auth.isLoggedIn() ? App.S.lists[0].id : BashyCal.LIST_ID;
+      const task = await TaskStore.createTask(listId, String(it.title).slice(0, 200), null, '');
       task.starred = false;
       (App.S.tasks[listId] = App.S.tasks[listId] || []).unshift(task);
       App._renderTasks(); App._updateStatsBanner();
