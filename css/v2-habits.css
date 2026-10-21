@@ -196,3 +196,26 @@ html[data-ui="v2"] .nt .set-link:last-child{ border-bottom:0; }
 .trk-tip-r i{ flex:none; width:12px; height:12px; border-radius:3px; border:1px solid currentColor; box-sizing:border-box; }
 .trk-tip-r.on{ opacity:1; }
 .trk-tip-r.on i{ border-color:var(--accent); background:var(--accent); }
+
+/* 월간 — 달력 */
+.trk-cal{ border-top:0; }
+.trk-dow{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:4px; }
+.trk-dow span{ text-align:center; font-size:11px; color:var(--text3); }
+.trk-dow span.sun{ color:#E5484D; }
+.trk-cg{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+.trk .cd{ position:relative; display:flex; align-items:flex-start; justify-content:flex-start; aspect-ratio:1; border-radius:8px; padding:6px; box-sizing:border-box; font-style:normal; border:0; }
+.trk .cd span{ font-size:12px; font-weight:500; color:var(--text2); line-height:1; }
+.trk .cd.pad{ background:none; }
+.trk .cd.fut{ background:none; box-shadow:inset 0 0 0 1px var(--border); opacity:.6; }
+.trk .cd.lv3 span, .trk .cd.lv4 span{ color:#17181B; }
+.trk .cd.now{ box-shadow:inset 0 0 0 2px var(--text); }
+.trk .cd.full{ background-size:44%; background-position:center 62%; }
+.trk-more{ display:flex; align-items:center; justify-content:space-between; width:100%; min-height:48px; margin-top:16px; padding:0; border:0;
+  border-top:1px solid var(--v2-line, var(--border)); background:none; color:var(--text); font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+.trk-more i{ font-style:normal; color:var(--text3); transform:rotate(90deg); transition:transform .15s; }
+.trk-more.open i{ transform:rotate(-90deg); }
+.trk-det{ border-top:1px solid var(--v2-line, var(--border)); }
+.trk-dr{ display:grid; grid-template-columns:minmax(0,1fr) auto 48px; gap:12px; align-items:center; min-height:44px; border-bottom:1px solid var(--v2-line, var(--border)); font-size:14px; }
+.trk-dn2{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text); }
+.trk-dc{ color:var(--text3); font-size:13px; }
+.trk-dr b{ text-align:right; font-weight:600; }
