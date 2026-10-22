@@ -23,7 +23,7 @@ const Econ = {
     report_times: ['08:00'],
     market_alerts: { kr_open:false, kr_close:false, us_open:false, us_close:false },
   },
-  TYPE: { kr:'국내', us:'해외', exchange:'환율', metal:'금' },
+  TYPE: { kr:'국내', us:'해외', exchange:'환율', metal:'금', crypto:'코인' },
 
   C: null, PRICES: {}, PREV: {}, TICKERS: null,
   HIST: { items:{} }, HIST_AT: 0,
@@ -62,6 +62,7 @@ const Econ = {
 
   fmt(it, p) {
     if (p == null) return '—';
+    if (it.type === 'crypto')   return (p >= 100 ? Math.round(p).toLocaleString('ko-KR') : p.toLocaleString('ko-KR', { maximumFractionDigits: p >= 1 ? 2 : 4 })) + '원';
     if (it.type === 'us')       return '$' + p.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
     if (it.type === 'exchange') return p.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2}) + (it.unit||'원');
     return Math.round(p).toLocaleString('ko-KR') + (it.unit || '');
@@ -156,14 +157,38 @@ const Econ = {
       if (!r.ok) throw new Error('시세 ' + r.status);
       const j = await r.json();
       this.PREV = this.PRICES;
-      this.PRICES = j.items || {};
+      this.PRICES = Object.assign({}, j.items || {}, this._cryptoOnly(this.PREV));
       this._updatedAt = j.updated || '';
       this._err = null;
     } catch (e) {
       // 조용히 옛 시세를 계속 보여주면 멈춘 걸 모른다 → 카드에 표시한다
       this._err = e.message;
     }
+    await this._crypto();
     this._paint();
+  },
+  // ── 코인(업비트 원화 시세) — 수집 서버를 거치지 않고 화면이 바로 받는다(키 없음) ──
+  _cryptoOnly(P) { const o = {}; for (const k in (P || {})) if (k.startsWith('crypto:')) o[k] = P[k]; return o; },
+  _cryptoCodes() {
+    const c = this.C || {}, all = [...(c.favorites || []), ...(c.holdings || []), ...(c.watchlists || []).flatMap(w => w.items || [])];
+    return [...new Set(all.filter(x => x.type === 'crypto').map(x => x.code))];
+  },
+  async _crypto() {
+    const codes = this._cryptoCodes(); if (!codes.length) return;
+    try {
+      const r = await fetch('https://api.upbit.com/v1/ticker?markets=' + codes.map(encodeURIComponent).join(','));
+      const j = await r.json();
+      for (const t of Array.isArray(j) ? j : []) this.PRICES['crypto:' + t.market] = { price: t.trade_price, pct: Math.round((t.signed_change_rate || 0) * 10000) / 100 };
+    } catch (e) {}
+  },
+  // 업비트 원화 마켓 목록 → 검색 목록에 '코인' 으로 섞는다(비트코인 · BTC · bitcoin 모두로 찾힌다)
+  async _coins() {
+    if (this.COINS) return this.COINS;
+    try {
+      const j = await (await fetch('https://api.upbit.com/v1/market/all?isDetails=false')).json();
+      this.COINS = (j || []).filter(m => /^KRW-/.test(m.market)).map(m => ({ n: m.korean_name, c: m.market, t: 'crypto', en: m.english_name, sym: m.market.slice(4) }));
+    } catch (e) { this.COINS = []; }
+    return this.COINS;
   },
   _paint() {
     const upd = document.getElementById('econUpd');
@@ -250,7 +275,7 @@ const Econ = {
     const c = this.cfg();
     const b = this._body(); if (!b) return;
     b.innerHTML =
-      `<input class="inp ec-search" id="ecFSearch" placeholder="종목 검색 — 금, 삼성, 테슬라, KODEX"
+      `<input class="inp ec-search" id="ecFSearch" placeholder="종목 검색 — 금, 삼성, 테슬라, KODEX, 비트코인"
          oninput="Econ.search(this.value,'F')"><div id="ecFRes"></div>` +
       (c.favorites.length
         ? `<div class="ec-sec"><span>즐겨찾기</span><b class="num">${c.favorites.length}</b></div>
@@ -294,8 +319,18 @@ const Econ = {
     if (!box) return;
     v = v.trim();
     if (!v) { box.innerHTML = ''; return; }
-    const list = await this._tickers();
+    const [list, coins] = await Promise.all([this._tickers(), this._coins()]);
     const q = v.toLowerCase(), out = [];
+    // 코인: 한글 이름 · 심볼(BTC) · 영어 이름. '코인' 이나 '비트' 처럼 치면 위로 올린다
+    const big = ['BTC', 'ETH', 'XRP', 'SOL', 'DOGE', 'ADA', 'USDT'];
+    for (const e of coins) {
+      const n = e.n.toLowerCase(), sym = e.sym.toLowerCase(), en = String(e.en || '').toLowerCase();
+      let s = -1;
+      if (sym === q || n === q) s = 0; else if (n.startsWith(q) || sym.startsWith(q) || en.startsWith(q)) s = 1;
+      else if (n.includes(q) || en.includes(q)) s = 3;
+      else if (/^(코인|암호화폐|가상화폐|crypto)$/.test(q) && big.includes(e.sym)) s = 2;
+      if (s >= 0) out.push([s - (big.includes(e.sym) ? 0.5 : 0), e.n.length, Object.assign({}, e, { c: e.c, ko: '' , cn: e.sym })]);
+    }
     // 한글로 친 해외 종목(테슬라·애플…)은 한글 이름표에서 티커를 찾아 맨 앞에 올린다.
     const ko = new Map((typeof EconKo !== 'undefined' ? EconKo.match(v) : []).map(m => [m.tk, m]));
     for (const e of list) {
@@ -316,7 +351,7 @@ const Econ = {
         const e = x[2];
         const it = { name:e.ko || e.n, code:e.c, type:e.t, tv:e.tv, unit:this.unitFor(e.t), floor:null };
         return `<div class="ec-res"><div class="ec-item-id"><div class="ec-nm">${esc(e.ko || e.n)}</div>
-          <div class="ec-meta">${e.ko ? esc(e.n)+' · ' : ''}<span class="num">${esc(e.c)}</span> · ${this.TYPE[e.t]||''}</div></div>
+          <div class="ec-meta">${e.ko ? esc(e.n)+' · ' : ''}<span class="num">${esc(e.cn || e.c)}</span> · ${this.TYPE[e.t]||''}${e.t === 'crypto' ? ' · 업비트' : ''}</div></div>
           <button class="btn-sm ec-add-btn" onclick='Econ.add("${where}",${this.attr(it)})'>${where==='H'?'보유 추가':'담기'}</button></div>`;
       }).join('') +
       (where === 'O' ? '' :
@@ -324,11 +359,12 @@ const Econ = {
         <span class="ec-item-id"><span class="ec-nm">코드로 직접 추가</span><span class="ec-meta">검색에 없는 ETF 등 · 예: 0173Y0</span></span><span class="ec-chev">›</span></button>`);
   },
   add(where, it) {
+    if (it.type === 'crypto') setTimeout(() => this._crypto().then(() => this._paint()), 300);   // 코인은 담자마자 시세를 받는다
     // 설정 도우미(O)에서 담은 종목은 즐겨찾기로 들어간다.
     if (where === 'O') {
       const c = this.cfg(), k = this.keyOf(it);
       if (c.favorites.some(x => this.keyOf(x) === k)) { App.showToast('이미 담았어요'); return; }
-      c.favorites.push(Object.assign({ alert:true }, it));
+      c.favorites.push(Object.assign({ alert: it.type !== 'crypto' }, it));
       this.queueSave(); App.showToast(`${it.name} 담음`, 'success');
       try { this._drawMain(); this.render(); } catch {}
       return;
@@ -345,7 +381,7 @@ const Econ = {
     }
     if (where === 'F') {
       if (c.favorites.some(x => this.keyOf(x) === k)) { App.showToast('이미 즐겨찾기에 있어요'); return; }
-      c.favorites.push(Object.assign({ alert:true }, it));
+      c.favorites.push(Object.assign({ alert: it.type !== 'crypto' }, it));
       this.queueSave(); App.showToast('즐겨찾기 추가','success'); this._drawMain(); this.render();
     } else {
       const w = c.watchlists.find(x => x.id === this.activeList);
