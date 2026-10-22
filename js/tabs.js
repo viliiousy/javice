@@ -98,23 +98,15 @@ const Tabs = {
     if (!this.tabOn(this._cur)) this.set(this._onTabs()[0].id, true); else this.set(this._cur, true);
     Settings._re('cats');
   },
+  // 설정 › 카테고리 · 카드: 실제 화면을 줄인 미니 화면에서 끌어서 순서를 바꾼다(js/card-sort.js). 아래는 카테고리 켜고 끄기.
   catsHtml() {
-    const off = this.getOff(), T = this.tabsSorted();
-    const mv = (fn, a, b) => `<span class="co-mv"><button type="button" class="co-b" ${a ? 'disabled' : ''} onclick="${fn}(-1)" aria-label="위로">↑</button><button type="button" class="co-b" ${b ? 'disabled' : ''} onclick="${fn}(1)" aria-label="아래로">↓</button></span>`;
-    return `<div class="co-intro">
-        <p>메인 화면을 내 쓰임새대로 고칩니다.</p>
-        <ul><li><b>카테고리 순서</b> — 카테고리 이름 옆 ↑↓ 로 아래 탭의 순서를 바꿉니다. 맨 위 카테고리가 앱을 열면 처음 보이는 화면입니다.</li>
-          <li><b>카드 순서</b> — 카드 이름 옆 ↑↓ 로 그 카테고리 안에서 위아래를 바꿉니다. 예: 식단보다 운동을 위로.</li>
-          <li><b>켜고 끄기</b> — 스위치를 끄면 그 카드(또는 카테고리 전체)가 화면에서만 빠집니다. 기록은 그대로 남고 다시 켜면 돌아옵니다.</li></ul>
-        <p class="co-sub">지금 바꾸는 순서: <b>${this._wide() ? 'PC·태블릿' : '휴대폰'}</b>. 순서는 휴대폰과 PC·태블릿을 따로 저장합니다(켜고 끄기는 함께). ${this._wide() ? 'PC·태블릿은 탭 없이 이 순서대로 한 화면에 놓입니다.' : '휴대폰은 카테고리 탭마다 이 순서로 보입니다.'}</p></div>`
-      + T.map((t, ti) => {
-      const on = this.tabOn(t.id);
-      return `<div class="set-h co-h">${t.label}</div>
-        ${Settings._item(`${t.label} 카테고리`, mv(`Tabs.moveTab.bind(Tabs,'${t.id}')`, ti === 0, ti === T.length - 1) + Settings._sw(on, `Tabs.toggleTab('${t.id}', ${!on})`), on ? `${ti === 0 ? '처음 보이는 화면 · ' : ''}아래 탭과 카드가 보입니다` : '탭과 카드가 모두 숨겨집니다(기록은 그대로)')}
-        ${on ? (() => { const list = this.order().filter(x => this.tabOf(x) === t.id).map(x => this.CARDS.find(c => c.cls === x));
-          return list.map((c, i) => Settings._item(c.name, mv(`Tabs.moveCard.bind(Tabs,'${c.cls}')`, i === 0, i === list.length - 1)
-            + Settings._sw(!off.includes(c.cls), `Tabs.toggleCard('${c.cls}', ${off.includes(c.cls)});Settings._re('cats')`))).join(''); })() : ''}`;
-    }).join('') + (this.hasOrder() || this.hasTabOrder() ? `<p class="co-note"><button type="button" class="co-reset" onclick="Tabs.resetOrder()">순서를 처음대로 돌리기</button></p>` : '');
+    const T = this.tabsSorted();
+    return `<p class="co-sub" style="margin:0 0 10px">지금 바꾸는 순서: <b>${this._wide() ? 'PC·태블릿' : '휴대폰'}</b> — 휴대폰과 PC·태블릿은 순서를 따로 저장합니다. 메인 화면에서 카드 이름을 꾹 눌러도 바로 바꿀 수 있습니다.</p>
+      <div class="mn-host">${typeof CardSort !== 'undefined' ? CardSort.html() : ''}</div>
+      <div class="set-h co-h">카테고리 켜고 끄기</div>
+      ${T.map((t, ti) => { const on = this.tabOn(t.id);
+        return Settings._item(`${t.label}`, Settings._sw(on, `Tabs.toggleTab('${t.id}', ${!on})`), on ? `${ti === 0 ? '처음 보이는 화면 · ' : ''}탭과 카드가 보입니다` : '탭과 카드가 모두 숨겨집니다(기록은 그대로)'); }).join('')}
+      ${this.hasOrder() || this.hasTabOrder() ? `<p class="co-note"><button type="button" class="co-reset" onclick="Tabs.resetOrder()">순서를 처음대로 돌리기</button></p>` : ''}`;
   },
   _cur: 'today',
   get current(){ return this._cur; },
