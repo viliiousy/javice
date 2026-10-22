@@ -1,14 +1,14 @@
-// js/card-layout.js — PC·태블릿 카드 배치를 화면에서 직접: 끌어서 옮기고, 테두리를 끌어 크기 조절(10px 단위)
+// js/card-layout.js — PC·태블릿 카드 배치를 화면에서 직접: 끌어서 옮기고, 테두리를 끌어 크기 조절(20px 단위)
 //
 // 카드 이름을 3초 꾹 누르면 '편집 모드' — 카드들이 살짝 흔들리고, 카드를 끌면 자리가 옮겨지고
-// 오른쪽·아래 테두리와 오른쪽 아래 모서리를 끌면 크기가 바뀐다. 모든 값은 10px 칸에 붙는다(8px 움직이면 10px 로).
+// 오른쪽·아래 테두리와 오른쪽 아래 모서리를 끌면 크기가 바뀐다. 모든 값은 20px 칸에 붙는다(12px 움직이면 20px 로).
 // 다른 카드와 겹치면 겹친 카드가 아래로 비켜선다. 완료(또는 Esc)를 누르면 저장.
 // 저장: gl_cards_free_w = { base: 저장할 때 판 너비, cards: { 카드: { x, y, w, h } } } — 판 너비가 바뀌면 가로만 같은 비율로 늘이고 줄인다.
 // 카드 안은 너비에 맞춰 바뀌고(container query), 칸보다 내용이 길면 카드 안에서 스크롤된다.
 const CardLayout = {
-  KEY: 'gl_cards_free_w', SNAP: 10, GAP: 16, MINW: 220, MINH: 140,
+  KEY: 'gl_cards_free_w', SNAP: 20, GAP: 20, MINW: 220, MINH: 140,
   get L() { try { const v = JSON.parse(UserStore.get(this.KEY) || 'null'); return v && v.cards ? v : null; } catch (e) { return null; } },
-  _save(L) { UserStore.set(this.KEY, JSON.stringify(L)); window.FirebaseSync?.scheduleSave?.(); },
+  _save(L) { const v = JSON.stringify(L); this._sig = v; UserStore.set(this.KEY, v); window.FirebaseSync?.scheduleSave?.(); },
   reset() { UserStore.set(this.KEY, 'null'); window.FirebaseSync?.scheduleSave?.(); this.apply(); if (this.on) this.exit(true); App.showToast('카드 배치를 처음대로 돌렸습니다', 'success'); },
   _dash() { return document.querySelector('.dashboard'); },
   _vis() { return Tabs.CARDS.filter(c => Tabs.isOn(c.cls) && Tabs.tabOn(c.tab)).map(c => c.cls); },
@@ -20,7 +20,7 @@ const CardLayout = {
   _capture() {
     const d = this._dash(), r0 = d.getBoundingClientRect(), B = this._box(), cards = {};
     for (const cls of this._vis()) { const el = d.querySelector('.' + cls); if (!el) continue; const r = el.getBoundingClientRect();
-      cards[cls] = { x: this.snap(r.left - r0.left - B.pl), y: this.snap(r.top - r0.top - B.pt), w: this.snap(r.width), h: this.snap(r.height) }; }
+      cards[cls] = { x: this.snap(r.left - r0.left - B.pl), y: this.snap(r.top - r0.top - B.pt), w: Math.floor(r.width / this.SNAP) * this.SNAP, h: Math.floor(r.height / this.SNAP) * this.SNAP }; }
     return { base: Math.round(B.w), cards };
   },
   // 빠진 카드(새로 켠 것)는 맨 아래에 붙이고, 겹친 것은 아래로 비킨다
@@ -49,9 +49,12 @@ const CardLayout = {
     const H = document.documentElement, d = this._dash(); if (!d) return;
     const L = Tabs._wide() ? this.L : null;
     if (!L) { H.classList.remove('card-free'); Tabs.CARDS.forEach(c => { const el = d.querySelector('.' + c.cls); if (el) ['left', 'top', 'width', 'height', 'max-height'].forEach(n => el.style.removeProperty(n)); }); d.style.height = ''; return; }
+    const B = this._box();
+    // 판이 아직 안 보이면(로그인 화면 뒤 · 처음 그리는 중) 너비가 0 이다 — 그때 놓으면 카드가 실처럼 가늘어진다. 보일 때 다시.
+    if (!(B.w > 300)) { H.classList.remove('card-free'); clearTimeout(this._rt); this._rt = setTimeout(() => this.apply(), 300); return; }
     this._fill(L);
     H.classList.add('card-free');
-    const B = this._box(), k = B.w / (L.base || B.w); let bottom = 0;
+    const k = B.w / (L.base || B.w); let bottom = 0;
     for (const c of Tabs.CARDS) {
       const el = d.querySelector('.' + c.cls), p = L.cards[c.cls]; if (!el) continue;
       if (!p || !this._vis().includes(c.cls)) { el.style.left = el.style.top = ''; continue; }
@@ -77,7 +80,7 @@ const CardLayout = {
       el.appendChild(ov); ov.addEventListener('pointerdown', e => this._down(e, cls));
     }
     const bar = document.createElement('div'); bar.id = 'clBar';
-    bar.innerHTML = `<span><b>카드 배치 편집</b> 카드를 끌어 옮기고 · 오른쪽·아래 테두리나 모서리를 끌어 크기 조절 (10px 단위)</span>
+    bar.innerHTML = `<span><b>카드 배치 편집</b> 카드를 끌어 옮기고 · 오른쪽·아래 테두리나 모서리를 끌어 크기 조절 (20px 단위)</span>
       <button type="button" class="cl-b" onclick="CardLayout.reset()">처음대로</button><button type="button" class="cl-b cl-done" onclick="CardLayout.exit()">완료</button>`;
     document.body.appendChild(bar);
     this._key = e => { if (e.key === 'Escape') this.exit(); }; document.addEventListener('keydown', this._key);
@@ -112,7 +115,11 @@ const CardLayout = {
   },
 
   init() {
-    let t = null;
+    let t = null, lw = 0;
     window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => this.apply(), 120); });
+    // 판 너비가 바뀔 때마다(로그인 뒤 처음 보일 때 포함) 다시 놓는다
+    // 다른 기기에서 바꾼 배치가 동기화로 내려오면 그걸로
+    this._sig = UserStore.get(this.KEY); setInterval(() => { const v = UserStore.get(this.KEY); if (v !== this._sig && !this.on) { this._sig = v; this.apply(); } }, 3000);
+    try { const d = this._dash(); if (d && window.ResizeObserver) new ResizeObserver(() => { const w = d.clientWidth; if (Math.abs(w - lw) > 2) { lw = w; clearTimeout(t); t = setTimeout(() => this.apply(), 60); } }).observe(d); } catch (e) {}
   },
 };
