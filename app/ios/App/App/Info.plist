@@ -53,6 +53,14 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
+			<string>app.bashy</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>bashy</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
 			<string>google-signin</string>
 			<key>CFBundleURLSchemes</key>
 			<array>

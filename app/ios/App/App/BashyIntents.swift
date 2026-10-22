@@ -15,8 +15,13 @@ enum BashyIntentStore {
     }
 
     static func drain() -> [[String: String]] {
-        let list = UserDefaults.standard.array(forKey: key) as? [[String: String]] ?? []
+        var list = UserDefaults.standard.array(forKey: key) as? [[String: String]] ?? []
         UserDefaults.standard.removeObject(forKey: key)
+        // 홈 화면 위젯에서 누른 것(할 일 완료 · 습관 체크)은 App Group 에 쌓여 있다
+        if let g = UserDefaults(suiteName: "group.app.bashy") {
+            list += g.array(forKey: "pending") as? [[String: String]] ?? []
+            g.removeObject(forKey: "pending")
+        }
         return list
     }
 }

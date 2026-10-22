@@ -18,6 +18,7 @@ const App = {
     this.initDarkMode();
     this._setupListeners();
     if (typeof Tabs !== 'undefined') Tabs.init();
+    try { if (typeof Weather !== 'undefined') Weather.init(); } catch(e){}
     setTimeout(()=>{ if(typeof JARVIS!=='undefined') JARVIS.init(); },500);
     if(typeof Platform!=='undefined'&&Platform.native){ Auth.init(); } else { const waitGIS=setInterval(()=>{ if(typeof google!=='undefined'&&google.accounts){ clearInterval(waitGIS); Auth.init(); } },150); setTimeout(()=>clearInterval(waitGIS),8000); }   // 앱은 GIS 를 기다리지 않는다
   },
@@ -498,7 +499,7 @@ const App = {
         const wd = d.toLocaleDateString('ko-KR',{weekday:'long'});
         const yy = d.getFullYear() !== now.getFullYear() ? `${String(d.getFullYear()).slice(2)}년 ` : '';
         const wdc = dow===0 ? 'wd-sun' : dow===6 ? 'wd-sat' : 'wd-day';
-        elDate.innerHTML = `<b class="hd-n">${d.getDate()}</b><span class="hd-s">${yy}${d.getMonth()+1}월${isToday ? '<i class="hd-today">TODAY</i>' : ''}<br><span class="${wdc}">${wd}</span></span>`;
+        elDate.innerHTML = `<b class="hd-n">${d.getDate()}</b><span class="hd-s">${yy}${d.getMonth()+1}월${isToday ? '<i class="hd-today">TODAY</i>' : ''}<br><span class="${wdc}">${wd}</span>${isToday && typeof Weather!=='undefined' ? `<span id="hWx">${Weather.html()}</span>` : ''}</span>`;
       } else
       elDate.textContent = isMobile
         ? `${String(d.getFullYear()).slice(2)}년 ${d.getMonth()+1}월 ${d.getDate()}일`

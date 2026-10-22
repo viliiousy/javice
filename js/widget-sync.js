@@ -20,21 +20,27 @@ const Widgets = {
     const now = new Date();
     const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const today = ymd(now);
-    const out = { v: 1, date: `${now.getMonth() + 1}월 ${now.getDate()}일 ${'일월화수목금토'[now.getDay()]}요일`, day: today, at: Date.now() };
+    const out = { v: 2, date: `${now.getMonth() + 1}월 ${now.getDate()}일 ${'일월화수목금토'[now.getDay()]}요일`, day: today, at: Date.now() };
 
     try {
       const hs = Habits.getHabitsForDate(now), ck = Habits.getChecked(now);
       out.habits = { done: hs.filter(h => ck.includes(h.id)).length, total: hs.length,
-        left: hs.filter(h => !ck.includes(h.id)).slice(0, 4).map(h => String(h.name || '').slice(0, 20)) };
+        left: hs.filter(h => !ck.includes(h.id)).slice(0, 4).map(h => String(h.name || '').slice(0, 20)),
+        // 위젯에서 바로 체크하는 목록(안 한 것 먼저)
+        items: hs.slice().sort((a, b) => ck.includes(a.id) - ck.includes(b.id)).slice(0, 8).map(h => ({ id: String(h.id), n: this._plain(h.name).slice(0, 18), ok: ck.includes(h.id) })) };
     } catch (e) {}
 
     try {
       const pend = [];
-      Object.values(App.S.tasks || {}).forEach(l => (l || []).forEach(t => { if (t.status === 'needsAction' && !t._hidden) pend.push(t); }));
+      Object.entries(App.S.tasks || {}).forEach(([lid, l]) => (l || []).forEach(t => { if (t.status === 'needsAction' && !t._hidden) pend.push({ ...t, _l: lid }); }));
       const todays = pend.filter(t => t.due ? t.due.split('T')[0] <= today : true);
       todays.sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0) || String(a.due || '9').localeCompare(String(b.due || '9')));
       out.tasks = { count: pend.filter(t => t.due ? t.due.split('T')[0] === today : true).length,
-        top: todays.slice(0, 4).map(t => String(t.title || '').slice(0, 24)) };
+        top: todays.slice(0, 4).map(t => String(t.title || '').slice(0, 24)),
+        // 위젯에서 바로 완료하는 목록 — 오늘·지난 것 먼저, 그다음 날짜 없는 것·다가오는 것
+        items: pend.slice().sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0) || String(a.due || '9').localeCompare(String(b.due || '9')))
+          .slice(0, 8).map(t => ({ id: String(t.id), l: String(t._l), t: String(t.title || '').slice(0, 30),
+            d: t.due ? (t.due.split('T')[0] < today ? '지남' : t.due.split('T')[0] === today ? '오늘' : `${+t.due.slice(5, 7)}/${+t.due.slice(8, 10)}`) : '' })) };
     } catch (e) {}
 
     try {
@@ -45,6 +51,17 @@ const Widgets = {
     try {
       const dt = Diet.totals(Diet.getData()), ds = Diet.getSettings();
       out.kcal = { eat: Math.round(dt.cal || 0), goal: Number(ds.calorieGoal) || 0 };
+      // 칼로리·운동 위젯
+      let burn = 0; try { burn = Fitness.burn(now).kcal || 0; } catch (e) {}
+      const bm = ds.burnMode || 'half', bonus = bm === 'off' ? 0 : bm === 'full' ? burn : Math.round(burn / 2 / 10) * 10;
+      out.body = { eat: Math.round(dt.cal || 0), goal: (Number(ds.calorieGoal) || 0) + bonus, burn: Math.round(burn),
+        p: Math.round(dt.protein || 0), c: Math.round(dt.carb || 0), f: Math.round(dt.fat || 0),
+        pg: Number(ds.proteinGoal) || 0, cg: Number(ds.carbGoal) || 0, fg: Number(ds.fatGoal) || 0 };
+      try {
+        const { list } = Fitness.exercisesFor(now), chk = Fitness._checked(now), day = WorkoutHistory.day(today, true);
+        const lg = PlanGen.log(today), doneNm = [...new Set(list.filter((_, i) => chk.includes(i)).map(x => x.name).concat(Object.keys(lg).filter(n => (lg[n] || []).length)))];
+        Object.assign(out.body, { part: PlanGen.dayLabel(doneNm.length ? doneNm : list.map(x => x.name)) || '', done: chk.length, total: list.length, vol: Math.round(day.vol || 0), sets: day.sets || 0 });
+      } catch (e) {}
     } catch (e) {}
 
     try {
@@ -61,7 +78,47 @@ const Widgets = {
         when: (ymd(next.d) === today ? '' : `${next.d.getMonth() + 1}/${next.d.getDate()} `) + (next.all ? '종일' : next.d.toTimeString().slice(0, 5)) };
     } catch (e) {}
 
+    // 달력 위젯: 이번 달에 일정이 있는 날
+    try {
+      const y = now.getFullYear(), m = now.getMonth(), marks = new Set();
+      (App.S.events || []).forEach(e => {
+        const d = e.start?.dateTime ? new Date(e.start.dateTime) : (e.start?.date ? new Date(e.start.date + 'T00:00:00') : null);
+        if (d && d.getFullYear() === y && d.getMonth() === m) marks.add(d.getDate());
+      });
+      out.cal = { y, m: m + 1, marks: [...marks].sort((a, b) => a - b) };
+      out.evs = (App.S.events || []).map(e => {
+        const d = e.start?.dateTime ? new Date(e.start.dateTime) : (e.start?.date ? new Date(e.start.date + 'T00:00:00') : null);
+        return d && { d, all: !e.start?.dateTime, t: String(e.summary || '일정').slice(0, 26) };
+      }).filter(x => x && (x.all ? ymd(x.d) >= today : x.d >= now)).sort((a, b) => a.d - b.d).slice(0, 4)
+        .map(x => ({ t: x.t, w: (ymd(x.d) === today ? '오늘 ' : `${x.d.getMonth() + 1}/${x.d.getDate()} `) + (x.all ? '종일' : x.d.toTimeString().slice(0, 5)) }));
+    } catch (e) {}
+    // AI 사용량 위젯: 남은 % (5시간 · 7일), Higgsfield 는 남은 크레딧 %
+    try {
+      const d = (typeof AIUsage !== 'undefined' && AIUsage.data) || {}, L = w => w && w.pct != null ? Math.max(0, Math.min(100, Math.round(100 - Number(w.pct)))) : null;
+      out.ai = ['claude', 'chatgpt', 'higgsfield'].filter(k => d[k]).map(k => {
+        const v = d[k];
+        if (k === 'higgsfield') { const tot = Number(v.total) || 0; return { k, n: 'Higgs', left: tot ? Math.round(Math.max(0, Math.min(1, Number(v.credits) / tot)) * 100) : null }; }
+        return { k, n: k === 'claude' ? 'Claude' : 'GPT', h5: L(v.h5), d7: L(v.d7), r: v.h5 && v.h5.reset ? String(v.h5.reset) : '' };
+      });
+    } catch (e) {}
+    // 시세 위젯: 비트코인 + 즐겨찾기 앞 3개
+    try {
+      const mk = [];
+      if (this._btc) mk.push({ n: '비트코인', p: Math.round(this._btc.p).toLocaleString('ko-KR') + '원', c: Math.round(this._btc.c * 10000) / 100 });
+      const E = typeof Econ !== 'undefined' ? Econ : null;
+      (E && E.C && E.C.favorites || []).slice(0, 4).forEach(it => { const q = E.PRICES[E.keyOf(it)]; if (q && q.price != null) mk.push({ n: String(it.name).slice(0, 10), p: E.fmt(it, q.price), c: q.pct != null ? Math.round(q.pct * 100) / 100 : null }); });
+      out.mkt = mk.slice(0, 5);
+    } catch (e) {}
+    try { const w = typeof Weather !== 'undefined' && Weather.w; if (w) out.wx = { t: w.t, icon: w.icon, name: w.name, hi: w.hi, lo: w.lo }; } catch (e) {}
     return out;
+  },
+  _plain(s) { return String(s || '').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '').trim(); },
+  // 업비트 비트코인 시세(키 없이) — 앱이 열려 있는 동안 10분마다
+  async _fetchBtc() {
+    try {
+      const r = await fetch('https://api.upbit.com/v1/ticker?markets=KRW-BTC'); const j = await r.json();
+      if (j && j[0]) { this._btc = { p: j[0].trade_price, c: j[0].signed_change_rate }; this.push(); }
+    } catch (e) {}
   },
 
   async _send() {
@@ -80,6 +137,9 @@ const Widgets = {
   init() {
     if (!this.P) return;
     this.push(3000);
+    this._fetchBtc(); setInterval(() => { if (!document.hidden) this._fetchBtc(); }, 10 * 60000);
+    // AI 사용량·시세가 바뀌어도 위젯을 새로(같은 내용이면 보내지 않는다)
+    setInterval(() => { if (!document.hidden) this.push(); }, 5 * 60000);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') this._send(); });
   },
 };

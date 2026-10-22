@@ -787,3 +787,8 @@ html[data-ui="v2"] .ob-btn.pri,
 html[data-ui="v2"] .dk-act.on{ background:var(--accent) !important; border-color:var(--accent) !important; color:var(--accent-fg) !important; }
 html[data-ui="v2"] .btn-sm.accent svg, html[data-ui="v2"] .dk-act.on svg{ color:inherit; stroke:currentColor; }
 html[data-ui="v2"] .btn-sm.accent:disabled, html[data-ui="v2"] .modal-btns .accent:disabled{ opacity:.4; }
+
+/* 상단바 요일 옆 날씨 — 요일과 같은 줄, 같은 크기. 아이콘은 선 하나, 기온만 숫자 서체 */
+.hd-wx{ display:inline-flex; align-items:center; gap:3px; margin-left:8px; padding:0; border:0; background:none; color:var(--text3); font:inherit; font-size:12px; cursor:pointer; vertical-align:baseline; }
+.hd-wx .wx-ic{ width:14px; height:14px; position:relative; top:2px; }
+.hd-wx .num{ color:var(--text); font-family:var(--v2-num, 'Space Grotesk'); font-weight:600; }

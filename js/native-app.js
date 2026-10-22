@@ -13,6 +13,11 @@ const NativeApp = {
     this.P.addListener('intent', () => this.pull());
     const A = window.Capacitor.Plugins.App;
     if (A) A.addListener('appStateChange', s => { if (s.isActive) this.pull(); });
+    // 홈 화면 위젯의 링크(bashy://…): + 할 일, 카드 열기, AI 사용량
+    if (A) {
+      A.addListener('appUrlOpen', d => this.openUrl(d && d.url));
+      A.getLaunchUrl?.().then(r => { if (r && r.url) this.openUrl(r.url); }).catch(() => {});
+    }
     this.pull();
     this.menu();
   },
@@ -36,8 +41,38 @@ const NativeApp = {
     }
   },
 
+  // bashy://task/new · bashy://open/<카드> · bashy://ai — 화면이 준비될 때까지 기다렸다가 연다
+  openUrl(url) {
+    const m = /^bashy:\/\/([^/?#]+)\/?([^?#]*)/.exec(String(url || '')); if (!m) return;
+    const go = () => {
+      if (!(typeof Auth !== 'undefined' && Auth.signedIn && Auth.signedIn() && App.S && Array.isArray(App.S.lists))) { setTimeout(go, 600); return; }
+      if (m[1] === 'task' && m[2] === 'new') {
+        App.closeModal?.(); App._gotoCard('calendar'); App.showAddTask(new Date());
+        setTimeout(() => document.getElementById('qtTitle')?.focus(), 350);   // 바로 쓸 수 있게 글자판을 올린다
+      } else if (m[1] === 'ai') { try { AIUsage.open(); } catch (e) {} }
+      else if (m[1] === 'open' && m[2]) { App.closeModal?.(); App._gotoCard(m[2]); }
+    };
+    go();
+  },
+
   async handle(it) {
     if (it.action === 'today') { App._gotoCard('calendar'); return; }
+    // 위젯에서 동그라미를 눌러 끝낸 할 일
+    if (it.action === 'taskDone' && it.id) {
+      const t = (App.S.tasks[it.list] || []).find(x => String(x.id) === String(it.id))
+        || Object.entries(App.S.tasks || {}).map(([l, a]) => (a || []).find(x => String(x.id) === String(it.id)) && { ...((a || []).find(x => String(x.id) === String(it.id))), _l: l }).find(Boolean);
+      const list = t && (t._l || it.list);
+      if (t && t.status !== 'completed') await App._toggle(t.id, list, false);
+      return;
+    }
+    // 위젯에서 누른 습관 체크(그날 것만, 이미 같은 상태면 그대로)
+    if (it.action === 'habitToggle' && it.id) {
+      const d = new Date(), ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      if (it.day && it.day !== ymd) return;
+      const want = it.ok === '1', has = Habits.getChecked(d).map(String).includes(String(it.id));
+      if (want !== has) { const h = Habits.getHabitsForDate(d).find(x => String(x.id) === String(it.id)); if (h) Habits.toggle(h.id, d); }
+      return;
+    }
     if (it.action === 'addTask' && it.title) {
       // 구글이 없으면 Bashy 목록으로
       const listId = Auth.isLoggedIn() ? App.S.lists[0].id : BashyCal.LIST_ID;

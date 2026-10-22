@@ -357,6 +357,15 @@ const Settings = {
           <li>검색 칸에 <button type="button" class="ez-chip" onclick="Settings.copy('Bashy','Bashy 를 복사했습니다 — 검색 칸에 붙여 넣으세요')">Bashy 복사</button> → <b>Bashy 오늘</b> › 크기 고르고 <b>위젯 추가</b></li>
         </ol>
         <p class="set-note">아이폰은 앱이 위젯을 대신 놓아 줄 수 없게 막혀 있어 위 세 단계만 직접 해 주세요. 위젯은 앱을 열 때마다 새 숫자로 바뀝니다.</p>
+        <div class="set-h">고를 수 있는 위젯</div>
+        ${[['일정 · 할 일', '중간(가로 4칸×2줄) · 큰', '이번 달 달력 + 할 일. 동그라미를 누르면 완료, + 를 누르면 앱이 열리며 바로 새 할 일을 적습니다'],
+           ['AI 사용량', '작은(2×2) · 중간', 'Claude·ChatGPT 5시간·7일 남은 양, Higgsfield 크레딧 — 초기화 시각'],
+           ['칼로리 · 운동', '작은 · 중간 · 잠금 화면', '남은 열량 고리, 단·탄·지, 오늘 운동 부위와 진행'],
+           ['습관 · 체크리스트', '작은 · 중간 · 큰 · 잠금 화면', '위젯에서 바로 습관을 체크합니다'],
+           ['시세', '작은 · 중간', '비트코인과 경제 카드 즐겨찾기 종목'],
+           ['Bashy 오늘', '작은 · 중간', '습관·할 일·다음 일정 요약'],
+           ['Bashy 잠금 화면', '잠금 화면 3가지', '날씨·할 일 한 줄, 다음 일정, 습관 고리']]
+          .map(([n, sz, d]) => `<div class="set-item"><span class="set-tx"><b>${n}</b><small>${sz} — ${d}</small></span></div>`).join('')}
         <div class="set-h">시리 · 단축어 — 설정 없이 바로 됩니다</div>
         ${siri.map(([p, d]) => `<div class="set-item"><span class="set-tx"><b>“시리야, ${p}”</b><small>${d}</small></span></div>`).join('')}
         ${this._link('단축어 앱에서 보기', "Settings.openExt('shortcuts://')", '단축어 앱 › 앱 단축어 › Bashy — 홈 화면 단추나 뒷면 탭에 붙일 수 있습니다')}`;
