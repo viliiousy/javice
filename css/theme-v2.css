@@ -792,3 +792,48 @@ html[data-ui="v2"] .btn-sm.accent:disabled, html[data-ui="v2"] .modal-btns .acce
 .hd-wx{ display:inline-flex; align-items:center; gap:3px; margin-left:8px; padding:0; border:0; background:none; color:var(--text3); font:inherit; font-size:12px; cursor:pointer; vertical-align:baseline; }
 .hd-wx .wx-ic{ width:14px; height:14px; position:relative; top:2px; }
 .hd-wx .num{ color:var(--text); font-family:var(--v2-num, 'Space Grotesk'); font-weight:600; }
+
+/* ── 날씨 세부 표시 ─────────────────────────────
+   날짜 숫자는 조금 작게(36→30), 그 숫자 뒤·위로 날씨가 지나간다. 오른쪽에 최저·지금·최고를 반원(호) 위에.
+   숫자 서체 하나, 주황은 해 하나에만. 효과는 숫자 칸 밖으로 넘치지 않는다. */
+html[data-ui="v2"] .h-date-main.wx-detail .hd-n{ font-size:30px; }
+html[data-ui="v2"] .hd-n{ position:relative; isolation:isolate; display:inline-block; }
+.wxfx{ position:absolute; inset:-12px -14px -4px -6px; pointer-events:none; overflow:hidden; z-index:-1; }
+.wxfx-rain, .wxfx-snow{ z-index:1; }
+/* 맑음: 숫자 오른쪽 위로 해가 천천히 떠오른다 */
+.wxf-sun{ position:absolute; right:0; top:0; width:20px; height:20px; border-radius:50%; background:var(--accent); opacity:.28;
+  animation:wxRise 2.4s cubic-bezier(.2,.8,.2,1) both, wxGlow 5s 2.4s ease-in-out infinite; }
+.wxf-moon{ position:absolute; right:0; top:0; width:18px; height:18px; border-radius:50%; box-shadow:-5px 3px 0 0 var(--text3); opacity:.5; animation:wxRise 2.4s ease-out both; }
+@keyframes wxRise{ from{ transform:translateY(26px); opacity:0; } to{ transform:none; } }
+@keyframes wxGlow{ 50%{ transform:scale(1.12); opacity:.36; } }
+/* 흐림: 구름 두 장이 숫자 뒤를 천천히 지나간다 */
+.wxf-cloud{ position:absolute; color:var(--text3); opacity:.32; }
+.wxf-cloud .wxf-cl{ display:block; width:100%; height:100%; fill:var(--text3); stroke:none; }
+.wxf-cloud.c1{ width:30px; height:30px; top:-8px; animation:wxDrift 14s linear infinite; }
+.wxf-cloud.c2{ width:22px; height:22px; top:8px; animation:wxDrift 19s -7s linear infinite; opacity:.22; }
+@keyframes wxDrift{ from{ left:-34px; } to{ left:100%; } }
+/* 안개: 옅은 띠 두 줄 */
+.wxf-fog{ position:absolute; left:-10%; width:120%; height:5px; border-radius:3px; background:var(--text3); opacity:.18; animation:wxFog 6s ease-in-out infinite alternate; }
+.wxf-fog.f1{ top:38%; } .wxf-fog.f2{ top:66%; animation-delay:-3s; }
+@keyframes wxFog{ to{ transform:translateX(12%); } }
+/* 비: 숫자 위로 가는 빗줄기가 떨어진다 */
+.wxf-r{ position:absolute; top:-12px; width:1.5px; height:9px; border-radius:1px; background:#3B82F6; opacity:.7; animation:wxRain .9s linear infinite; }
+@keyframes wxRain{ from{ transform:translateY(0) skewX(-8deg); } to{ transform:translateY(54px) skewX(-8deg); opacity:0; } }
+.wxf-flash{ position:absolute; inset:0; background:#fff; opacity:0; animation:wxFlash 7s 2s infinite; }
+@keyframes wxFlash{ 0%,92%,100%{ opacity:0; } 93%{ opacity:.35; } 95%{ opacity:0; } 96%{ opacity:.2; } }
+/* 눈: 송이가 흔들리며 내려오고, 숫자 윗면에 눈이 조금씩 쌓인다 */
+.wxf-s{ position:absolute; top:-8px; width:4px; height:4px; border-radius:50%; background:#C9D6E3; animation:wxSnow 3.4s linear infinite; }
+html.dark .wxf-s{ background:#EEF3F8; }
+@keyframes wxSnow{ 0%{ transform:translate(0,0); } 50%{ transform:translate(4px,24px); } 100%{ transform:translate(-2px,50px); opacity:0; } }
+.wxf-cap{ position:absolute; left:8%; right:10%; top:5px; height:4px; border-radius:3px 3px 1px 1px; background:#C9D6E3; transform-origin:bottom; animation:wxCap 9s ease-out both; }
+html.dark .wxf-cap{ background:#EEF3F8; }
+@keyframes wxCap{ from{ transform:scaleY(0); opacity:0; } 30%{ opacity:1; } to{ transform:scaleY(1); } }
+@media (prefers-reduced-motion:reduce){ .wxfx *{ animation:none !important; } .wxf-r, .wxf-s{ display:none; } }
+
+/* 호: 최저(왼쪽) · 지금(가운데) · 최고(오른쪽) */
+.hd-wxd{ display:inline-flex; align-self:center; width:72px; height:36px; margin-left:4px; padding:0; border:0; background:none; cursor:pointer; flex:none; }
+.hd-wxd svg{ width:100%; height:100%; overflow:visible; }
+.wxd-line{ fill:none; stroke:var(--border); stroke-width:1.2; }
+.hd-wxd text{ font-family:var(--v2-num, 'Space Grotesk'), sans-serif; fill:var(--text); }
+.wxd-now{ font-size:17px; font-weight:600; }
+.wxd-lo, .wxd-hi{ font-size:12px; font-weight:500; fill:var(--text3) !important; opacity:.85; }

@@ -75,6 +75,7 @@ const Settings = {
         ${this._item('디자인', this._seg(ui, [['v2','새 디자인'],['v1','예전']], 'Settings.setUI'), '새 디자인: 여백을 넓히고 카드 테두리를 줄인 지금 화면 · 예전: 이전 화면 배치')}
         ${this._item('테마', this._seg(App._theme, [['system','시스템'],['light','밝게'],['dark','어둡게']], 'Settings.setTheme'), '시스템은 휴대폰 설정(다크 모드)을 따라 낮·밤에 맞춰 바뀝니다')}
         ${this._item('아이콘', this._seg(Icons.mode, [['simple','심플'],['color','컬러']], 'Settings.setIcons'), '심플: 한 가지 색 선 아이콘 · 컬러: 카드마다 색이 들어간 아이콘')}
+        ${typeof Weather!=='undefined' ? this._item('날씨 표시', this._seg(Weather.mode, [['simple','간단'],['detail','세부'],['off','끄기']], 'Settings.setWx'), '간단: 요일 옆 아이콘·기온 · 세부: 최저·지금·최고를 호 모양으로, 날짜 위에 해·구름·비·눈 효과 · 상단바 날씨를 눌러도 바뀝니다') : ''}
         <div class="set-h">메인 화면</div>
         ${this._link('상단바 정보', "Settings.go('topinfo')", '맨 위 줄에 보일 숫자 고르기 — 몸무게·체지방·BMI·근육량·추세·주식 등락·AI 사용량')}
         ${this._link('카테고리 · 카드 순서와 켜고 끄기', "Settings.go('cats')", `지금 ${Tabs._onTabs().map(t => t.label).join(' → ')} — 탭 순서, 카드 위아래 순서(예: 운동을 식단 위로), 안 쓰는 카드 숨기기`)}`;
@@ -160,6 +161,7 @@ const Settings = {
 
   // ── 바로 바뀌는 항목 ─────────────────────
   setUI(v) { if ((document.documentElement.dataset.ui === 'v1' ? 'v1' : 'v2') !== v) App.toggleUI(); this._re('design'); },
+  setWx(v) { Weather.setMode(v); this._re('design'); },
   setTheme(v) { App._theme = v; App._applyTheme(); this._re('design'); },
   setIcons(v) { Icons.mode = v; Icons.applyMode(); Icons.updateModeLabel?.(); this._re('design'); },
   toggleTTS() { JARVIS.toggleTTS(); this._re('voice'); },

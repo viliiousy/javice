@@ -499,7 +499,10 @@ const App = {
         const wd = d.toLocaleDateString('ko-KR',{weekday:'long'});
         const yy = d.getFullYear() !== now.getFullYear() ? `${String(d.getFullYear()).slice(2)}년 ` : '';
         const wdc = dow===0 ? 'wd-sun' : dow===6 ? 'wd-sat' : 'wd-day';
-        elDate.innerHTML = `<b class="hd-n">${d.getDate()}</b><span class="hd-s">${yy}${d.getMonth()+1}월${isToday ? '<i class="hd-today">TODAY</i>' : ''}<br><span class="${wdc}">${wd}</span>${isToday && typeof Weather!=='undefined' ? `<span id="hWx">${Weather.html()}</span>` : ''}</span>`;
+        const W = isToday && typeof Weather!=='undefined' ? Weather : null, wxd = W && W.mode === 'detail' && W.w;
+        // 날씨 세부 표시: 날짜 숫자는 조금 작게, 그 위로 날씨 효과 · 오른쪽에 최저-지금-최고 호
+        elDate.classList.toggle('wx-detail', !!wxd);
+        elDate.innerHTML = `<b class="hd-n">${d.getDate()}${wxd ? W.fx() : ''}</b><span class="hd-s">${yy}${d.getMonth()+1}월${isToday ? '<i class="hd-today">TODAY</i>' : ''}<br><span class="${wdc}">${wd}</span>${W && !wxd ? `<span id="hWx">${W.html()}</span>` : ''}</span>${wxd ? `<span id="hWx">${W.html()}</span>` : ''}`;
       } else
       elDate.textContent = isMobile
         ? `${String(d.getFullYear()).slice(2)}년 ${d.getMonth()+1}월 ${d.getDate()}일`
@@ -965,6 +968,40 @@ const App = {
         if(e.key==='Enter'){ e.preventDefault(); App._saveQuickTask(); }
       });
     },50);
+  },
+  // ── 빠른 할 일 (위젯의 + 에서) ─────────────
+  // 제목과 세부만 적는 아래 시트. 목록은 위젯에서 고른 목록이 먼저 골라져 있고, 위 칩으로 바꿀 수 있다.
+  // 날짜는 기본 없음 — 오늘/내일만 한 번에. 제목 치고 엔터(또는 저장)면 끝.
+  quickTask(listId) {
+    if(!this.S.lists.some(l=>l.id===BashyCal.LIST_ID)) this.S.lists=[...this.S.lists,BashyCal.list()];
+    const lists=this.S.lists, cur=lists.some(l=>l.id===listId) ? listId : (this.S.taskFilter!=='all' && lists.some(l=>l.id===this.S.taskFilter) ? this.S.taskFilter : (lists[0]?.id||BashyCal.LIST_ID));
+    document.getElementById('qtSheet')?.remove();
+    const ov=document.createElement('div'); ov.id='qtSheet'; ov.className='mx-ov qt-ov';
+    const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const t0=new Date(), t1=new Date(Date.now()+864e5);
+    ov.innerHTML=`<div class="mx-sh qt-sh" role="dialog" aria-label="새 할 일">
+      <div class="qt-lists">${lists.map(l=>`<button type="button" class="qt-l${l.id===cur?' on':''}" data-id="${esc(l.id)}">${esc(l.title)}</button>`).join('')}</div>
+      <input id="qtTitle" class="qt-title" type="text" placeholder="새 할 일" enterkeyhint="done" autocomplete="off">
+      <textarea id="qtNotes" class="qt-notes" rows="1" placeholder="세부정보 추가"></textarea>
+      <input type="hidden" id="qtList" value="${esc(cur)}"><input type="hidden" id="qtDue" value=""><input type="hidden" id="qtTime" value="">
+      <div class="qt-bar">
+        <button type="button" class="qt-d" data-d="${ymd(t0)}">오늘</button>
+        <button type="button" class="qt-d" data-d="${ymd(t1)}">내일</button>
+        <span class="qt-sp"></span>
+        <button type="button" class="qt-save" disabled>저장</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    const $=s=>ov.querySelector(s), title=$('#qtTitle'), save=$('.qt-save');
+    const close=()=>{ ov.classList.remove('on'); setTimeout(()=>ov.remove(),200); };
+    ov.addEventListener('click',e=>{ if(e.target===ov) close(); });
+    ov.querySelectorAll('.qt-l').forEach(b=>b.onclick=()=>{ ov.querySelectorAll('.qt-l').forEach(x=>x.classList.toggle('on',x===b)); $('#qtList').value=b.dataset.id; try{Haptic.light();}catch(e){} title.focus(); });
+    ov.querySelectorAll('.qt-d').forEach(b=>b.onclick=()=>{ const on=!b.classList.contains('on'); ov.querySelectorAll('.qt-d').forEach(x=>x.classList.remove('on')); b.classList.toggle('on',on); $('#qtDue').value=on?b.dataset.d:''; title.focus(); });
+    title.addEventListener('input',()=>{ save.disabled=!title.value.trim(); });
+    const go=async()=>{ if(!title.value.trim()) return; save.disabled=true; await this._saveQuickTask(); close(); };
+    title.addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.isComposing){ e.preventDefault(); go(); } });
+    $('#qtNotes').addEventListener('input',e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(120,e.target.scrollHeight)+'px'; });
+    save.onclick=go;
+    requestAnimationFrame(()=>{ ov.classList.add('on'); title.focus(); });
   },
   // 예전 이름. 달력 길게 누르기 메뉴가 아직 이 이름으로 부른다.
   _showAddTaskForDate(date) { this.showAddTask(date); },

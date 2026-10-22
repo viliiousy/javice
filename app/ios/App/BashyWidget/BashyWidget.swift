@@ -11,7 +11,8 @@ let bashyGroup = "group.app.bashy"
 
 struct Snap: Decodable {
     struct HabitItem: Decodable { let id: String; let n: String; let ok: Bool }
-    struct TaskItem: Decodable { let id: String; let l: String?; let t: String; let d: String? }
+    struct TaskItem: Decodable { let id: String; let l: String?; let t: String; let d: String?; let o: Bool?; let s: Bool? }
+    struct ListInfo: Decodable { let id: String; let n: String; let c: Int? }
     struct Habits: Decodable { let done: Int; let total: Int; let left: [String]?; let items: [HabitItem]? }
     struct Tasks: Decodable { let count: Int; let top: [String]?; let items: [TaskItem]? }
     struct Cal: Decodable { let y: Int; let m: Int; let marks: [Int]? }
@@ -41,6 +42,8 @@ struct Snap: Decodable {
     let body: Body?
     let mkt: [Mkt]?
     let wx: Wx?
+    let lists: [ListInfo]?
+    let tl: [String: [TaskItem]]?
 
     static func load() -> Snap? {
         guard let s = UserDefaults(suiteName: bashyGroup)?.string(forKey: "today"),
@@ -336,6 +339,7 @@ struct BashyWidgets: WidgetBundle {
     var body: some Widget {
         BashyWidget()
         BashyPlannerWidget()
+        BashyTasksWidget()
         BashyAIWidget()
         BashyBodyWidget()
         BashyHabitsWidget()
@@ -972,6 +976,17 @@ struct TaskDoneIntent: AppIntent {
             if let c = t["count"] as? Int { t["count"] = max(0, c - 1) }
             o["tasks"] = t
         }
+        // 목록별 할 일(할 일 위젯)에서도 빼고 남은 개수를 줄인다
+        WStore.edit { o in
+            if var tl = o["tl"] as? [String: Any] {
+                for k in tl.keys { if var a = tl[k] as? [[String: Any]] { a.removeAll { ($0["id"] as? String) == id }; tl[k] = a } }
+                o["tl"] = tl
+            }
+            if var ls = o["lists"] as? [[String: Any]] {
+                for i in ls.indices where (ls[i]["id"] as? String) == list { ls[i]["c"] = max(0, (ls[i]["c"] as? Int ?? 1) - 1) }
+                o["lists"] = ls
+            }
+        }
         return .result()
     }
 }
@@ -997,5 +1012,111 @@ struct HabitToggleIntent: AppIntent {
             o["habits"] = h
         }
         return .result()
+    }
+}
+
+
+// ═══ 할 일 위젯 (목록 고르기) ═══════════════════════
+// 위젯을 길게 눌러 '위젯 편집' 에서 목록(개인 · 업무 · 전체 …)을 고른다. 목록마다 위젯을 하나씩 둘 수도 있다.
+// 왼쪽: 목록 이름 · 남은 개수, 아래 + (누르면 그 목록으로 제목·세부만 적는 빠른 입력이 바로 뜬다)
+// 오른쪽: 할 일 — 동그라미를 누르면 완료, 날짜는 지난 것만 주황.
+struct TaskListEntity: AppEntity {
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "할 일 목록"
+    static var defaultQuery = TaskListQuery()
+    var id: String
+    var name: String
+    var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(name)") }
+}
+
+struct TaskListQuery: EntityQuery {
+    static func all() -> [TaskListEntity] {
+        [TaskListEntity(id: "__all", name: "전체")] + (Snap.load()?.lists ?? []).map { TaskListEntity(id: $0.id, name: $0.n) }
+    }
+    func entities(for identifiers: [String]) async throws -> [TaskListEntity] { Self.all().filter { identifiers.contains($0.id) } }
+    func suggestedEntities() async throws -> [TaskListEntity] { Self.all() }
+    func defaultResult() async -> TaskListEntity? { Self.all().first }
+}
+
+struct TasksConfigIntent: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource = "할 일 목록"
+    static var description = IntentDescription("위젯에 보여 줄 할 일 목록을 고릅니다.")
+    @Parameter(title: "목록") var list: TaskListEntity?
+}
+
+struct TasksEntry: TimelineEntry { let date: Date; let snap: Snap?; let listId: String; let listName: String }
+
+struct TasksProvider: AppIntentTimelineProvider {
+    func placeholder(in context: Context) -> TasksEntry { TasksEntry(date: Date(), snap: nil, listId: "__all", listName: "할 일") }
+    func entry(_ c: TasksConfigIntent) -> TasksEntry {
+        let id = c.list?.id ?? "__all"
+        return TasksEntry(date: Date(), snap: Snap.load(), listId: id, listName: c.list?.name ?? "전체")
+    }
+    func snapshot(for configuration: TasksConfigIntent, in context: Context) async -> TasksEntry { entry(configuration) }
+    func timeline(for configuration: TasksConfigIntent, in context: Context) async -> Timeline<TasksEntry> {
+        Timeline(entries: [entry(configuration)], policy: .never)
+    }
+}
+
+struct TaskLine: View {
+    let t: Snap.TaskItem; let font: CGFloat
+    var body: some View {
+        HStack(spacing: 10) {
+            Button(intent: TaskDoneIntent(id: t.id, list: t.l ?? "")) {
+                Image(systemName: "circle").font(.system(size: font + 3)).foregroundColor(sub)
+            }.buttonStyle(.plain)
+            Text(t.t).font(.system(size: font)).foregroundColor(fg).lineLimit(1)
+            if t.s == true { Image(systemName: "star.fill").font(.system(size: font - 4)).foregroundColor(accent) }
+            Spacer(minLength: 4)
+            if let d = t.d, !d.isEmpty {
+                Text(d).font(.system(size: font - 2, weight: .medium, design: .rounded)).foregroundColor(t.o == true ? accent : sub).lineLimit(1)
+            }
+        }
+    }
+}
+
+struct TasksView: View {
+    let e: TasksEntry
+    @Environment(\.widgetFamily) var family
+    var body: some View {
+        let s = e.snap
+        let items = s?.tl?[e.listId] ?? []
+        let name = e.listId == "__all" ? "전체" : (s?.lists?.first(where: { $0.id == e.listId })?.n ?? e.listName)
+        let count = e.listId == "__all" ? (s?.lists?.reduce(0) { $0 + ($1.c ?? 0) } ?? items.count) : (s?.lists?.first(where: { $0.id == e.listId })?.c ?? items.count)
+        let add = URL(string: "bashy://task/quick?list=\(e.listId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name).font(.system(size: 17, weight: .semibold)).foregroundColor(fg).lineLimit(2).minimumScaleFactor(0.7)
+                Text("\(count)개 남음").font(.system(size: 12)).foregroundColor(sub)
+                Spacer(minLength: 6)
+                Link(destination: add) {
+                    Image(systemName: "plus").font(.system(size: 18, weight: .bold)).foregroundColor(.black)
+                        .frame(width: 44, height: 44).background(Circle().fill(accent))
+                }
+            }
+            .frame(width: 84, alignment: .leading)
+            VStack(alignment: .leading, spacing: family == .systemLarge ? 12 : 9) {
+                if s == nil { StaleNote() }
+                else if items.isEmpty {
+                    Spacer(minLength: 0)
+                    Text("남은 할 일이 없습니다").font(.system(size: 14)).foregroundColor(sub)
+                    Spacer(minLength: 0)
+                }
+                ForEach(items.prefix(family == .systemLarge ? 8 : 4), id: \.id) { TaskLine(t: $0, font: 14) }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .widgetURL(URL(string: "bashy://open/calendar"))
+        .widgetBg()
+    }
+}
+
+struct BashyTasksWidget: Widget {
+    var body: some WidgetConfiguration {
+        AppIntentConfiguration(kind: "BashyTasks", intent: TasksConfigIntent.self, provider: TasksProvider()) { e in TasksView(e: e) }
+            .configurationDisplayName("할 일")
+            .description("목록을 골라 할 일만 봅니다. 길게 눌러 '위젯 편집' 에서 목록을 바꿉니다. + 를 누르면 바로 새 할 일.")
+            .supportedFamilies([.systemMedium, .systemLarge])
     }
 }

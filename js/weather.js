@@ -28,12 +28,53 @@ const Weather = {
     } catch (e) {}
     return this.w;
   },
-  html() {
-    const w = this.w || this.cached(); if (!w) return '';
-    return `<button type="button" class="hd-wx" onclick="event.stopPropagation();Weather.tell()" aria-label="날씨 ${w.name} ${w.t}도">${this.icon(w.icon)}<span class="num">${w.t}°</span></button>`;
+  // 표시 방식: simple(아이콘+기온) · detail(최저-지금-최고 호 + 날짜 위 날씨 효과) · off — 이 기기에 저장
+  MODE_KEY: 'gl_wx_mode',
+  get mode() { const v = localStorage.getItem(this.MODE_KEY); return v === 'detail' || v === 'off' ? v : 'simple'; },
+  setMode(v) {
+    localStorage.setItem(this.MODE_KEY, v);
+    try { App._updateHeaderDate(App.S.selDate || new Date()); } catch (e) {}
+    try { Haptic.light(); } catch (e) {}
   },
-  paint() { const el = document.getElementById('hWx'); if (el) el.innerHTML = this.html(); },
-  tell() {
+  // 날씨를 누르면 간단 ↔ 세부
+  toggle() {
+    const next = this.mode === 'detail' ? 'simple' : 'detail';
+    this.setMode(next);
+    App.showToast(next === 'detail' ? '날씨 세부 표시 — 다시 누르면 간단히' : '날씨 간단 표시 — 다시 누르면 세부로');
+  },
+  html() {
+    const w = this.w || this.cached(); if (!w || this.mode === 'off') return '';
+    if (this.mode === 'detail') return this.arc(w);
+    return `<button type="button" class="hd-wx" onclick="event.stopPropagation();Weather.toggle()" aria-label="날씨 ${w.name} ${w.t}도 — 누르면 세부 표시">${this.icon(w.icon)}<span class="num">${w.t}°</span></button>`;
+  },
+  // 세부: 반원(호) 위에 최저(왼쪽, 작고 흐리게) · 지금(가운데, 크게) · 최고(오른쪽)
+  arc(w) {
+    const n = v => (v == null || isNaN(v)) ? '–' : v + '°';
+    return `<button type="button" class="hd-wxd" onclick="event.stopPropagation();Weather.toggle()" aria-label="${w.name} 지금 ${w.t}도, 최저 ${w.lo}도, 최고 ${w.hi}도 — 누르면 간단 표시">
+      <svg viewBox="0 0 100 50" aria-hidden="true">
+        <path class="wxd-line" d="M4 48 A46 46 0 0 1 96 48"/>
+        <path class="wxd-line" d="M22.6 12.8 L38 48 M77.4 12.8 L62 48"/>
+        <text class="wxd-lo" x="20" y="43" transform="rotate(-24 20 43)" text-anchor="middle">${n(w.lo)}</text>
+        <text class="wxd-now" x="50" y="34" text-anchor="middle">${n(w.t)}</text>
+        <text class="wxd-hi" x="80" y="43" transform="rotate(24 80 43)" text-anchor="middle">${n(w.hi)}</text>
+      </svg></button>`;
+  },
+  // 날짜 숫자 위에 얹는 날씨 효과(세부 표시일 때) — 해가 뜨고 · 구름이 흐르고 · 비가 내리고 · 눈이 내려 살짝 쌓인다
+  fx() {
+    const w = this.w || this.cached(); if (!w || this.mode !== 'detail') return '';
+    const k = { sun: 'sun', moon: 'moon', 'cloud-sun': 'cloud', 'cloud-moon': 'cloud', cloud: 'cloud', fog: 'fog', rain: 'rain', storm: 'rain', snow: 'snow' }[w.icon] || 'cloud';
+    const drops = (n, cls) => Array.from({ length: n }, (_, i) => `<i class="${cls}" style="left:${(i * 97 / n + (i % 3) * 4) % 96}%;animation-delay:${(i * 0.37) % 1.6}s;animation-duration:${(cls === 'wxf-s' ? 3.2 : 0.9) + (i % 4) * (cls === 'wxf-s' ? 0.5 : 0.12)}s"></i>`).join('');
+    let inner = '';
+    if (k === 'sun') inner = '<i class="wxf-sun"></i>';
+    else if (k === 'moon') inner = '<i class="wxf-moon"></i>';
+    else if (k === 'cloud') inner = `<i class="wxf-cloud c1">${this.icon('cloud', 'wxf-cl')}</i><i class="wxf-cloud c2">${this.icon('cloud', 'wxf-cl')}</i>`;
+    else if (k === 'fog') inner = '<i class="wxf-fog f1"></i><i class="wxf-fog f2"></i>';
+    else if (k === 'rain') inner = drops(9, 'wxf-r') + (w.icon === 'storm' ? '<i class="wxf-flash"></i>' : '');
+    else if (k === 'snow') inner = drops(10, 'wxf-s') + '<i class="wxf-cap"></i>';
+    return `<span class="wxfx wxfx-${k}" aria-hidden="true">${inner}</span>`;
+  },
+  paint() { try { App._updateHeaderDate(App.S.selDate || new Date()); } catch (e) { const el = document.getElementById('hWx'); if (el) el.innerHTML = this.html(); } },
+  tell() {   // (예전) 누르면 짧게 알려 주던 것 — 이제 누르면 표시 방식을 바꾼다
     const w = this.w; if (!w) return;
     App.showToast(`${w.name} ${w.t}° · 체감 ${w.feels}° · 최고 ${w.hi}° 최저 ${w.lo}°${w.rain != null ? ` · 비 올 확률 ${w.rain}%` : ''}`);
   },

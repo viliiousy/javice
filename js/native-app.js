@@ -46,7 +46,10 @@ const NativeApp = {
     const m = /^bashy:\/\/([^/?#]+)\/?([^?#]*)/.exec(String(url || '')); if (!m) return;
     const go = () => {
       if (!(typeof Auth !== 'undefined' && Auth.signedIn && Auth.signedIn() && App.S && Array.isArray(App.S.lists))) { setTimeout(go, 600); return; }
-      if (m[1] === 'task' && m[2] === 'new') {
+      if (m[1] === 'task' && m[2] === 'quick') {
+        const lid = decodeURIComponent((/[?&]list=([^&#]*)/.exec(String(url)) || [])[1] || '');
+        App.closeModal?.(); App.quickTask(lid === '__all' ? '' : lid);
+      } else if (m[1] === 'task' && m[2] === 'new') {
         App.closeModal?.(); App._gotoCard('calendar'); App.showAddTask(new Date());
         setTimeout(() => document.getElementById('qtTitle')?.focus(), 350);   // 바로 쓸 수 있게 글자판을 올린다
       } else if (m[1] === 'ai') { try { AIUsage.open(); } catch (e) {} }

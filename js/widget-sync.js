@@ -41,6 +41,15 @@ const Widgets = {
         items: pend.slice().sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0) || String(a.due || '9').localeCompare(String(b.due || '9')))
           .slice(0, 8).map(t => ({ id: String(t.id), l: String(t._l), t: String(t.title || '').slice(0, 30),
             d: t.due ? (t.due.split('T')[0] < today ? '지남' : t.due.split('T')[0] === today ? '오늘' : `${+t.due.slice(5, 7)}/${+t.due.slice(8, 10)}`) : '' })) };
+      // 할 일 위젯(목록 고르기): 목록 이름과 목록마다 할 일(먼저 할 것 순, 8개까지)
+      const ord = (a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0) || String(a.due || '9').localeCompare(String(b.due || '9'));
+      const row = t => ({ id: String(t.id), l: String(t._l), t: String(t.title || '').slice(0, 30),
+        d: t.due ? (t.due.split('T')[0] < today ? `${+t.due.slice(5, 7)}월 ${+t.due.slice(8, 10)}일` : t.due.split('T')[0] === today ? '오늘' : `${+t.due.slice(5, 7)}/${+t.due.slice(8, 10)}`) : '',
+        o: t.due ? t.due.split('T')[0] < today : false, s: !!t.starred });
+      out.lists = (App.S.lists || []).map(l => ({ id: String(l.id), n: String(l.title || '목록').slice(0, 12), c: pend.filter(t => t._l === String(l.id)).length }));
+      out.tl = {};
+      out.lists.forEach(l => { out.tl[l.id] = pend.filter(t => t._l === l.id).sort(ord).slice(0, 8).map(row); });
+      out.tl.__all = pend.slice().sort(ord).slice(0, 8).map(row);
     } catch (e) {}
 
     try {

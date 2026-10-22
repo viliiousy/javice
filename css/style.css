@@ -3591,3 +3591,19 @@ html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto;
 .rw-full.rw-arm > .rw-slide{ transform-origin:left center; opacity:.72; box-shadow:4px 0 0 0 #E5484D; }
 .rw-full.rw-gone::after{ content:'삭제됨'; background-image:none; padding-right:16px; justify-content:center; }
 .rw-full{ transition:height .2s ease; }
+/* 빠른 할 일 시트(위젯 + 에서): 목록 칩 · 제목 · 세부 · 오늘/내일 · 저장 */
+.qt-ov{ z-index:10075; align-items:flex-end; }
+.qt-sh{ padding:16px 16px calc(12px + env(safe-area-inset-bottom)); border-radius:16px 16px 0 0; }
+.qt-lists{ display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; margin:0 -16px 12px; padding:0 16px; }
+.qt-lists::-webkit-scrollbar{ display:none; }
+.qt-l{ flex:none; height:32px; padding:0 14px; border-radius:16px; border:1px solid var(--border); background:none; color:var(--text3); font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+.qt-l.on{ background:var(--text); border-color:var(--text); color:var(--card); }
+.qt-title{ display:block; width:100%; border:0; background:none; color:var(--text); font:inherit; font-size:18px; font-weight:500; padding:8px 0; outline:none; }
+.qt-notes{ display:block; width:100%; border:0; background:none; color:var(--text2, var(--text)); font:inherit; font-size:14px; padding:4px 0 8px; outline:none; resize:none; line-height:1.5; }
+.qt-title::placeholder, .qt-notes::placeholder{ color:var(--text3); }
+.qt-bar{ display:flex; align-items:center; gap:8px; border-top:1px solid var(--border); padding-top:12px; margin-top:4px; }
+.qt-d{ height:32px; padding:0 12px; border-radius:8px; border:1px solid var(--border); background:none; color:var(--text3); font:inherit; font-size:13px; cursor:pointer; }
+.qt-d.on{ border-color:var(--accent); color:var(--accent); font-weight:600; }
+.qt-sp{ flex:1; }
+.qt-save{ height:36px; padding:0 18px; border-radius:18px; border:0; background:var(--accent); color:var(--accent-fg, #fff); font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+.qt-save:disabled{ background:none; color:var(--text3); cursor:default; }
