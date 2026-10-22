@@ -53,10 +53,9 @@ const Weather = {
     return `<button type="button" class="hd-wxd" onclick="event.stopPropagation();Weather.toggle()" aria-label="${w.name} 지금 ${w.t}도, 최저 ${w.lo}도, 최고 ${w.hi}도 — 누르면 간단 표시">
       <svg viewBox="0 0 100 50" aria-hidden="true">
         <path class="wxd-line" d="M4 48 A46 46 0 0 1 96 48"/>
-        <path class="wxd-line" d="M22.6 12.8 L38 48 M77.4 12.8 L62 48"/>
-        <text class="wxd-lo" x="20" y="43" transform="rotate(-24 20 43)" text-anchor="middle">${n(w.lo)}</text>
-        <text class="wxd-now" x="50" y="34" text-anchor="middle">${n(w.t)}</text>
-        <text class="wxd-hi" x="80" y="43" transform="rotate(24 80 43)" text-anchor="middle">${n(w.hi)}</text>
+        <text class="wxd-lo" x="17" y="40" transform="rotate(-48 17 40)" text-anchor="middle">${n(w.lo)}</text>
+        <text class="wxd-now" x="50" y="36" text-anchor="middle">${n(w.t)}</text>
+        <text class="wxd-hi" x="83" y="40" transform="rotate(48 83 40)" text-anchor="middle">${n(w.hi)}</text>
       </svg></button>`;
   },
   // 날짜 숫자 위에 얹는 날씨 효과(세부 표시일 때) — 해가 뜨고 · 구름이 흐르고 · 비가 내리고 · 눈이 내려 살짝 쌓인다

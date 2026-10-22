@@ -836,7 +836,7 @@ html.dark .wxf-cap{ background:#EEF3F8; }
 .wxd-line{ fill:none; stroke:var(--border); stroke-width:1.2; }
 .hd-wxd text{ font-family:var(--v2-num, 'Space Grotesk'), sans-serif; fill:var(--text); }
 .wxd-now{ font-size:17px; font-weight:600; }
-.wxd-lo, .wxd-hi{ font-size:12px; font-weight:500; fill:var(--text3) !important; opacity:.85; }
+.wxd-lo, .wxd-hi{ font-size:9.5px; font-weight:500; fill:var(--text3) !important; opacity:.85; }
 
 /* ── 가입 신청 · 대기 화면 ───────────────────── */
 .gate{ position:fixed; inset:0; z-index:20000; background:var(--card); color:var(--text); display:flex; align-items:center; justify-content:center; padding:24px; overflow:auto; }
