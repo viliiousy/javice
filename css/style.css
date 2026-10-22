@@ -3671,3 +3671,9 @@ html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto;
 .ec-sr-l .ec-meta, #econWrap .ec-meta{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .nt-link{ border:0; background:none; width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px; font:inherit; color:inherit; cursor:pointer; text-align:left; }
 .nt-link b{ font-size:13px; color:var(--accent,#FF6A2B); font-weight:600; }
+/* 운동 모드: 목록 줄도 밀어서 삭제 */
+.wk-lsw{ border-top:0; }
+.wk-lsw .wk-li{ position:relative; z-index:1; background:#101113; transition:transform .2s; touch-action:pan-y; }
+@media (hover:hover){ .wk-lsw:hover .wk-li{ transform:translateX(-72px); } }
+.wk-tool-del{ color:#FF8A8D; border-color:#3A2326; }
+.wk-tool-del.arm{ background:#E5484D; border-color:#E5484D; color:#fff; }

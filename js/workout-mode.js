@@ -470,8 +470,9 @@ const WorkoutMode = {
     const A = v => esc(v).replace(/'/g, '&#39;');
     const nowK = x.rows.findIndex(q => !q.ok);
     // 운동 순서: 지금 운동 앞의 것은 위에, 뒤의 것은 아래에 (예: 3번째면 1·2 → 지금 운동 → 4·5·6·7)
-    const li = (a, b) => S.ex.slice(a, b).map((e, j) => { const i = a + j; return `<button class="wk-li${e.done ? ' done' : ''}" onclick="WorkoutMode.go(${i})">
-          <span>${i + 1}</span><b>${esc(e.name)}</b><i>${e.done ? '완료' : e.rows.filter(r => r.ok).length + '/' + e.rows.length}</i></button>`; }).join('');
+    // 목록 줄을 왼쪽으로 밀면 '삭제' 가 나온다(세트 줄과 같은 손짓)
+    const li = (a, b) => S.ex.slice(a, b).map((e, j) => { const i = a + j; return `<div class="wk-sw wk-lsw"><button class="wk-li${e.done ? ' done' : ''}" onclick="WorkoutMode.go(${i})">
+          <span>${i + 1}</span><b>${esc(e.name)}</b><i>${e.done ? '완료' : e.rows.filter(r => r.ok).length + '/' + e.rows.length}</i></button><button class="wk-sdel" onclick="WorkoutMode.delEx(${i})">삭제</button></div>`; }).join('');
     el.innerHTML = `
       <div class="wk-top">
         <button class="wk-x" onclick="WorkoutMode.finish()">끝내기</button>
@@ -489,6 +490,7 @@ const WorkoutMode = {
             <button class="wk-tool" onclick="WorkoutMode.addEx()">+ 운동 추가</button>
             <button class="wk-tool" onclick="WorkoutHistory.open('${A(x.name)}')">기록 · 그래프</button>
             ${em ? `<button class="wk-tool" onclick="ExMedia.open('${A(x.name)}')">자세 요령</button>` : ''}
+            ${S.ex.length > 1 ? `<button class="wk-tool wk-tool-del" onclick="WorkoutMode.delEx(${S.cur}, this)">삭제</button>` : ''}
           </div>
         </div>
         ${x.cardio ? `<p class="wk-note">${esc(x.sets || '시간')} — 세트 없이 시간으로 합니다. 끝나면 아래 ‘완료’ 를 눌러 주세요.</p>` : `
@@ -519,7 +521,7 @@ const WorkoutMode = {
   // 세트 줄을 왼쪽으로 밀면 그 세트를 지운다(마지막 세트가 아니라 민 세트)
   _bindSwipe(el) {
     el.querySelectorAll('.wk-sw').forEach(w => {
-      const row = w.querySelector('.wk-set'); let sx = 0, sy = 0, dx = 0, on = false;
+      const row = w.querySelector('.wk-set, .wk-li'); if (!row) return; let sx = 0, sy = 0, dx = 0, on = false;
       row.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; dx = 0; on = false; }, { passive: true });
       row.addEventListener('touchmove', e => {
         const mx = e.touches[0].clientX - sx, my = e.touches[0].clientY - sy;
@@ -593,6 +595,25 @@ const WorkoutMode = {
   addSet() {
     const x = this.st.ex[this.st.cur], l = x.rows[x.rows.length - 1] || {};
     x.rows.push({ w: l.w ?? '', r: l.r ?? '', ok: false }); this.paint(); this._persist();
+  },
+  // 운동 종목 빼기 — 목록에서 밀어서 '삭제', 또는 지금 운동의 '삭제' 단추(한 번 더 눌러 확인)
+  delEx(i, btn) {
+    const S = this.st; if (!S || !S.ex[i]) return;
+    if (S.ex.length <= 1) { App.showToast('운동이 하나뿐이라 지울 수 없습니다 — 끝내기를 눌러 주세요'); this.paint(); return; }
+    if (btn && !btn.classList.contains('arm')) {
+      btn.classList.add('arm'); btn.textContent = '한 번 더 누르면 삭제';
+      clearTimeout(this._dxT); this._dxT = setTimeout(() => { btn.classList.remove('arm'); btn.textContent = '삭제'; }, 3000);
+      try { Haptic.light(); } catch (e) {} return;
+    }
+    const e = S.ex[i];
+    S.ex.splice(i, 1);
+    // 오늘 이 운동으로 남긴 기록도 지운다(운동 모드 들어오기 전부터 있던 기록은 그대로)
+    { const L = PlanGen.log(S.ds); if (L[e.name] && !(S.snapLog || {})[e.name]) { delete L[e.name]; PlanGen.saveLog(S.ds, L); } }
+    if (i < S.cur) S.cur--;
+    else if (i === S.cur) { const n = S.ex.findIndex((q, k) => !q.done && k >= i); S.cur = n >= 0 ? n : Math.min(i, S.ex.length - 1); }
+    try { Haptic.medium(); } catch (er) {}
+    this.paint(); this._persist();
+    App.showToast(`${e.name} 을(를) 뺐습니다`);
   },
   delSet(k) {
     const x = this.st.ex[this.st.cur];
