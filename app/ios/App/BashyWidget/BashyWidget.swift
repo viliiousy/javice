@@ -626,6 +626,58 @@ struct AIBar: View {
     }
 }
 
+// AI 고유 색 — Claude 주황, ChatGPT 초록, Higgsfield 연두
+private func aiColor(_ k: String) -> Color {
+    switch k {
+    case "claude": return Color(red: 0xD9/255, green: 0x77/255, blue: 0x57/255)
+    case "chatgpt": return Color(red: 0x10/255, green: 0xA3/255, blue: 0x7F/255)
+    case "higgsfield": return Color(red: 0xB5/255, green: 0xE6/255, blue: 0x3C/255)
+    default: return Color(red: 0x8B/255, green: 0x7C/255, blue: 0xF6/255)
+    }
+}
+struct AICell: View {
+    let a: Snap.AI; let now: Date
+    var body: some View {
+        let col = aiColor(a.k)
+        let reset = isoDate(a.r)
+        let left = reset.map { max(0, Int($0.timeIntervalSince(now))) }
+        VStack(spacing: 2) {
+            ZStack {
+                Ring(frac: Double(a.d7 ?? a.left ?? 0) / 100, color: col.opacity(0.55), width: 3.5).frame(width: 44, height: 44)
+                if let h = a.h5 { Ring(frac: Double(h) / 100, color: col, width: 3.5).frame(width: 34, height: 34) }
+                if let l = left, l > 0 {
+                    Text(String(format: "%d:%02d", l / 3600, (l % 3600) / 60)).font(.system(size: 10, weight: .semibold, design: .rounded)).foregroundColor(fg).minimumScaleFactor(0.7)
+                } else if a.h5 == nil, let v = a.left {
+                    Text("\(v)").font(.system(size: 11, weight: .semibold, design: .rounded)).foregroundColor(fg)
+                }
+            }
+            Text(a.n).font(.system(size: 9, weight: .medium)).foregroundColor(sub).lineLimit(1)
+            if a.h5 != nil || a.d7 != nil {
+                HStack(spacing: 1) {
+                    Text(a.h5.map { "\($0)%" } ?? "–").font(.system(size: 8.5, weight: .medium, design: .rounded)).foregroundColor(sub)
+                    Text("/").font(.system(size: 8.5)).foregroundColor(sub.opacity(0.6))
+                    Text(a.d7.map { "\($0)%" } ?? "–").font(.system(size: 10.5, weight: .semibold, design: .rounded)).foregroundColor(fg)
+                }.lineLimit(1).minimumScaleFactor(0.7)
+            } else {
+                Text(a.left.map { "\($0)%" } ?? "–").font(.system(size: 10.5, weight: .semibold, design: .rounded)).foregroundColor(fg)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// 2×2 AI 위젯은 남은 시간(2:49)을 보여 주므로 1분마다 새로 그린다(3시간치)
+struct AIProvider: TimelineProvider {
+    func placeholder(in context: Context) -> Entry { Entry(date: Date(), snap: nil) }
+    func getSnapshot(in context: Context, completion: @escaping (Entry) -> Void) { completion(Entry(date: Date(), snap: Snap.load())) }
+    func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> Void) {
+        let s = Snap.load(), now = Date()
+        let start = Calendar.current.date(bySetting: .second, value: 0, of: now) ?? now
+        let entries = (0..<180).map { Entry(date: start.addingTimeInterval(Double($0) * 60), snap: s) }
+        completion(Timeline(entries: entries, policy: .atEnd))
+    }
+}
+
 struct AIView: View {
     let e: Entry
     @Environment(\.widgetFamily) var family
@@ -633,29 +685,22 @@ struct AIView: View {
         let ai = e.snap?.ai ?? []
         let reset = ai.first(where: { isoDate($0.r) != nil })
         VStack(alignment: .leading, spacing: 0) {
-            WHead(title: "AI 남은 양")
-            Spacer(minLength: 6)
+            if family != .systemSmall { WHead(title: "AI 남은 양"); Spacer(minLength: 6) }
             if ai.isEmpty {
                 Text("설정 › AI › 사용량에서 연결하면 보입니다").font(.system(size: 12)).foregroundColor(sub).lineLimit(3)
             } else if family == .systemSmall {
-                HStack(spacing: 4) {
-                    ForEach(Array(ai.prefix(3).enumerated()), id: \.offset) { _, a in
-                        VStack(spacing: 4) {
-                            ZStack {
-                                Ring(frac: Double(a.d7 ?? a.left ?? 0) / 100, color: pctColor(a.d7 ?? a.left), width: 4.5).frame(width: 40, height: 40)
-                                if let h = a.h5 { Ring(frac: Double(h) / 100, color: pctColor(h), width: 4.5).frame(width: 25, height: 25) }
+                // 2×2: 네 칸에 AI 하나씩 — 바깥 고리 7일, 안쪽 고리 5시간(AI마다 고유 색).
+                // 가운데: 5시간 창이 다시 차기까지 남은 시간(2:49), 아래: 이름 · 5시간 / 7일 남은 %
+                let cells = Array(ai.prefix(4))
+                VStack(spacing: 6) {
+                    ForEach(0..<2, id: \.self) { r in
+                        HStack(spacing: 6) {
+                            ForEach(0..<2, id: \.self) { c in
+                                let i = r * 2 + c
+                                if i < cells.count { AICell(a: cells[i], now: e.date) } else { Color.clear.frame(maxWidth: .infinity) }
                             }
-                            Text("\(a.h5 ?? a.left ?? 0)%").font(.system(size: 14, weight: .semibold, design: .rounded)).foregroundColor(fg).minimumScaleFactor(0.7)
-                            Text(a.n).font(.system(size: 10)).foregroundColor(sub).lineLimit(1)
-                        }.frame(maxWidth: .infinity)
+                        }
                     }
-                }
-                Spacer(minLength: 4)
-                if let r = reset, let d = isoDate(r.r) {
-                    HStack(spacing: 3) {
-                        Text("\(r.n) 5시간").font(.system(size: 11)).foregroundColor(sub)
-                        Text(d, style: .time).font(.system(size: 11, weight: .semibold)).foregroundColor(accent)
-                    }.lineLimit(1)
                 }
             } else {
                 VStack(spacing: 10) {
@@ -678,9 +723,9 @@ struct AIView: View {
 
 struct BashyAIWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "BashyAI", provider: Provider()) { e in AIView(e: e) }
+        StaticConfiguration(kind: "BashyAI", provider: AIProvider()) { e in AIView(e: e) }
             .configurationDisplayName("AI 사용량")
-            .description("Claude · ChatGPT · Higgsfield 남은 양. 바깥 고리 7일, 안쪽 고리 5시간.")
+            .description("Claude · ChatGPT · Higgsfield 남은 양. 바깥 고리 7일, 안쪽 고리 5시간, 가운데는 5시간 창이 다시 차기까지 남은 시간.")
             .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
@@ -1079,19 +1124,49 @@ struct TaskLine: View {
     }
 }
 
+// 위젯 안에서 목록 바꾸기: 목록 이름을 누르면 전체 → 개인 → 업무 … 순서로 넘어간다(고른 것은 App Group 에 기억)
+struct TaskListCycleIntent: AppIntent {
+    static var title: LocalizedStringResource = "할 일 목록 바꾸기"
+    static var openAppWhenRun: Bool = false
+    @Parameter(title: "지금 목록") var cur: String
+    init() { cur = "__all" }
+    init(cur: String) { self.cur = cur }
+    func perform() async throws -> some IntentResult {
+        let ids = ["__all"] + (Snap.load()?.lists ?? []).map { $0.id }
+        let i = ids.firstIndex(of: cur) ?? -1
+        WStore.d?.set(ids[(i + 1) % max(1, ids.count)], forKey: "tlSel")
+        return .result()
+    }
+}
+
 struct TasksView: View {
     let e: TasksEntry
     @Environment(\.widgetFamily) var family
     var body: some View {
         let s = e.snap
+        // 위젯에서 고른 목록이 있으면 그게 먼저(위젯 편집에서 고른 목록은 처음 값)
+        let sel = WStore.d?.string(forKey: "tlSel")
+        let lid = (sel != nil && (sel == "__all" || (s?.lists ?? []).contains(where: { $0.id == sel }))) ? sel! : e.listId
+        let e = TasksEntry(date: e.date, snap: s, listId: lid, listName: e.listName)
         let items = s?.tl?[e.listId] ?? []
         let name = e.listId == "__all" ? "전체" : (s?.lists?.first(where: { $0.id == e.listId })?.n ?? e.listName)
         let count = e.listId == "__all" ? (s?.lists?.reduce(0) { $0 + ($1.c ?? 0) } ?? items.count) : (s?.lists?.first(where: { $0.id == e.listId })?.c ?? items.count)
         let add = URL(string: "bashy://task/quick?list=\(e.listId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
         HStack(alignment: .top, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(name).font(.system(size: 17, weight: .semibold)).foregroundColor(fg).lineLimit(2).minimumScaleFactor(0.7)
+                Button(intent: TaskListCycleIntent(cur: e.listId)) {
+                    HStack(spacing: 3) {
+                        Text(name).font(.system(size: 17, weight: .semibold)).foregroundColor(fg).lineLimit(1).minimumScaleFactor(0.6)
+                        Image(systemName: "chevron.up.chevron.down").font(.system(size: 10, weight: .semibold)).foregroundColor(sub)
+                    }
+                }.buttonStyle(.plain)
                 Text("\(count)개 남음").font(.system(size: 12)).foregroundColor(sub)
+                // 목록 점: 지금 보는 목록이 몇 번째인지
+                HStack(spacing: 3) {
+                    ForEach(Array((["__all"] + (s?.lists ?? []).map { $0.id }).enumerated()), id: \.offset) { _, id in
+                        Circle().fill(id == e.listId ? accent : sub.opacity(0.35)).frame(width: 4, height: 4)
+                    }
+                }.padding(.top, 3)
                 Spacer(minLength: 6)
                 Link(destination: add) {
                     Image(systemName: "plus").font(.system(size: 18, weight: .bold)).foregroundColor(.black)

@@ -32,7 +32,9 @@ const Widgets = {
 
     try {
       const pend = [];
-      Object.entries(App.S.tasks || {}).forEach(([lid, l]) => (l || []).forEach(t => { if (t.status === 'needsAction' && !t._hidden) pend.push({ ...t, _l: lid }); }));
+      // 앱에서 '지난 할 일 안 보기' 로 해 두면 위젯에서도 기한 지난 것은 뺀다
+      const showOver = typeof App.showOverdue === 'function' ? App.showOverdue() : true;
+      Object.entries(App.S.tasks || {}).forEach(([lid, l]) => (l || []).forEach(t => { if (t.status === 'needsAction' && !t._hidden && (showOver || !t.due || t.due.split('T')[0] >= today)) pend.push({ ...t, _l: lid }); }));
       const todays = pend.filter(t => t.due ? t.due.split('T')[0] <= today : true);
       todays.sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0) || String(a.due || '9').localeCompare(String(b.due || '9')));
       out.tasks = { count: pend.filter(t => t.due ? t.due.split('T')[0] === today : true).length,

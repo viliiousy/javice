@@ -1102,7 +1102,7 @@ const App = {
   toggleOverdue(){
     UserStore.set('gl_task_show_overdue', this.showOverdue()?'0':'1');
     FirebaseSync?.scheduleSave();
-    this._buildTaskFilters(); this._renderTasks();
+    this._buildTaskFilters(); this._renderTasks(); try { Widgets.push(); } catch(e){}
   },
   // 지금 몇 개가 숨어 있는지. 숫자를 안 적으면 '지난 할일이 없다' 와 '가려 뒀다' 가 같아 보인다.
   _overdueCount(){
