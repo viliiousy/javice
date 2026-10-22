@@ -177,6 +177,7 @@ const Admin = {
     if (u.gemail) parts.push(`구글 ${esc(u.gemail)}`);
     if (u.email && u.email !== u.gemail) parts.push(/privaterelay\.appleid\.com$/.test(u.email) ? `애플(이메일 가림) ${esc(u.email.split('@')[0])}` : esc(u.email));
     parts.push(`ID ${esc(u.uid)}`);
+    if (u.gone) parts.push('<b class="adm-prov">로그인 계정 없음(지워짐)</b>');
     return parts.join(' · ');
   },
   _ago(t) {
