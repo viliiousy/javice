@@ -339,7 +339,9 @@ const App = {
     try { if(typeof JARVIS!=='undefined'&&JARVIS.history&&JARVIS.history.length){ const H=JARVIS.history; for(let i=H.length-1;i>=0;i--){ if(H[i]&&H[i].role==='assistant'){ lastMsg=String(H[i].content||'').replace(/[{][\s\S]*[}]/g,'').trim(); break; } } } } catch(e){}
 
     // 이번주 일정 + 기한 있는 할일 (오늘~7일)
-    const weekEnd=new Date(now); weekEnd.setDate(now.getDate()+7); weekEnd.setHours(23,59,59,999);
+    // 넓은 화면(PC·태블릿)은 상단바가 길다 — 2주 앞까지, 더 많이 보인다
+    const _wideTop = (()=>{ try { return matchMedia('(min-width:641px)').matches; } catch(e){ return false; } })();
+    const weekEnd=new Date(now); weekEnd.setDate(now.getDate()+(_wideTop?14:7)); weekEnd.setHours(23,59,59,999);
     const upcoming=[];
     // 캘린더 이벤트
     (this.S.events||[]).forEach(e=>{
@@ -356,7 +358,7 @@ const App = {
       }catch{}
     });
     upcoming.sort((a,b)=>a.date-b.date);
-    upcoming.splice(6); // 근일주일 일정 최대 6개 표시
+    upcoming.splice(_wideTop?12:6); // 일정 최대 6개(넓은 화면 12개)
 
     // 긴급 할일 TOP 3
     // 설정 › 일정과 할일 › '상단에 지난 할일도 보이기' — 끄면 기한이 지난 것은 위 줄에서 뺀다
@@ -367,7 +369,7 @@ const App = {
       if(bS!==aS) return bS-aS;
       if(a.due&&b.due) return new Date(a.due)-new Date(b.due);
       return 0;
-    }).filter(t=>!upcoming.some(u=>u.id===t.id)).slice(0,3);
+    }).filter(t=>!upcoming.some(u=>u.id===t.id)).slice(0,_wideTop?6:3);
 
     // 변경 감지 (긴급할일 id+status 포함)
     const curStr=JSON.stringify({hDone,cal:dt.cal,pending,cl:clItems.length,uIds:urgentTasks.map(t=>t.id+t.status).join()});

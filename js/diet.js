@@ -145,7 +145,41 @@ const Diet = {
     return Math.round(v) + (unit?`<i>${unit}</i>`:'') + (t.unknown?'<sup class="macro-plus">+</sup>':'');
   },
 
+  // 한 팩을 '1개' 로 담아 둔 지난 기록 바로잡기(광어초밥 200g 한 팩 × 12 = 3,840kcal 처럼) — 낱개 무게로 다시 계산한다.
+  // 이미 고친 줄은 단위가 '1개(25g)' 라 다시 걸리지 않는다. 최근 목록과 지난 30일 기록만 본다.
+  _pieceOf(name, W){
+    const cnt = /(\d+)\s*(?:p|P|pcs|PCS|개입|입|피스|알)(?![a-zA-Z가-힣])/.exec(String(name)), N = cnt ? Number(cnt[1]) : 0;
+    if (N >= 2 && N <= 100) return Math.round(W / N * 10) / 10;
+    const pp = !this.PIECE_NOT.test(String(name)) && this.PIECEP.find(([re]) => re.test(String(name)));
+    return pp && W >= pp[1] * 2.5 ? pp[1] : 0;
+  },
+  _migPiece(){
+    if (Date.now() - (this._migAt || 0) < 60000) return; this._migAt = Date.now();   // 고친 줄은 다시 안 걸리므로 여러 번 돌아도 된다(동기화로 옛 값이 다시 내려와도 다음에 바로잡힌다)
+    const fix = (name, unit) => { const m = /^1개\((\d+(?:\.\d+)?)(g|mL)\)$/.exec(unit || ''); if (!m) return null;
+      const W = Number(m[1]), pc = this._pieceOf(name, W); if (!pc || pc >= W) return null; return { f: pc / W, u: `1개(${pc}${m[2]})` }; };
+    let n = 0;
+    try {
+      const h = this.getHistory(); let hc = false;
+      for (const x of h) { const r = x && fix(x.name, x.unit); if (!r) continue;
+        x.unit = r.u; x.cal = Math.round((x.cal || 0) * r.f); x.protein = +((x.protein || 0) * r.f).toFixed(1); x.carb = +((x.carb || 0) * r.f).toFixed(1); x.fat = +((x.fat || 0) * r.f).toFixed(1); hc = true; n++; }
+      if (hc) this.saveHistory(h);
+      for (let i = 0; i < 30; i++) {
+        const d = new Date(); d.setDate(d.getDate() - i);
+        const data = this.getData(d); let ch = false;
+        for (const meal of Object.keys(data || {})) for (const e of (Array.isArray(data[meal]) ? data[meal] : [])) {
+          const r = e && fix(e.base || e.name, e.unit); if (!r) continue;
+          const q = Number(e.qty) || 1;
+          e.unit = r.u; e.name = `${e.base || e.name} ${this._scaleUnit(r.u, q)}`;
+          e.cal = Math.round((e.cal || 0) * r.f); e.protein = +((e.protein || 0) * r.f).toFixed(1); e.carb = +((e.carb || 0) * r.f).toFixed(1); e.fat = +((e.fat || 0) * r.f).toFixed(1);
+          ch = true; n++;
+        }
+        if (ch) this.saveData(data, d);
+      }
+    } catch (e) { console.warn('[diet] 낱개 바로잡기', e); }
+    if (n) setTimeout(() => { try { App.showToast(`한 팩을 1개로 잘못 센 기록 ${n}줄을 낱개 기준으로 바로잡았습니다`, 'success'); this.render(App.S.selDate || new Date()); } catch (e) {} }, 300);
+  },
   render(date=new Date()){
+    this._migPiece();
     if(!document.getElementById('dietWrap')) return;
     const data=this.getData(date);
     const s=this.getSettings();
@@ -605,16 +639,21 @@ JSON 만 출력해. 다른 말은 붙이지 마.
   PIECE: [[/^(달걀|계란)(?!.*(말이|찜|국|탕|덮밥|샐러드|빵|볶음|장조림|조림|지단|밥|죽|라면|토스트|샌드위치))/, 50, '1개'], [/^메추리알/, 10, '1개'],
     [/^바나나/, 120, '1개'], [/^사과/, 200, '1개'], [/^배(_|$)/, 300, '1개'], [/^귤/, 80, '1개'], [/^오렌지/, 180, '1개'], [/^키위/, 90, '1개'],
     [/^고구마/, 150, '1개'], [/^감자/, 150, '1개'], [/^토마토(_|$)/, 150, '1개'], [/^방울토마토/, 15, '1개'], [/^딸기/, 15, '1개'],
-    [/^(쌀밥|흰밥|밥_쌀|현미밥|잡곡밥)/, 210, '1공기'], [/^두부(_|$)/, 300, '1모'], [/^식빵/, 35, '1장'], [/^김밥(_|$)/, 230, '1줄']],
+    [/^(쌀밥|흰밥|밥_쌀|현미밥|잡곡밥)/, 210, '1공기'], [/^두부(_|$)/, 300, '1모'], [/^식빵/, 35, '1장'], [/^김밥(_|$)/, 230, '1줄'],
+    [/초밥/, 25, '1개']],
+  // 여러 개가 든 한 팩(초밥·만두·너겟…): 식약처 '식품중량' 은 팩 전체라 '1개' 로 쓰면 팩을 하나로 센다
+  // (광어초밥 200g 한 팩을 1개로 보고 12개 = 3,840kcal 가 되던 것). 낱개 무게로 바꿔 담는다.
+  PIECEP: [[/초밥/, 25], [/왕만두/, 70], [/물만두/, 15], [/만두/, 30], [/너겟/, 20], [/동그랑땡/, 20], [/떡꼬치/, 60], [/미니약과/, 15], [/약과/, 35], [/마카롱/, 20]],
+  PIECE_NOT: /(용$|용\s|도시락|반죽|소스|쿠키|크로넛|볶음밥|덮밥|세트|토핑|피$|만두피|키트|DIY)/,
   _fromDb(x){
     const base = Number(x.per) || 100, unit = x.unit || 'g';
     const r1 = (v, k) => Math.round((Number(v)||0) * k * 10) / 10;
-    const mk = (u, grams) => { const k = grams / base; return {
+    const mk = (u, grams, extra) => { const k = grams / base; return {
       e: x.e || '🥗', n: x.name, u,
       c: Math.round((Number(x.kcal)||0) * k), p: r1(x.protein, k), cb: r1(x.carb, k), ft: r1(x.fat, k),
       grp: x.maker || x.group || '',
       // 환산했으면 원래 기준을 같이 보여 준다. 숫자를 확인할 길이 있어야 한다.
-      note: grams !== base ? `${base}${unit}당 ${Math.round(x.kcal||0)}kcal` : '',
+      note: (extra ? extra + ' · ' : '') + (grams !== base ? `${base}${unit}당 ${Math.round(x.kcal||0)}kcal` : ''),
     }; };
     const generic = x.cls === '품목대표' || x.group === '음식';
     if (generic) {
@@ -624,8 +663,19 @@ JSON 만 출력해. 다른 말은 붙이지 마.
       if (x.pack && Math.abs(x.pack - base) > 0.5) return mk(`1인분(${x.pack}${unit})`, x.pack);
       return mk(`${base}${unit}`, base);
     }
-    // 가공식품(상용제품)은 식품중량이 제품 한 개(한 봉지)의 중량이다
-    return x.pack ? mk(`1개(${x.pack}${unit})`, x.pack) : mk(`${base}${unit}`, base);
+    // 가공식품(상용제품)은 식품중량이 제품 한 개(한 봉지·한 팩)의 중량이다
+    if (x.pack) {
+      const r1g = v => Math.round(v * 10) / 10;
+      // 이름에 '8p' '10개입' 처럼 개수가 있으면 팩 무게를 그 수로 나눈 낱개로
+      const cnt = /(\d+)\s*(?:p|P|pcs|PCS|개입|입|피스|알)(?![a-zA-Z가-힣])/.exec(String(x.name)), N = cnt ? Number(cnt[1]) : 0;
+      if (N >= 2 && N <= 100) return mk(`1개(${r1g(x.pack / N)}${unit})`, x.pack / N, `${N}개입 한 팩 ${x.pack}${unit}`);
+      const pp = !this.PIECE_NOT.test(String(x.name)) && this.PIECEP.find(([re]) => re.test(String(x.name)));
+      if (pp && x.pack >= pp[1] * 2.5) return mk(`1개(${pp[1]}${unit})`, pp[1], `한 팩 ${x.pack}${unit} 중 1개 약 ${pp[1]}${unit}`);
+      // 기름·소스·대용량처럼 한 통을 한 번에 먹지 않는 것은 기준량(100g)으로 — 한 통이 '1개' 로 담겨 8,000kcal 가 되던 것
+      if (x.pack >= 400 && (Number(x.kcal) || 0) * x.pack / base > 1000) return mk(`${base}${unit}`, base, `한 통 ${x.pack}${unit}`);
+      return mk(`1개(${x.pack}${unit})`, x.pack);
+    }
+    return mk(`${base}${unit}`, base);
   },
   // 쪽마다 15개. 같은 검색어의 쪽은 잠시 기억해 둔다(지웠다 다시 쳐도 바로 나오게).
   _dbCache: {},

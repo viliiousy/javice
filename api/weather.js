@@ -63,13 +63,17 @@ const TTL = 15 * 60 * 1000;
 // WMO 날씨 코드 → 짧은 이름 · 아이콘 이름
 function sky(code, day) {
   const c = Number(code);
-  if (c === 0) return [day ? '맑음' : '맑음', day ? 'sun' : 'moon'];
+  if (c === 0) return ['맑음', day ? 'sun' : 'moon'];
   if (c === 1 || c === 2) return ['구름 조금', day ? 'cloud-sun' : 'cloud-moon'];
   if (c === 3) return ['흐림', 'cloud'];
   if (c === 45 || c === 48) return ['안개', 'fog'];
-  if (c >= 51 && c <= 57) return ['이슬비', 'rain'];
-  if ((c >= 61 && c <= 67) || (c >= 80 && c <= 82)) return ['비', 'rain'];
-  if ((c >= 71 && c <= 77) || c === 85 || c === 86) return ['눈', 'snow'];
+  if (c >= 51 && c <= 55) return ['이슬비', 'drizzle'];
+  if (c === 56 || c === 57 || c === 66 || c === 67) return ['어는 비', 'sleet'];
+  if (c === 61 || c === 63 || c === 80 || c === 81) return ['비', 'rain'];
+  if (c === 65 || c === 82) return ['폭우', 'rain-heavy'];
+  if (c === 71 || c === 73 || c === 77 || c === 85) return ['눈', 'snow'];
+  if (c === 75 || c === 86) return ['폭설', 'snow-heavy'];
+  if (c === 96 || c === 99) return ['뇌우·우박', 'hail'];
   if (c >= 95) return ['뇌우', 'storm'];
   return ['—', 'cloud'];
 }

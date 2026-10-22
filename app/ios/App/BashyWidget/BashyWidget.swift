@@ -397,6 +397,11 @@ private func sfName(_ i: String) -> String {
     case "snow": return "cloud.snow"
     case "fog": return "cloud.fog"
     case "storm": return "cloud.bolt"
+    case "drizzle": return "cloud.drizzle"
+    case "rain-heavy": return "cloud.heavyrain"
+    case "sleet": return "cloud.sleet"
+    case "snow-heavy": return "cloud.snow"
+    case "hail": return "cloud.hail"
     default: return "cloud"
     }
 }

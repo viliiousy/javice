@@ -14,6 +14,11 @@ const Weather = {
     snow: '<path d="M7 15.5h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.1 6.6 4.5 4.5 0 0 0 7 15.5Z"/><path d="M8.5 19h.01M12 20.5h.01M15.5 19h.01"/>',
     fog: '<path d="M4 9h16M6 13h12M4 17h16"/>',
     storm: '<path d="M7 15.5h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.1 6.6 4.5 4.5 0 0 0 7 15.5Z"/><path d="m12.5 15-2 3.5h3l-2 3.5"/>',
+    drizzle: '<path d="M7 15.5h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.1 6.6 4.5 4.5 0 0 0 7 15.5Z"/><path d="M9 18.5v1M13 18.5v1M17 18.5v1"/>',
+    'rain-heavy': '<path d="M7 14.5h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.1 5.6 4.5 4.5 0 0 0 7 14.5Z"/><path d="m7.5 17-1.5 3M11 17l-1.5 3M14.5 17 13 20M18 17l-1.5 3"/>',
+    sleet: '<path d="M7 15.5h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.1 6.6 4.5 4.5 0 0 0 7 15.5Z"/><path d="m9 18.5-1 2M15 18.5l-1 2"/><path d="M12 19.5h.01"/>',
+    'snow-heavy': '<path d="M7 14.5h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.1 5.6 4.5 4.5 0 0 0 7 14.5Z"/><path d="M8 17.5h.01M12 17.5h.01M16 17.5h.01M10 20.5h.01M14 20.5h.01"/>',
+    hail: '<path d="M7 14.5h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.1 5.6 4.5 4.5 0 0 0 7 14.5Z"/><circle cx="9" cy="18.5" r=".9"/><circle cx="13" cy="20" r=".9"/><circle cx="16.5" cy="18" r=".9"/><path d="m11.5 15.5-1 2h2l-1 2"/>',
   },
   icon(n, cls = 'wx-ic') { return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${this.IC[n] || this.IC.cloud}</svg>`; },
   cached() { try { const v = JSON.parse(localStorage.getItem(this.KEY) || 'null'); return v && v.ok ? v : null; } catch (e) { return null; } },
@@ -82,9 +87,11 @@ const Weather = {
   // 다른 날은 가운데에 지금 기온 대신 그날 하늘(아이콘)
   arc(w, today = true) {
     const n = v => (v == null || isNaN(v)) ? '–' : v + '°';
-    const mid = today ? n(w.t) : this.icon(w.icon, 'wxd-ic');
-    return `<button type="button" class="hd-wxd${today ? '' : ' wxd-day'}" onclick="event.stopPropagation();Weather.toggle()" aria-label="${w.name}${today ? ` 지금 ${w.t}도,` : ''} 최저 ${w.lo}도, 최고 ${w.hi}도 — 누르면 간단 표시">
-      <span class="wxd-now num"><span class="wxd-lo">${n(w.lo)}</span>${mid}<span class="wxd-hi">${n(w.hi)}</span></span></button>`;
+    const lbl = `${w.name}${today ? ` 지금 ${w.t}도,` : ''} 최저 ${w.lo}도, 최고 ${w.hi}도 — 누르면 간단 표시`;
+    // 다른 날: 지금 기온이 없으니 최저 / 최고만 조금 크게
+    if (!today) return `<button type="button" class="hd-wxd wxd-day" onclick="event.stopPropagation();Weather.toggle()" aria-label="${lbl}"><span class="wxd-lo2 num">${n(w.lo)}</span><i class="wxd-sl">/</i><span class="wxd-hi2 num">${n(w.hi)}</span></button>`;
+    return `<button type="button" class="hd-wxd" onclick="event.stopPropagation();Weather.toggle()" aria-label="${lbl}">
+      <span class="wxd-now num"><span class="wxd-lo">${n(w.lo)}</span>${n(w.t)}<span class="wxd-hi">${n(w.hi)}</span></span></button>`;
   },
   // 날짜 숫자 위에 얹는 날씨 효과(세부 표시일 때) — 해가 뜨고 · 구름이 흐르고 · 비가 내리고 · 눈이 내려 살짝 쌓인다
   // 해: 해 뜬 시각 → 진 시각 사이에서 날짜 숫자 위를 왼쪽에서 오른쪽으로 둥글게 지나간다. 해가 지면 달.
@@ -107,20 +114,26 @@ const Weather = {
   },
   _fxHtml(icon, p, still, w) {
     w = w || {};
-    const k = { sun: 'sun', moon: 'moon', 'cloud-sun': 'cloud', 'cloud-moon': 'cloud', cloud: 'cloud', fog: 'fog', rain: 'rain', storm: 'rain', snow: 'snow' }[icon] || 'cloud';
+    const k = { sun: 'sun', moon: 'moon', 'cloud-sun': 'cloud', 'cloud-moon': 'cloud', cloud: 'cloud', fog: 'fog', rain: 'rain', 'rain-heavy': 'rain', drizzle: 'rain', storm: 'rain', hail: 'hail', sleet: 'sleet', snow: 'snow', 'snow-heavy': 'snow' }[icon] || 'cloud';
     // 해 자리: p(0~1)에 따라 왼쪽→오른쪽, 한낮에 가장 높게(반원)
     const pos = `left:calc(${(p * 100).toFixed(1)}% - 8px);top:${(2 + (1 - Math.sin(Math.PI * p)) * 16).toFixed(1)}px`;
-    const drops = (n, cls) => Array.from({ length: n }, (_, i) => `<i class="${cls}" style="left:${(i * 97 / n + (i % 3) * 4) % 96}%;animation-delay:${(i * 0.37) % 1.6}s;animation-duration:${(cls === 'wxf-s' ? 3.2 : 0.9) + (i % 4) * (cls === 'wxf-s' ? 0.5 : 0.12)}s"></i>`).join('');
+    const drops = (n, cls) => Array.from({ length: n }, (_, i) => { const sl = cls === 'wxf-s', hl = cls === 'wxf-h', base = sl ? 3.2 : hl ? 0.7 : cls.includes('dz') ? 1.3 : cls.includes('hv') ? 0.6 : 0.9;
+      return `<i class="${cls}" style="left:${(i * 97 / n + (i % 3) * 4) % 96}%;animation-delay:${(i * 0.37) % 1.6}s;animation-duration:${base + (i % 4) * (sl ? 0.5 : 0.12)}s"></i>`; }).join('');
     let inner = '';
     const SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.2v2.6M12 19.2v2.6M2.2 12h2.6M19.2 12h2.6M5.1 5.1l1.8 1.8M17.1 17.1l1.8 1.8M5.1 18.9l1.8-1.8M17.1 6.9l1.8-1.8"/></svg>';
     const MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 14.6A7.6 7.6 0 1 1 9.4 4.5a6 6 0 0 0 10.1 10.1Z"/></svg>';
     if (k === 'sun') inner = `<i class="wxf-sun${still ? ' still' : ''}" style="${pos}">${SUN}</i>`;
     else if (k === 'moon') inner = `<i class="wxf-moon${still ? ' still' : ''}">${MOON}</i>`;
-    else if (k === 'cloud' && (icon === 'cloud-sun' || icon === 'cloud-moon')) inner = (icon === 'cloud-sun' ? `<i class="wxf-sun dim" style="${pos}">${SUN}</i>` : `<i class="wxf-moon dim">${MOON}</i>`) + `<i class="wxf-cloud c1">${this.icon('cloud', 'wxf-cl')}</i>`;
-    else if (k === 'cloud') inner = `<i class="wxf-cloud c1">${this.icon('cloud', 'wxf-cl')}</i><i class="wxf-cloud c2">${this.icon('cloud', 'wxf-cl')}</i>`;
-    else if (k === 'fog') inner = '<i class="wxf-fog f1"></i><i class="wxf-fog f2"></i>';
-    else if (k === 'rain') inner = drops(9, 'wxf-r') + (icon === 'storm' ? '<i class="wxf-flash"></i>' : '');
-    else if (k === 'snow') inner = drops(10, 'wxf-s') + '<i class="wxf-cap"></i>';
+    // 구름: 해를 가린 채 떠다니지 않고 제자리에서 두둥실(구름 조금 = 한 장, 흐림 = 두 장)
+    else if (k === 'cloud') inner = `<i class="wxf-cloud c1">${this.icon('cloud', 'wxf-cl')}</i>` + (icon === 'cloud' ? `<i class="wxf-cloud c2">${this.icon('cloud', 'wxf-cl')}</i>` : '');
+    else if (k === 'fog') inner = '<i class="wxf-fog f1"></i><i class="wxf-fog f2"></i><i class="wxf-fog f3"></i>';
+    else if (k === 'rain') {
+      const n = icon === 'drizzle' ? 6 : icon === 'rain-heavy' || icon === 'storm' ? 14 : 9, cls = icon === 'drizzle' ? 'wxf-r dz' : icon === 'rain-heavy' ? 'wxf-r hv' : 'wxf-r';
+      inner = drops(n, cls) + (icon === 'storm' ? '<i class="wxf-flash"></i><i class="wxf-bolt"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4.5 13.5H11L9.5 22 19 9.5h-6.5Z"/></svg></i>' : '');
+    }
+    else if (k === 'hail') inner = drops(7, 'wxf-r') + drops(7, 'wxf-h') + '<i class="wxf-flash"></i>';
+    else if (k === 'sleet') inner = drops(6, 'wxf-r') + drops(6, 'wxf-s');
+    else if (k === 'snow') inner = drops(icon === 'snow-heavy' ? 16 : 10, 'wxf-s');
     return `<span class="wxfx wxfx-${k}" aria-hidden="true">${inner}</span>`;
   },
   paint() { try { App._updateHeaderDate(App.S.selDate || new Date()); } catch (e) { const el = document.getElementById('hWx'); if (el) el.innerHTML = this.html(); } },
