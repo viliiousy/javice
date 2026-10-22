@@ -124,7 +124,7 @@ const Tabs = {
   catsHtml() {
     const T = this.tabsSorted();
     return `<p class="co-sub" style="margin:0 0 10px">지금 바꾸는 순서: <b>${this._wide() ? 'PC·태블릿' : '휴대폰'}</b> — 휴대폰과 PC·태블릿은 순서를 따로 저장합니다. 메인 화면에서 카드 이름을 꾹 눌러도 바로 바꿀 수 있습니다.</p>
-      ${this._wide() ? `<div class="cl-panel"><p>PC·태블릿은 화면에서 직접 배치합니다. <b>카드 이름을 2초 꾹</b> 누르거나 아래 단추를 누르면 편집 모드가 됩니다 — 카드가 살짝 흔들리면 끌어서 옮기고, 오른쪽·아래 테두리나 모서리를 끌어 크기를 바꿉니다(50px 단위 · 바깥을 누르면 저장). 카드 안은 크기에 맞춰 바뀝니다.</p>
+      ${this._wide() ? `<div class="cl-panel"><p>PC·태블릿은 화면에서 직접 배치합니다. <b>카드 이름을 2초 꾹</b> 누르거나 아래 단추를 누르면 편집 모드가 됩니다 — 카드가 살짝 흔들리면 끌어서 옮기고, 오른쪽·아래 테두리나 모서리를 끌어 크기를 바꿉니다(가로는 1·2·3열, 세로는 50px · 바깥을 누르면 저장). 카드 안은 크기에 맞춰 바뀝니다.</p>
         <div class="cl-pbtn"><button type="button" class="btn-sm accent" onclick="Settings.close?.();App.closeModal?.();setTimeout(()=>CardLayout.enter(),250)">화면에서 배치 편집</button>${typeof CardLayout !== 'undefined' && CardLayout.L ? '<button type="button" class="btn-sm" onclick="CardLayout.reset();Settings._re(\'cats\')">배치 처음대로</button>' : ''}</div></div>`
         : `<div class="mn-host">${typeof CardSort !== 'undefined' ? CardSort.html() : ''}</div>`}
       <div class="set-h co-h">카테고리 켜고 끄기</div>
