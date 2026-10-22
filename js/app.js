@@ -962,7 +962,7 @@ const App = {
           <select id="qtTime" class="inp inp-sm">${this._halfHours('')}</select></div>
       </div>
       <div class="modal-row"><label class="modal-lbl">목록</label>
-        <select id="qtList" class="inp inp-sm">${this.S.lists.map(l=>
+        <select id="qtList" class="inp inp-sm">${this.visLists().map(l=>
           `<option value="${l.id}"${l.id===cur?' selected':''}>${esc(l.title)}</option>`).join('')}</select></div>
       <div class="modal-btns">
         <button onclick="App._saveQuickTask()" class="btn-sm accent">추가</button>
@@ -982,7 +982,7 @@ const App = {
   // 날짜는 기본 없음 — 오늘/내일만 한 번에. 제목 치고 엔터(또는 저장)면 끝.
   quickTask(listId) {
     if(!this.S.lists.some(l=>l.id===BashyCal.LIST_ID)) this.S.lists=[...this.S.lists,BashyCal.list()];
-    const lists=this.S.lists, cur=lists.some(l=>l.id===listId) ? listId : (this.S.taskFilter!=='all' && lists.some(l=>l.id===this.S.taskFilter) ? this.S.taskFilter : (lists[0]?.id||BashyCal.LIST_ID));
+    const lists=this.visLists().length?this.visLists():this.S.lists, cur=lists.some(l=>l.id===listId) ? listId : (this.S.taskFilter!=='all' && lists.some(l=>l.id===this.S.taskFilter) ? this.S.taskFilter : (lists[0]?.id||BashyCal.LIST_ID));
     document.getElementById('qtSheet')?.remove();
     const ov=document.createElement('div'); ov.id='qtSheet'; ov.className='mx-ov qt-ov';
     const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -1099,6 +1099,8 @@ const App = {
   // 매번 기본값으로 돌아가는 토글은 토글이 아니라 버튼이다.
   // 기본은 '보인다'. 지금 할일 중 기한 지난 게 대부분인데 기본을 숨김으로 두면
   // 앱을 처음 열었을 때 목록이 텅 비어 보인다 — 없는 것과 가려 둔 것은 다르다.
+  // 보여 줄 할 일 목록: 구글에 로그인했으면 앱 안 'Bashy' 목록은 할 일이 있을 때만(구글 목록 개인·업무만 보이게)
+  visLists(){ const g=typeof Auth!=='undefined'&&Auth.isLoggedIn(); return (this.S.lists||[]).filter(l=>l.id!==BashyCal.LIST_ID||!g||(this.S.tasks[l.id]||[]).some(t=>t.status!=='completed')); },
   showOverdue(){ return UserStore.get('gl_task_show_overdue') !== '0'; },
   toggleOverdue(){
     UserStore.set('gl_task_show_overdue', this.showOverdue()?'0':'1');
@@ -1276,7 +1278,7 @@ const App = {
     const due=t.due?t.due.split('T')[0]:'';
     // 시간/반복은 localStorage에 보조 저장
     const extra=UserStore.parse('gl_task_extra_'+taskId, {});
-    const listOptions=this.S.lists.map(l=>`<option value="${l.id}"${l.id===listId?' selected':''}>${esc(l.title)}</option>`).join('');
+    const listOptions=(this.visLists().some(l=>l.id===listId)?this.visLists():this.S.lists).map(l=>`<option value="${l.id}"${l.id===listId?' selected':''}>${esc(l.title)}</option>`).join('');
     const repeatOpts=['없음','매일','매주','매월','매년'].map(v=>`<option${extra.repeat===v?' selected':''}>${v}</option>`).join('');
     this.openModal('@list 세부정보',`
       <div class="modal-row"><label class="modal-lbl">제목</label>

@@ -1340,7 +1340,7 @@ const JarvisActions = {
       const evT = (App.S.events || []).filter(e => { try { return new Date(e.start?.dateTime || e.start?.date + 'T00:00:00').toDateString() === now.toDateString(); } catch { return false; } });
       out.events = evT.map(e => `${e.start?.dateTime ? new Date(e.start.dateTime).toTimeString().slice(0, 5) : '종일'} ${e.summary}`);
       out.tasks = this._tasks(true).slice(0, 10).map(o => o.t.title + (o.t.due ? ` (~${String(o.t.due).slice(5, 10)})` : ''));
-      if ((App.S.lists || []).length > 1) out.taskLists = App.S.lists.map(l => l.title);
+      { const V = typeof App.visLists === 'function' ? App.visLists() : (App.S.lists || []); if (V.length > 1) out.taskLists = V.map(l => l.title); }
     } catch (e) {}
     try { out.checklist = Checklist.getItems().filter(i => !i.done).slice(0, 10).map(i => i.title); } catch (e) {}
     try { const ms = Memo.getItems(); out.memos = ms.filter(m => !m.locked).slice(0, 5).map(m => m.title); const lk = ms.filter(m => m.locked).length; if (lk) out.memos.push(`(잠긴 메모 ${lk}개)`); } catch (e) {}
