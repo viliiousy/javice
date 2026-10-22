@@ -3607,3 +3607,20 @@ html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto;
 .qt-sp{ flex:1; }
 .qt-save{ height:36px; padding:0 18px; border-radius:18px; border:0; background:var(--accent); color:var(--accent-fg, #fff); font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
 .qt-save:disabled{ background:none; color:var(--text3); cursor:default; }
+/* 오른쪽으로 밀어 즐겨찾기: 왼쪽부터 노랗게, 35% 를 넘으면 진하게 + 별 */
+.rw-hasfav::before{ content:'즐겨찾기'; position:absolute; top:0; left:0; bottom:0; width:var(--rw-ffill, 0px); background:rgba(245,190,40,.45); color:#3a2a00;
+  font-size:14px; font-weight:600; display:none; align-items:center; padding-left:16px; box-sizing:border-box; overflow:hidden; white-space:nowrap; z-index:0; }
+.rw-hasfav.rw-fact::before{ display:flex; }
+.rw-hasfav.rw-farm::before{ content:'★ 놓으면 즐겨찾기'; background:#F5BE28; }
+.rw-hasfav > .rw-slide{ background:var(--card); position:relative; z-index:1; }
+/* 경제 카드: 별 · 아래 안내 줄 · 검색 시트 */
+.ec-star{ font-style:normal; color:#F5BE28; margin-right:4px; font-size:12px; }
+.ec-foot{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 0 0; flex-wrap:wrap; }
+.ec-foot .ec-hint{ font-size:11px; color:var(--text3); }
+.ec-link{ border:0; background:none; color:var(--text3); font:inherit; font-size:12px; font-weight:600; cursor:pointer; padding:4px 0; }
+.ec-ssh{ max-height:86vh; display:flex; flex-direction:column; }
+.ec-sres{ overflow:auto; margin:4px -16px 0; padding:0 16px; min-height:120px; }
+.ec-ssh > .qt-lists, .ec-ssh > .qt-title{ flex:none; }
+.ec-ssh .qt-title::-webkit-search-cancel-button{ -webkit-appearance:none; }
+.ec-sres{ flex:1 1 auto; }
+.ec-got{ font-size:12px; color:var(--text3); padding:0 8px; }

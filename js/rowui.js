@@ -18,6 +18,7 @@ const RowUI = {
   LP:   380,   // 길게 누르기로 치는 시간(ms)
   MOVE: 10,    // 이만큼 움직이면 누른 게 아니라 미는 것
   SNAP: 56,    // 이만큼 밀면 삭제 버튼이 열린 채로 멈춘다
+  FULL: 0.35,  // 줄 너비의 이만큼을 넘겨 밀면(지우기·즐겨찾기) 놓았을 때 실행
   _open: null, // 지금 열려 있는 줄 (한 번에 하나만)
 
   closeOpen() {
@@ -37,7 +38,7 @@ const RowUI = {
 
       // 줄을 감싸고, 뒤에 삭제 버튼을 깐다
       const wrap = document.createElement('div');
-      wrap.className = 'rw' + (h.full !== false ? ' rw-full' : '');
+      wrap.className = 'rw' + (h.full !== false ? ' rw-full' : '') + (h.fav ? ' rw-hasfav' : '');
       row.parentNode.insertBefore(wrap, row);
       wrap.appendChild(row);
       row.classList.add('rw-slide');
@@ -97,11 +98,21 @@ const RowUI = {
         e.preventDefault();
         row.classList.add('rw-drag');
         // 끝까지 밀어 지우기(h.full): 오른쪽에서부터 빨갛게 차오르고, 줄 너비의 35% 를 넘으면 진동 한 번 — 놓으면 지워진다
+        // 오른쪽으로 밀어 즐겨찾기(h.fav): 왼쪽에서부터 노랗게 차오르고 35% 를 넘으면 진동 — 놓으면 별을 켜고/끈다(줄은 제자리)
+        if (h.fav && dx > 0) {
+          const w = wrap.offsetWidth || 1, x4 = Math.min(dx, w * 0.6);
+          row.style.transform = `translateX(${x4}px)`;
+          wrap.classList.remove('rw-act', 'rw-arm'); wrap.classList.add('rw-fact'); wrap.style.setProperty('--rw-ffill', `${x4}px`);
+          const arm = x4 > w * this.FULL;
+          if (arm !== wrap.classList.contains('rw-farm')) { wrap.classList.toggle('rw-farm', arm); try { arm ? Haptic.medium() : Haptic.light(); } catch {} }
+          return;
+        }
+        wrap.classList.remove('rw-fact', 'rw-farm');
         if (h.full !== false) {
           const w = wrap.offsetWidth || 1, x3 = Math.min(0, dx);
           row.style.transform = `translateX(${x3}px)`;
           wrap.classList.add('rw-act'); wrap.style.setProperty('--rw-fill', `${-x3}px`);
-          const arm = -x3 > w * 0.35;   // 35% 를 넘으면
+          const arm = -x3 > w * this.FULL;   // 35% 를 넘으면
           if (arm !== wrap.classList.contains('rw-arm')) {
             wrap.classList.toggle('rw-arm', arm);
             try { arm ? (Haptic.heavy ? Haptic.heavy() : Haptic.medium()) : Haptic.light(); } catch {}
@@ -118,6 +129,14 @@ const RowUI = {
         clearTimeout(lp);
         if (dragging) { dragging = false; this._dragEnd(h.reorder); return; }
         if (!sliding) return;
+        if (wrap.classList.contains('rw-fact')) {
+          const on = wrap.classList.contains('rw-farm');
+          row.classList.remove('rw-drag');
+          row.style.transition = 'transform .22s cubic-bezier(.2,.8,.2,1)'; row.style.transform = '';
+          setTimeout(() => { row.style.transition = ''; wrap.classList.remove('rw-fact', 'rw-farm'); wrap.style.setProperty('--rw-ffill', '0px'); }, 240);
+          if (on) { try { Haptic.success(); } catch {} h.fav(id); }
+          return;
+        }
         if (h.full !== false) {
           const armed = wrap.classList.contains('rw-arm');
           row.classList.remove('rw-drag');

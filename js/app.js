@@ -504,7 +504,7 @@ const App = {
         const W = isToday && typeof Weather!=='undefined' ? Weather : null, wxd = W && W.mode === 'detail' && W.w;
         // 날씨 세부 표시: 날짜 숫자는 조금 작게, 그 위로 날씨 효과 · 오른쪽에 최저-지금-최고 호
         elDate.classList.toggle('wx-detail', !!wxd);
-        elDate.innerHTML = `<b class="hd-n">${d.getDate()}${wxd ? W.fx() : ''}</b><span class="hd-s">${yy}${d.getMonth()+1}월${isToday ? '<i class="hd-today">TODAY</i>' : ''}<br><span class="${wdc}">${wd}</span>${W && !wxd ? `<span id="hWx">${W.html()}</span>` : ''}</span>${wxd ? `<span id="hWx">${W.html()}</span>` : ''}`;
+        elDate.innerHTML = `<b class="hd-n">${d.getDate()}${wxd ? W.fx() : ''}</b><span class="hd-s">${yy}${d.getMonth()+1}월${isToday ? '<i class="hd-today">TODAY</i>' : ''}<br><span class="${wdc}">${wd}</span>${W ? `<span id="hWx">${W.html()}</span>` : ''}</span>`;
       } else
       elDate.textContent = isMobile
         ? `${String(d.getFullYear()).slice(2)}년 ${d.getMonth()+1}월 ${d.getDate()}일`

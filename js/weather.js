@@ -48,15 +48,12 @@ const Weather = {
     return `<button type="button" class="hd-wx" onclick="event.stopPropagation();Weather.toggle()" aria-label="날씨 ${w.name} ${w.t}도 — 누르면 세부 표시">${this.icon(w.icon)}<span class="num">${w.t}°</span></button>`;
   },
   // 세부: 반원(호) 위에 최저(왼쪽, 작고 흐리게) · 지금(가운데, 크게) · 최고(오른쪽)
+  // 간단 표시와 같은 자리(요일 옆)에 들어간다: 지금 기온이 맨 앞에 크게, 최저(왼쪽 아래)·최고(오른쪽 아래)는 뒤에 작고 흐리게,
+  // 짧은 반지름으로 기울여 지금 기온을 감싼다. 살짝 겹쳐도 된다. (두 자리 기온 기준으로 맞춤)
   arc(w) {
     const n = v => (v == null || isNaN(v)) ? '–' : v + '°';
     return `<button type="button" class="hd-wxd" onclick="event.stopPropagation();Weather.toggle()" aria-label="${w.name} 지금 ${w.t}도, 최저 ${w.lo}도, 최고 ${w.hi}도 — 누르면 간단 표시">
-      <svg viewBox="0 0 100 50" aria-hidden="true">
-        <path class="wxd-line" d="M4 48 A46 46 0 0 1 96 48"/>
-        <text class="wxd-lo" x="17" y="40" transform="rotate(-48 17 40)" text-anchor="middle">${n(w.lo)}</text>
-        <text class="wxd-now" x="50" y="36" text-anchor="middle">${n(w.t)}</text>
-        <text class="wxd-hi" x="83" y="40" transform="rotate(48 83 40)" text-anchor="middle">${n(w.hi)}</text>
-      </svg></button>`;
+      <span class="wxd-now num"><span class="wxd-lo">${n(w.lo)}</span>${n(w.t)}<span class="wxd-hi">${n(w.hi)}</span></span></button>`;
   },
   // 날짜 숫자 위에 얹는 날씨 효과(세부 표시일 때) — 해가 뜨고 · 구름이 흐르고 · 비가 내리고 · 눈이 내려 살짝 쌓인다
   fx() {

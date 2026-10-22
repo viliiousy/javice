@@ -106,6 +106,44 @@ const Econ = {
   // 훑어보는 자리라 다 늘어놓으면 카드만 길어지고 아래 카드가 밀린다.
   MAIN_MAX: 4,
   _expanded: false,
+  // 카드에서 바로: 빼기 · 별 · 순서
+  favRemove(k) {
+    const c = this.cfg(), it = c.favorites.find(x => this.keyOf(x) === k); if (!it) return;
+    c.favorites = c.favorites.filter(x => this.keyOf(x) !== k);
+    this.queueSave(); this.render(); App.showToast(`${it.name} 뺐습니다`);
+  },
+  favStar(k) {
+    const it = this.cfg().favorites.find(x => this.keyOf(x) === k); if (!it) return;
+    it.star = !it.star; this.queueSave(); this.render();
+    App.showToast(it.star ? `${it.name} 즐겨찾기 — 맨 위에 둡니다` : `${it.name} 즐겨찾기 해제`, 'success');
+  },
+  favOrder(keys) {
+    const c = this.cfg(), by = new Map(c.favorites.map(x => [this.keyOf(x), x]));
+    const moved = keys.map(k => by.get(k)).filter(Boolean), rest = c.favorites.filter(x => !keys.includes(this.keyOf(x)));
+    c.favorites = moved.concat(rest);
+    this.queueSave(); this.render();
+  },
+  // ── 검색 시트: 전체 · 국내 · 해외 · 코인 (고른 칸은 기억) ──
+  SCAT_KEY: 'gl_ec_scat',
+  searchSheet() {
+    document.getElementById('ecSearch')?.remove();
+    const cat = localStorage.getItem(this.SCAT_KEY) || 'all';
+    const ov = document.createElement('div'); ov.id = 'ecSearch'; ov.className = 'mx-ov qt-ov';
+    ov.innerHTML = `<div class="mx-sh qt-sh ec-ssh" role="dialog" aria-label="종목 검색">
+      <div class="qt-lists">${[['all','전체'],['kr','국내'],['us','해외'],['crypto','코인'],['etc','지수·금·환율']].map(([v,l]) => `<button type="button" class="qt-l${v===cat?' on':''}" data-v="${v}">${l}</button>`).join('')}</div>
+      <input id="ecSQ" class="qt-title" type="search" autocomplete="off" placeholder="삼성전자 · 테슬라 · 비트코인 · 금" enterkeyhint="search">
+      <div id="ecSRes" class="ec-sres"></div></div>`;
+    document.body.appendChild(ov);
+    const q = ov.querySelector('#ecSQ');
+    ov.addEventListener('click', e => { if (e.target === ov) { ov.classList.remove('on'); setTimeout(() => ov.remove(), 200); } });
+    ov.querySelectorAll('.qt-l').forEach(b => b.onclick = () => {
+      ov.querySelectorAll('.qt-l').forEach(x => x.classList.toggle('on', x === b));
+      localStorage.setItem(this.SCAT_KEY, b.dataset.v); try { Haptic.light(); } catch (e) {}
+      this.search(q.value, 'S'); q.focus();
+    });
+    q.addEventListener('input', () => this.search(q.value, 'S'));
+    requestAnimationFrame(() => { ov.classList.add('on'); q.focus(); });
+  },
   toggleMore() { this._expanded = !this._expanded; this.render(); },
 
   // 카드에는 즐겨찾기만 간단히 보여준다. 전체 터미널은 모달에서 연다.
@@ -118,28 +156,36 @@ const Econ = {
     if (upd) upd.textContent = this._updatedAt ? '업데이트 ' + this._updatedAt.replace('T',' ').slice(5,16) : '시세 대기 중';
 
     if (!c.favorites.length) {
-      wrap.innerHTML = `<p class="empty">${Icons.big('trend')}즐겨찾기가 비어 있어요<br><span class="ec-hint">「전체 보기」에서 종목을 ★ 하면 여기에 표시됩니다</span></p>`;
+      wrap.innerHTML = `<p class="empty">${Icons.big('trend')}담은 종목이 없어요<br><span class="ec-hint">위 「검색」에서 주식·지수·금·환율·코인을 찾아 담으면 여기에 시세가 보입니다</span></p>`;
       return;
     }
-    const all = c.favorites;
+    // 별(즐겨찾기) 붙인 종목이 맨 위, 그다음 담은 순서. 꾹 눌러 끌면 순서가 바뀌고, 왼쪽으로 밀면 빼고, 오른쪽으로 밀면 별
+    const all = c.favorites.filter(x => x.star).concat(c.favorites.filter(x => !x.star));
     const shown = this._expanded ? all : all.slice(0, this.MAIN_MAX);
     const rest = all.length - shown.length;
-    wrap.innerHTML = shown.map(it => {
+    wrap.innerHTML = '<div class="ec-list">' + shown.map(it => {
       const q = this.PRICES[this.keyOf(it)] || {};
-      return `<div class="ec-row" onclick='Econ.openChart(${this.attr(it)})'>
+      return `<div class="ec-row" data-row data-i="${esc(this.keyOf(it))}" data-label="${esc(it.name)}" onclick='Econ.openChart(${this.attr(it)})'>
         <div class="ec-row-l">
-          <div class="ec-nm">${esc(it.name)}</div>
+          <div class="ec-nm">${it.star ? '<i class="ec-star" aria-label="즐겨찾기">★</i>' : ''}${esc(it.name)}</div>
           <div class="ec-meta">${esc(it.code)} · ${this.TYPE[it.type]||''}</div>
         </div>
         <div class="ec-row-r" data-pk="${this.keyOf(it)}" data-ptype="${it.type}" data-punit="${it.unit||''}">
           <div class="ec-price">${this.fmt(it, q.price)}</div>${this.delta(q.pct)}
         </div>
       </div>`;
-    }).join('')
+    }).join('') + '</div>'
     + (rest > 0
         ? `<div class="ec-more" onclick="Econ.toggleMore()">+${rest}개 더 보기</div>`
         : this._expanded && all.length > this.MAIN_MAX
-          ? `<div class="ec-more" onclick="Econ.toggleMore()">접기</div>` : '');
+          ? `<div class="ec-more" onclick="Econ.toggleMore()">접기</div>` : '')
+    + `<div class="ec-foot"><span class="ec-hint">꾹 눌러 순서 · 왼쪽으로 밀어 빼기 · 오른쪽으로 밀어 즐겨찾기</span><button type="button" class="ec-link" onclick="Econ.open('main')">관심·보유·차트·알림 ›</button></div>`;
+    try { RowUI.paint(wrap.querySelector('.ec-list'), {
+      edit: () => {},
+      del: k => this.favRemove(k),
+      fav: k => this.favStar(k),
+      reorder: keys => this.favOrder(keys),
+    }); } catch (e) {}
   },
 
   // ── 시세 ────────────────────────────────────────────
@@ -315,11 +361,14 @@ const Econ = {
     return this.TICKERS;
   },
   async search(v, where) {
-    const box = document.getElementById({ F:'ecFRes', L:'ecLRes', H:'ecHRes', O:'obERes' }[where]);
+    const box = document.getElementById({ F:'ecFRes', L:'ecLRes', H:'ecHRes', O:'obERes', S:'ecSRes' }[where]);
+    const cat = where === 'S' ? (localStorage.getItem(this.SCAT_KEY) || 'all') : 'all';
+    const okT = t => cat === 'all' || (cat === 'etc' ? !['kr', 'us', 'crypto'].includes(t) : t === cat);
     if (!box) return;
     v = v.trim();
     if (!v) { box.innerHTML = ''; return; }
-    const [list, coins] = await Promise.all([this._tickers(), this._coins()]);
+    const [list0, coins0] = await Promise.all([this._tickers(), this._coins()]);
+    const list = list0.filter(e => okT(e.t)), coins = okT('crypto') ? coins0 : [];
     const q = v.toLowerCase(), out = [];
     // 코인: 한글 이름 · 심볼(BTC) · 영어 이름. '코인' 이나 '비트' 처럼 치면 위로 올린다
     const big = ['BTC', 'ETH', 'XRP', 'SOL', 'DOGE', 'ADA', 'USDT'];
@@ -348,12 +397,13 @@ const Econ = {
     }
     out.sort((a,b) => a[0]-b[0] || a[1]-b[1]);
     const code = /^[0-9A-Za-z]{6}$/.test(v) ? v.toUpperCase() : '';
-    box.innerHTML = out.slice(0,8).map(x => {
+    const have = new Set(this.cfg().favorites.map(x => this.keyOf(x)));
+    box.innerHTML = out.slice(0, where === 'S' ? 20 : 8).map(x => {
         const e = x[2];
         const it = { name:e.ko || e.n, code:e.c, type:e.t, tv:e.tv, unit:this.unitFor(e.t), floor:null };
         return `<div class="ec-res"><div class="ec-item-id"><div class="ec-nm">${esc(e.ko || e.n)}</div>
           <div class="ec-meta">${e.ko ? esc(e.n)+' · ' : ''}<span class="num">${esc(e.cn || e.c)}</span> · ${this.TYPE[e.t]||''}${e.t === 'crypto' ? ' · 업비트' : ''}</div></div>
-          <button class="btn-sm ec-add-btn" onclick='Econ.add("${where}",${this.attr(it)})'>${where==='H'?'보유 추가':'담기'}</button></div>`;
+          ${where === 'S' && have.has(this.keyOf(it)) ? '<span class="ec-got">담음</span>' : `<button class="btn-sm ec-add-btn" onclick='Econ.add("${where}",${this.attr(it)})'>${where==='H'?'보유 추가':'담기'}</button>`}</div>`;
       }).join('') +
       (where === 'O' ? '' :
       `<button class="ec-res ec-manual" onclick="Econ.manual('${where}','${code}')">
@@ -380,10 +430,13 @@ const Econ = {
       this._drawHold(); this._paintHold();
       return;
     }
-    if (where === 'F') {
-      if (c.favorites.some(x => this.keyOf(x) === k)) { App.showToast('이미 즐겨찾기에 있어요'); return; }
+    if (where === 'F' || where === 'S') {
+      if (c.favorites.some(x => this.keyOf(x) === k)) { App.showToast('이미 담겨 있어요'); return; }
       c.favorites.push(Object.assign({ alert: it.type !== 'crypto' }, it));
-      this.queueSave(); App.showToast('즐겨찾기 추가','success'); this._drawMain(); this.render();
+      this.queueSave(); App.showToast(`${it.name} 담았습니다 — 카드에 시세가 보입니다`,'success');
+      try { if (where === 'F') this._drawMain(); } catch (e) {}
+      this.render();
+      if (where === 'S') { const q = document.getElementById('ecSQ'); if (q) this.search(q.value, 'S'); }
     } else {
       const w = c.watchlists.find(x => x.id === this.activeList);
       if (!w) return;

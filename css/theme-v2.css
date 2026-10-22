@@ -796,16 +796,15 @@ html[data-ui="v2"] .btn-sm.accent:disabled, html[data-ui="v2"] .modal-btns .acce
 /* ── 날씨 세부 표시 ─────────────────────────────
    날짜 숫자는 조금 작게(36→30), 그 숫자 뒤·위로 날씨가 지나간다. 오른쪽에 최저·지금·최고를 반원(호) 위에.
    숫자 서체 하나, 주황은 해 하나에만. 효과는 숫자 칸 밖으로 넘치지 않는다. */
-html[data-ui="v2"] .h-date-main.wx-detail .hd-n{ font-size:30px; }
 html[data-ui="v2"] .hd-n{ position:relative; isolation:isolate; display:inline-block; }
 .wxfx{ position:absolute; inset:-12px -14px -4px -6px; pointer-events:none; overflow:hidden; z-index:-1; }
 .wxfx-rain, .wxfx-snow{ z-index:1; }
 /* 맑음: 숫자 오른쪽 위로 해가 천천히 떠오른다 */
-.wxf-sun{ position:absolute; right:0; top:0; width:20px; height:20px; border-radius:50%; background:var(--accent); opacity:.28;
+.wxf-sun{ position:absolute; right:2px; top:2px; width:11px; height:11px; border-radius:50%; background:none; border:1.5px solid var(--text3); opacity:.6;
   animation:wxRise 2.4s cubic-bezier(.2,.8,.2,1) both, wxGlow 5s 2.4s ease-in-out infinite; }
 .wxf-moon{ position:absolute; right:0; top:0; width:18px; height:18px; border-radius:50%; box-shadow:-5px 3px 0 0 var(--text3); opacity:.5; animation:wxRise 2.4s ease-out both; }
 @keyframes wxRise{ from{ transform:translateY(26px); opacity:0; } to{ transform:none; } }
-@keyframes wxGlow{ 50%{ transform:scale(1.12); opacity:.36; } }
+@keyframes wxGlow{ 50%{ transform:scale(1.15); opacity:.8; } }
 /* 흐림: 구름 두 장이 숫자 뒤를 천천히 지나간다 */
 .wxf-cloud{ position:absolute; color:var(--text3); opacity:.32; }
 .wxf-cloud .wxf-cl{ display:block; width:100%; height:100%; fill:var(--text3); stroke:none; }
@@ -817,7 +816,7 @@ html[data-ui="v2"] .hd-n{ position:relative; isolation:isolate; display:inline-b
 .wxf-fog.f1{ top:38%; } .wxf-fog.f2{ top:66%; animation-delay:-3s; }
 @keyframes wxFog{ to{ transform:translateX(12%); } }
 /* 비: 숫자 위로 가는 빗줄기가 떨어진다 */
-.wxf-r{ position:absolute; top:-12px; width:1.5px; height:9px; border-radius:1px; background:#3B82F6; opacity:.7; animation:wxRain .9s linear infinite; }
+.wxf-r{ position:absolute; top:-12px; width:1.2px; height:8px; border-radius:1px; background:var(--text3); opacity:.7; animation:wxRain .9s linear infinite; }
 @keyframes wxRain{ from{ transform:translateY(0) skewX(-8deg); } to{ transform:translateY(54px) skewX(-8deg); opacity:0; } }
 .wxf-flash{ position:absolute; inset:0; background:#fff; opacity:0; animation:wxFlash 7s 2s infinite; }
 @keyframes wxFlash{ 0%,92%,100%{ opacity:0; } 93%{ opacity:.35; } 95%{ opacity:0; } 96%{ opacity:.2; } }
@@ -830,13 +829,13 @@ html.dark .wxf-cap{ background:#EEF3F8; }
 @keyframes wxCap{ from{ transform:scaleY(0); opacity:0; } 30%{ opacity:1; } to{ transform:scaleY(1); } }
 @media (prefers-reduced-motion:reduce){ .wxfx *{ animation:none !important; } .wxf-r, .wxf-s{ display:none; } }
 
-/* 호: 최저(왼쪽) · 지금(가운데) · 최고(오른쪽) */
-.hd-wxd{ display:inline-flex; align-self:center; width:72px; height:36px; margin-left:4px; padding:0; border:0; background:none; cursor:pointer; flex:none; }
-.hd-wxd svg{ width:100%; height:100%; overflow:visible; }
-.wxd-line{ fill:none; stroke:var(--border); stroke-width:1.2; }
-.hd-wxd text{ font-family:var(--v2-num, 'Space Grotesk'), sans-serif; fill:var(--text); }
-.wxd-now{ font-size:17px; font-weight:600; }
-.wxd-lo, .wxd-hi{ font-size:9.5px; font-weight:500; fill:var(--text3) !important; opacity:.85; }
+/* 세부: 간단 표시 자리에 — 지금 기온(앞) · 최저/최고(뒤, 작고 흐리고 기울어짐) */
+.hd-wxd{ position:relative; display:inline-block; margin-left:20px; margin-right:18px; padding:0; border:0; background:none; cursor:pointer; line-height:1; vertical-align:baseline; }
+.hd-wxd .num{ font-family:var(--v2-num,'Space Grotesk'),sans-serif; line-height:1; white-space:nowrap; }
+.wxd-now{ position:relative; z-index:2; font-size:15px; font-weight:600; color:var(--text); text-shadow:0 0 3px var(--card),0 0 3px var(--card),0 0 2px var(--card); }
+.wxd-lo,.wxd-hi{ position:absolute; z-index:-1; bottom:4px; text-shadow:none; font-size:9px; font-weight:500; color:var(--text3); opacity:.8; }
+.wxd-lo{ right:calc(100% - 1px); transform:rotate(-24deg); transform-origin:right bottom; }
+.wxd-hi{ left:calc(100% - 1px); transform:rotate(24deg); transform-origin:left bottom; }
 
 /* ── 가입 신청 · 대기 화면 ───────────────────── */
 .gate{ position:fixed; inset:0; z-index:20000; background:var(--card); color:var(--text); display:flex; align-items:center; justify-content:center; padding:24px; overflow:auto; }
@@ -901,3 +900,7 @@ html.dark .wxf-cap{ background:#EEF3F8; }
 .adm-acts.adm-col{ flex-direction:column; align-items:stretch; }
 .adm-card .adm-id, .adm-card .adm-note{ display:block; margin-top:4px; }
 .adm-u .adm-prov, .adm-id .adm-prov{ font-size:12px; }
+/* 상단 습관·할일·체크 칸: 글자를 칸 세로 가운데로 (숫자 서체가 위로 떠 보이던 것) */
+html[data-ui="v2"] .sg-l{ align-items:center; }
+html[data-ui="v2"] .sg-l .stat-chip{ align-items:center; line-height:1; height:32px; }
+html[data-ui="v2"] .sg-l .stat-chip b{ line-height:1; display:inline-flex; align-items:center; position:relative; top:1px; }
