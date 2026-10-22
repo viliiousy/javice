@@ -328,8 +328,8 @@ const Econ = {
       let s = -1;
       if (sym === q || n === q) s = 0; else if (n.startsWith(q) || sym.startsWith(q) || en.startsWith(q)) s = 1;
       else if (n.includes(q) || en.includes(q)) s = 3;
-      else if (/^(코인|암호화폐|가상화폐|crypto)$/.test(q) && big.includes(e.sym)) s = 2;
-      if (s >= 0) out.push([s - (big.includes(e.sym) ? 0.5 : 0), e.n.length, Object.assign({}, e, { c: e.c, ko: '' , cn: e.sym })]);
+      else if (/^(코인|암호화폐|가상화폐|crypto)$/.test(q) && big.includes(e.sym)) s = 2 + big.indexOf(e.sym) * 0.01;
+      if (s >= 0) out.push([s - (big.includes(e.sym) ? 0.5 : 0), s >= 2 && s < 3 ? 0 : e.n.length, Object.assign({}, e, { c: e.c, ko: '' , cn: e.sym })]);
     }
     // 한글로 친 해외 종목(테슬라·애플…)은 한글 이름표에서 티커를 찾아 맨 앞에 올린다.
     const ko = new Map((typeof EconKo !== 'undefined' ? EconKo.match(v) : []).map(m => [m.tk, m]));
