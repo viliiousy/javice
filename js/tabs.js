@@ -44,7 +44,8 @@ const Tabs = {
   get ORDER_KEY() { return this._wide() ? 'gl_cards_order_w' : 'gl_cards_order'; },     // 카드 순서(사람마다) — 예: 식단보다 운동을 위로
   order() {
     let o = []; try { o = JSON.parse(UserStore.get(this.ORDER_KEY) || '[]') || []; } catch {}
-    const all = this.CARDS.map(c => c.cls);
+    // 넓은 화면 기본 자리: 일정 · 습관 · 체크리스트 / 식단 · 메모 / 운동 · 인바디 / 경제 (예전 신문 1면 배치와 같게)
+    const all = this._wide() && !o.length ? ['card-calendar', 'card-habits', 'card-checklist', 'card-diet', 'card-memo', 'card-fitness', 'card-inbody', 'card-econ'] : this.CARDS.map(c => c.cls);
     return o.filter(x => all.includes(x)).concat(all.filter(x => !o.includes(x)));
   },
   get TABS_ORDER_KEY() { return this._wide() ? 'gl_tabs_order_w' : 'gl_tabs_order'; },  // 카테고리(아래 탭) 순서
@@ -63,9 +64,29 @@ const Tabs = {
     try { Haptic.light(); } catch (e) {}
     Settings._re('cats');
   },
+  // ── 넓은 화면(PC·태블릿) 칸 크기: '오늘의 습관' 한 칸을 1×1 로 보고 카드마다 가로(1~3) × 세로(1~2) 칸 ──
+  SIZE_KEY: 'gl_cards_size_w',
+  SIZE_DEF: { 'card-calendar': [1, 2], 'card-habits': [1, 1], 'card-checklist': [1, 1], 'card-memo': [1, 1], 'card-diet': [1, 1], 'card-fitness': [1, 2], 'card-inbody': [2, 1], 'card-econ': [3, 1] },
+  sizes() { let o = {}; try { o = JSON.parse(UserStore.get(this.SIZE_KEY) || '{}') || {}; } catch {} const out = {}; for (const c of this.CARDS) out[c.cls] = Array.isArray(o[c.cls]) ? o[c.cls] : this.SIZE_DEF[c.cls] || [1, 1]; return out; },
+  setSize(cls, w, h) {
+    const o = this.sizes(); o[cls] = [Math.max(1, Math.min(3, w)), Math.max(1, Math.min(2, h))];
+    UserStore.set(this.SIZE_KEY, JSON.stringify(o)); window.FirebaseSync?.scheduleSave?.(); this.applyOrder();
+  },
+  cols() { try { return matchMedia('(min-width:1100px)').matches ? 3 : 2; } catch (e) { return 3; } },
   hasOrder() { try { return (JSON.parse(UserStore.get(this.ORDER_KEY) || '[]') || []).length > 0; } catch { return false; } },
   // 순서를 화면에 입힌다: 카드를 한 줄 흐름으로 펴고(order 속성) — 기본 순서면 원래 배치 그대로
   applyOrder() {
+    // 넓은 화면은 언제나 칸 격자(카드마다 가로×세로 칸) — 순서는 카테고리와 상관없이 한 줄(gl_cards_order_w)
+    if (this._wide()) {
+      const H = document.documentElement; H.classList.add('card-grid'); H.classList.remove('card-ordered');
+      const o = this.order(), S = this.sizes(), C = this.cols();
+      H.style.setProperty('--cg-cols', C);
+      this.CARDS.forEach(c => { const el = document.querySelector('.' + c.cls); if (!el) return;
+        el.style.order = String(o.indexOf(c.cls) + 1); el.style.setProperty('--cw', Math.min(C, S[c.cls][0])); el.style.setProperty('--ch', S[c.cls][1]);
+        el.dataset.cw = Math.min(C, S[c.cls][0]); el.dataset.ch = S[c.cls][1]; });
+      return;
+    }
+    document.documentElement.classList.remove('card-grid');
     const on = this.hasOrder() || this.hasTabOrder();
     document.documentElement.classList.toggle('card-ordered', on);
     // 카테고리 순서가 먼저, 그 안에서 카드 순서 (PC 에서는 이 순서대로 한 화면에 놓인다)
@@ -82,7 +103,7 @@ const Tabs = {
     this.applyOrder(); try { Haptic.light(); } catch (e) {}
     (document.getElementById('cardSetBody') ? this._paintSettings() : Settings._re('cats'));
   },
-  resetOrder() { UserStore.set(this.ORDER_KEY, '[]'); UserStore.set(this.TABS_ORDER_KEY, '[]'); this._paintBar(); this.set(this._cur, true); window.FirebaseSync?.scheduleSave?.(); this.applyOrder(); (document.getElementById('cardSetBody') ? this._paintSettings() : Settings._re('cats')); App.showToast('카테고리·카드 순서를 처음대로 돌렸습니다', 'success'); },
+  resetOrder() { if (this._wide()) UserStore.set(this.SIZE_KEY, '{}'); UserStore.set(this.ORDER_KEY, '[]'); UserStore.set(this.TABS_ORDER_KEY, '[]'); this._paintBar(); this.set(this._cur, true); window.FirebaseSync?.scheduleSave?.(); this.applyOrder(); (document.getElementById('cardSetBody') ? this._paintSettings() : Settings._re('cats')); App.showToast('카테고리·카드 순서를 처음대로 돌렸습니다', 'success'); },
   TABS_OFF_KEY: 'gl_tabs_off',
   getTabsOff() { try { return JSON.parse(UserStore.get(this.TABS_OFF_KEY) || '[]'); } catch { return []; } },
   tabOn(id) { return !this.getTabsOff().includes(id); },
@@ -106,7 +127,7 @@ const Tabs = {
       <div class="set-h co-h">카테고리 켜고 끄기</div>
       ${T.map((t, ti) => { const on = this.tabOn(t.id);
         return Settings._item(`${t.label}`, Settings._sw(on, `Tabs.toggleTab('${t.id}', ${!on})`), on ? `${ti === 0 ? '처음 보이는 화면 · ' : ''}탭과 카드가 보입니다` : '탭과 카드가 모두 숨겨집니다(기록은 그대로)'); }).join('')}
-      ${this.hasOrder() || this.hasTabOrder() ? `<p class="co-note"><button type="button" class="co-reset" onclick="Tabs.resetOrder()">순서를 처음대로 돌리기</button></p>` : ''}`;
+      ${this.hasOrder() || this.hasTabOrder() || (this._wide() && UserStore.get(this.SIZE_KEY) && UserStore.get(this.SIZE_KEY) !== '{}') ? `<p class="co-note"><button type="button" class="co-reset" onclick="Tabs.resetOrder()">순서를 처음대로 돌리기</button></p>` : ''}`;
   },
   _cur: 'today',
   get current(){ return this._cur; },
@@ -126,6 +147,7 @@ const Tabs = {
     this.applyOrder();
     // 화면 폭이 휴대폰 ↔ 넓은 화면으로 바뀌면(태블릿 돌리기 등) 그쪽 순서로 다시 놓는다
     try { matchMedia('(min-width:641px)').addEventListener('change', () => { this._paintBar(); this.applyOrder(); this.set(this._cur, true); }); } catch (e) {}
+    try { matchMedia('(min-width:1100px)').addEventListener('change', () => this.applyOrder()); } catch (e) {}
     // 매일 여는 앱의 기본 상태는 언제나 '오늘'이다. 마지막 탭을 복원하지 않는다.
     this.set(this._onTabs()[0]?.id || 'today', true);   // 맨 위 카테고리부터
   },

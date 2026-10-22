@@ -78,7 +78,7 @@ const Settings = {
         ${typeof Weather!=='undefined' ? this._item('날씨 표시', this._seg(Weather.mode, [['simple','간단'],['detail','세부'],['off','끄기']], 'Settings.setWx'), '간단: 요일 옆 아이콘·기온 · 세부: 최저·지금·최고를 호 모양으로, 날짜 위에 해·구름·비·눈 효과 · 상단바 날씨를 눌러도 바뀝니다') : ''}
         <div class="set-h">메인 화면</div>
         ${this._link('상단바 정보', "Settings.go('topinfo')", '맨 위 줄에 보일 숫자 고르기 — 몸무게·체지방·BMI·근육량·추세·주식 등락·AI 사용량')}
-        ${this._link('카테고리 · 카드 순서와 켜고 끄기', "Settings.go('cats')", `지금 ${Tabs._onTabs().map(t => t.label).join(' → ')} — 탭 순서, 카드 위아래 순서(예: 운동을 식단 위로), 안 쓰는 카드 숨기기`)}`;
+        ${this._link('카테고리 · 카드 순서와 켜고 끄기', "Settings.go('cats')", `지금 ${Tabs._onTabs().map(t => t.label).join(' → ')} — 탭 순서, 카드 순서(예: 운동을 식단 위로), PC·태블릿은 카드 칸 크기(1×1·2×1…)와 자리, 안 쓰는 카드 숨기기`)}`;
     } else if (cat === 'topinfo') {
       h = TopInfo.pageHtml();
     } else if (cat === 'cats') {

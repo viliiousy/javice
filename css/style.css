@@ -3710,3 +3710,36 @@ html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto;
 .mn-sh-h{ display:flex; align-items:center; justify-content:space-between; margin:0 2px 10px; }
 .mn-sh-h b{ font-size:16px; }
 .mn-done{ height:32px; padding:0 14px; border-radius:16px; border:0; background:var(--accent,#FF6A2B); color:var(--accent-fg,#fff); font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+
+/* ── 넓은 화면 칸 격자: '오늘의 습관' 한 칸 = 1×1. 카드마다 가로(--cw) × 세로(--ch) 칸을 차지하고,
+   칸보다 내용이 길면 카드 안에서 스크롤(제목 줄은 위에 붙어 있다). 칸 크기는 설정 › 카테고리 · 카드 에서 바꾼다. */
+@media (min-width:641px){
+  html.card-grid .dash-top, html.card-grid .dash-rest, html.card-grid .dash-col{ display:contents !important; }
+  html.card-grid .dashboard{ display:grid !important; grid-template-columns:repeat(var(--cg-cols,3), minmax(0,1fr)); grid-template-areas:none !important; grid-template-rows:none !important;
+    grid-auto-rows:var(--cg-cell, 560px) !important; grid-auto-flow:row dense; gap:16px; align-items:stretch; }
+  html.card-grid .dashboard .card{ grid-area:auto !important; grid-column:span var(--cw,1) !important; grid-row:span var(--ch,1) !important; align-self:stretch !important; margin:0; min-width:0; min-height:0;
+    height:auto !important; max-height:none; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; container-type:inline-size; scrollbar-width:thin; }
+  html.card-grid .dashboard .card.card-off{ display:none !important; }
+  html.card-grid .dashboard .card > .card-head{ position:sticky; top:0; z-index:3; background:var(--card); }
+  /* 넓은 칸이면 안쪽을 옆으로 펼친다 */
+  @container (min-width:700px){
+    .card-econ .ec-list{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); column-gap:32px; }
+  }
+  @container (min-width:1100px){ .card-econ .ec-list{ grid-template-columns:repeat(3, minmax(0,1fr)); } }
+}
+@media (min-width:641px) and (max-height:820px){ html.card-grid .dashboard{ --cg-cell:480px; } }
+/* 넓은 화면 판(격자) 편집 */
+.mn-wide{ width:100%; }
+.mn-board{ width:100%; max-width:640px; display:grid; grid-template-columns:repeat(var(--cols,3), minmax(0,1fr)); grid-auto-rows:78px; grid-auto-flow:row dense; gap:8px;
+  padding:12px; border-radius:18px; border:1.5px solid var(--border); background:var(--bg); user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; box-sizing:border-box; }
+.mn-blk{ position:relative; display:flex; flex-direction:column; justify-content:space-between; padding:8px 8px 7px 10px; border-radius:12px; background:var(--card); border:1px solid var(--border); cursor:grab; touch-action:none; min-width:0; transition:opacity .2s; box-sizing:border-box; }
+.mn-blk.off{ opacity:.45; } .mn-blk.off .mn-nm{ text-decoration:line-through; }
+.mn-bh{ display:flex; align-items:flex-start; gap:4px; } .mn-bh .mn-nm{ font-size:12.5px; font-weight:700; line-height:1.25; white-space:normal; }
+.mn-bh .mn-eye{ width:26px; height:26px; margin:-4px -4px 0 auto; }
+.mn-sz{ display:flex; align-items:center; gap:4px; }
+.mn-sz button{ height:24px; padding:0 8px; border-radius:12px; border:1px solid var(--border); background:var(--bg); color:var(--text); font:inherit; font-size:11px; font-weight:600; cursor:pointer; }
+.mn-sz b{ margin-left:auto; font-size:11px; color:var(--accent,#FF6A2B); font-family:var(--v2-num,'Space Grotesk'),sans-serif; }
+.mn-blk.mn-ph{ background:transparent; border:1.5px dashed var(--accent,#FF6A2B); }
+.mn-blk.mn-ph > *{ visibility:hidden; }
+.mn-ghost{ box-shadow:0 12px 28px rgba(0,0,0,.22); border-color:var(--accent,#FF6A2B) !important; cursor:grabbing; opacity:.96; }
+@media (min-width:641px){ .mn-ov .mx-sh.mn-sh{ max-width:760px; border-radius:20px 20px 0 0; } }

@@ -26,7 +26,32 @@ const CardSort = {
   },
 
   // ── 미니 화면 ─────────────────────────
+  // 넓은 화면(PC·태블릿): 실제 칸 격자를 줄인 판 — 카드마다 가로×세로 칸 크기를 바꾸고, 끌어서 자리를 옮긴다
+  boardHtml() {
+    const C = Tabs.cols(), S = Tabs.sizes(), off = Tabs.getOff();
+    const list = Tabs.order().filter(x => Tabs.tabOn(Tabs.tabOf(x))).map(x => Tabs.CARDS.find(c => c.cls === x));
+    const eye = on => on
+      ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>'
+      : '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.3 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/></svg>';
+    const stop = 'ontouchstart="event.stopPropagation()" onmousedown="event.stopPropagation()"';
+    return `<div class="mn-ed mn-wide">
+      <div class="mn-board" style="--cols:${C}" data-axis="g">
+        ${list.map(c => { const [w0, h] = S[c.cls], w = Math.min(C, w0), on = !off.includes(c.cls);
+          return `<div class="mn-blk${on ? '' : ' off'}" data-id="${c.cls}" style="grid-column:span ${w};grid-row:span ${h}" ontouchstart="CardSort.down(event,this)" onmousedown="CardSort.down(event,this)">
+            <div class="mn-bh"><span class="mn-nm">${esc(c.name)}</span><button type="button" class="mn-eye" ${stop} onclick="CardSort.eye('${c.cls}')" aria-label="${on ? '숨기기' : '보이기'}">${eye(on)}</button></div>
+            <div class="mn-sz"><button type="button" ${stop} onclick="CardSort.size('${c.cls}','w')" aria-label="가로 칸 바꾸기">↔ ${w}</button><button type="button" ${stop} onclick="CardSort.size('${c.cls}','h')" aria-label="세로 칸 바꾸기">↕ ${h}</button><b>${w}×${h}</b></div>
+          </div>`; }).join('')}
+      </div>
+      <p class="mn-help">'오늘의 습관' 한 칸이 <b>1×1</b> · <b>↔</b> 가로 칸(1~${C}) · <b>↕</b> 세로 칸(1~2) · 카드를 끌어서 자리 옮기기 · 눈 모양은 켜고 끄기<br>칸에 맞춰 카드 안이 넓으면 옆으로 펼쳐지고, 내용이 길면 카드 안에서 스크롤됩니다.</p>
+    </div>`;
+  },
+  size(cls, dim) {
+    const S = Tabs.sizes(), C = Tabs.cols(); let [w, h] = S[cls]; w = Math.min(C, w);
+    if (dim === 'w') w = w >= C ? 1 : w + 1; else h = h >= 2 ? 1 : h + 1;
+    Tabs.setSize(cls, w, h); try { Haptic.light(); } catch (e) {} this.paint();
+  },
   html() {
+    if (Tabs._wide()) return this.boardHtml();
     const T = Tabs.tabsSorted(), tab = this._tab && T.some(t => t.id === this._tab) ? this._tab : (Tabs._cur || T[0].id);
     this._tab = tab;
     const off = Tabs.getOff(), tOn = id => Tabs.tabOn(id);
@@ -71,6 +96,7 @@ const CardSort = {
     const rects = items.map(x => x.getBoundingClientRect());
     this._d = { el, box, axis, items, rects, i: items.indexOf(el), to: items.indexOf(el), sx: t.clientX, sy: t.clientY, id: e.touches ? t.identifier : 'm', moved: !!fromLP, live: !!fromLP };
     if (fromLP) this._lift();
+    if (axis === 'g') { const r = el.getBoundingClientRect(); this._d.r = r; this._d.ox = t.clientX - r.left; this._d.oy = t.clientY - r.top; if (fromLP) this._gLift(); }
     if (!this._bound) {
       this._bound = true;
       document.addEventListener('touchmove', ev => this.move(ev), { passive: false });
@@ -80,6 +106,24 @@ const CardSort = {
       document.addEventListener('mouseup', ev => this.up(ev));
     }
     if (!e.touches) e.preventDefault();
+  },
+  // 판(격자) 끌기: 떠 있는 복사본이 손가락을 따라오고, 원래 자리는 점선 칸이 되어 놓일 곳으로 옮겨 다닌다
+  _gLift() {
+    const d = this._d; if (d.ghost) return;
+    const g = d.el.cloneNode(true); g.classList.add('mn-ghost'); g.removeAttribute('ontouchstart'); g.removeAttribute('onmousedown');
+    Object.assign(g.style, { position: 'fixed', left: d.r.left + 'px', top: d.r.top + 'px', width: d.r.width + 'px', height: d.r.height + 'px', margin: 0, pointerEvents: 'none', zIndex: 100000 });
+    document.body.appendChild(g); d.ghost = g; d.el.classList.add('mn-ph');
+  },
+  _gMove(t) {
+    const d = this._d; d.ghost.style.left = (t.clientX - d.ox) + 'px'; d.ghost.style.top = (t.clientY - d.oy) + 'px';
+    const hit = document.elementFromPoint(t.clientX, t.clientY), b = hit && hit.closest && hit.closest('.mn-blk');
+    if (!b || b === d.el || b.parentElement !== d.box) return;
+    const r = b.getBoundingClientRect(), after = t.clientX > r.left + r.width / 2 || t.clientY > r.top + r.height * 0.75;
+    const ref = after ? b.nextSibling : b;
+    if (ref === d.el || (after && b.nextSibling === d.el) || (!after && b.previousSibling === d.el && false)) return;
+    if (d.last === b && d.lastAfter === after) return; d.last = b; d.lastAfter = after;
+    d.box.insertBefore(d.el, ref); d.to = -1;
+    try { Haptic.light(); } catch (e) {}
   },
   _lift() { const d = this._d; d.el.classList.add('mn-drag'); d.box.classList.add('mn-sorting'); try { Haptic.medium(); } catch (e) {} },
   _pt(ev) {
@@ -93,9 +137,10 @@ const CardSort = {
     if (!d.live) {
       if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
       if (d.axis === 'y' && Math.abs(dx) > Math.abs(dy) * 1.5 && !ev.touches) return;
-      d.live = true; this._lift();
+      d.live = true; this._lift(); if (d.axis === 'g') this._gLift();
     }
     if (ev.cancelable) ev.preventDefault();
+    if (d.axis === 'g') { this._gMove(t); return; }
     const r0 = d.rects[d.i], key = d.axis === 'y' ? 'top' : 'left', size = d.axis === 'y' ? 'height' : 'width';
     d.el.style.transform = d.axis === 'y' ? `translateY(${dy}px)` : `translateX(${dx}px)`;
     const c = r0[key] + r0[size] / 2 + dv;
@@ -113,6 +158,15 @@ const CardSort = {
     const d = this._d; if (!d) return; if (ev && !this._pt(ev) && ev.type !== 'mouseup') return;
     this._d = null;
     d.items.forEach(x => { x.style.transform = ''; }); d.el.classList.remove('mn-drag'); d.box.classList.remove('mn-sorting');
+    if (d.axis === 'g') {
+      d.ghost?.remove(); d.el.classList.remove('mn-ph');
+      if (!d.live) return;
+      const ids = [...d.box.querySelectorAll(':scope > [data-id]')].map(x => x.dataset.id);
+      const rest = Tabs.order().filter(x => !ids.includes(x));
+      UserStore.set(Tabs.ORDER_KEY, JSON.stringify(ids.concat(rest))); window.FirebaseSync?.scheduleSave?.();
+      Tabs.applyOrder(); try { Haptic.success ? Haptic.success() : Haptic.medium(); } catch (e) {}
+      this.paint(); return;
+    }
     if (!d.live) {   // 움직이지 않고 뗐다 — 탭이면 그 카테고리 보기
       if (d.axis === 'x') this.pickTab(d.el.dataset.id);
       return;
@@ -131,14 +185,14 @@ const CardSort = {
     this._tab = tab;
     const ov = document.createElement('div'); ov.id = 'mnSheet'; ov.className = 'mx-ov mn-ov';
     ov.innerHTML = `<div class="mx-sh mn-sh" role="dialog" aria-label="카드 순서">
-      <div class="mn-sh-h"><b>카드 순서</b><button type="button" class="mn-done" onclick="CardSort.closeSheet()">완료</button></div>
+      <div class="mn-sh-h"><b>${Tabs._wide() ? '카드 자리 · 크기' : '카드 순서'}</b><button type="button" class="mn-done" onclick="CardSort.closeSheet()">완료</button></div>
       <div class="mn-host">${this.html()}</div></div>`;
     document.body.appendChild(ov);
     ov.addEventListener('click', e => { if (e.target === ov) this.closeSheet(); });
     requestAnimationFrame(() => ov.classList.add('on'));
     // 누른 카드를 바로 손가락에 붙인다 — 손을 떼지 않고 그대로 끌면 된다
     if (cls && touch) setTimeout(() => {
-      const el = ov.querySelector(`.mn-card[data-id="${cls}"]`); if (!el || !this._lp) return;
+      const el = ov.querySelector(`.mn-card[data-id="${cls}"], .mn-blk[data-id="${cls}"]`); if (!el || !this._lp) return;
       const r = el.getBoundingClientRect();
       const fake = { touches: touch.identifier != null ? [{ clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, identifier: touch.identifier }] : null, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: 0, preventDefault() {} };
       if (!fake.touches) delete fake.touches;
