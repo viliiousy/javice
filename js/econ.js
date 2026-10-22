@@ -326,7 +326,8 @@ const Econ = {
     for (const e of coins) {
       const n = e.n.toLowerCase(), sym = e.sym.toLowerCase(), en = String(e.en || '').toLowerCase();
       let s = -1;
-      if (sym === q || n === q) s = 0; else if (n.startsWith(q) || sym.startsWith(q) || en.startsWith(q)) s = 1;
+      if (/^(코인|암호화폐|가상화폐|crypto)$/.test(q) && big.includes(e.sym)) s = 2 + big.indexOf(e.sym) * 0.01;
+      else if (sym === q || n === q) s = 0; else if (n.startsWith(q) || sym.startsWith(q) || en.startsWith(q)) s = 1;
       else if (n.includes(q) || en.includes(q)) s = 3;
       else if (/^(코인|암호화폐|가상화폐|crypto)$/.test(q) && big.includes(e.sym)) s = 2 + big.indexOf(e.sym) * 0.01;
       if (s >= 0) out.push([s - (big.includes(e.sym) ? 0.5 : 0), s >= 2 && s < 3 ? 0 : e.n.length, Object.assign({}, e, { c: e.c, ko: '' , cn: e.sym })]);
