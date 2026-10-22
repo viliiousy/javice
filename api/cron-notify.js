@@ -465,13 +465,18 @@ module.exports = async (req, res) => {
     const tokens = await fbGet('/fcm_tokens.json');
     if(!tokens) { res.status(200).json({endpoint:'cron-notify',success:true,sent:0,failed:0,detail:['등록된 기기 없음']}); return; }
     let sent=0, failed=0; const detail=[];
-    for(const [uid,data] of Object.entries(tokens)) {
-      try {
-        const r = await processUser(uid, forceAll ? {...data, force:true} : data);
-        if (typeof r === 'number') { sent += r; continue; }   // 아무것도 보낼 게 없던 경우
-        sent += r.sent; failed += r.failed; detail.push(...r.detail);
-      } catch(e) { failed++; detail.push(`${uid}: 예외 ${e.message}`); console.error(uid,e.message); }
-    }
+    // 사용자를 8명씩 동시에 처리한다. 한 명씩 차례로 하면 사람당 1~3초라, 100명쯤에서 함수 한도(300초)에 걸린다.
+    const queue = Object.entries(tokens);
+    await Promise.all(Array.from({ length: Math.min(8, queue.length) }, async () => {
+      while (queue.length) {
+        const [uid, data] = queue.shift();
+        try {
+          const r = await processUser(uid, forceAll ? {...data, force:true} : data);
+          if (typeof r === 'number') { sent += r; continue; }   // 아무것도 보낼 게 없던 경우
+          sent += r.sent; failed += r.failed; detail.push(...r.detail);
+        } catch(e) { failed++; detail.push(`${uid}: 예외 ${e.message}`); console.error(uid,e.message); }
+      }
+    }));
     // 실패를 조용히 넘기지 않는다 — 예전에는 시도 횟수를 성공으로 보고했고,
     // 워크플로는 HTTP 200만 보므로 계속 초록불이었다. 실패가 있으면 200을 주지 않는다.
     // endpoint 를 박아 둔다. 바깥 스케줄러에 작업이 둘이라 URL 을 서로 바꿔 넣기 쉬운데,
