@@ -11,8 +11,16 @@ const Gate = {
   _uid() { try { return firebase.auth().currentUser?.uid || ''; } catch (e) { return ''; } },
   _key() { return 'gl_gate_' + this._uid(); },
   async _tok() { try { return await firebase.auth().currentUser?.getIdToken(); } catch (e) { return null; } },
+  // 누구인지 단서(운영자 화면용): 앱에서 쓰는 이름 · 연결된 구글 이메일
+  _hints() {
+    let hname = '', hgoogle = '';
+    try { hname = localStorage.getItem('gl_apple_name') || (Auth.appleUser && Auth.appleUser.name) || (Auth.userInfo && Auth.userInfo.name) || (this._info && this._info.name) || ''; } catch (e) {}
+    try { hgoogle = (Auth.userInfo && Auth.userInfo.email) || ''; } catch (e) {}
+    return { hname: hname === 'Apple 사용자' ? '' : hname, hgoogle };
+  },
   async call(act, extra = {}) {
     const idToken = await this._tok(); if (!idToken) throw new Error('nologin');
+    if (act === 'gate') extra = { ...this._hints(), ...extra };
     const r = await fetch(Platform.api('/api/hub'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ act, idToken, ...extra }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
@@ -155,6 +163,22 @@ const Admin = {
     document.getElementById('hAvatar')?.parentElement?.classList.toggle('adm-dot', n > 0);
     const it = document.getElementById('pmAdmin'); if (it) it.innerHTML = `관리${n ? ` <b class="adm-n">${n}</b>` : ''}`;
   },
+  // 이름 → 구글 이메일 → 로그인 이메일(애플 가림 주소는 앞부분만) 순으로 사람을 부른다
+  title(u) {
+    if (u.alias) return u.alias;
+    if (u.name && !/privaterelay/.test(u.name)) return u.name;
+    if (u.gemail) return u.gemail;
+    if (u.email && !/privaterelay\.appleid\.com$/.test(u.email)) return u.email;
+    return (u.prov && u.prov.includes('Apple') ? 'Apple 로그인 사용자' : '이름 모름') + ' · ' + u.uid.slice(0, 6);
+  },
+  idLine(u) {
+    const parts = [];
+    parts.push(`<b class="adm-prov">${esc(u.prov || '로그인 수단 모름')}</b>`);
+    if (u.gemail) parts.push(`구글 ${esc(u.gemail)}`);
+    if (u.email && u.email !== u.gemail) parts.push(/privaterelay\.appleid\.com$/.test(u.email) ? `애플(이메일 가림) ${esc(u.email.split('@')[0])}` : esc(u.email));
+    parts.push(`ID ${esc(u.uid)}`);
+    return parts.join(' · ');
+  },
   _ago(t) {
     if (!t) return '—';
     const m = Math.round((Date.now() - t) / 60000);
@@ -171,18 +195,21 @@ const Admin = {
     if (this.tab === 'req') {
       const P = U.filter(u => u.status === 'pending');
       b.innerHTML = P.length ? P.map(u => `<div class="adm-card">
-          <div class="adm-h"><b>${esc(u.name || '(이름 없음)')}</b><span>${esc(u.email)}</span><i>${this._ago(u.at)}</i></div>
+          <div class="adm-h"><b>${esc(Admin.title(u))}</b><i>${this._ago(u.at)}</i></div>
+          <span class="adm-id">${Admin.idLine(u)}</span>${u.note ? `<span class="adm-note">${esc(u.note)}</span>` : ''}
           <p class="adm-msg">${u.msg ? esc(u.msg) : '<span class="pg-note">한마디 없음</span>'}</p>
-          <div class="adm-acts">${act(u, 'reject', '거절')}${act(u, 'approve', '승인', 'pri')}</div></div>`).join('')
+          <div class="adm-acts"><button type="button" class="adm-b" onclick="Admin.memo('${esc(u.uid)}')">메모</button>${act(u, 'reject', '거절')}${act(u, 'approve', '승인', 'pri')}</div></div>`).join('')
         : '<p class="pg-note">기다리는 신청이 없습니다.</p>';
       return;
     }
     if (this.tab === 'users') {
       const A = U.filter(u => u.status !== 'pending');
       b.innerHTML = `<p class="adm-sum">승인 <b class="num">${s.total}</b> · 차단 <b class="num">${s.blocked}</b></p>` + A.map(u => `<div class="adm-row${u.status === 'blocked' ? ' off' : ''}">
-          <div class="adm-u"><b>${esc(u.name || u.email || ('계정 ' + u.uid.slice(0, 6)))}${u.admin ? ' <em>운영자</em>' : ''}${u.status === 'blocked' ? ' <em class="bad">차단됨</em>' : ''}</b>
-            <span>${esc(u.email)} · 마지막 ${this._ago(u.last)} · 7일 중 <b class="num">${u.days}</b>일 · 오늘 <b class="num">${u.today}</b>회</span></div>
-          ${u.admin ? '' : `<div class="adm-acts">${u.status === 'blocked' ? act(u, 'unblock', '차단 풀기') : act(u, 'block', '차단')}${act(u, 'delete', '삭제', 'bad')}</div>`}
+          <div class="adm-u"><b>${esc(Admin.title(u))}${u.admin ? ' <em>운영자</em>' : ''}${u.status === 'blocked' ? ' <em class="bad">차단됨</em>' : ''}</b>
+            <span class="adm-id">${Admin.idLine(u)}</span>
+            ${u.note ? `<span class="adm-note">${esc(u.note)}</span>` : ''}
+            <span>마지막 ${this._ago(u.last)} · 7일 중 <b class="num">${u.days}</b>일 · 오늘 <b class="num">${u.today}</b>회</span></div>
+          ${u.admin ? '' : `<div class="adm-acts adm-col"><button type="button" class="adm-b" onclick="Admin.memo('${esc(u.uid)}')">메모</button>${u.status === 'blocked' ? act(u, 'unblock', '차단 풀기') : act(u, 'block', '차단')}${act(u, 'delete', '삭제', 'bad')}</div>`}
         </div>`).join('');
       return;
     }
@@ -196,6 +223,26 @@ const Admin = {
       <div class="adm-h2">많이 쓴 기능 · 최근 7일(누른 횟수)</div>
       ${cats.length ? cats.map(([k, n]) => `<div class="adm-cat"><span>${esc(k)}</span><em><i style="width:${Math.round(n / cmax * 100)}%"></i></em><b class="num">${n}</b></div>`).join('') : '<p class="pg-note">아직 모인 기록이 없습니다.</p>'}
       <p class="pg-note">가입은 ${s.open ? '누구나 가능(열림)' : '운영자 승인제'}입니다. 사용량은 앱이 몇 분마다 기능별 횟수만 보냅니다(내용은 보내지 않음).</p>`;
+  },
+  // 운영자 메모 · 별칭(예: '민우', '민우 회사 동료') — 목록에서 이름 대신 별칭이 먼저 보인다
+  memo(uid) {
+    const u = (this.data?.users || []).find(x => x.uid === uid); if (!u) return;
+    document.getElementById('admMemo')?.remove();
+    const ov = document.createElement('div'); ov.id = 'admMemo'; ov.className = 'mx-ov qt-ov';
+    ov.innerHTML = `<div class="mx-sh qt-sh" role="dialog" aria-label="메모">
+      <p class="adm-id" style="margin:0 0 12px">${Admin.idLine(u)}</p>
+      <input id="admAlias" class="qt-title" maxlength="30" placeholder="별칭 (예: 민우)" value="${esc(u.alias || '')}">
+      <textarea id="admNote" class="qt-notes" rows="3" maxlength="300" placeholder="메모 (누구인지, 어떻게 아는 사이인지)">${esc(u.note || '')}</textarea>
+      <div class="qt-bar"><span class="qt-sp"></span><button type="button" class="adm-b" onclick="document.getElementById('admMemo').remove()">취소</button><button type="button" class="qt-save" id="admSave">저장</button></div></div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+    ov.querySelector('#admSave').onclick = async () => {
+      const alias = ov.querySelector('#admAlias').value, note = ov.querySelector('#admNote').value;
+      ov.remove();
+      try { this.data = await Gate.call('adm', { op: 'note', uid, alias, note }); this.paint(); App.showToast('메모를 저장했습니다', 'success'); }
+      catch (e) { App.showToast('저장 실패: ' + (e.message || e), 'error'); }
+    };
+    requestAnimationFrame(() => { ov.classList.add('on'); ov.querySelector('#admAlias').focus(); });
   },
   async act(op, uid, name) {
     const msg = { approve: `${name} 님을 승인할까요?`, reject: `${name} 님의 신청을 거절할까요?`, block: `${name} 님을 차단할까요? 다음에 앱을 열 때부터 막힙니다.`,

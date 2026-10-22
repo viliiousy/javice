@@ -895,3 +895,9 @@ html.dark .wxf-cap{ background:#EEF3F8; }
 .adm-cat em{ height:6px; border-radius:3px; background:var(--card2); overflow:hidden; }
 .adm-cat em i{ display:block; height:100%; background:var(--accent); border-radius:3px; }
 .adm-cat b{ text-align:right; font-size:13px; }
+.adm-id{ font-size:12px; color:var(--text3); line-height:1.5; word-break:break-all; }
+.adm-prov{ font-weight:600; color:var(--text); }
+.adm-note{ font-size:13px; color:var(--text); line-height:1.5; padding-left:8px; border-left:2px solid var(--border); }
+.adm-acts.adm-col{ flex-direction:column; align-items:stretch; }
+.adm-card .adm-id, .adm-card .adm-note{ display:block; margin-top:4px; }
+.adm-u .adm-prov, .adm-id .adm-prov{ font-size:12px; }
