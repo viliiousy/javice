@@ -1025,7 +1025,7 @@ JSON 만 출력. 다른 말 금지.
       ${mk('kr_close','한국 장 마감','15:30')}
       ${mk('us_open','미국 장 시작','밤 22:30경')}
       ${mk('us_close','미국 장 마감','새벽 05:00경')}
-      <p class="ec-hint">켜면 그 시각에 메인과 알림 켠 리스트의 시세를 텔레그램으로 보냅니다.</p>
+      <p class="ec-hint">켜면 그 시각에 담은 종목과 알림 켠 리스트의 시세를 앱 알림으로 보냅니다. (서버가 10분마다 확인 — 최대 10분 늦을 수 있습니다)</p>
       <div class="ec-sec"><span>급변동 알림 기준</span></div>
       <div class="ec-pct"><input id="ecMove" type="number" inputmode="decimal" class="inp inp-sm num" value="${c.move_pct||10}" aria-label="급변동 알림 기준"><span>%</span></div>
       <div class="modal-btns">

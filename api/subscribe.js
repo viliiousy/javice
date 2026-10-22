@@ -33,7 +33,7 @@ module.exports = async (req, res) => {
   if(req.method !== 'POST') { res.status(405).json({ error:'Method not allowed' }); return; }
 
   try {
-    const { uid: rawUid, token, settings, prevUid, deviceId, ua, idToken } = req.body || {};
+    const { uid: rawUid, token, settings, prevUid, deviceId, ua, idToken, local } = req.body || {};
     const uid = safeId(rawUid);
     if(!uid || !token || typeof token !== 'string') { res.status(400).json({ error:'uid and token required' }); return; }
     const authUid = await uidFromIdToken(idToken);
@@ -47,7 +47,7 @@ module.exports = async (req, res) => {
     const devRes = await fbFetch(`/fcm_tokens/${uid}/devices/${devId}.json`, {
       method:  'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ token, ua: String(ua||'').slice(0,120), updatedAt: Date.now() }),
+      body:    JSON.stringify({ token, ua: String(ua||'').slice(0,120), updatedAt: Date.now(), ...(local ? { local: true } : {}) }),
     });
     if(!devRes.ok) { res.status(502).json({ error:`기기 토큰 저장 실패 (Firebase ${devRes.status})` }); return; }
     done.push('device');

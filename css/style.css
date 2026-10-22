@@ -3669,3 +3669,5 @@ html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto;
 @media (prefers-reduced-motion: reduce){ .ec-sr.pop .ec-sbtn, .ec-sr.pop::after, #econWrap .ec-row.ec-new{ animation:none; } }
 .stat-stock .ti-pct{ margin-left:4px; }
 .ec-sr-l .ec-meta, #econWrap .ec-meta{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nt-link{ border:0; background:none; width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px; font:inherit; color:inherit; cursor:pointer; text-align:left; }
+.nt-link b{ font-size:13px; color:var(--accent,#FF6A2B); font-weight:600; }

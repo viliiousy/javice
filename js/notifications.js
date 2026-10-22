@@ -34,6 +34,7 @@ const Notifications = {
     tasks:    { enabled: true,  time: '09:00' },
     checklist:{ enabled: true,  time: '09:00' },
     calendar: { enabled: true,  time: '08:00' },
+    econ:     { enabled: true },   // 시세 알림(기준가·급변동·리포트·장 시작/마감) — 서버가 보낸다
   },
 
   getSettings() {
@@ -46,6 +47,7 @@ const Notifications = {
   async init() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       console.log('[Notif] 푸시 알림 미지원 브라우저');
+      setTimeout(() => this.nativePush(), 4000);   // 앱이면 시세 알림용 토큰만 서버에 올린다
       return false;
     }
     try {
@@ -112,7 +114,25 @@ const Notifications = {
     return ask ? Notification.requestPermission() : Notification.permission;
   },
 
+  // 앱(아이폰·안드로이드): 습관·식단 알림은 기기 안에서 울리지만, 시세 알림은 값이 바뀔 때 서버가 보내야 한다.
+  // 그래서 앱도 FCM 토큰을 서버에 올린다(local 표식 — 서버는 이 기기엔 시세 알림만 보낸다).
+  async nativePush(forceReg) {
+    try {
+      if (!(typeof LocalNotify !== 'undefined' && LocalNotify.ok) || !this._fm()) return;
+      const s = this.getSettings(); if (!s.enabled) return;
+      if ((await this._permission(false)) !== 'granted') return;
+      const get = await this._waitForFcm(4000); if (!get) return;
+      const token = await get(); if (!token) return;
+      const stale = Date.now() - (this.syncedAt() || 0) > this.REFRESH_AFTER;
+      if (!forceReg && token === this.localToken() && !stale && localStorage.getItem('gl_fcm_uid_dev') === this._effectiveUid()) return;
+      this.setLocalToken(token);
+      const r = await this._registerToken(token);
+      console.log('[Notif] 앱 시세 알림 등록', r.ok ? '성공' : r.error);
+    } catch (e) { console.warn('[Notif] 앱 등록', e); }
+  },
+
   async refresh() {
+    if (typeof LocalNotify !== 'undefined' && LocalNotify.ok) return this.nativePush();
     if ((await this._permission(false)) !== 'granted') return;
     if (!this.localToken()) return;            // 이 기기는 애초에 등록한 적이 없다
     const get = await this._waitForFcm();
@@ -217,7 +237,7 @@ const Notifications = {
     const uid      = this._effectiveUid();
     const prev     = localStorage.getItem('gl_fcm_uid_dev');
     const settings = this.getSettings();
-    const body     = { uid, token, settings, deviceId: this.deviceId(), ua: navigator.userAgent };
+    const body     = { uid, token, settings, deviceId: this.deviceId(), ua: navigator.userAgent, local: typeof LocalNotify !== 'undefined' && LocalNotify.ok };
     if (prev && prev !== uid) body.prevUid = prev;   // 구경로 등록분 삭제 요청
     try { if (FirebaseSync?._authed) { const t = await Auth._firebaseIdToken?.(); if (t) body.idToken = t; } } catch (e) {}   // 서버가 본인인지 확인한다
     try {
@@ -295,6 +315,7 @@ const Notifications = {
       ${block('tasks', '오늘 마감 할일', '마감인 할일이 있는 날만', t('tasks','time', s.tasks?.time||'09:00', '알림 시각'))}
       ${block('checklist', '체크리스트', '그날 날짜를 정해 둔 항목', t('checklist','time', s.checklist?.time||'09:00', '알림 시각'))}
       ${block('calendar', '오늘 일정 요약', '일정이 있는 날 아침에', t('calendar','time', s.calendar?.time||'08:00', '알림 시각'))}
+      ${block('econ', '시세 알림', '담은 종목 기준가 도달 · 급변동 · 리포트 · 장 시작/마감', `<button type="button" class="nt-cell nt-link" onclick="Econ.settings()"><span>리포트 시각 · 급변동 기준 · 장 알림</span><b>바꾸기 ›</b></button>`)}
       ${local ? '' : '<p class="set-note">웹에서는 서버가 10분마다 확인해 보냅니다. 시각이 최대 10분 늦을 수 있습니다.</p>'}` : ''}
       <div class="set-h">점검</div>
       ${Settings._link('테스트 알림 보내기', 'Notifications.sendTest()', local ? '3초 뒤 이 기기에서 울립니다' : '이 기기로 바로 보냅니다')}
@@ -304,7 +325,7 @@ const Notifications = {
 
   _after() {
     try { FirebaseSync?.scheduleSave(); } catch {}
-    if (typeof LocalNotify !== 'undefined' && LocalNotify.ok) LocalNotify.reschedule(300);
+    if (typeof LocalNotify !== 'undefined' && LocalNotify.ok) { LocalNotify.reschedule(300); this.nativePush(); }
     else { const token = this.localToken(); if (token) this._registerToken(token); }
     if (typeof Settings !== 'undefined') Settings._re('notify');
   },
@@ -317,6 +338,7 @@ const Notifications = {
       if (typeof LocalNotify !== 'undefined' && LocalNotify.ok) {
         const p = await LocalNotify.permission(true);
         if (p !== 'granted') this._deniedHelp();
+        else { try { await this._fm()?.requestPermissions(); } catch (e) {} this.nativePush(true); }
       } else if (!this.localToken()) await this.subscribe();
     }
     this._after();

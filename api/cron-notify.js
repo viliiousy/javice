@@ -9,6 +9,9 @@ const { todayEvents } = require('../lib/gcal');
 // FCM v1 발송 — 토큰 캐시·시간 제한은 lib/fcm.js 에 있다 (api/test-push.js 와 같이 쓴다)
 const fcm = require('../lib/fcm');
 
+// 시세 알림(기준가 · 급변동 · 리포트 · 장 시작/마감) — 예전 텔레그램 봇을 옮겨 왔다
+const { econAlerts } = require('../lib/econ-alerts');
+
 // notification 블록을 빼고 data 로만 보낸다.
 // notification 이 들어 있으면 브라우저·SDK 가 그것만으로도 알림을 띄울 수 있고,
 // 우리 서비스워커도 따로 띄운다 — 같은 알림이 두 번 뜨는 흔한 원인이다.
@@ -56,18 +59,18 @@ function googleSubFromPrefix(prefix) {
 //   구버전: { token, settings }            ← 기기 하나만 담을 수 있어 PC·폰이 서로 덮어썼다
 function deviceList(data) {
   const out = [], skipped = [];
-  const take = (id, token, ua, invalid) => {
+  const take = (id, token, ua, invalid, local) => {
     if (typeof token !== 'string' || !token) return;
     // 한 번 죽었다고 표시된 기기는 다시 두드리지 않는다.
     // 매번 재시도하면 매번 실패하고, 이 크론은 실패가 있으면 500 을 준다 —
     // 10분마다 도는 지금은 그게 곧 실패 메일 폭주다. 2026-08-26 에 겪었다.
     // 기기를 다시 등록하면 이 노드가 통째로 교체되면서 표식도 같이 사라진다.
     if (invalid) { skipped.push(id); return; }
-    out.push({ id, token, ua: ua || '' });
+    out.push({ id, token, ua: ua || '', local: !!local });
   };
   if (data.devices && typeof data.devices === 'object') {
     for (const [id, d] of Object.entries(data.devices)) {
-      if (d) take(id, d.token, d.ua, d.invalid);
+      if (d) take(id, d.token, d.ua, d.invalid, d.local);
     }
   }
   take('legacy', data.token, '', data.invalid);
@@ -307,6 +310,14 @@ async function processUser(uid, tokenData) {
     }
   }
 
+  // 💹 시세 알림 — 담은 종목의 기준가 · 급변동 · 정한 시각 리포트 · 장 시작/마감
+  if (settings.econ?.enabled !== false) {
+    try {
+      const cfg = parse(await readKey(`${prefix}gl_econ_config`), null);
+      if (cfg) { const E = await econAlerts(uid, cfg, today, nowMin, force); msgs.push(...E.msgs); notes.push(...E.notes.map(n => `${tag} ${n}`)); }
+    } catch (e) { notes.push(`${tag} 시세 알림: ${e.message}`); }
+  }
+
   // 처리 끝난 칸에 오늘 날짜를 남긴다. 이게 있어야 다음 실행이 같은 걸 또 보내지 않는다.
   // force(수동 테스트)일 때는 남기지 않는다 — 테스트 한 번이 그날 진짜 알림을 삼키면 안 된다.
   async function stamp() {
@@ -332,7 +343,10 @@ async function processUser(uid, tokenData) {
       await markInvalid(uid, dev.id, { status:0, reason:'UNSUPPORTED_TOKEN_FORMAT', shape });
       continue;
     }
-    const results = await Promise.all(msgs.map(m => sendFCM(fcm, m.title, m.body, m.slot).then(r => ({...r, title:m.title, slot:m.slot}))));
+    // 앱(아이폰·안드로이드)은 습관·식단·일정 알림을 기기 안에서 직접 울린다 — 서버는 시세 알림만 보낸다(같은 알림 두 번 방지)
+    const list = dev.local ? msgs.filter(m => String(m.slot || '').startsWith('ec_')) : msgs;
+    if (!list.length) continue;
+    const results = await Promise.all(list.map(m => sendFCM(fcm, m.title, m.body, m.slot).then(r => ({...r, title:m.title, slot:m.slot}))));
     const ok   = results.filter(r=>r.ok);
     const fail = results.filter(r=>!r.ok);
     sent += ok.length; failed += fail.length;
@@ -347,6 +361,8 @@ async function processUser(uid, tokenData) {
     if (dead) await markInvalid(uid, dev.id, { status: dead.status, reason: dead.reason || null });
   }
 
+  // 기기가 모두 앱이면 습관·식단 같은 칸은 기기가 이미 울렸다 — 서버도 '처리됨' 으로 남겨 10분마다 다시 셈하지 않는다
+  if (!force && devices.every(d => d.local)) for (const m of msgs) if (!String(m.slot || '').startsWith('ec_')) done.add(m.slot);
   await stamp();
   return { sent, failed, detail };
 }
