@@ -52,10 +52,12 @@ const CardLayout = {
     const hit = (a, b) => a.c < b.c + b.s && b.c < a.c + a.s && a.y < b.y + b.h && b.y < a.y + a.h;
     if (fixed && L.cards[fixed]) { L.cards[fixed] = this._fit(L.cards[fixed], C); placed.push(L.cards[fixed]); }
     const rest = ids.filter(k => k !== fixed).sort((a, b) => src[a].y - src[b].y || src[a].c - src[b].c);
+    // 빈 줄 없이 위로 붙인다: 위에서부터 차례로, 자기 열에서 비어 있는 가장 위 자리로(끌고 있는 카드는 손가락 자리 그대로)
     for (const k of rest) {
       const p = this._fit({ ...src[k] }, C);
+      p.y = 0;
       let moved = true, guard = 0;
-      while (moved && guard++ < 100) { moved = false; for (const q of placed) if (hit(p, q)) { p.y = q.y + q.h; moved = true; } }
+      while (moved && guard++ < 200) { moved = false; for (const q of placed) if (hit(p, q)) { p.y = q.y + q.h; moved = true; } }
       L.cards[k] = p; placed.push(p);
     }
     return L;
@@ -68,7 +70,7 @@ const CardLayout = {
     const B = this._box();
     // 판이 아직 안 보이면(로그인 화면 뒤 · 처음 그리는 중) 너비가 0 이다 — 그때 놓으면 카드가 실처럼 가늘어진다. 보일 때 다시.
     if (!(B.w > 300)) { H.classList.remove('card-free'); clearTimeout(this._rt); this._rt = setTimeout(() => this.apply(), 300); return; }
-    this._fill(L);
+    this._fill(L); this._resolve(L);   // 저장된 배치에 빈 줄이 있어도 위로 붙여 놓는다
     H.classList.add('card-free');
     let bottom = 0;
     for (const c of Tabs.CARDS) {
@@ -132,7 +134,9 @@ const CardLayout = {
       const o = { ...orig }; o[cls] = p;
       this._resolve(L, cls, o); this._save(L); this.apply(); this._sizes();
     };
-    const up = () => { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up); el.classList.remove('cl-active'); try { Haptic.light(); } catch (er) {} };
+    const up = () => { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up); el.classList.remove('cl-active');
+      this._resolve(L); this._save(L); this.apply(); this._sizes();   // 놓으면 끌던 카드도 위로 붙는다
+      try { Haptic.light(); } catch (er) {} };
     document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
   },
 
