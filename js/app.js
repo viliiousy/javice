@@ -53,6 +53,8 @@ const App = {
     return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
   },
   async onAuthSuccess(userInfo) {
+    // 가입 승인: 승인 전이면 신청/대기 화면을 띄우고 여기서 멈춘다(js/gate.js)
+    try { if (typeof Gate !== 'undefined' && !(await Gate.pass(userInfo))) { const ls=document.getElementById('loginScreen'); if(ls) ls.style.display='none'; return; } } catch(e) { console.warn('[Gate]', e); }
     try { if (typeof AppUpdate !== 'undefined') setTimeout(() => AppUpdate.check('login'), 1200); } catch (e) {}   // 로그인하자마자 새 APK 가 있는지 보고 바로 안내
     { const ls=document.getElementById('loginScreen'); if(ls) ls.style.display='none'; }
     { const ap=document.getElementById('app'); if(ap) ap.style.display='block'; }
