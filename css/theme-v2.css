@@ -800,9 +800,13 @@ html[data-ui="v2"] .hd-n{ position:relative; isolation:isolate; display:inline-b
 .wxfx{ position:absolute; inset:-12px -14px -4px -6px; pointer-events:none; overflow:hidden; z-index:-1; }
 .wxfx-rain, .wxfx-snow{ z-index:1; }
 /* 맑음: 숫자 오른쪽 위로 해가 천천히 떠오른다 */
-.wxf-sun{ position:absolute; right:2px; top:2px; width:11px; height:11px; border-radius:50%; background:none; border:1.5px solid var(--text3); opacity:.6;
-  animation:wxRise 2.4s cubic-bezier(.2,.8,.2,1) both, wxGlow 5s 2.4s ease-in-out infinite; }
-.wxf-moon{ position:absolute; right:0; top:0; width:18px; height:18px; border-radius:50%; box-shadow:-5px 3px 0 0 var(--text3); opacity:.5; animation:wxRise 2.4s ease-out both; }
+.wxf-sun{ position:absolute; width:15px; height:15px; color:var(--text3); opacity:.75; animation:wxRise 2.4s cubic-bezier(.2,.8,.2,1) both; }
+.wxf-sun svg{ display:block; width:100%; height:100%; animation:wxSpin 40s linear infinite; }
+.wxf-moon{ position:absolute; right:0; top:1px; width:14px; height:14px; color:var(--text3); opacity:.7; animation:wxRise 2.4s ease-out both; }
+.wxf-moon svg{ display:block; width:100%; height:100%; }
+.wxf-sun.dim, .wxf-moon.dim{ opacity:.45; }
+.wxf-sun.still, .wxf-sun.still svg, .wxf-moon.still{ animation:none; }
+@keyframes wxSpin{ to{ transform:rotate(360deg); } }
 @keyframes wxRise{ from{ transform:translateY(26px); opacity:0; } to{ transform:none; } }
 @keyframes wxGlow{ 50%{ transform:scale(1.15); opacity:.8; } }
 /* 흐림: 구름 두 장이 숫자 뒤를 천천히 지나간다 */
@@ -830,12 +834,19 @@ html.dark .wxf-cap{ background:#EEF3F8; }
 @media (prefers-reduced-motion:reduce){ .wxfx *{ animation:none !important; } .wxf-r, .wxf-s{ display:none; } }
 
 /* 세부: 간단 표시 자리에 — 지금 기온(앞) · 최저/최고(뒤, 작고 흐리고 기울어짐) */
-.hd-wxd{ position:relative; display:inline-block; margin-left:20px; margin-right:18px; padding:0; border:0; background:none; cursor:pointer; line-height:1; vertical-align:baseline; }
+.hd-wxd{ position:relative; display:inline-block; margin-left:22px; margin-right:20px; padding:0; border:0; background:none; cursor:pointer; line-height:1; vertical-align:baseline; }
 .hd-wxd .num{ font-family:var(--v2-num,'Space Grotesk'),sans-serif; line-height:1; white-space:nowrap; }
-.wxd-now{ position:relative; z-index:2; font-size:15px; font-weight:600; color:var(--text); text-shadow:0 0 3px var(--card),0 0 3px var(--card),0 0 2px var(--card); }
-.wxd-lo,.wxd-hi{ position:absolute; z-index:-1; bottom:4px; text-shadow:none; font-size:9px; font-weight:500; color:var(--text3); opacity:.8; }
-.wxd-lo{ right:calc(100% - 1px); transform:rotate(-24deg); transform-origin:right bottom; }
-.wxd-hi{ left:calc(100% - 1px); transform:rotate(24deg); transform-origin:left bottom; }
+/* 지금 기온이 앞에서 최저·최고를 살짝 가린다 — 둘은 뒤에서 작은 반지름으로 둥글게 기운다(최저는 왼쪽 아래, 최고는 오른쪽 아래) */
+.wxd-now{ position:relative; z-index:2; isolation:isolate; font-size:15px; font-weight:600; color:var(--text); }
+.wxd-now::before{ content:''; position:absolute; inset:1px -1px 1px -1px; z-index:-1; border-radius:6px; background:var(--card); opacity:.75; }
+.wxd-lo,.wxd-hi{ position:absolute; z-index:-2; bottom:3px; font-size:9px; font-weight:500; color:var(--text3); opacity:.85; letter-spacing:-.2px; }
+.wxd-lo{ right:calc(100% - 5px); transform:rotate(-46deg); transform-origin:right bottom; }
+.wxd-hi{ left:calc(100% - 6px); transform:rotate(46deg); transform-origin:left bottom; }
+.wxd-day .wxd-now{ display:inline-block; width:16px; height:15px; vertical-align:-2px; }
+.wxd-day .wxd-hi{ left:calc(100% - 2px); bottom:2px; }
+.wxd-day .wxd-lo{ right:calc(100% - 2px); bottom:2px; }
+.wxd-ic{ width:16px; height:16px; color:var(--text2, var(--text)); display:block; }
+.hd-wx-sl{ font-style:normal; color:var(--text3); margin:0 1px; }
 
 /* ── 가입 신청 · 대기 화면 ───────────────────── */
 .gate{ position:fixed; inset:0; z-index:20000; background:var(--card); color:var(--text); display:flex; align-items:center; justify-content:center; padding:24px; overflow:auto; }
@@ -904,3 +915,11 @@ html.dark .wxf-cap{ background:#EEF3F8; }
 html[data-ui="v2"] .sg-l{ align-items:center; }
 html[data-ui="v2"] .sg-l .stat-chip{ align-items:center; line-height:1; height:32px; }
 html[data-ui="v2"] .sg-l .stat-chip b{ line-height:1; display:inline-flex; align-items:center; position:relative; top:1px; }
+
+/* 상단바 주식 칩: 두 줄 · 크기 고정. 이름 칸은 40px 고정(긴 이름은 글자만 작게/잘라서), 등락 칸도 고정 — 줄이 밀려 내려가지 않는다 */
+html[data-ui="v2"] .stat-stock.ti-two{ display:inline-flex !important; flex-direction:column; justify-content:center; gap:1px; width:96px; height:28px; padding:0 !important; overflow:hidden; white-space:nowrap; line-height:1; }
+html[data-ui="v2"] .ti-two .ti-sr{ display:flex; align-items:center; justify-content:space-between; height:12px; width:100%; }
+html[data-ui="v2"] .ti-two .ti-nmf{ flex:none; width:40px; height:12px; line-height:12px; overflow:hidden; font-size:10.5px; color:var(--text3); font-weight:500; text-align:left; }
+html[data-ui="v2"] .stats-row .stat-stock.ti-two b, html[data-ui="v2"] .stats-row.dense .stat-stock.ti-two b{ flex:none; width:52px; text-align:right; font-size:11px !important; line-height:12px; font-weight:600; margin:0 !important; font-family:var(--v2-num,'Space Grotesk'),sans-serif; }
+html[data-ui="v2"] .stats-row .sg-s{ flex:none; }
+@media (max-width:640px){ html[data-ui="v2"] .stats-row .sg-s{ order:0 !important; margin-left:auto; } html[data-ui="v2"] .stats-row .sg-r{ order:3 !important; } }
