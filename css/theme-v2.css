@@ -834,11 +834,10 @@ html.dark .wxf-cap{ background:#EEF3F8; }
 @media (prefers-reduced-motion:reduce){ .wxfx *{ animation:none !important; } .wxf-r, .wxf-s{ display:none; } }
 
 /* 세부: 간단 표시 자리에 — 지금 기온(앞) · 최저/최고(뒤, 작고 흐리고 기울어짐) */
-.hd-wxd{ position:relative; display:inline-block; margin-left:22px; margin-right:20px; padding:0; border:0; background:none; cursor:pointer; line-height:1; vertical-align:baseline; }
+.hd-wxd{ position:relative; display:inline-block; margin-left:13px; margin-right:20px; padding:0; border:0; background:none; cursor:pointer; line-height:1; vertical-align:baseline; }
 .hd-wxd .num{ font-family:var(--v2-num,'Space Grotesk'),sans-serif; line-height:1; white-space:nowrap; }
 /* 지금 기온이 앞에서 최저·최고를 살짝 가린다 — 둘은 뒤에서 작은 반지름으로 둥글게 기운다(최저는 왼쪽 아래, 최고는 오른쪽 아래) */
 .wxd-now{ position:relative; z-index:2; isolation:isolate; font-size:15px; font-weight:600; color:var(--text); }
-.wxd-now::before{ content:''; position:absolute; inset:1px -1px 1px -1px; z-index:-1; border-radius:6px; background:var(--card); opacity:.75; }
 .wxd-lo,.wxd-hi{ position:absolute; z-index:-2; bottom:3px; font-size:9px; font-weight:500; color:var(--text3); opacity:.85; letter-spacing:-.2px; }
 .wxd-lo{ right:calc(100% - 5px); transform:rotate(-46deg); transform-origin:right bottom; }
 .wxd-hi{ left:calc(100% - 6px); transform:rotate(46deg); transform-origin:left bottom; }
@@ -916,10 +915,12 @@ html[data-ui="v2"] .sg-l{ align-items:center; }
 html[data-ui="v2"] .sg-l .stat-chip{ align-items:center; line-height:1; height:32px; }
 html[data-ui="v2"] .sg-l .stat-chip b{ line-height:1; display:inline-flex; align-items:center; position:relative; top:1px; }
 
-/* 상단바 주식 칩: 두 줄 · 크기 고정. 이름 칸은 40px 고정(긴 이름은 글자만 작게/잘라서), 등락 칸도 고정 — 줄이 밀려 내려가지 않는다 */
-html[data-ui="v2"] .stat-stock.ti-two{ display:inline-flex !important; flex-direction:column; justify-content:center; gap:1px; width:96px; height:28px; padding:0 !important; overflow:hidden; white-space:nowrap; line-height:1; }
-html[data-ui="v2"] .ti-two .ti-sr{ display:flex; align-items:center; justify-content:space-between; height:12px; width:100%; }
-html[data-ui="v2"] .ti-two .ti-nmf{ flex:none; width:40px; height:12px; line-height:12px; overflow:hidden; font-size:10.5px; color:var(--text3); font-weight:500; text-align:left; }
-html[data-ui="v2"] .stats-row .stat-stock.ti-two b, html[data-ui="v2"] .stats-row.dense .stat-stock.ti-two b{ flex:none; width:52px; text-align:right; font-size:11px !important; line-height:12px; font-weight:600; margin:0 !important; font-family:var(--v2-num,'Space Grotesk'),sans-serif; }
+/* 상단바 주식 칩: 한 줄에 종목 둘 · 크기 고정. 이름 칸 22×26px 고정(긴 이름은 두 줄로 나누고 글자를 줄인다), 등락 칸 34px 고정 */
+html[data-ui="v2"] .stat-stock.ti-two{ display:inline-flex !important; flex-direction:row; align-items:center; gap:3px; width:121px; height:28px; padding:0 !important; overflow:hidden; white-space:nowrap; line-height:1; }
+html[data-ui="v2"] .ti-two .ti-sr{ display:flex; align-items:center; gap:2px; height:28px; flex:none; }
+html[data-ui="v2"] .ti-two .ti-nmf{ flex:none; display:flex; flex-direction:column; justify-content:center; width:22px; height:26px; overflow:hidden; color:var(--text3); font-weight:500; text-align:left; letter-spacing:-.3px; }
+html[data-ui="v2"] .ti-two .ti-nmf i{ display:block; font-style:normal; line-height:1.12; white-space:nowrap; overflow:hidden; }
+html[data-ui="v2"] .stats-row .stat-stock.ti-two b, html[data-ui="v2"] .stats-row.dense .stat-stock.ti-two b{ flex:none; width:34px; text-align:right; font-size:10px !important; line-height:12px; font-weight:600; margin:0 !important; letter-spacing:-.3px; font-family:var(--v2-num,'Space Grotesk'),sans-serif; }
 html[data-ui="v2"] .stats-row .sg-s{ flex:none; }
 @media (max-width:640px){ html[data-ui="v2"] .stats-row .sg-s{ order:0 !important; margin-left:auto; } html[data-ui="v2"] .stats-row .sg-r{ order:3 !important; } }
+html[data-ui="v2"] .ti-two .ti-ar{ font-style:normal; font-size:7px; margin-right:1px; vertical-align:1px; }

@@ -55,29 +55,36 @@ const TopInfo = {
     if (c.stock === 'off' || typeof Econ === 'undefined') return '';
     let cfg; try { cfg = Econ.cfg(); } catch (e) { return ''; }
     const pc = v => v == null ? '—' : `<b class="${v > 0 ? 'ti-up' : v < 0 ? 'ti-dn' : ''}">${v > 0 ? '▲' : v < 0 ? '▼' : ''}${Math.abs(v).toFixed(1)}%</b>`;
-    // 칩 크기는 늘 같다(두 줄 · 폭 고정) — 이름 칸(NB px)도 고정이고, 긴 이름은 글자를 줄이고 그래도 길면 잘라 그 칸 안에만 쓴다
-    const NB = 40;
+    // 칩 크기는 늘 같다(한 줄에 종목 둘 · 폭 고정). 이름 칸(NB×26px)도 고정 —
+    // 긴 이름은 두 줄로 나누고(삼성/전자) 그래도 길면 글자를 줄이고, 끝까지 넘치면 그 칸에 들어가는 만큼만 쓴다
+    const NB = 22;
+    const wOf = x => { let w = 0; for (const ch of x) w += /[\u3131-\uD79D]/.test(ch) ? 1 : 0.6; return w; };
     const fit = (name) => {
       let t = (typeof Econ.shortName === 'function' ? Econ.shortName(name) : String(name || '')).replace(/\s+/g, '');
       const SH = { '금(국내)': '금', '원/달러': '환율', '달러/원': '환율', '원/엔': '엔화', '원/유로': '유로' };
       t = SH[String(name || '').trim()] || t;
-      const wOf = x => { let w = 0; for (const ch of x) w += /[\u3131-\uD79D]/.test(ch) ? 1 : 0.6; return w; };
-      let fs = Math.min(10.5, NB / Math.max(1, wOf(t)));
-      if (fs < 8) { fs = 8; while (t.length > 1 && wOf(t) * 8 > NB) t = t.slice(0, -1); }
-      return `<span class="ti-nmf" style="font-size:${fs.toFixed(1)}px">${esc(t)}</span>`;
+      if (wOf(t) * 10.5 <= NB) return `<span class="ti-nmf" style="font-size:10.5px"><i>${esc(t)}</i></span>`;
+      // 두 줄: 무게가 반씩 되도록 자른다
+      const ch = [...t], tot = wOf(t); let i = 0, acc = 0;
+      while (i < ch.length - 1 && acc + wOf(ch[i]) <= tot / 2 + 0.01) acc += wOf(ch[i++]);
+      if (!i) i = 1;
+      let l1 = ch.slice(0, i).join(''), l2 = ch.slice(i).join('');
+      let fs = Math.min(10.5, NB / Math.max(wOf(l1), wOf(l2)));
+      if (fs < 7) { fs = 7; while (l2.length > 1 && wOf(l2) * 7 > NB) l2 = l2.slice(0, -1); while (l1.length > 1 && wOf(l1) * 7 > NB) l1 = l1.slice(0, -1); }
+      return `<span class="ti-nmf ti-nm2" style="font-size:${fs.toFixed(1)}px"><i>${esc(l1)}</i><i>${esc(l2)}</i></span>`;
     };
     const row = (nm, val) => `<span class="ti-sr">${nm}${val}</span>`;
     // 보유: 산 값 대비 지금 총 수익 — 윗줄 수익률, 아랫줄 금액
     if (c.stock === 'hold') {
       const S = Econ.holdSummary();
-      if (!S.cost) return S.n ? `<div class="stat-chip stat-stock ti-two" data-s="econ" title="보유 종목의 평단·수량을 넣으면 총 수익이 보입니다">${row('<span class="ti-nmf">보유</span>', '<b>—</b>')}</div>` : '';
+      if (!S.cost) return S.n ? `<div class="stat-chip stat-stock ti-two" data-s="econ" title="보유 종목의 평단·수량을 넣으면 총 수익이 보입니다">${row(fit('보유'), '<b>—</b>')}</div>` : '';
       const p = S.profit, cls = p > 0 ? 'ti-up' : p < 0 ? 'ti-dn' : '';
       const a = Math.abs(p), won = a >= 1e8 ? (a / 1e8).toFixed(a >= 1e9 ? 0 : 1) + '억' : a >= 1e4 ? Math.round(a / 1e4).toLocaleString('ko-KR') + '만' : Math.round(a).toLocaleString('ko-KR');
-      return `<div class="stat-chip stat-stock ti-two" data-s="econ" title="보유 총 수익 (수익률 · 평가손익)">${row('<span class="ti-nmf">보유</span>', `<b class="${cls}">${S.pct == null ? '—' : (S.pct > 0 ? '+' : '') + S.pct.toFixed(1) + '%'}</b>`)}${row('<span class="ti-nmf">손익</span>', `<b class="${cls}">${p > 0 ? '+' : p < 0 ? '-' : ''}${won}</b>`)}</div>`;
+      return `<div class="stat-chip stat-stock ti-two" data-s="econ" title="보유 총 수익 (수익률 · 평가손익)">${row(fit('보유'), `<b class="${cls}">${S.pct == null ? '—' : (S.pct > 0 ? '+' : '') + S.pct.toFixed(1) + '%'}</b>`)}${row(fit('손익'), `<b class="${cls}">${p > 0 ? '+' : p < 0 ? '-' : ''}${won}</b>`)}</div>`;
     }
     const favs = Econ.favOrdered().slice(0, 2);   // 카드에서 바꾼 순서(별 먼저) 그대로
     if (!favs.length) return '';
-    const pc2 = v => v == null ? '<b>—</b>' : `<b class="${v > 0 ? 'ti-up' : v < 0 ? 'ti-dn' : ''}">${v > 0 ? '▲' : v < 0 ? '▼' : ''}${Math.abs(v).toFixed(1)}%</b>`;
+    const pc2 = v => v == null ? '<b>—</b>' : `<b class="${v > 0 ? 'ti-up' : v < 0 ? 'ti-dn' : ''}"><i class="ti-ar">${v > 0 ? '▲' : v < 0 ? '▼' : ''}</i>${Math.abs(v).toFixed(1)}%</b>`;
     return `<div class="stat-chip stat-stock ti-two" data-s="econ" title="담은 종목 오늘 등락">${favs.map(it => row(fit(it.name), pc2((Econ.PRICES[Econ.keyOf(it)] || {}).pct))).join('')}</div>`;
   },
 
