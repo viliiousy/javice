@@ -423,7 +423,8 @@ html[data-ui="v2"] .h-sum{ display:none !important; }
   html[data-ui="v2"] .card-inbody > :not(.card-head){ padding-left:24px; padding-right:24px; }
   html[data-ui="v2"] #econHold:empty{ display:none; }
   html[data-ui="v2"] #econHold{ padding-top:16px; }
-  html[data-ui="v2"] #econWrap{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); column-gap:40px; padding-bottom:8px; }
+  html[data-ui="v2"] #econWrap{ display:block; padding-bottom:8px; }
+  html[data-ui="v2"] #econWrap .ec-list{ display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); column-gap:40px; }
   html[data-ui="v2"] #econWrap .ec-row{ border-bottom:1px solid var(--v2-line); padding:14px 0; }
   html[data-ui="v2"] #econWrap .ec-row:last-of-type{ border-bottom:1px solid var(--v2-line); }
   html[data-ui="v2"] #econWrap .ec-more{ grid-column:1 / -1; }
@@ -934,8 +935,9 @@ html[data-ui="v2"] .stats-row .sg-s{ flex:none; }
 @media (max-width:640px){ html[data-ui="v2"] .stats-row .sg-s{ order:0 !important; margin-left:auto; } html[data-ui="v2"] .stats-row .sg-r{ order:3 !important; } }
 html[data-ui="v2"] .ti-two .ti-ar{ font-style:normal; font-size:7px; margin-right:1px; vertical-align:1px; }
 @media (max-width:380px){ html[data-ui="v2"] .ti-two .ti-sr:nth-child(n+2){ display:none; } }
+/* 넓은 화면: 이름 칸을 글자 길이만큼만(빈칸 없이) — 이름 바로 뒤에 등락 */
 @media (min-width:641px){
-  html[data-ui="v2"] .ti-two .ti-nmf{ width:56px; }
-  html[data-ui="v2"] .stats-row .stat-stock.ti-two b{ width:40px; font-size:11.5px !important; }
-  html[data-ui="v2"] .stat-stock.ti-two{ gap:12px; }
+  html[data-ui="v2"] .ti-two .ti-nmf{ width:auto; max-width:72px; margin-right:4px; }
+  html[data-ui="v2"] .stats-row .stat-stock.ti-two b{ width:auto; font-size:11.5px !important; }
+  html[data-ui="v2"] .stat-stock.ti-two{ gap:14px; }
 }

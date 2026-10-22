@@ -207,10 +207,16 @@ const CardSort = {
     const start = (e, x, y, id) => {
       const title = e.target.closest && e.target.closest('.dashboard .card .card-title'); if (!title) return;
       const card = title.closest('.card'), c = Tabs.CARDS.find(k => card.classList.contains(k.cls)); if (!c) return;
-      clearTimeout(this._lpT); this._lp = { x, y, id };
+      clearTimeout(this._lpT); clearTimeout(this._lpT2); this._lp = { x, y, id };
+      // PC·태블릿: 3초 꾹 → 화면 배치 편집 모드(카드가 흔들리고 끌어서 옮기기·테두리로 크기). 누르는 동안 제목 밑줄이 차오른다.
+      if (Tabs._wide() && typeof CardLayout !== 'undefined') {
+        this._lpT2 = setTimeout(() => { if (this._lp) title.classList.add('cl-hold'); }, 500);
+        this._lpT = setTimeout(() => { title.classList.remove('cl-hold'); if (!this._lp) return; this._lp = null; CardLayout.enter(); }, 3000);
+        this._lpTitle = title; return;
+      }
       this._lpT = setTimeout(() => { if (!this._lp) return; this.sheet(c.tab, c.cls, { clientX: this._lp.x, clientY: this._lp.y, identifier: id }); }, this.LP);
     };
-    const cancel = () => { clearTimeout(this._lpT); this._lp = null; };
+    const cancel = () => { clearTimeout(this._lpT); clearTimeout(this._lpT2); this._lpTitle?.classList.remove('cl-hold'); this._lp = null; };
     document.addEventListener('touchstart', e => { const t = e.touches[0]; start(e, t.clientX, t.clientY, t.identifier); }, { passive: true });
     document.addEventListener('touchmove', e => { if (!this._lp || this._d) return; const t = e.touches[0]; if (Math.abs(t.clientX - this._lp.x) > 8 || Math.abs(t.clientY - this._lp.y) > 8) cancel(); }, { passive: true });
     document.addEventListener('touchend', () => { if (!this._d) cancel(); }, { passive: true });

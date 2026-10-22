@@ -3722,10 +3722,6 @@ html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto;
   html.card-grid .dashboard .card.card-off{ display:none !important; }
   html.card-grid .dashboard .card > .card-head{ position:sticky; top:0; z-index:3; background:var(--card); }
   /* 넓은 칸이면 안쪽을 옆으로 펼친다 */
-  @container (min-width:700px){
-    .card-econ .ec-list{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); column-gap:32px; }
-  }
-  @container (min-width:1100px){ .card-econ .ec-list{ grid-template-columns:repeat(3, minmax(0,1fr)); } }
 }
 @media (min-width:641px) and (max-height:820px){ html.card-grid .dashboard{ --cg-cell:480px; } }
 /* 넓은 화면 판(격자) 편집 */
@@ -3743,3 +3739,59 @@ html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto;
 .mn-blk.mn-ph > *{ visibility:hidden; }
 .mn-ghost{ box-shadow:0 12px 28px rgba(0,0,0,.22); border-color:var(--accent,#FF6A2B) !important; cursor:grabbing; opacity:.96; }
 @media (min-width:641px){ .mn-ov .mx-sh.mn-sh{ max-width:760px; border-radius:20px 20px 0 0; } }
+
+/* 경제 카드: 담은 종목 | 보유 */
+.ec-cv{ display:inline-flex; padding:3px; margin:2px 0 6px; border-radius:12px; background:var(--card2, rgba(127,127,127,.12)); }
+.ec-cv button{ height:30px; padding:0 14px; border:0; border-radius:9px; background:none; color:var(--text3); font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+.ec-cv button b{ font-weight:600; opacity:.7; margin-left:2px; }
+.ec-cv button.on{ background:var(--card); color:var(--text); box-shadow:0 1px 2px rgba(0,0,0,.08); }
+html.dark .ec-cv button.on{ background:var(--text); color:var(--card); }
+.ec-hsum2{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px 16px; padding:12px 0 14px; border-bottom:1px solid var(--border); }
+.ec-hsum2 div{ display:flex; flex-direction:column; gap:3px; } .ec-hsum2 span{ font-size:11.5px; color:var(--text3); } .ec-hsum2 b{ font-size:16px; font-weight:700; }
+.ec-hsum2 .ec-up b{ color:var(--up, #E5484D); } .ec-hsum2 .ec-dn b{ color:var(--dn, #3B82F6); }
+@container (min-width:640px){ .ec-hsum2{ grid-template-columns:repeat(4, minmax(0,1fr)); } }
+.ec-hadd{ display:flex; gap:8px; flex-wrap:wrap; padding:12px 0 2px; }
+.ec-he{ max-width:420px; } .ec-he-h{ display:flex; flex-direction:column; gap:2px; margin-bottom:12px; } .ec-he-h b{ font-size:17px; }
+.ec-he-r{ display:flex; flex-direction:column; gap:6px; margin-bottom:12px; font-size:12.5px; color:var(--text3); }
+@media (min-width:641px){ #econWrap .ec-foot{ justify-content:flex-start; gap:12px 24px; } #econWrap .ec-topset{ width:auto; } #econWrap .ec-flinks{ margin-left:0; } }
+
+/* ── PC·태블릿: 화면에서 직접 놓은 배치(js/card-layout.js) — 카드마다 자리·크기가 px(10px 칸) ── */
+@media (min-width:641px){
+  html.card-free .dashboard{ display:block !important; position:relative; }
+  html.card-free .dash-top, html.card-free .dash-rest, html.card-free .dash-col{ display:contents !important; }
+  html.card-free .dashboard .card{ position:absolute !important; margin:0 !important; box-sizing:border-box; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; container-type:inline-size; scrollbar-width:thin; }
+  html.card-free .dashboard .card.card-off{ display:none !important; }
+  html.card-free .dashboard .card > .card-head{ position:sticky; top:0; z-index:3; background:var(--card); }
+  html.card-free:not(.card-edit) .dashboard .card{ transition:none; }
+  html.card-edit .dashboard .card{ transition:left .14s ease, top .14s ease, width .14s ease, height .14s ease; overflow:hidden; }
+  html.card-edit .dashboard .card.cl-active{ transition:none; z-index:20; box-shadow:0 16px 40px rgba(0,0,0,.18); }
+}
+/* 편집 모드: 카드가 살짝 흔들리고, 위에 덮개(끌기) · 오른쪽/아래/모서리 손잡이(크기) */
+html.card-edit .dashboard .card{ animation:clWig .32s ease-in-out infinite alternate; }
+html.card-edit .dashboard .card.cl-active{ animation:none; }
+@keyframes clWig{ from{ rotate:-.25deg; } to{ rotate:.25deg; } }
+.cl-ov{ position:absolute; inset:0; z-index:30; cursor:grab; border-radius:inherit; outline:2px dashed color-mix(in srgb, var(--accent,#FF6A2B) 70%, transparent); outline-offset:-2px;
+  background:color-mix(in srgb, var(--card) 35%, transparent); touch-action:none; }
+.cl-active .cl-ov{ cursor:grabbing; outline-style:solid; }
+.cl-name{ position:absolute; left:12px; top:10px; display:inline-flex; align-items:center; gap:8px; padding:5px 10px; border-radius:10px; background:var(--text); color:var(--card); font-size:12.5px; font-weight:700; pointer-events:none; }
+.cl-sz{ font-style:normal; font-weight:500; opacity:.75; font-family:var(--v2-num,'Space Grotesk'),sans-serif; }
+.cl-h{ position:absolute; background:transparent; }
+.cl-e{ top:14px; bottom:14px; right:-4px; width:12px; cursor:ew-resize; }
+.cl-s{ left:14px; right:14px; bottom:-4px; height:12px; cursor:ns-resize; }
+.cl-se{ right:-4px; bottom:-4px; width:22px; height:22px; cursor:nwse-resize; }
+.cl-e::after, .cl-s::after{ content:''; position:absolute; border-radius:3px; background:var(--accent,#FF6A2B); }
+.cl-e::after{ right:3px; top:50%; width:4px; height:36px; margin-top:-18px; }
+.cl-s::after{ bottom:3px; left:50%; height:4px; width:36px; margin-left:-18px; }
+.cl-se::after{ content:''; position:absolute; right:5px; bottom:5px; width:12px; height:12px; border-right:3px solid var(--accent,#FF6A2B); border-bottom:3px solid var(--accent,#FF6A2B); border-radius:0 0 4px 0; }
+#clBar{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:100001; display:flex; align-items:center; gap:10px; max-width:calc(100vw - 32px);
+  padding:10px 10px 10px 18px; border-radius:16px; background:var(--text); color:var(--card); font-size:13px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+#clBar span{ opacity:.9; } #clBar b{ margin-right:6px; opacity:1; }
+.cl-b{ height:34px; padding:0 14px; border-radius:17px; border:1px solid color-mix(in srgb, var(--card) 35%, transparent); background:none; color:var(--card); font:inherit; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.cl-b.cl-done{ background:var(--accent,#FF6A2B); border-color:var(--accent,#FF6A2B); color:#fff; }
+/* 3초 꾹: 제목 밑줄이 차오른다 */
+.card-title.cl-hold{ position:relative; }
+.card-title.cl-hold::after{ content:''; position:absolute; left:0; right:0; bottom:-6px; height:3px; border-radius:2px; background:var(--accent,#FF6A2B); transform-origin:left; animation:clHold 2.5s linear forwards; }
+@keyframes clHold{ from{ transform:scaleX(0); } to{ transform:scaleX(1); } }
+.cl-panel{ padding:4px 0 6px; } .cl-panel p{ font-size:13px; line-height:1.6; color:var(--text3); margin:0 0 10px; } .cl-panel b{ color:var(--text); }
+.cl-pbtn{ display:flex; gap:8px; flex-wrap:wrap; }
+@media (prefers-reduced-motion: reduce){ html.card-edit .dashboard .card{ animation:none; } }

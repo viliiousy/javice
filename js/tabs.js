@@ -84,6 +84,7 @@ const Tabs = {
       this.CARDS.forEach(c => { const el = document.querySelector('.' + c.cls); if (!el) return;
         el.style.order = String(o.indexOf(c.cls) + 1); el.style.setProperty('--cw', Math.min(C, S[c.cls][0])); el.style.setProperty('--ch', S[c.cls][1]);
         el.dataset.cw = Math.min(C, S[c.cls][0]); el.dataset.ch = S[c.cls][1]; });
+      try { CardLayout.apply(); } catch (e) {}   // 화면에서 직접 놓은 배치가 있으면 그게 이긴다
       return;
     }
     document.documentElement.classList.remove('card-grid');
@@ -123,7 +124,9 @@ const Tabs = {
   catsHtml() {
     const T = this.tabsSorted();
     return `<p class="co-sub" style="margin:0 0 10px">지금 바꾸는 순서: <b>${this._wide() ? 'PC·태블릿' : '휴대폰'}</b> — 휴대폰과 PC·태블릿은 순서를 따로 저장합니다. 메인 화면에서 카드 이름을 꾹 눌러도 바로 바꿀 수 있습니다.</p>
-      <div class="mn-host">${typeof CardSort !== 'undefined' ? CardSort.html() : ''}</div>
+      ${this._wide() ? `<div class="cl-panel"><p>PC·태블릿은 화면에서 직접 배치합니다. <b>카드 이름을 3초 꾹</b> 누르거나 아래 단추를 누르면 편집 모드가 됩니다 — 카드가 살짝 흔들리면 끌어서 옮기고, 오른쪽·아래 테두리나 모서리를 끌어 크기를 바꿉니다(10px 단위). 카드 안은 크기에 맞춰 바뀝니다.</p>
+        <div class="cl-pbtn"><button type="button" class="btn-sm accent" onclick="Settings.close?.();App.closeModal?.();setTimeout(()=>CardLayout.enter(),250)">화면에서 배치 편집</button>${typeof CardLayout !== 'undefined' && CardLayout.L ? '<button type="button" class="btn-sm" onclick="CardLayout.reset();Settings._re(\'cats\')">배치 처음대로</button>' : ''}</div></div>`
+        : `<div class="mn-host">${typeof CardSort !== 'undefined' ? CardSort.html() : ''}</div>`}
       <div class="set-h co-h">카테고리 켜고 끄기</div>
       ${T.map((t, ti) => { const on = this.tabOn(t.id);
         return Settings._item(`${t.label}`, Settings._sw(on, `Tabs.toggleTab('${t.id}', ${!on})`), on ? `${ti === 0 ? '처음 보이는 화면 · ' : ''}탭과 카드가 보입니다` : '탭과 카드가 모두 숨겨집니다(기록은 그대로)'); }).join('')}
@@ -191,6 +194,7 @@ const Tabs = {
       const el = document.querySelector('.' + c.cls);
       if (el) el.classList.toggle('card-off', off.includes(c.cls) || !this.tabOn(c.tab));
     });
+    try { CardLayout.apply(); } catch (e) {}
   },
 
   toggleCard(cls, on) {
