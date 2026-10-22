@@ -208,10 +208,10 @@ const CardSort = {
       const title = e.target.closest && e.target.closest('.dashboard .card .card-title'); if (!title) return;
       const card = title.closest('.card'), c = Tabs.CARDS.find(k => card.classList.contains(k.cls)); if (!c) return;
       clearTimeout(this._lpT); clearTimeout(this._lpT2); this._lp = { x, y, id };
-      // PC·태블릿: 2초 꾹 → 화면 배치 편집 모드(카드가 흔들리고 끌어서 옮기기·테두리로 크기). 누르는 동안 제목 밑줄이 차오른다.
+      // PC·태블릿: 1초 꾹 → 화면 배치 편집 모드(카드가 흔들리고 끌어서 옮기기·테두리로 크기). 누르는 동안 제목 밑줄이 차오른다.
       if (Tabs._wide() && typeof CardLayout !== 'undefined') {
         const head = title.closest('.card-head') || title; head.classList.remove('cl-hold'); void head.offsetWidth; head.classList.add('cl-hold'); this._lpHead = head;   // 카드 머리 전체 너비에 2초 동안 주황 줄이 찬다
-        this._lpT = setTimeout(() => { head.classList.remove('cl-hold'); if (!this._lp) return; this._lp = null; CardLayout.enter(); }, 2000);
+        this._lpT = setTimeout(() => { head.classList.remove('cl-hold'); if (!this._lp) return; this._lp = null; CardLayout.enter(); }, 1000);
         this._lpTitle = title; return;
       }
       this._lpT = setTimeout(() => { if (!this._lp) return; this.sheet(c.tab, c.cls, { clientX: this._lp.x, clientY: this._lp.y, identifier: id }); }, this.LP);

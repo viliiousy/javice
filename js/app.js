@@ -20,6 +20,7 @@ const App = {
     if (typeof Tabs !== 'undefined') Tabs.init();
     try { if (typeof CardSort !== 'undefined') CardSort.init(); } catch (e) {}
     try { if (typeof CardLayout !== 'undefined') { CardLayout.init(); CardLayout.apply(); } } catch (e) {}
+    try { if (typeof CardFit !== 'undefined') CardFit.init(); } catch (e) {}
     try { if (typeof Weather !== 'undefined') Weather.init(); } catch(e){}
     setTimeout(()=>{ if(typeof JARVIS!=='undefined') JARVIS.init(); },500);
     if(typeof Platform!=='undefined'&&Platform.native){ Auth.init(); } else { const waitGIS=setInterval(()=>{ if(typeof google!=='undefined'&&google.accounts){ clearInterval(waitGIS); Auth.init(); } },150); setTimeout(()=>clearInterval(waitGIS),8000); }   // 앱은 GIS 를 기다리지 않는다

@@ -3788,10 +3788,19 @@ html.card-edit .dashboard .card.cl-active{ animation:none; }
 #clBar span{ opacity:.9; } #clBar b{ margin-right:6px; opacity:1; }
 .cl-b{ height:34px; padding:0 14px; border-radius:17px; border:1px solid color-mix(in srgb, var(--card) 35%, transparent); background:none; color:var(--card); font:inherit; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
 .cl-b.cl-done{ background:var(--accent,#FF6A2B); border-color:var(--accent,#FF6A2B); color:#fff; }
-/* 2초 꾹: 카드 머리 밑에 주황 줄이 왼쪽 끝에서 오른쪽 끝까지 정확히 2초 동안 찬다 */
+/* 2초 꾹: 카드 머리 밑에 주황 줄이 왼쪽 끝에서 오른쪽 끝까지 정확히 1초 동안 찬다 */
 html:not(.card-free) .card-head.cl-hold{ position:relative; }
-.card-head.cl-hold::before{ content:''; position:absolute; left:0; right:0; bottom:0; height:3px; border-radius:2px; background:var(--accent,#FF6A2B); transform-origin:left center; transform:scaleX(0); animation:clHold 2s linear forwards; z-index:4; pointer-events:none; }
+.card-head.cl-hold::before{ content:''; position:absolute; left:0; right:0; bottom:0; height:3px; border-radius:2px; background:var(--accent,#FF6A2B); transform-origin:left center; transform:scaleX(0); animation:clHold 1s linear forwards; z-index:4; pointer-events:none; }
 @keyframes clHold{ from{ transform:scaleX(0); } to{ transform:scaleX(1); } }
 .cl-panel{ padding:4px 0 6px; } .cl-panel p{ font-size:13px; line-height:1.6; color:var(--text3); margin:0 0 10px; } .cl-panel b{ color:var(--text); }
 .cl-pbtn{ display:flex; gap:8px; flex-wrap:wrap; }
 @media (prefers-reduced-motion: reduce){ html.card-edit .dashboard .card{ animation:none; } }
+/* 좁은 카드에서 인바디 숫자가 두 줄로 꺾이지 않게 — 카드 너비(cqi)에 맞춰 글자 크기를 정한다 */
+@media (min-width:641px){
+  html.card-free .card-inbody .ib-tile, html.card-grid .card-inbody .ib-tile{ white-space:nowrap; min-width:0; overflow:hidden; }
+  html.card-free .card-inbody .ib-tile-val, html.card-grid .card-inbody .ib-tile-val{ font-size:clamp(15px, 4.4cqi, 28px) !important; }
+  html.card-free .card-inbody .ib-tile-unit, html.card-grid .card-inbody .ib-tile-unit{ font-size:clamp(9px, 2cqi, 13px) !important; }
+  html.card-free .card-inbody .ib-tile-lbl, html.card-grid .card-inbody .ib-tile-lbl{ font-size:clamp(10px, 2.2cqi, 13px) !important; overflow:hidden; text-overflow:ellipsis; }
+  html.card-free .card-inbody .ib-tile, html.card-grid .card-inbody .ib-tile{ padding-right:8px !important; }
+  html.card-free .card-inbody .ib-tile + .ib-tile, html.card-grid .card-inbody .ib-tile + .ib-tile{ padding-left:8px !important; }
+}

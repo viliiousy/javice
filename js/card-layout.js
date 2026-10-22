@@ -149,3 +149,29 @@ const CardLayout = {
     try { const d = this._dash(); if (d && window.ResizeObserver) new ResizeObserver(() => { const w = d.clientWidth; if (Math.abs(w - lw) > 2) { lw = w; clearTimeout(t); t = setTimeout(() => this.apply(), 60); } }).observe(d); } catch (e) {}
   },
 };
+
+// ── 카드가 좁을 때 글자가 두 줄로 내려가지 않게 ──────────
+// 숫자·이름표·단추처럼 한 줄이어야 하는 것은 줄바꿈을 막고, 넘치면 그만큼 글자만 줄인다(원래 크기의 55%까지).
+// 카드 크기가 바뀔 때(ResizeObserver)와 카드 안이 다시 그려질 때(MutationObserver) 다시 맞춘다. PC·태블릿에서만.
+const CardFit = {
+  SEL: '.ib-tile, .ib-tile-lbl, .ib-tile-val, .ib-period, .ib-step, .ib-recent, .card-title, .btn-sm, .ec-price, .ec-delta, .ec-cv button, .ec-tseg, .dt-big, .diet-kcal, .diet-big, .macro-lbl, .macro-val, .fit-day, .fw-d, .hb-day, .ec-hsum2 b, .ec-hsum2 span, .tf-chip, .task-filter, .wk-d, .cal-dow, .stat-row b',
+  fit(card) {
+    if (!Tabs._wide()) return;
+    card.querySelectorAll(this.SEL).forEach(el => {
+      if (el.closest('.cl-ov')) return;
+      if (!el.dataset.fs0) el.dataset.fs0 = parseFloat(getComputedStyle(el).fontSize) || 14;
+      el.style.removeProperty('font-size'); el.style.whiteSpace = 'nowrap';
+      const w = el.clientWidth; if (!w) return;
+      const need = el.scrollWidth;
+      if (need > w + 1) { const f0 = Number(el.dataset.fs0), f = Math.max(f0 * 0.55, f0 * w / need * 0.98); el.style.setProperty('font-size', f.toFixed(1) + 'px', 'important'); }
+    });
+  },
+  all() { document.querySelectorAll('.dashboard .card').forEach(c => { if (c.offsetParent) this.fit(c); }); },
+  init() {
+    if (!('ResizeObserver' in window)) return;
+    const ro = new ResizeObserver(es => { for (const e of es) { clearTimeout(e.target._fitT); e.target._fitT = setTimeout(() => this.fit(e.target), 60); } });
+    const mo = new MutationObserver(ms => { const seen = new Set(); for (const m of ms) { const c = m.target.closest && m.target.closest('.dashboard .card'); if (c && !seen.has(c)) { seen.add(c); clearTimeout(c._fitT); c._fitT = setTimeout(() => this.fit(c), 120); } } });
+    document.querySelectorAll('.dashboard .card').forEach(c => { ro.observe(c); mo.observe(c, { childList: true, subtree: true }); });
+    setTimeout(() => this.all(), 800);
+  },
+};
