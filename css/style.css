@@ -3790,7 +3790,7 @@ html.card-edit .dashboard .card.cl-active{ animation:none; }
 .cl-b.cl-done{ background:var(--accent,#FF6A2B); border-color:var(--accent,#FF6A2B); color:#fff; }
 /* 3초 꾹: 제목 밑줄이 차오른다 */
 .card-title.cl-hold{ position:relative; }
-.card-title.cl-hold::after{ content:''; position:absolute; left:0; right:0; bottom:-6px; height:3px; border-radius:2px; background:var(--accent,#FF6A2B); transform-origin:left; animation:clHold 2.5s linear forwards; }
+.card-title.cl-hold::after{ content:''; position:absolute; left:0; right:0; bottom:-6px; height:3px; border-radius:2px; background:var(--accent,#FF6A2B); transform-origin:left; animation:clHold 1.7s linear forwards; }
 @keyframes clHold{ from{ transform:scaleX(0); } to{ transform:scaleX(1); } }
 .cl-panel{ padding:4px 0 6px; } .cl-panel p{ font-size:13px; line-height:1.6; color:var(--text3); margin:0 0 10px; } .cl-panel b{ color:var(--text); }
 .cl-pbtn{ display:flex; gap:8px; flex-wrap:wrap; }

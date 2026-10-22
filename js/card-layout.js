@@ -1,13 +1,23 @@
-// js/card-layout.js — PC·태블릿 카드 배치를 화면에서 직접: 끌어서 옮기고, 테두리를 끌어 크기 조절(20px 단위)
+// js/card-layout.js — PC·태블릿 카드 배치를 화면에서 직접: 끌어서 옮기고, 테두리를 끌어 크기 조절(50px 단위 · 바깥을 누르면 저장)
 //
-// 카드 이름을 3초 꾹 누르면 '편집 모드' — 카드들이 살짝 흔들리고, 카드를 끌면 자리가 옮겨지고
-// 오른쪽·아래 테두리와 오른쪽 아래 모서리를 끌면 크기가 바뀐다. 모든 값은 20px 칸에 붙는다(12px 움직이면 20px 로).
+// 카드 이름을 2초 꾹 누르면 '편집 모드' — 카드들이 살짝 흔들리고, 카드를 끌면 자리가 옮겨지고
+// 오른쪽·아래 테두리와 오른쪽 아래 모서리를 끌면 크기가 바뀐다. 모든 값은 50px 칸에 붙는다(30px 움직이면 다음 50px 칸으로).
 // 다른 카드와 겹치면 겹친 카드가 아래로 비켜선다. 완료(또는 Esc)를 누르면 저장.
 // 저장: gl_cards_free_w = { base: 저장할 때 판 너비, cards: { 카드: { x, y, w, h } } } — 판 너비가 바뀌면 가로만 같은 비율로 늘이고 줄인다.
 // 카드 안은 너비에 맞춰 바뀌고(container query), 칸보다 내용이 길면 카드 안에서 스크롤된다.
 const CardLayout = {
-  KEY: 'gl_cards_free_w', SNAP: 20, GAP: 20, MINW: 220, MINH: 140,
-  get L() { try { const v = JSON.parse(UserStore.get(this.KEY) || 'null'); return v && v.cards ? v : null; } catch (e) { return null; } },
+  KEY: 'gl_cards_free_w2', SNAP: 50, GAP: 20, MINW: 250, MINH: 150,   // 50px 칸 · 칸 안쪽으로 20px 띄워 그린다(칸끼리는 딱 붙는다)
+  get L() {
+    try {
+      const v = JSON.parse(UserStore.get(this.KEY) || 'null'); if (v && v.cards) return v;
+      // 예전(20px 칸 · 카드 사이를 비워 저장) 배치를 50px 칸으로 옮겨 온다
+      const o = JSON.parse(UserStore.get('gl_cards_free_w') || 'null');
+      if (o && o.cards && !this._mig) { this._mig = true; const L = { base: o.base, cards: {} };
+        for (const [k, c] of Object.entries(o.cards)) L.cards[k] = { x: this.snap(c.x), y: this.snap(c.y), w: Math.max(this.MINW, this.snap(c.w + this.GAP)), h: Math.max(this.MINH, this.snap(c.h + this.GAP)) };
+        this._resolve(L); this._save(L); return L; }
+    } catch (e) {}
+    return null;
+  },
   _save(L) { const v = JSON.stringify(L); this._sig = v; UserStore.set(this.KEY, v); window.FirebaseSync?.scheduleSave?.(); },
   reset() { UserStore.set(this.KEY, 'null'); window.FirebaseSync?.scheduleSave?.(); this.apply(); if (this.on) this.exit(true); App.showToast('카드 배치를 처음대로 돌렸습니다', 'success'); },
   _dash() { return document.querySelector('.dashboard'); },
@@ -20,26 +30,26 @@ const CardLayout = {
   _capture() {
     const d = this._dash(), r0 = d.getBoundingClientRect(), B = this._box(), cards = {};
     for (const cls of this._vis()) { const el = d.querySelector('.' + cls); if (!el) continue; const r = el.getBoundingClientRect();
-      cards[cls] = { x: this.snap(r.left - r0.left - B.pl), y: this.snap(r.top - r0.top - B.pt), w: Math.floor(r.width / this.SNAP) * this.SNAP, h: Math.floor(r.height / this.SNAP) * this.SNAP }; }
+      cards[cls] = { x: this.snap(r.left - r0.left - B.pl), y: this.snap(r.top - r0.top - B.pt), w: Math.max(this.MINW, this.snap(r.width + this.GAP)), h: Math.max(this.MINH, this.snap(r.height + this.GAP)) }; }
     return { base: Math.round(B.w), cards };
   },
   // 빠진 카드(새로 켠 것)는 맨 아래에 붙이고, 겹친 것은 아래로 비킨다
   _fill(L) {
     let bottom = 0; for (const c of Object.values(L.cards)) bottom = Math.max(bottom, c.y + c.h);
-    for (const cls of this._vis()) if (!L.cards[cls]) { const w = Math.min(L.base, (Tabs.sizes()[cls] || [1])[0] * Math.round(L.base / 3)); L.cards[cls] = { x: 0, y: bottom ? bottom + this.GAP : 0, w: this.snap(w), h: 560 }; bottom = L.cards[cls].y + 560; }
+    for (const cls of this._vis()) if (!L.cards[cls]) { const w = Math.min(L.base, (Tabs.sizes()[cls] || [1])[0] * Math.round(L.base / 3)); L.cards[cls] = { x: 0, y: bottom, w: this.snap(w), h: 550 }; bottom = L.cards[cls].y + 550; }
     return L;
   },
   // 겹침 풀기: fixed 는 그 자리에, 나머지는 원래 자리(orig)에서 시작해 겹치면 아래로
   _resolve(L, fixed, orig) {
     const ids = Object.keys(L.cards).filter(k => this._vis().includes(k));
     const src = orig || L.cards, placed = [];
-    const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h + this.GAP && b.y < a.y + a.h + this.GAP;
+    const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
     if (fixed && L.cards[fixed]) placed.push(L.cards[fixed]);
     const rest = ids.filter(k => k !== fixed).sort((a, b) => src[a].y - src[b].y || src[a].x - src[b].x);
     for (const k of rest) {
       const c = { ...src[k] }; c.x = Math.max(0, Math.min(c.x, L.base - c.w));
       let moved = true, guard = 0;
-      while (moved && guard++ < 100) { moved = false; for (const p of placed) if (hit(c, p)) { c.y = p.y + p.h + this.GAP; moved = true; } }
+      while (moved && guard++ < 100) { moved = false; for (const p of placed) if (hit(c, p)) { c.y = p.y + p.h; moved = true; } }
       L.cards[k] = c; placed.push(c);
     }
     return L;
@@ -59,7 +69,7 @@ const CardLayout = {
       const el = d.querySelector('.' + c.cls), p = L.cards[c.cls]; if (!el) continue;
       if (!p || !this._vis().includes(c.cls)) { el.style.left = el.style.top = ''; continue; }
       const S = (n, v) => el.style.setProperty(n, v, 'important');
-      S('left', (B.pl + p.x * k) + 'px'); S('top', (B.pt + p.y) + 'px'); S('width', (p.w * k) + 'px'); S('height', p.h + 'px'); S('max-height', 'none');
+      S('left', (B.pl + p.x * k) + 'px'); S('top', (B.pt + p.y) + 'px'); S('width', Math.max(40, p.w * k - this.GAP) + 'px'); S('height', Math.max(40, p.h - this.GAP) + 'px'); S('max-height', 'none');
       bottom = Math.max(bottom, p.y + p.h);
     }
     d.style.height = (B.pt + bottom + 40) + 'px';
@@ -80,10 +90,13 @@ const CardLayout = {
       el.appendChild(ov); ov.addEventListener('pointerdown', e => this._down(e, cls));
     }
     const bar = document.createElement('div'); bar.id = 'clBar';
-    bar.innerHTML = `<span><b>카드 배치 편집</b> 카드를 끌어 옮기고 · 오른쪽·아래 테두리나 모서리를 끌어 크기 조절 (20px 단위)</span>
+    bar.innerHTML = `<span><b>카드 배치 편집</b> 카드를 끌어 옮기고 · 오른쪽·아래 테두리나 모서리를 끌어 크기 조절 (50px 단위)</span>
       <button type="button" class="cl-b" onclick="CardLayout.reset()">처음대로</button><button type="button" class="cl-b cl-done" onclick="CardLayout.exit()">완료</button>`;
     document.body.appendChild(bar);
     this._key = e => { if (e.key === 'Escape') this.exit(); }; document.addEventListener('keydown', this._key);
+    // 카드 바깥(배경)을 누르면 저장하고 끝낸다 — 꾹 누른 손을 뗄 때는 무시
+    setTimeout(() => { this._bg = e => { if (!this.on) return; if (e.target.closest && (e.target.closest('.cl-ov') || e.target.closest('#clBar'))) return; this.exit(); };
+      document.addEventListener('pointerdown', this._bg, true); }, 400);
     this._sizes();
     try { Haptic.medium(); } catch (e) {}
   },
@@ -91,6 +104,7 @@ const CardLayout = {
     if (!this.on) return; this.on = false;
     document.querySelectorAll('.cl-ov').forEach(x => x.remove()); document.getElementById('clBar')?.remove();
     document.documentElement.classList.remove('card-edit'); document.removeEventListener('keydown', this._key);
+    if (this._bg) { document.removeEventListener('pointerdown', this._bg, true); this._bg = null; }
     if (!silent) App.showToast('카드 배치를 저장했습니다', 'success');
   },
   _sizes() { const L = this.L; if (!L) return; document.querySelectorAll('.cl-ov').forEach(ov => { const p = L.cards[ov.dataset.cls]; const z = ov.querySelector('.cl-sz'); if (p && z) z.textContent = `${Math.round(p.w)}×${Math.round(p.h)}`; }); },
