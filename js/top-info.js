@@ -2,7 +2,7 @@
 //
 // 왼쪽 묶음(습관·할일·체크)은 그대로 두고, 오른쪽 묶음을 사용자가 고른다.
 //   몸: 칼로리 · 몸무게 · 체지방 · BMI · 근육량  (+ 추세: 직전 기록보다 오르면 빨간 ▲, 내리면 파란 ▼)
-//   주식: 끔 / 보유 주식(오늘 등락 %) / 관심종목(앞 2개 오늘 등락 %)
+//   주식: 끔 / 담은 종목(카드 순서 앞 2개 오늘 등락 %) / 보유 수익(총 평가손익 · 수익률)
 // AI 사용량 고리에 무엇을 보일지도 여기서 고른다(gl_aiu_show — AIUsage 가 읽는다).
 const TopInfo = {
   KEY: 'gl_top_info',
@@ -55,19 +55,15 @@ const TopInfo = {
     if (c.stock === 'off' || typeof Econ === 'undefined') return '';
     let cfg; try { cfg = Econ.cfg(); } catch (e) { return ''; }
     const pc = v => v == null ? '—' : `<b class="${v > 0 ? 'ti-up' : v < 0 ? 'ti-dn' : ''}">${v > 0 ? '▲' : v < 0 ? '▼' : ''}${Math.abs(v).toFixed(1)}%</b>`;
+    // 보유: 산 값 대비 지금 총 수익(금액 · %) — 평단·수량을 넣은 종목만 센다
     if (c.stock === 'hold') {
-      const hs = cfg.holdings || [];
-      let now = 0, prev = 0;
-      for (const h of hs) {
-        const q = Econ.PRICES[Econ.keyOf(h)] || {};
-        const cur = Econ.toKRW(h, q.price);
-        if (cur == null || !h.qty || q.pct == null) continue;
-        now += cur * h.qty; prev += cur * h.qty / (1 + q.pct / 100);
-      }
-      if (!prev) return '';
-      return `<div class="stat-chip stat-stock" data-s="econ" title="보유 주식 오늘 등락"><span class="ti-lb">보유</span>${pc((now / prev - 1) * 100)}</div>`;
+      const S = Econ.holdSummary();
+      if (!S.cost) return S.n ? `<div class="stat-chip stat-stock" data-s="econ" title="보유 종목의 평단·수량을 넣으면 총 수익이 보입니다"><span class="ti-lb">보유</span><b>—</b></div>` : '';
+      const p = S.profit, cls = p > 0 ? 'ti-up' : p < 0 ? 'ti-dn' : '';
+      const a = Math.abs(p), won = a >= 1e8 ? (a / 1e8).toFixed(a >= 1e9 ? 0 : 1) + '억' : a >= 1e4 ? Math.round(a / 1e4).toLocaleString('ko-KR') + '만' : Math.round(a).toLocaleString('ko-KR');
+      return `<div class="stat-chip stat-stock" data-s="econ" title="보유 총 수익 (평가손익 · 수익률)"><span class="ti-lb">보유</span><b class="${cls}">${p > 0 ? '+' : p < 0 ? '-' : ''}${won}</b><b class="${cls} ti-pct">${S.pct == null ? '—' : (S.pct > 0 ? '+' : '') + S.pct.toFixed(1) + '%'}</b></div>`;
     }
-    const favs = (cfg.favorites || []).slice(0, 2);
+    const favs = Econ.favOrdered().slice(0, 2);   // 카드에서 바꾼 순서(별 먼저) 그대로
     if (!favs.length) return '';
     return `<div class="stat-chip stat-stock" data-s="econ" title="관심종목 오늘 등락">${favs.map((it, i) =>
       `<span class="ti-st${i ? ' ti-st2' : ''}"><span class="ti-nm">${esc(String(it.name || '').replace(/\s*\(.*$/, '').slice(0, 5))}</span> ${pc((Econ.PRICES[Econ.keyOf(it)] || {}).pct)}</span>`).join(' ')}</div>`;
@@ -79,7 +75,7 @@ const TopInfo = {
     const sw = (k) => Settings._sw(!!c[k], `TopInfo.toggle('${k}')`);
     return `<div class="set-h">상단바 오른쪽에 보일 것</div><p class="pg-note" style="margin:0 0 4px">직전 기록보다 오르면 빨간 ▲, 내리면 파란 ▼ 가 함께 붙습니다.</p>
       ${this.METRICS.map(([k, n]) => Settings._item(n, sw(k))).join('')}
-      ${Settings._item('주식', Settings._seg(c.stock, [['off', '끔'], ['hold', '보유'], ['watch', '관심']], 'TopInfo.setStock'), '오늘(전날 대비) 등락 %')}
+      ${Settings._item('주식·코인', Settings._seg(c.stock, [['off', '끔'], ['watch', '담은 종목'], ['hold', '보유 수익']], 'TopInfo.setStock'), '담은 종목: 경제 카드 맨 위 2개의 오늘 등락 · 보유 수익: 산 값 대비 총 수익(금액·%)')}
       <div class="set-h">AI 사용량 고리</div>
       <div class="set-pad">${typeof AIUsage !== 'undefined' ? AIUsage.trackHtml() : ''}</div>`;
   },

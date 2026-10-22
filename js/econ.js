@@ -16,7 +16,7 @@ const Econ = {
   REPO:   'viliiousy/economy',
   BRANCH: 'main',
   KEY:    'gl_econ_config',
-  POLL:   60000,          // 수집 크론이 30분 주기라 1분이면 충분하다
+  POLL:   60000,          // 1분마다 — 화면이 떠 있을 때만(서버가 네이버에서 바로 받아 준다: lib/market.js)
 
   DEF: {
     move_pct: 10, favorites: [], watchlists: [], holdings: [],
@@ -56,6 +56,19 @@ const Econ = {
   // ── 유틸 ────────────────────────────────────────────
   raw(f)     { return `https://raw.githubusercontent.com/${this.REPO}/${this.BRANCH}/${f}?t=${Date.now()}`; },
   keyOf(it)  { return it.type + ':' + it.code; },
+  // 별(즐겨찾기) 먼저, 그다음 담은 순서 — 카드 · 상단바 · 위젯이 모두 이 순서를 쓴다
+  favOrdered() { const f = this.cfg().favorites || []; return f.filter(x => x.star).concat(f.filter(x => !x.star)); },
+  // 긴 이름 줄이기: 괄호 속 풀이 · Class A · Inc. 같은 꼬리를 뗀다(원래 이름은 title 로 남긴다)
+  shortName(n) {
+    let s = String(n || '').trim();
+    const b = s.replace(/\s*\([^)]*\)\s*/g, ' ').trim(); if (b) s = b;
+    s = s.replace(/\s+Class\s+([A-C])\b/i, ' $1').replace(/\s+보통주$/, '')
+         .replace(/,?\s+(Inc\.?|Corp\.?|Corporation|Holdings?|Ltd\.?|plc|Co\.?|Company|Group|Incorporated)$/i, '').trim();
+    return s || String(n || '');
+  },
+  // 이름 길이에 맞춰 글자만 줄인다 — 칸 높이는 그대로(아주 길면 작은 글씨 두 줄)
+  nmCls(n) { let w = 0; for (const ch of String(n)) w += /[\u3131-\uD79D]/.test(ch) ? 1 : 0.58; return w <= 8 ? '' : w <= 11 ? ' ec-nm-s' : ' ec-nm-xs'; },
+  nmHtml(it, pre = '') { const s = this.shortName(it.name); return `<div class="ec-nm${this.nmCls(s)}" title="${esc(it.name)}">${pre}${esc(s)}</div>`; },
   unitFor(t) { return t === 'us' ? '$' : t === 'metal' ? '원/g' : '원'; },
   uid()      { return 'w' + Date.now().toString(36) + Math.floor(Math.random()*1e3).toString(36); },
   attr(o)    { return JSON.stringify(o).replace(/'/g,'&#39;').replace(/"/g,'&quot;'); },
@@ -81,6 +94,9 @@ const Econ = {
     this.render();
     if (!had) this._seed().then(() => this.refresh());
     else this.refresh();
+    // 1분마다 새 시세 — 앱이 화면에 떠 있을 때만. 돌아오면 바로 한 번.
+    setInterval(() => { if (!document.hidden) this.refresh(); }, this.POLL);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - (this._lastRf || 0) > 20e3) this.refresh(); });
   },
 
   // PAT 시절 설정은 공개 레포의 config.json 에 있었다. 처음 한 번만 가져와 옮긴다.
@@ -139,10 +155,27 @@ const Econ = {
     ov.querySelectorAll('.qt-l').forEach(b => b.onclick = () => {
       ov.querySelectorAll('.qt-l').forEach(x => x.classList.toggle('on', x === b));
       localStorage.setItem(this.SCAT_KEY, b.dataset.v); try { Haptic.light(); } catch (e) {}
-      this.search(q.value, 'S'); q.focus();
+      this.search(q.value, 'S');
     });
     q.addEventListener('input', () => this.search(q.value, 'S'));
-    requestAnimationFrame(() => { ov.classList.add('on'); q.focus(); });
+    this._sList('');
+    requestAnimationFrame(() => { ov.classList.add('on'); });
+  },
+  // 카드 아래: 상단바에 무엇을 보일지(담은 종목 / 보유 수익 / 끔) · 보유 설정 · 전체 화면
+  _foot() {
+    const st = typeof TopInfo !== 'undefined' ? TopInfo.get().stock : 'off';
+    const seg = [['watch', '담은 종목'], ['hold', '보유 수익'], ['off', '끔']].map(([v, l]) =>
+      `<button type="button" class="ec-tseg${st === v ? ' on' : ''}" onclick="event.stopPropagation();Econ.setTop('${v}')">${l}</button>`).join('');
+    return `<div class="ec-foot">
+      <div class="ec-topset"><span class="ec-tlb">상단바</span><span class="ec-tsegs">${seg}</span></div>
+      <span class="ec-hint">꾹 눌러 순서 · 왼쪽으로 밀어 빼기 · 오른쪽으로 밀어 즐겨찾기</span>
+      <div class="ec-flinks"><button type="button" class="ec-link" onclick="Econ.open('hold')">보유 종목 설정 ›</button><button type="button" class="ec-link" onclick="Econ.open('main')">차트·알림 ›</button></div></div>`;
+  },
+  setTop(v) {
+    if (typeof TopInfo === 'undefined') return;
+    if (v === 'hold' && !(this.cfg().holdings || []).length) App.showToast('보유 종목이 아직 없습니다 — 「보유 종목 설정」에서 넣으면 상단바에 총 수익이 보입니다');
+    TopInfo.set({ stock: v }); try { Haptic.light(); } catch (e) {}
+    this.render();
   },
   toggleMore() { this._expanded = !this._expanded; this.render(); },
 
@@ -156,18 +189,18 @@ const Econ = {
     if (upd) upd.textContent = this._updatedAt ? '업데이트 ' + this._updatedAt.replace('T',' ').slice(5,16) : '시세 대기 중';
 
     if (!c.favorites.length) {
-      wrap.innerHTML = `<p class="empty">${Icons.big('trend')}담은 종목이 없어요<br><span class="ec-hint">위 「검색」에서 주식·지수·금·환율·코인을 찾아 담으면 여기에 시세가 보입니다</span></p>`;
+      wrap.innerHTML = `<p class="empty">${Icons.big('trend')}담은 종목이 없어요<br><span class="ec-hint">위 「검색」에서 주식·지수·금·환율·코인을 찾아 담으면 여기에 시세가 보입니다</span></p>` + this._foot();
       return;
     }
     // 별(즐겨찾기) 붙인 종목이 맨 위, 그다음 담은 순서. 꾹 눌러 끌면 순서가 바뀌고, 왼쪽으로 밀면 빼고, 오른쪽으로 밀면 별
-    const all = c.favorites.filter(x => x.star).concat(c.favorites.filter(x => !x.star));
+    const all = this.favOrdered(), nk = this._newK; this._newK = null;
     const shown = this._expanded ? all : all.slice(0, this.MAIN_MAX);
     const rest = all.length - shown.length;
     wrap.innerHTML = '<div class="ec-list">' + shown.map(it => {
       const q = this.PRICES[this.keyOf(it)] || {};
-      return `<div class="ec-row" data-row data-i="${esc(this.keyOf(it))}" data-label="${esc(it.name)}" onclick='Econ.openChart(${this.attr(it)})'>
+      return `<div class="ec-row${nk === this.keyOf(it) ? ' ec-new' : ''}" data-row data-i="${esc(this.keyOf(it))}" data-label="${esc(it.name)}" onclick='Econ.openChart(${this.attr(it)})'>
         <div class="ec-row-l">
-          <div class="ec-nm">${it.star ? '<i class="ec-star" aria-label="즐겨찾기">★</i>' : ''}${esc(it.name)}</div>
+          ${this.nmHtml(it, it.star ? '<i class="ec-star" aria-label="즐겨찾기">★</i>' : '')}
           <div class="ec-meta">${esc(it.code)} · ${this.TYPE[it.type]||''}</div>
         </div>
         <div class="ec-row-r" data-pk="${this.keyOf(it)}" data-ptype="${it.type}" data-punit="${it.unit||''}">
@@ -179,17 +212,37 @@ const Econ = {
         ? `<div class="ec-more" onclick="Econ.toggleMore()">+${rest}개 더 보기</div>`
         : this._expanded && all.length > this.MAIN_MAX
           ? `<div class="ec-more" onclick="Econ.toggleMore()">접기</div>` : '')
-    + `<div class="ec-foot"><span class="ec-hint">꾹 눌러 순서 · 왼쪽으로 밀어 빼기 · 오른쪽으로 밀어 즐겨찾기</span><button type="button" class="ec-link" onclick="Econ.open('main')">관심·보유·차트·알림 ›</button></div>`;
+    + this._foot();
     try { RowUI.paint(wrap.querySelector('.ec-list'), {
       edit: () => {},
       del: k => this.favRemove(k),
       fav: k => this.favStar(k),
       reorder: keys => this.favOrder(keys),
     }); } catch (e) {}
+    try { App._updateStatsBanner(); } catch (e) {}   // 순서를 바꾸면 상단바 순서도 바로
   },
 
   // ── 시세 ────────────────────────────────────────────
+  // 담은·보유·관심 종목의 지금 값을 서버(네이버 증권)에서 바로 — 코인은 _crypto 가 업비트에서
+  _allItems() { const c = this.C || {}; return [...(c.favorites || []), ...(c.holdings || []), ...(c.watchlists || []).flatMap(w => w.items || [])]; },
+  async _live() {
+    const seen = new Set(), items = [];
+    for (const x of this._allItems()) { const k = this.keyOf(x); if (x.type === 'crypto' || seen.has(k)) continue; seen.add(k); items.push({ t: x.type, c: x.code }); }
+    if (!items.length) return false;
+    const r = await fetch(Platform.api('/api/hub'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ act: 'quote', items }), cache: 'no-store' });
+    if (!r.ok) throw new Error('시세 ' + r.status);
+    const j = await r.json();
+    for (const [k, v] of Object.entries(j.items || {})) this.PRICES[k] = Object.assign({}, this.PRICES[k] || {}, { price: v.price, pct: v.pct });
+    if (Object.keys(j.items || {}).length) this._updatedAt = j.at || '';
+    return true;
+  },
   async refresh() {
+    this._lastRf = Date.now();
+    document.querySelector('.ec-rf')?.classList.add('spin');
+    this.PREV = Object.assign({}, this.PRICES);
+    let live = false;
+    try { live = await this._live(); this._err = null; } catch (e) { this._err = null; }
+    if (live) { await this._crypto(); this._paint(); document.querySelector('.ec-rf')?.classList.remove('spin'); return; }
     try {
       // 예전엔 레포의 prices.json 을 raw 로 읽었다. 그런데 raw 는 max-age=300 이고
       // 쿼리스트링을 무시한다 — 1분마다 갱신되는 시세가 최대 5분 늦게 보였다.
@@ -212,6 +265,7 @@ const Econ = {
     }
     await this._crypto();
     this._paint();
+    document.querySelector('.ec-rf')?.classList.remove('spin');
   },
   // ── 코인(업비트 원화 시세) — 수집 서버를 거치지 않고 화면이 바로 받는다(키 없음) ──
   _cryptoOnly(P) { const o = {}; for (const k in (P || {})) if (k.startsWith('crypto:')) o[k] = P[k]; return o; },
@@ -260,8 +314,9 @@ const Econ = {
       if (d) d.outerHTML = this.delta(q.pct);
     });
     this._paintHold();
+    try { App._updateStatsBanner(); } catch (e) {}   // 상단바의 종목 등락 · 보유 수익도 같이
   },
-  _startPoll() { this._stopPoll(); this._poll = setInterval(() => this.refresh(), this.POLL); },
+  _startPoll() {},   // 이제 init 이 늘 1분마다 돈다(모달이 열려 있을 때만 돌던 것)
   _stopPoll()  { if (this._poll) { clearInterval(this._poll); this._poll = null; } },
 
   // ── 터미널 (모달) ───────────────────────────────────
@@ -361,12 +416,26 @@ const Econ = {
     return this.TICKERS;
   },
   async search(v, where) {
-    const box = document.getElementById({ F:'ecFRes', L:'ecLRes', H:'ecHRes', O:'obERes', S:'ecSRes' }[where]);
-    const cat = where === 'S' ? (localStorage.getItem(this.SCAT_KEY) || 'all') : 'all';
-    const okT = t => cat === 'all' || (cat === 'etc' ? !['kr', 'us', 'crypto'].includes(t) : t === cat);
+    if (where === 'S') return this._sList(v);
+    const box = document.getElementById({ F:'ecFRes', L:'ecLRes', H:'ecHRes', O:'obERes' }[where]);
     if (!box) return;
     v = v.trim();
     if (!v) { box.innerHTML = ''; return; }
+    const out = await this._match(v, () => true);
+    const code = /^[0-9A-Za-z]{6}$/.test(v) ? v.toUpperCase() : '';
+    box.innerHTML = out.slice(0, 8).map(x => {
+        const e = x[2];
+        const it = { name:e.ko || e.n, code:e.c, type:e.t, tv:e.tv, unit:this.unitFor(e.t), floor:null };
+        return `<div class="ec-res"><div class="ec-item-id"><div class="ec-nm">${esc(e.ko || e.n)}</div>
+          <div class="ec-meta">${e.ko ? esc(e.n)+' · ' : ''}<span class="num">${esc(e.cn || e.c)}</span> · ${this.TYPE[e.t]||''}${e.t === 'crypto' ? ' · 업비트' : ''}</div></div>
+          <button class="btn-sm ec-add-btn" onclick='Econ.add("${where}",${this.attr(it)})'>${where==='H'?'보유 추가':'담기'}</button></div>`;
+      }).join('') +
+      (where === 'O' ? '' :
+      `<button class="ec-res ec-manual" onclick="Econ.manual('${where}','${code}')">
+        <span class="ec-item-id"><span class="ec-nm">코드로 직접 추가</span><span class="ec-meta">검색에 없는 ETF 등 · 예: 0173Y0</span></span><span class="ec-chev">›</span></button>`);
+  },
+  // 이름 · 코드 · 한글 이름표로 찾기 → [[점수, 길이, 항목], …] (점수 낮을수록 먼저)
+  async _match(v, okT) {
     const [list0, coins0] = await Promise.all([this._tickers(), this._coins()]);
     const list = list0.filter(e => okT(e.t)), coins = okT('crypto') ? coins0 : [];
     const q = v.toLowerCase(), out = [];
@@ -396,18 +465,100 @@ const Econ = {
       if (s >= 0) out.push([s, e.n.length, e]);
     }
     out.sort((a,b) => a[0]-b[0] || a[1]-b[1]);
-    const code = /^[0-9A-Za-z]{6}$/.test(v) ? v.toUpperCase() : '';
+    return out;
+  },
+
+  // ── 검색 시트 목록 ─────────────────────────────────
+  // 아무것도 안 쳤을 때: 담은 종목(별 먼저, 담은 순서) → 거래대금이 많은 종목. 쳤으면 이름이 맞는 순서.
+  // 담긴 줄은 주황 띠와 '담김' 단추로 구분하고, 다시 누르면 뺀다.
+  async _sList(v) {
+    const box = document.getElementById('ecSRes'); if (!box) return;
+    const cat = localStorage.getItem(this.SCAT_KEY) || 'all';
+    const okT = t => cat === 'all' || (cat === 'etc' ? !['kr', 'us', 'crypto'].includes(t) : t === cat);
+    const tok = this._sTok = (this._sTok || 0) + 1;
+    v = String(v || '').trim();
     const have = new Set(this.cfg().favorites.map(x => this.keyOf(x)));
-    box.innerHTML = out.slice(0, where === 'S' ? 20 : 8).map(x => {
-        const e = x[2];
-        const it = { name:e.ko || e.n, code:e.c, type:e.t, tv:e.tv, unit:this.unitFor(e.t), floor:null };
-        return `<div class="ec-res"><div class="ec-item-id"><div class="ec-nm">${esc(e.ko || e.n)}</div>
-          <div class="ec-meta">${e.ko ? esc(e.n)+' · ' : ''}<span class="num">${esc(e.cn || e.c)}</span> · ${this.TYPE[e.t]||''}${e.t === 'crypto' ? ' · 업비트' : ''}</div></div>
-          ${where === 'S' && have.has(this.keyOf(it)) ? '<span class="ec-got">담음</span>' : `<button class="btn-sm ec-add-btn" onclick='Econ.add("${where}",${this.attr(it)})'>${where==='H'?'보유 추가':'담기'}</button>`}</div>`;
-      }).join('') +
-      (where === 'O' ? '' :
-      `<button class="ec-res ec-manual" onclick="Econ.manual('${where}','${code}')">
-        <span class="ec-item-id"><span class="ec-nm">코드로 직접 추가</span><span class="ec-meta">검색에 없는 ETF 등 · 예: 0173Y0</span></span><span class="ec-chev">›</span></button>`);
+    if (!v) {
+      const mine = this.favOrdered().filter(x => okT(x.type)).map(it => ({ it, q: this.PRICES[this.keyOf(it)] }));
+      const head = mine.length ? `<div class="ec-sh"><span>담은 종목</span><b class="num">${mine.length}</b></div>` + mine.map(r => this._sRow(r, have)).join('') : '';
+      box.innerHTML = head + '<div class="ec-sh"><span>거래대금 많은 순</span></div><p class="ec-sload">불러오는 중…</p>';
+      const mk = await this._mkt(cat);
+      if (tok !== this._sTok) return;
+      const rest = mk.filter(r => !have.has(this.keyOf(r.it))).slice(0, 80);
+      box.innerHTML = head + `<div class="ec-sh"><span>${cat === 'etc' ? '지수·금·환율' : '거래대금 많은 순'}</span></div>` +
+        (rest.length ? rest.map(r => this._sRow(r, have)).join('') : '<p class="ec-sload">목록을 받지 못했습니다 — 위에서 이름으로 찾아 주세요</p>');
+      return;
+    }
+    const out = await this._match(v, okT);
+    if (tok !== this._sTok) return;
+    const code = /^[0-9A-Za-z]{6}$/.test(v) ? v.toUpperCase() : '';
+    box.innerHTML = out.slice(0, 30).map(x => {
+      const e = x[2], it = { name: e.ko || e.n, code: e.c, type: e.t, tv: e.tv, unit: this.unitFor(e.t), floor: null };
+      return this._sRow({ it, q: this.PRICES[this.keyOf(it)], sub: e.ko ? e.n : '', cn: e.cn }, have);
+    }).join('') + `<button class="ec-res ec-manual" onclick="Econ.manual('F','${code}')">
+        <span class="ec-item-id"><span class="ec-nm">코드로 직접 추가</span><span class="ec-meta">검색에 없는 ETF 등 · 예: 0173Y0</span></span><span class="ec-chev">›</span></button>`;
+  },
+  _sRow(r, have) {
+    const it = r.it, k = this.keyOf(it), on = have.has(k);
+    const mine = on ? this.cfg().favorites.find(x => this.keyOf(x) === k) : null, q = r.q || {};
+    const code = r.cn || (it.type === 'crypto' ? String(it.code).replace(/^KRW-/, '') : it.code);
+    return `<div class="ec-sr${on ? ' on' : ''}" data-k="${esc(k)}">
+      <div class="ec-sr-l">${this.nmHtml(it, mine && mine.star ? '<i class="ec-star">★</i>' : '')}
+        <div class="ec-meta">${r.sub ? esc(this.shortName(r.sub)) + ' · ' : ''}<span class="num">${esc(code)}</span> · ${this.TYPE[it.type] || ''}</div></div>
+      <div class="ec-sr-p">${q.price != null ? `<div class="ec-price num">${this.fmt(it, q.price)}</div>${this.delta(q.pct)}` : ''}</div>
+      <button type="button" class="ec-sbtn" onclick='Econ.sToggle(this,${this.attr(it)})' aria-pressed="${on}">${on ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>담김' : '담기'}</button></div>`;
+  },
+  // 담기 ↔ 빼기 — 목록을 다시 그리지 않고 그 줄만 바꾼다(움직임이 끊기지 않게)
+  sToggle(btn, it) {
+    const row = btn.closest('.ec-sr'), c = this.cfg(), k = this.keyOf(it);
+    const on = c.favorites.some(x => this.keyOf(x) === k);
+    if (on) {
+      c.favorites = c.favorites.filter(x => this.keyOf(x) !== k);
+      this.queueSave(); this.render();
+      try { Haptic.light(); } catch (e) {}
+      App.showToast(`${this.shortName(it.name)} 뺐습니다`);
+    } else {
+      c.favorites.push(Object.assign({ alert: it.type !== 'crypto' }, it));
+      this.queueSave(); this._newK = k; this.render();
+      try { Haptic.success ? Haptic.success() : Haptic.medium(); } catch (e) {}
+      if (it.type === 'crypto') setTimeout(() => this._crypto().then(() => this._paint()), 200);
+      else setTimeout(() => this._live().then(() => this._paint()).catch(() => {}), 200);
+    }
+    if (!row) return;
+    row.classList.toggle('on', !on); btn.setAttribute('aria-pressed', String(!on));
+    btn.innerHTML = !on ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>담김' : '담기';
+    row.classList.remove('pop', 'unpop'); void row.offsetWidth; row.classList.add(on ? 'unpop' : 'pop');
+  },
+  // 거래대금 상위: 국내·해외는 서버(네이버), 코인은 업비트 24시간 거래대금 — 1분 기억
+  async _mkt(cat) {
+    if (!this._MK || Date.now() - this._MK.t > 60e3) {
+      const [st, cr] = await Promise.all([
+        fetch(Platform.api('/api/hub'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ act: 'mkt' }) }).then(r => r.json()).catch(() => ({})),
+        this._coinTop()]);
+      const mk = e => ({ it: { name: e.n, code: e.c, type: e.t, tv: e.tv, unit: this.unitFor(e.t), floor: null }, q: { price: e.price, pct: e.pct }, val: e.val || 0, sub: e.en || '' });
+      const ok = (st.items || []).map(mk).sort((a, b) => b.val - a.val);
+      this._MK = { t: Date.now(), kr: ok.filter(r => r.it.type === 'kr'), us: ok.filter(r => r.it.type === 'us'), crypto: cr };
+      if (!ok.length && !cr.length) this._MK.t = 0;
+    }
+    const M = this._MK;
+    if (cat === 'kr' || cat === 'us' || cat === 'crypto') return M[cat];
+    if (cat === 'etc') {
+      const t = (await this._tickers()).filter(e => !['kr', 'us', 'crypto'].includes(e.t));
+      return t.map(e => ({ it: { name: e.n, code: e.c, type: e.t, tv: e.tv, unit: this.unitFor(e.t), floor: null }, q: this.PRICES[e.t + ':' + e.c] }));
+    }
+    // 전체: 국내 · 해외 · 코인을 순위대로 번갈아(한쪽만 몰려 보이지 않게)
+    const out = [], n = Math.max(M.kr.length, M.us.length, M.crypto.length);
+    for (let i = 0; i < n; i++) for (const L of [M.kr, M.us, M.crypto]) if (L[i]) out.push(L[i]);
+    return out;
+  },
+  async _coinTop() {
+    try {
+      const [coins, tk] = await Promise.all([this._coins(), fetch('https://api.upbit.com/v1/ticker/all?quote_currencies=KRW').then(r => r.json())]);
+      const nm = new Map(coins.map(c => [c.c, c]));
+      return (Array.isArray(tk) ? tk : []).filter(t => nm.has(t.market)).sort((a, b) => (b.acc_trade_price_24h || 0) - (a.acc_trade_price_24h || 0)).slice(0, 60)
+        .map(t => { const c = nm.get(t.market);
+          return { it: { name: c.n, code: t.market, type: 'crypto', tv: '', unit: '원', floor: null }, q: { price: t.trade_price, pct: Math.round((t.signed_change_rate || 0) * 10000) / 100 }, val: t.acc_trade_price_24h || 0, sub: c.en || '' }; });
+    } catch (e) { return []; }
   },
   add(where, it) {
     if (it.type === 'crypto') setTimeout(() => this._crypto().then(() => this._paint()), 300);   // 코인은 담자마자 시세를 받는다
@@ -436,7 +587,6 @@ const Econ = {
       this.queueSave(); App.showToast(`${it.name} 담았습니다 — 카드에 시세가 보입니다`,'success');
       try { if (where === 'F') this._drawMain(); } catch (e) {}
       this.render();
-      if (where === 'S') { const q = document.getElementById('ecSQ'); if (q) this.search(q.value, 'S'); }
     } else {
       const w = c.watchlists.find(x => x.id === this.activeList);
       if (!w) return;

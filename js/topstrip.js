@@ -69,7 +69,7 @@ const TopStrip = {
     // 보유가 없으면 관심종목 등락으로 대신한다. 두 개까지만 — 훑어보는 자리다.
     // '+2' 는 뺐다. 그 자리에서 할 수 있는 게 없는 숫자였다(눌러 봐야 경제 카드가 열릴 뿐이고,
     // 그건 줄 전체가 이미 하는 일이다). 폰에서는 그 두 글자가 왼쪽 날짜를 밀어냈다.
-    const favs = (c && c.favorites) || [];
+    const favs = typeof Econ.favOrdered === 'function' ? Econ.favOrdered() : ((c && c.favorites) || []);
     if (!favs.length) return '';
     const SHOW = 2;
     const parts = favs.slice(0, SHOW).map(it => {

@@ -115,7 +115,7 @@ const Widgets = {
       const mk = [];
       if (this._btc) mk.push({ n: '비트코인', p: Math.round(this._btc.p).toLocaleString('ko-KR') + '원', c: Math.round(this._btc.c * 10000) / 100 });
       const E = typeof Econ !== 'undefined' ? Econ : null;
-      (E && E.C && E.C.favorites || []).slice().sort((a, b) => (b.star ? 1 : 0) - (a.star ? 1 : 0)).slice(0, 4).forEach(it => { const q = E.PRICES[E.keyOf(it)]; if (q && q.price != null) mk.push({ n: String(it.name).slice(0, 10), p: E.fmt(it, q.price), c: q.pct != null ? Math.round(q.pct * 100) / 100 : null }); });
+      (E && E.C ? E.favOrdered() : []).slice(0, 4).forEach(it => { const q = E.PRICES[E.keyOf(it)]; if (q && q.price != null) mk.push({ n: String(it.name).slice(0, 10), p: E.fmt(it, q.price), c: q.pct != null ? Math.round(q.pct * 100) / 100 : null }); });
       out.mkt = mk.slice(0, 5);
     } catch (e) {}
     try { const w = typeof Weather !== 'undefined' && Weather.w; if (w) out.wx = { t: w.t, icon: w.icon, name: w.name, hi: w.hi, lo: w.lo }; } catch (e) {}

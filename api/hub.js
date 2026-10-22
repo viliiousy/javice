@@ -724,6 +724,8 @@ module.exports = async (req, res) => {
     if (body.act === 'ics')         { send(res, await icsFetch(body.idToken, body.url)); return; }
     // 앱의 AI 비서가 로그인한 본인의 SmartThings 를 읽고 켠다(허브 연결 코드 없이 Firebase 로그인 토큰으로).
     // cmd 가 없으면 기기·방·장면 목록, 있으면 stCmd 와 같은 모양({ device, commands } 또는 { scene }).
+    // 시세(네이버 증권 대신 받기) — 담은 종목 지금 값 · 검색 첫 화면의 거래대금 상위 (lib/market.js)
+    if (body.act === 'quote' || body.act === 'mkt') { const M = require('../lib/market'); send(res, await M[body.act](body)); return; }
     // 가입 승인 · 운영 관리 · 사용량 (lib/gate.js)
     if (body.act === 'gate' || body.act === 'adm' || body.act === 'usage') {
       const G = require('../lib/gate');
