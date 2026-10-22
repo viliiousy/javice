@@ -180,7 +180,7 @@ const Admin = {
     if (this.tab === 'users') {
       const A = U.filter(u => u.status !== 'pending');
       b.innerHTML = `<p class="adm-sum">승인 <b class="num">${s.total}</b> · 차단 <b class="num">${s.blocked}</b></p>` + A.map(u => `<div class="adm-row${u.status === 'blocked' ? ' off' : ''}">
-          <div class="adm-u"><b>${esc(u.name || u.email)}${u.admin ? ' <em>운영자</em>' : ''}${u.status === 'blocked' ? ' <em class="bad">차단됨</em>' : ''}</b>
+          <div class="adm-u"><b>${esc(u.name || u.email || ('계정 ' + u.uid.slice(0, 6)))}${u.admin ? ' <em>운영자</em>' : ''}${u.status === 'blocked' ? ' <em class="bad">차단됨</em>' : ''}</b>
             <span>${esc(u.email)} · 마지막 ${this._ago(u.last)} · 7일 중 <b class="num">${u.days}</b>일 · 오늘 <b class="num">${u.today}</b>회</span></div>
           ${u.admin ? '' : `<div class="adm-acts">${u.status === 'blocked' ? act(u, 'unblock', '차단 풀기') : act(u, 'block', '차단')}${act(u, 'delete', '삭제', 'bad')}</div>`}
         </div>`).join('');
