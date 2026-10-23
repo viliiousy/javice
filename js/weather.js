@@ -21,13 +21,39 @@ const Weather = {
     hail: '<path d="M7 14.5h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.1 5.6 4.5 4.5 0 0 0 7 14.5Z"/><circle cx="9" cy="18.5" r=".9"/><circle cx="13" cy="20" r=".9"/><circle cx="16.5" cy="18" r=".9"/><path d="m11.5 15.5-1 2h2l-1 2"/>',
   },
   icon(n, cls = 'wx-ic') { return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${this.IC[n] || this.IC.cloud}</svg>`; },
+  // ── 위치: 기기 위치(GPS·와이파이)로 — 허락 안 하면 접속 위치(서버가 IP 로)로 ──
+  // 좌표는 0.05도(약 5km)로 뭉개서 쓴다: 날씨에는 충분하고, 정확한 자리는 어디에도 남지 않는다.
+  GEO_KEY: 'gl_wx_geo', GEO_ON: 'gl_wx_gps',
+  get gpsOn() { return localStorage.getItem(this.GEO_ON) !== '0'; },
+  setGps(on) { localStorage.setItem(this.GEO_ON, on ? '1' : '0'); if (!on) localStorage.removeItem(this.GEO_KEY); this.H = null; localStorage.removeItem(this.HIST_KEY); this.load(true); this.loadHist(true); },
+  geo() { try { const g = JSON.parse(localStorage.getItem(this.GEO_KEY) || 'null'); return g && this.gpsOn ? g : null; } catch (e) { return null; } },
+  _q() { const g = this.geo(); return g ? `lat=${g.lat}&lon=${g.lon}` : ''; },
+  locate() {
+    if (!this.gpsOn || !navigator.geolocation) return Promise.resolve(null);
+    const g0 = this.geo(); if (g0 && Date.now() - g0.at < 30 * 60000) return Promise.resolve(g0);
+    if (this._locP) return this._locP;
+    this._locP = new Promise(res => {
+      navigator.geolocation.getCurrentPosition(p => {
+        const r = v => Math.round(v * 20) / 20;
+        const g = { lat: r(p.coords.latitude), lon: r(p.coords.longitude), at: Date.now() };
+        const moved = !g0 || g0.lat !== g.lat || g0.lon !== g.lon;
+        try { localStorage.setItem(this.GEO_KEY, JSON.stringify(g)); } catch (e) {}
+        if (moved) { this.H = null; try { localStorage.removeItem(this.HIST_KEY); } catch (e) {} }
+        res(g);
+      }, () => res(g0 || null), { enableHighAccuracy: false, maximumAge: 30 * 60000, timeout: 8000 });
+    }).finally(() => { setTimeout(() => { this._locP = null; }, 1000); });
+    return this._locP;
+  },
   cached() { try { const v = JSON.parse(localStorage.getItem(this.KEY) || 'null'); return v && v.ok ? v : null; } catch (e) { return null; } },
   async load(force) {
     const c = this.cached();
     if (c) this.w = c;
-    if (!force && c && Date.now() - c.at < this.TTL) return c;
     try {
-      const r = await fetch(Platform.api('/api/weather'));
+      const g0 = this.geo(); await this.locate(); const g = this.geo();
+      const moved = (g0 && g0.lat) !== (g && g.lat) || (g0 && g0.lon) !== (g && g.lon);
+      if (!force && !moved && c && Date.now() - c.at < this.TTL) return c;
+      const q = this._q();
+      const r = await fetch(Platform.api('/api/weather' + (q ? '?' + q : '')));
       const j = await r.json();
       if (j && j.ok) { this.w = j; try { localStorage.setItem(this.KEY, JSON.stringify(j)); } catch (e) {} this.paint(); try { Widgets.push(); } catch (e) {} }
     } catch (e) {}
@@ -60,7 +86,8 @@ const Weather = {
     if (!force && this.H && Date.now() - (this.H.at || 0) < 3 * 3600e3) return;
     if (this._hl) return; this._hl = true;
     try {
-      const j = await (await fetch(Platform.api('/api/weather?hist=1'))).json();
+      await this.locate(); const q = this._q();
+      const j = await (await fetch(Platform.api('/api/weather?hist=1' + (q ? '&' + q : '')))).json();
       if (j && j.ok && j.days) { this.H = { at: Date.now(), days: j.days }; try { localStorage.setItem(this.HIST_KEY, JSON.stringify(this.H)); } catch (e) {} this.paint(); }
     } catch (e) {} finally { this._hl = false; }
   },

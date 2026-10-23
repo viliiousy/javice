@@ -29,7 +29,7 @@ copyDir(path.join(app, 'native-android/res'), path.join(main, 'res'));
 // 2) 매니페스트: 권한, 위젯 등록, 다른 앱 보이기
 const manPath = path.join(main, 'AndroidManifest.xml');
 let x = read(manPath);
-for (const p of ['android.permission.RECORD_AUDIO', 'android.permission.POST_NOTIFICATIONS', 'android.permission.VIBRATE']) {
+for (const p of ['android.permission.RECORD_AUDIO', 'android.permission.POST_NOTIFICATIONS', 'android.permission.VIBRATE', 'android.permission.ACCESS_COARSE_LOCATION']) {
   if (!x.includes(p)) x = x.replace('</manifest>', `    <uses-permission android:name="${p}" />\n</manifest>`);
 }
 if (!x.includes('BashyWidgets$Today')) {

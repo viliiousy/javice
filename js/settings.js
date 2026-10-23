@@ -76,6 +76,7 @@ const Settings = {
         ${this._item('테마', this._seg(App._theme, [['system','시스템'],['light','밝게'],['dark','어둡게']], 'Settings.setTheme'), '시스템은 휴대폰 설정(다크 모드)을 따라 낮·밤에 맞춰 바뀝니다')}
         ${this._item('아이콘', this._seg(Icons.mode, [['simple','심플'],['color','컬러']], 'Settings.setIcons'), '심플: 한 가지 색 선 아이콘 · 컬러: 카드마다 색이 들어간 아이콘')}
         ${typeof Weather!=='undefined' ? this._item('날씨 표시', this._seg(Weather.mode, [['simple','간단'],['detail','세부'],['off','끄기']], 'Settings.setWx'), '간단: 요일 옆 아이콘·기온 · 세부: 최저·지금·최고를 호 모양으로, 날짜 위에 해·구름·비·눈 효과 · 상단바 날씨를 눌러도 바뀝니다') : ''}
+        ${typeof Weather!=='undefined' ? this._item('날씨 위치', this._seg(Weather.gpsOn ? 'gps' : 'ip', [['gps','내 위치'],['ip','접속 위치']], 'Settings.setWxGeo'), Weather.gpsOn ? (Weather.geo() ? '휴대폰·컴퓨터 위치로(약 5km 단위로만 씀 · 저장 안 함)' : '위치 허락을 기다리는 중 — 허락하지 않으면 접속 위치로 봅니다') : '인터넷 접속 위치(시·구 수준)로') : ''}
         <div class="set-h">메인 화면</div>
         ${this._link('상단바 정보', "Settings.go('topinfo')", '맨 위 줄에 보일 숫자 고르기 — 몸무게·체지방·BMI·근육량·추세·주식 등락·AI 사용량')}
         ${this._link('카테고리 · 카드 순서와 켜고 끄기', "Settings.go('cats')", `지금 ${Tabs._onTabs().map(t => t.label).join(' → ')} — 탭 순서, 카드 순서(예: 운동을 식단 위로), PC·태블릿은 카드 칸 크기(1×1·2×1…)와 자리, 안 쓰는 카드 숨기기`)}`;
@@ -162,6 +163,7 @@ const Settings = {
   // ── 바로 바뀌는 항목 ─────────────────────
   setUI(v) { if ((document.documentElement.dataset.ui === 'v1' ? 'v1' : 'v2') !== v) App.toggleUI(); this._re('design'); },
   setWx(v) { Weather.setMode(v); this._re('design'); },
+  setWxGeo(v) { Weather.setGps(v === 'gps'); setTimeout(() => this._re('design'), 1500); this._re('design'); },
   setTheme(v) { App._theme = v; App._applyTheme(); this._re('design'); },
   setIcons(v) { Icons.mode = v; Icons.applyMode(); Icons.updateModeLabel?.(); this._re('design'); },
   toggleTTS() { JARVIS.toggleTTS(); this._re('voice'); },
