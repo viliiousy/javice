@@ -1,5 +1,5 @@
 // js/weather.js — 상단바 요일 옆의 작은 날씨(아이콘 + 기온). 위젯 요약에도 같이 실린다.
-// 서버(/api/weather)가 접속 위치로 날씨를 찾아 준다 — 위치 권한을 따로 묻지 않는다.
+// 위치: 기기 위치(앱은 기기 위치 기능, 웹은 브라우저)로 — 허락은 계정마다 한 번만 묻는다(아래 locate). 허락이 없으면 서버가 접속 위치로 찾는다.
 // 20분 동안은 기억해 둔 값을 쓴다. 누르면 오늘 최고·최저와 비 올 확률이 짧게 뜬다.
 const Weather = {
   KEY: 'gl_wx', TTL: 20 * 60000, w: null,
@@ -23,25 +23,76 @@ const Weather = {
   icon(n, cls = 'wx-ic') { return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${this.IC[n] || this.IC.cloud}</svg>`; },
   // ── 위치: 기기 위치(GPS·와이파이)로 — 허락 안 하면 접속 위치(서버가 IP 로)로 ──
   // 좌표는 0.05도(약 5km)로 뭉개서 쓴다: 날씨에는 충분하고, 정확한 자리는 어디에도 남지 않는다.
-  GEO_KEY: 'gl_wx_geo', GEO_ON: 'gl_wx_gps',
+  // 위치 허락은 계정마다 한 번만 묻는다 (gl_wx_ask: 'yes'·'no' — 계정에 같이 저장돼 다른 기기·다시 설치해도 따라간다)
+  //   앱(iOS·안드로이드): 기기 위치 기능(@capacitor/geolocation)으로 — 운영체제가 한 번 묻고 기억한다.
+  //     예전엔 웹뷰의 위치 기능을 써서 iOS 가 앱을 켤 때마다 "bashy.app 이(가) 위치를 사용하려고 합니다" 를 다시 물었다.
+  //   웹: 브라우저가 이미 허락돼 있으면 조용히 받고, 아직이면 이 계정에서 처음 한 번만 묻는다.
+  //   묻지 않는 기기에서는 계정에 저장된 마지막 좌표(5km 단위)를 그대로 쓴다.
+  GEO_KEY: 'gl_wx_geo', GEO_ON: 'gl_wx_gps', ASK_KEY: 'gl_wx_ask',
   get gpsOn() { return localStorage.getItem(this.GEO_ON) !== '0'; },
-  setGps(on) { localStorage.setItem(this.GEO_ON, on ? '1' : '0'); if (!on) localStorage.removeItem(this.GEO_KEY); this.H = null; localStorage.removeItem(this.HIST_KEY); this.load(true); this.loadHist(true); },
-  geo() { try { const g = JSON.parse(localStorage.getItem(this.GEO_KEY) || 'null'); return g && this.gpsOn ? g : null; } catch (e) { return null; } },
+  setGps(on) {
+    localStorage.setItem(this.GEO_ON, on ? '1' : '0');
+    if (on) localStorage.removeItem(this.ASK_KEY);          // 설정에서 다시 켜면 한 번 더 물어도 된다
+    else { localStorage.setItem(this.ASK_KEY, 'no'); localStorage.removeItem(this.GEO_KEY); localStorage.removeItem(this.GEO_ACCT); }
+    this.H = null; localStorage.removeItem(this.HIST_KEY); this.load(true); this.loadHist(true);
+  },
+  GEO_ACCT: 'gl_wx_geo_a',   // 계정에 저장되는 마지막 좌표 {lat, lon} — 자리가 바뀔 때만 고쳐 쓴다
+  geo() {
+    if (!this.gpsOn) return null;
+    try {
+      const g = JSON.parse(localStorage.getItem(this.GEO_KEY) || 'null'); if (g) return g;
+      const a = JSON.parse(localStorage.getItem(this.GEO_ACCT) || 'null');
+      return a && a.lat != null ? { lat: a.lat, lon: a.lon, at: 0 } : null;
+    } catch (e) { return null; }
+  },
   _q() { const g = this.geo(); return g ? `lat=${g.lat}&lon=${g.lon}` : ''; },
+  _nGeo() { try { return window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.Geolocation || null : null; } catch (e) { return null; } },
+  // 지금 이 기기의 허락 상태: 'granted' | 'denied' | 'prompt'
+  async _perm() {
+    const N = this._nGeo();
+    try {
+      if (N) { const p = await N.checkPermissions(); return p.coarseLocation === 'granted' || p.location === 'granted' ? 'granted' : (p.location === 'denied' ? 'denied' : 'prompt'); }
+      if (navigator.permissions && navigator.permissions.query) return (await navigator.permissions.query({ name: 'geolocation' })).state;
+    } catch (e) {}
+    return 'prompt';
+  },
+  async _pos(N) {
+    if (N) {
+      try {
+        const p = await N.getCurrentPosition({ enableHighAccuracy: false, maximumAge: 30 * 60000, timeout: 8000 });
+        return p && p.coords ? p.coords : null;
+      } catch (e) { return null; }
+    }
+    if (!navigator.geolocation) return null;
+    return new Promise(res => navigator.geolocation.getCurrentPosition(p => res(p.coords), () => res(null),
+      { enableHighAccuracy: false, maximumAge: 30 * 60000, timeout: 8000 }));
+  },
   locate() {
-    if (!this.gpsOn || !navigator.geolocation) return Promise.resolve(null);
+    if (!this.gpsOn) return Promise.resolve(null);
     const g0 = this.geo(); if (g0 && Date.now() - g0.at < 30 * 60000) return Promise.resolve(g0);
     if (this._locP) return this._locP;
-    this._locP = new Promise(res => {
-      navigator.geolocation.getCurrentPosition(p => {
-        const r = v => Math.round(v * 20) / 20;
-        const g = { lat: r(p.coords.latitude), lon: r(p.coords.longitude), at: Date.now() };
-        const moved = !g0 || g0.lat !== g.lat || g0.lon !== g.lon;
-        try { localStorage.setItem(this.GEO_KEY, JSON.stringify(g)); } catch (e) {}
-        if (moved) { this.H = null; try { localStorage.removeItem(this.HIST_KEY); } catch (e) {} }
-        res(g);
-      }, () => res(g0 || null), { enableHighAccuracy: false, maximumAge: 30 * 60000, timeout: 8000 });
-    }).finally(() => { setTimeout(() => { this._locP = null; }, 1000); });
+    this._locP = (async () => {
+      const N = this._nGeo();
+      if (!N && !navigator.geolocation) return g0 || null;
+      const st = await this._perm(), ask = localStorage.getItem(this.ASK_KEY);
+      if (st === 'denied') { if (!ask) localStorage.setItem(this.ASK_KEY, 'no'); return g0 || null; }
+      // 아직 허락 전: 앱은 이 계정이 '아니오' 라고 한 적 없으면 한 번(운영체제가 기억), 웹은 이 계정에서 처음일 때만
+      if (st !== 'granted' && (ask === 'no' || (!N && ask))) return g0 || null;
+      // 계정 기록을 아직 못 받았으면(새 기기 첫 실행) 이번엔 묻지 않는다 — 받아 온 뒤 '이미 물었음' 이면 다시 묻지 않게
+      try { if (st !== 'granted' && !ask && typeof FirebaseSync !== 'undefined' && FirebaseSync.ready && FirebaseSync.ready() && !FirebaseSync._synced) return g0 || null; } catch (e) {}
+      const c = await this._pos(N);
+      if (st !== 'granted') localStorage.setItem(this.ASK_KEY, c ? 'yes' : 'no');
+      if (!c) return g0 || null;
+      const r = v => Math.round(v * 20) / 20;
+      const g = { lat: r(c.latitude), lon: r(c.longitude), at: Date.now() };
+      const moved = !g0 || g0.lat !== g.lat || g0.lon !== g.lon;
+      try { localStorage.setItem(this.GEO_KEY, JSON.stringify(moved || !g0 ? g : { ...g0, at: g.at })); } catch (e) {}
+      if (moved) {
+        this.H = null; try { localStorage.removeItem(this.HIST_KEY); } catch (e) {}
+        try { localStorage.setItem(this.GEO_ACCT, JSON.stringify({ lat: g.lat, lon: g.lon })); } catch (e) {}
+      }
+      return g;
+    })().finally(() => { setTimeout(() => { this._locP = null; }, 1000); });
     return this._locP;
   },
   cached() { try { const v = JSON.parse(localStorage.getItem(this.KEY) || 'null'); return v && v.ok ? v : null; } catch (e) { return null; } },
