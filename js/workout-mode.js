@@ -1243,7 +1243,12 @@ const VolTier = {
       // 진행도 0~100%를 그 안에 나눠 놓는다. 주황 줄은 거기까지 채운다.
       const p = t.next ? t.pct : 100, pl = 32 + p * 0.36;
       if (!this._syncing) { this._syncing = true; setTimeout(() => this.sync().finally(() => { this._syncing = false; }), 300); }
-      const nm = (lv, name) => `<b class="num">Lv.${lv}</b> ${name}`;
+      // 이름은 한 줄로 — 칸(80px)에 안 들어가면 글자를 줄인다(한글 1em, 영문·숫자·공백 0.55em 으로 어림)
+      const nm = (lv, name) => {
+        const w = [...`Lv.${lv} ${name}`].reduce((t, c) => t + (/[\u3131-\uD79D]/.test(c) ? 1 : 0.58), 0);
+        const fs = Math.max(8.5, Math.min(10.5, 78 / w));   // 8.5px 보다 작아지면 끝을 … 로 줄인다
+        return `<span class="ftr-nmi" style="font-size:${fs.toFixed(1)}px"><b class="num">Lv.${lv}</b> ${name}</span>`;
+      };
       return `<button type="button" class="fit-tier" onclick="VolTier.open('${Fitness._dateStr(d)}')" aria-label="들어 올린 무게 Lv.${t.lv}">
         <span class="ftr-trk">
           <span class="ftr-nm" style="left:0%">${prev ? nm(t.lv - 1, esc(prev[0])) : '시작'}</span>
@@ -1268,7 +1273,7 @@ const VolTier = {
     return `<div class="vt-cmp">
       ${card('내 볼륨', mine, `Lv.${this.tier(mine).lv}`, true)}
       ${card('평균 볼륨', r.avgV || 0, `운동한 ${r.total.toLocaleString('ko-KR')}명`)}
-      ${card('모두 합친 볼륨', r.sumY || 0, '어제까지')}
+      ${card('모두 합친 볼륨', Math.max(r.sumY || 0, mine), '지금까지')}
     </div>`;
   },
   open(ds) {
@@ -1292,7 +1297,8 @@ const VolTier = {
       <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div>`;
     };
     App.openModal('@dumbbell 들어 올린 무게', `<div class="fz fz-vt" id="vtBody">${body(this.rank())}</div>`);
-    const scroll = () => { const me = document.querySelector('.vt-ladder li.me') || document.querySelector('.vt-ladder li.nx'); const box = document.querySelector('.vt-ladder'); if (me && box) box.scrollTop = me.offsetTop - box.offsetTop - 120; };
+    // 단계 목록은 내 바로 전 단계가 맨 위에 오게(1단계부터 보이지 않게)
+    const scroll = () => { const box = document.querySelector('.vt-ladder'); if (!box) return; const li = box.children[Math.max(0, t.lv - 2)]; box.scrollTop = li ? li.offsetTop - box.offsetTop : 0; };
     setTimeout(scroll, 60);
     this.sync(true).then(r => { const el = document.getElementById('vtBody'); if (el && r) { el.innerHTML = body(r); setTimeout(scroll, 30); } });
   },

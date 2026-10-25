@@ -198,6 +198,9 @@ html[data-ui="v2"] .nt .set-link:last-child{ border-bottom:0; }
 .trk-dow{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:4px; }
 .trk-dow span{ text-align:center; font-size:11px; color:var(--text3); }
 .trk-dow span.sun{ color:#E5484D; }
+.trk-dow span.sat{ color:#3B82F6; }
+html .hw.sat > span{ color:#3B82F6; }
+html .hw.sun > span{ color:#E5484D; }
 .trk-cg{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
 .trk .cd{ position:relative; display:flex; align-items:flex-start; justify-content:flex-start; aspect-ratio:1; border-radius:8px; padding:6px; box-sizing:border-box; font-style:normal; border:0; }
 .trk .cd span{ font-size:12px; font-weight:500; color:var(--text2); line-height:1; }

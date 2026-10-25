@@ -3862,7 +3862,8 @@ html.dark .vt-ic img, html.dark .ftr-ic img{ filter:invert(1); }
 .fit-tier .ftr-title{ display:block; font-size:12px; font-weight:600; color:var(--text3); }
 .fit-tier .ftr-trk{ position:relative; display:block; height:104px; margin:0 38px; }
 .fit-tier .ftr-nm, .fit-tier .ftr-v, .fit-tier .ftr-at, .fit-tier .ftr-dot{ position:absolute; transform:translateX(-50%); }
-.fit-tier .ftr-nm{ bottom:74px; width:80px; text-align:center; font-size:10.5px; line-height:1.3; color:var(--text2); word-break:keep-all; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.fit-tier .ftr-nm{ bottom:74px; width:80px; text-align:center; font-size:10.5px; line-height:1.3; color:var(--text2); white-space:nowrap; overflow:hidden; }
+.fit-tier .ftr-nmi{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .fit-tier .ftr-nm b{ font-weight:700; color:var(--text3); }
 .fit-tier .ftr-nm.ftr-cur{ color:var(--text); font-weight:600; }
 .fit-tier .ftr-nm.ftr-cur b{ color:var(--accent); }

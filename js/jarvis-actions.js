@@ -963,10 +963,60 @@ const JarvisActions = {
     const bm = s.burnMode || 'half', bonus = bm === 'off' ? 0 : bm === 'full' ? b.kcal : Math.round(b.kcal / 2 / 10) * 10;
     return { t, s, burn: b.kcal, bonus, left: s.calorieGoal + bonus - t.cal };
   },
+  // 식단을 바꾸기 전 그날 기록을 남겨 둔다 — '되돌려 줘' 로 바로 앞 식단 변경을 취소한다
+  _dSnap(d, label) { try { this._undo = { ds: this._ds(d), data: JSON.stringify(Diet.getData(d)), label }; } catch (e) {} },
+  _dFind(a, d) {
+    const data = Diet.getData(d), all = [];
+    Diet.MEALS.forEach(m => (data[m] || []).forEach((f, i) => { if (!a.meal || a.meal === m || !Diet.MEALS.includes(a.meal)) all.push({ m, i, name: f.name, cal: f.cal }); }));
+    return { data, r: JMatch.find(a.name, all) };
+  },
   D: {
+    diet_clear(a) {
+      const d = this._date(a.date), data = Diet.getData(d), ms = Diet.MEALS.includes(a.meal) ? [a.meal] : Diet.MEALS;
+      const n = ms.reduce((t, m) => t + (data[m] || []).length, 0);
+      if (!n) return { ok: true, msg: `${this._md(d)} ${ms.length === 1 ? ms[0] + ' ' : ''}식단은 이미 비어 있습니다` };
+      this._dSnap(d, '식단 초기화');
+      ms.forEach(m => { data[m] = []; }); Diet.saveData(data, d); this._rerender();
+      return { ok: true, msg: `${this._md(d)} ${ms.length === 1 ? ms[0] : '식단'} ${n}개를 모두 지웠습니다 (되돌리려면 '되돌려 줘')` };
+    },
+    edit_food(a) {
+      const d = this._date(a.date), { data, r } = this._dFind(a, d);
+      if (!r.item) return { ok: false, msg: JMatch.miss('음식', a.name, r) };
+      this._dSnap(d, '음식 수정');
+      const f = data[r.item.m][r.item.i], num = v => (v === undefined || v === null || v === '' ? null : Number(v));
+      if (a.newName) f.name = String(a.newName).trim();
+      for (const [k, src] of [['cal', a.cal], ['protein', a.protein], ['carb', a.carb], ['fat', a.fat]]) { const n = num(src); if (n != null && n >= 0) f[k] = k === 'cal' ? Math.round(n) : n; }
+      Diet.saveData(data, d); this._rerender();
+      return { ok: true, msg: `${r.item.m}의 '${r.item.name}' 을(를) '${f.name}' ${f.cal}kcal 로 고쳤습니다` };
+    },
+    move_food(a) {
+      const d = this._date(a.date), to = a.to || a.toMeal;
+      if (!Diet.MEALS.includes(to)) return { ok: false, msg: '어느 끼니로 옮길지 알려 주세요 (아침·점심·저녁·간식)' };
+      const { data, r } = this._dFind({ name: a.name, meal: a.meal }, d);
+      if (!r.item) return { ok: false, msg: JMatch.miss('음식', a.name, r) };
+      this._dSnap(d, '음식 옮기기');
+      const [f] = data[r.item.m].splice(r.item.i, 1); (data[to] = data[to] || []).push(f);
+      Diet.saveData(data, d); this._rerender();
+      return { ok: true, msg: `'${f.name}' 을(를) ${r.item.m}에서 ${to}(으)로 옮겼습니다` };
+    },
+    diet_copy(a) {
+      const from = this._date(a.from || '어제'), to = this._date(a.to || a.date), src = Diet.getData(from), dst = Diet.getData(to);
+      const ms = Diet.MEALS.includes(a.meal) ? [a.meal] : Diet.MEALS; let n = 0;
+      this._dSnap(to, '식단 복사');
+      ms.forEach(m => (src[m] || []).forEach(f => { (dst[m] = dst[m] || []).push({ ...f }); n++; }));
+      if (!n) return { ok: false, msg: `${this._md(from)} ${ms.length === 1 ? ms[0] + ' ' : ''}식단이 비어 있어 가져올 것이 없습니다` };
+      Diet.saveData(dst, to); this._rerender();
+      return { ok: true, msg: `${this._md(from)} ${ms.length === 1 ? ms[0] : '식단'} ${n}개를 ${this._md(to)}에 그대로 넣었습니다` };
+    },
+    undo() {
+      const u = this._undo; if (!u) return { ok: false, msg: '되돌릴 식단 변경이 없습니다' };
+      const d = new Date(u.ds + 'T00:00:00'); Diet.saveData(JSON.parse(u.data), d); this._undo = null; this._rerender();
+      return { ok: true, msg: `${this._md(d)} 식단을 '${u.label}' 전으로 되돌렸습니다` };
+    },
     log_food(a) {
       const d = this._date(a.date), meal = Diet.MEALS.includes(a.meal) ? a.meal : Diet._suggestMeal(d);
       const name = String(a.name || '').trim(); if (!name) return { ok: false, msg: '무엇을 드셨는지 알려 주세요' };
+      this._dSnap(d, '식단 기록');
       const data = Diet.getData(d); if (!data[meal]) data[meal] = [];
       const food = { name, cal: Math.round(Number(a.cal) || 0), protein: Number(a.protein) || 0, carb: Number(a.carb) || 0, fat: Number(a.fat) || 0 };
       data[meal].push(food); Diet.saveData(data, d); Diet.addToHistory(food);
@@ -978,6 +1028,7 @@ const JarvisActions = {
       const d = this._date(a.date), data = Diet.getData(d);
       const all = []; Diet.MEALS.forEach(m => (data[m] || []).forEach((f, i) => { if (!a.meal || a.meal === m || !Diet.MEALS.includes(a.meal)) all.push({ m, i, name: f.name, cal: f.cal }); }));
       const r = JMatch.find(a.name, all); if (!r.item) return { ok: false, msg: JMatch.miss('음식', a.name, r) };
+      this._dSnap(d, '음식 삭제');
       Diet.remove(r.item.m, r.item.i, this._ds(d)); this._rerender();
       return { ok: true, msg: `${r.item.m}의 '${r.item.name}' 을(를) 지웠습니다` };
     },
@@ -1216,6 +1267,8 @@ const JarvisActions = {
     complete_habit: a => ['habit_check', { ...a, done: true }], uncheck_habit: a => ['habit_check', { ...a, done: false }],
     add_habit: a => ['habit_add', a], delete_habit: a => ['habit_del', a], edit_habit: a => ['habit_edit', a],
     swap_exercise: a => ['ex_swap', a], replace_exercise: a => ['ex_swap', a], add_exercise: a => ['ex_add', a], remove_exercise: a => ['ex_remove', a], delete_exercise: a => ['ex_remove', a],
+    diet_reset: a => ['diet_clear', a], clear_diet: a => ['diet_clear', a], reset_diet: a => ['diet_clear', a], clear_food: a => ['diet_clear', a],
+    update_food: a => ['edit_food', a], add_food: a => ['log_food', a], log_meal: a => ['log_food', a], remove_food: a => ['delete_food', a],
     complete_task: a => ['task_done', a], toggle_task: a => ['task_done', a], smarthome: a => ['home', a], device: a => ['home', a],
   },
   _fn(type) {
@@ -1341,7 +1394,12 @@ const JarvisActions = {
       const chk = Habits.getChecked(now);
       out.habits = Habits.getHabitsForDate(now).map(h => `${h.name}${chk.includes(h.id) ? ' ✓' : ''}${h.notify && h.time ? ` (${h.time}알림)` : ''}`);
     } catch (e) {}
-    try { const L = this._dietLeft(now); out.diet = { kcal: L.t.cal, goal: L.s.calorieGoal, exBonus: L.bonus, left: L.left, protein: Math.round(L.t.protein), proteinGoal: L.s.proteinGoal }; } catch (e) {}
+    try {
+      const L = this._dietLeft(now), data = Diet.getData(now);
+      out.diet = { kcal: L.t.cal, goal: L.s.calorieGoal, exBonus: L.bonus, left: L.left, protein: Math.round(L.t.protein), proteinGoal: L.s.proteinGoal };
+      const items = Diet.MEALS.map(m => (data[m] || []).length ? `${m}: ${data[m].map(f => `${f.name} ${f.cal}`).join(', ')}` : '').filter(Boolean);
+      if (items.length) out.diet.items = items;   // 지우기·고치기 때 이름을 정확히 짚게
+    } catch (e) {}
     try {
       const evT = (App.S.events || []).filter(e => { try { return new Date(e.start?.dateTime || e.start?.date + 'T00:00:00').toDateString() === now.toDateString(); } catch { return false; } });
       out.events = evT.map(e => `${e.start?.dateTime ? new Date(e.start.dateTime).toTimeString().slice(0, 5) : '종일'} ${e.summary}`);
@@ -1359,6 +1417,7 @@ const JarvisActions = {
     return `당신은 Bashy(자기관리 앱)의 AI 비서입니다. 한국어 존댓말로 짧게 답합니다. 사용자: 수훈님.
 사용자 말은 음성 인식으로 들어와 잘못 들린 글자가 섞일 수 있습니다(예: '백 익스텐션'→'100 익스텐션', '원 암'→'1암', '덤벨'→'덤블'). 아래 상태에 있는 실제 이름 중 가장 가까운 것으로 이해하고, 이름은 상태에 적힌 그대로 쓰세요(모르면 들은 대로 — 앱이 비슷한 것을 찾습니다).
 앱을 바꾸거나 조회하는 요청은 반드시 actions 로 합니다. actions 없이 '했습니다' 라고 말하지 마세요. 앱이 실행 결과를 사용자에게 직접 알려 주므로 response 는 "바꾸겠습니다" 정도로 짧게 씁니다. 앱으로 할 수 없는 일은 할 수 없다고 말합니다.
+음식 이름은 사용자가 말한 그대로 한 음식으로 씁니다 — '갈비만두'·'김치볶음밥'·'치즈돈까스'·'불고기버거' 처럼 붙어 있는 말은 하나의 음식입니다. '랑·하고·와·과·그리고·쉼표' 로 나눠 말했을 때만 여러 음식으로 나눕니다. 이미 먹은 것으로 기록된 음식(현재 상태 diet.items)과 같은 것을 다시 말하면 양을 고치는 것인지 문맥으로 판단하세요.
 식단 기록(log_food)의 열량·단백질·탄수·지방은 당신이 추정해서 넣습니다 — 사용자에게 영양 정보를 묻거나 몰라서 못 넣는다고 하지 마세요. 처음 보는 음식도 비슷한 음식의 일반적인 한국 기준 1회 제공량으로 어림합니다. 여러 음식을 말하면 음식마다 log_food 하나씩(최대 20개), name 에는 양까지 그대로 적고(예 '후라이드 치킨 6조각'), 열량·탄단지는 아래 식품 참고의 1개·1인분 값에 그 양(반 줄·반 그릇·1.5인분·6조각·300ml)을 곱한 값입니다. '어제·그제·○요일' 은 현재 상태의 now 날짜로 계산해 date 에 YYYY-MM-DD 로 넣습니다.
 운동 변경의 scope 는 기본 "day"(그날만), 사용자가 '앞으로·계속·루틴에·플랜에' 라고 하면 "plan". date 는 YYYY-MM-DD(생략=오늘). sets 는 "3×12" 또는 "30분", w 는 kg. 요일(dow·days)은 0=일 … 6=토.
 
@@ -1368,7 +1427,7 @@ JSON 하나만 출력: {"response":"","actions":[{"type":"…",…}]}
 actions (괄호 안 필드, ?는 생략 가능):
 [운동] ex_list(date?) ex_parts(parts:["가슴|등|하체|어깨|팔|복근"],scope?,date?) ex_swap(from,to,sets?,w?,scope?,date?) ex_add(name,sets?,w?,pos?,scope?,date?) ex_remove(name,scope?,date?) ex_set(name,sets?,w?,scope?,date?) ex_move(name,pos) ex_done(name|"전체",done) ex_log(name,sets:[{w,r}],date?) workout_start(date?) routine_save(name,exercises:[{name,sets}],days?,mode?:"add|replace") day_assign(dow,routines:["루틴 이름|휴식|유산소"],mode?:"set|add")
 [습관] habit_check(name,done,date?) habit_add(name,days?,time?) habit_edit(name,newName?,days?,time?:"HH:MM|off") habit_del(name) habit_stats(name?,days?)
-[식단] log_food(meal:"아침|점심|저녁|간식",name,cal,protein,carb,fat,date?) delete_food(name,meal?,date?) diet_goal(cal?,protein?,carb?,fat?) diet_status(date?)
+[식단] log_food(meal:"아침|점심|저녁|간식",name,cal,protein,carb,fat,date?) delete_food(name,meal?,date?) edit_food(name,newName?,cal?,protein?,carb?,fat?,meal?,date?) move_food(name,to:"끼니",meal?,date?) diet_clear(meal?,date?) — 초기화·전부 지워·리셋(끼니를 말하면 그 끼니만) diet_copy(from,to?,meal?) — '어제랑 똑같이' undo() — 방금 한 식단 변경 되돌리기 diet_goal(cal?,protein?,carb?,fat?) diet_status(date?)
 [인바디] inbody_add(wt?,ms?,bf?,bmr?,date?) inbody_trend(n?)
 [일정] add_event(summary,start,end?,location?) edit_event(title,newTitle?,start?,end?,location?) delete_event(title) list_events(from,to?)
 [할일] add_task(title,due?,notes?,list?) edit_task(title,newTitle?,due?,notes?) task_done(title,done?) delete_task(title)
@@ -1378,7 +1437,10 @@ actions (괄호 안 필드, ?는 생략 가능):
 [스마트홈] home(cmd:"list|status|on|off|toggle|level|temp|open|close|scene|start|dock",device?,value?) — device 는 상태 home.devices 의 이름 그대로(괄호 앞). '거실 불' 처럼 방+종류도 됨. 불·전등·라이트=조명. 대상 없이 '불 꺼' 는 켜진 조명 각각에 off. level 은 0~100, temp 는 도. 잠금 해제는 하지 않음. home 이 '연결 안 됨'이면 설정 › 스마트홈 허브 › 스마트홈 연결을 안내
 [설정] setting(key:"theme|fx|tts",value)
 예) "100 익스텐션 대신 덤벨 로우 3세트 12회로" → {"response":"바꾸겠습니다","actions":[{"type":"ex_swap","from":"백 익스텐션","to":"덤벨 로우","sets":"3×12"}]}
-시각은 +09:00 ISO(예 2026-05-22T14:00:00+09:00). 식품 참고: 닭가슴살100g=165kcal/단31g, 달걀=77kcal/단6g, 흰밥200g=260kcal/탄57g, 삼겹살100g=331kcal, 치킨조각=213kcal/단14g/탄8g/지13g, 김밥1줄=420kcal, 우동1그릇=450kcal, 감자탕1인분=700kcal/단40g, 공깃밥=300kcal, 약과1개=230kcal, 스트링치즈1개=70kcal/단6g, 아이스크림100g=250kcal, 맥주100ml=43kcal, 라면=500kcal, 소주1병=400kcal, 아메리카노=5kcal, 프로틴=120kcal/단25g`;
+예) "점심에 갈비만두 6개 먹었어" → {"response":"기록하겠습니다","actions":[{"type":"log_food","meal":"점심","name":"갈비만두 6개","cal":420,"protein":18,"carb":48,"fat":17}]}
+예) "식단 초기화해줘" → {"response":"지우겠습니다","actions":[{"type":"diet_clear"}]}
+예) "저녁 김치찌개 반만 먹었어로 고쳐줘" → {"response":"고치겠습니다","actions":[{"type":"edit_food","name":"김치찌개","meal":"저녁","newName":"김치찌개 0.5인분","cal":200,"protein":11,"carb":8,"fat":13}]}
+시각은 +09:00 ISO(예 2026-05-22T14:00:00+09:00). 식품 참고: 닭가슴살100g=165kcal/단31g, 달걀=77kcal/단6g, 흰밥200g=260kcal/탄57g, 삼겹살100g=331kcal, 치킨조각=213kcal/단14g/탄8g/지13g, 만두1개=70kcal/단3g/탄8g/지3g, 김밥1줄=420kcal, 우동1그릇=450kcal, 감자탕1인분=700kcal/단40g, 공깃밥=300kcal, 약과1개=230kcal, 스트링치즈1개=70kcal/단6g, 아이스크림100g=250kcal, 맥주100ml=43kcal, 라면=500kcal, 소주1병=400kcal, 아메리카노=5kcal, 프로틴=120kcal/단25g`;
   },
 };
 

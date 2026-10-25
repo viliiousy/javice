@@ -197,9 +197,9 @@ const Habits = {
     const head = `<div class="trk-row trk-dn"><span class="trk-l"></span>${D31.map(i => `<span>${[1,5,10,15,20,25,31].includes(i)?i:''}</span>`).join('')}<span class="trk-pc"></span></div>`;
     let tDone = 0, tDue = 0, html = '';
     if (t.mode === 'm') {
-      // 월간: 달력(일~토 7칸). 칸 농도 = 그날 달성률, 다 한 날 체크. 습관별 횟수는 '세부 정보 보기' 안에.
+      // 월간: 달력(월~일 7칸). 칸 농도 = 그날 달성률, 다 한 날 체크. 습관별 횟수는 '세부 정보 보기' 안에.
       const n = new Date(t.y, t.m+1, 0).getDate(), first = new Date(t.y, t.m, 1), last = new Date(t.y, t.m, n);
-      const rows = this._trkRows(all, first, last), lead = first.getDay(), DOWS = '일월화수목금토';
+      const rows = this._trkRows(all, first, last), lead = (first.getDay() + 6) % 7, DOWS = '월화수목금토일';   // 월요일부터
       const per = rows.map(h => ({ h, dn:0, due:0 }));
       const cells = [];
       for (let k = 0; k < lead; k++) cells.push('<i class="cd pad"></i>');
@@ -224,7 +224,7 @@ const Habits = {
         </div>
         <div class="trk-months">${D31.slice(0,12).map(i => `<button type="button" class="${i-1===t.m?'on':''}" onclick="Habits._trkGo('m',${i-1})">${i}</button>`).join('')}</div>
         <div class="trk-sheet trk-cal">
-          <div class="trk-dow">${[...DOWS].map((w,i) => `<span class="${i===0?'sun':''}">${w}</span>`).join('')}</div>
+          <div class="trk-dow">${[...DOWS].map((w,i) => `<span class="${i===5?'sat':i===6?'sun':''}">${w}</span>`).join('')}</div>
           <div class="trk-cg">${cells.join('')}</div>
         </div>
         <div class="trk-key"><span><i class="c lv1"></i><i class="c lv2"></i><i class="c lv3"></i><i class="c lv4"></i>적게 → 많이</span><span><i class="c lv4 full"></i>다 함</span></div>
@@ -380,7 +380,8 @@ const Habits = {
           const dn=hs.filter(h=>ck.includes(h.id)).length, tot=hs.length;
           const r=tot?dn/tot:0, lv=!tot?0:r===0?0:r<.34?1:r<.67?2:r<1?3:4;
           const lbl=i===0?(isToday?'오늘':this.DAYS_KO[d.getDay()]):this.DAYS_KO[d.getDay()];
-          cells.push(`<div class="hw${i===0?' cur':''}"><span>${lbl}</span><i class="lv${lv}">${tot?dn:''}</i></div>`);
+          const wd=d.getDay();
+          cells.push(`<div class="hw${i===0?' cur':''}${wd===6?' sat':wd===0?' sun':''}"><span>${lbl}</span><i class="lv${lv}">${tot?dn:''}</i></div>`);
         }
         foot.innerHTML=`<div class="hw-row">${cells.join('')}</div><div class="hw-sum"><b class="num">${done}</b> / ${list.length} 완료<button type="button" class="hw-open" onclick="Habits.openTracker('m')">월간 · 연간 기록 ›</button></div>`;
       }
