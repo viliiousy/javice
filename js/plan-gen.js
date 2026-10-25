@@ -395,7 +395,7 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
 
   // ── 무게·횟수 기록과 다음 무게 ─────────────
   log(ds) { try { return JSON.parse(UserStore.get(this.LOG_PREFIX + ds) || '{}') || {}; } catch { return {}; } },
-  saveLog(ds, L) { UserStore.set(this.LOG_PREFIX + ds, JSON.stringify(L)); window.FirebaseSync?.scheduleSave?.(); },
+  saveLog(ds, L) { UserStore.set(this.LOG_PREFIX + ds, JSON.stringify(L)); window.FirebaseSync?.scheduleSave?.(); if (window.VolTier) VolTier._c = null; },   // 들어 올린 무게 1분 기억도 비운다
   // 이 운동의 가장 최근 기록(오늘 이전)
   // 120일을 거슬러 찾는다 — 운동 줄마다 불리므로 날짜별 기록은 읽기 전용 캐시로 읽는다
   last(name, beforeDs) {

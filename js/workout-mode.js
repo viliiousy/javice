@@ -1236,13 +1236,13 @@ const VolTier = {
   // 오늘의 운동 카드 아래 진행 칸 — 한 줄(주황 진행줄)이 이전 단계 아이콘 밑에서 다음 단계 아이콘 밑까지 이어진다.
   //   위: 'Lv.N 이름'  가운데: 아이콘(지금 단계는 진행도만큼 오른쪽에)  줄  아래: 무게(지금 단계는 내 총볼륨)
   //   등수는 이 칸을 눌러 여는 '들어 올린 무게' 시트에서 보여 준다.
-  // 그날 운동을 다 끝냈으면(목록의 운동을 모두 체크) 그날 든 무게만큼을 한 줄로 — '+8톤 200kg · 비즈니스 제트기만큼'
+  // 그날 운동을 하나라도 체크하면 그날 든 무게만큼을 한 줄로 — '+8톤 200kg · 비즈니스 제트기만큼'
   //   그날 볼륨은 총볼륨에 넣는 것과 같은 기준(상한 적용)이고, 그 무게 아래로 가장 가까운 단계의 사물과 아이콘을 보여 준다.
   _dayLine(d, s) {
     try {
       if (!(s.day > 0)) return '';
       const list = Fitness.exercisesFor(d).list, chk = Fitness._checked(d);
-      if (!list.length || chk.filter(i => i < list.length).length < list.length) return '';
+      if (!chk.some(i => i < list.length)) return '';   // 운동을 하나라도 체크했으면 바로 보여 준다
       const dt = this.tier(s.day), ds = Fitness._dateStr(d), isT = ds === Fitness._dateStr(new Date());
       const when = isT ? '오늘' : `${d.getMonth() + 1}/${d.getDate()}`;
       return `<span class="ftr-day">${dt.now ? this.img(dt.lv, 'ftr-dic') : ''}<span class="ftr-dt">${when} <b class="num">+${this.kg(s.day)}</b>${dt.now ? ` · <em>${esc(dt.now[0])}</em>만큼 들었어요` : ''}</span></span>`;
