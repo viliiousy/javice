@@ -33,6 +33,6 @@ console.log(`배포 ${all.length}개 · 남김 ${keep.size}개 · 지움 ${del.l
 let n = 0;
 for (const d of del) {
   try { await api(`/v13/deployments/${d.uid}?${q.slice(1)}`, { method: 'DELETE' }); n++; }
-  catch (e) { console.log('못 지움', d.uid, e.message); }
+  catch (e) { if (e.status === 429) { console.log('한 번에 지울 수 있는 개수(약 200개/10분)를 넘어 나머지는 다음 배포 때 지웁니다'); break; } console.log('못 지움', d.uid, e.message); }
 }
 console.log(`${n}개 지웠습니다`);
