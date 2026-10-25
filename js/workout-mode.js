@@ -1198,21 +1198,21 @@ const VolTier = {
       return r;
     } catch (e) { return this.rank(); }
   },
-  // 오늘의 운동 카드 아래: [이전 단계] ──●(지금 단계 아이콘이 다음 단계 쪽으로 걸어감)── [?]
+  // 오늘의 운동 카드 아래: [이전 단계·무게] ── 지금 단계 아이콘(진행도만큼 오른쪽으로) ── [? · 다음 무게]
+  //   진행도 줄(주황)은 아이콘 아래에 깔린다.
   chip(d) {
     try {
       const s = this.sums(d); if (!s.all) return '';
       const t = this.tier(s.all), prev = t.lv > 1 ? this.T[t.lv - 2] : null, r = this.rank();
       setTimeout(() => {
-        const el = document.querySelector('.fit-tier .ftr-run'); if (el) requestAnimationFrame(() => { el.style.left = el.dataset.pct + '%'; });
         if (!this._syncing) { this._syncing = true; this.sync().then(x => { this._syncing = false; const b = document.querySelector('.fit-tier .ftr-rk'); if (b && x && x.rank) b.textContent = `${x.rank.toLocaleString('ko-KR')}등 / ${x.total.toLocaleString('ko-KR')}명`; }); }
       }, 60);
       return `<button type="button" class="fit-tier" onclick="VolTier.open('${Fitness._dateStr(d)}')">
         <span class="ftr-hd"><span class="ftr-lv num">Lv.${t.lv} ${t.now ? esc(t.now[0]) : '시작 전'}</span><span class="ftr-tot">총볼륨 <b class="num">${this.kg(s.all)}</b></span><span class="ftr-rk num">${r && r.rank ? `${r.rank.toLocaleString('ko-KR')}등 / ${r.total.toLocaleString('ko-KR')}명` : ''}</span></span>
         <span class="ftr-trk">
-          <span class="ftr-end ftr-prev">${prev ? this.img(t.lv - 1, 'ftr-ic') : this.img(0, 'ftr-ic')}<small>${prev ? esc(prev[0]) : '시작'}</small></span>
-          <span class="ftr-line"><i class="ftr-fill" style="width:${t.next ? t.pct.toFixed(1) : 100}%"></i><span class="ftr-run" data-pct="${t.next ? t.pct.toFixed(1) : 100}" style="left:0%">${this.img(t.lv, 'ftr-ic ftr-me')}</span></span>
-          <span class="ftr-end ftr-next">${t.next ? this.img('q', 'ftr-ic') : this.img(t.lv, 'ftr-ic')}<small class="num">${t.next ? this.kg(t.next[1], true) : '끝'}</small></span>
+          <span class="ftr-end ftr-prev">${prev ? this.img(t.lv - 1, 'ftr-ic') : this.img(0, 'ftr-ic')}<small>${prev ? esc(prev[0]) : '시작'}</small><small class="num">${prev ? this.kg(prev[1], true) : '0kg'}</small></span>
+          <span class="ftr-line"><i class="ftr-fill" style="width:${t.next ? t.pct.toFixed(1) : 100}%"></i><span class="ftr-run" style="left:${t.next ? t.pct.toFixed(1) : 100}%">${this.img(t.lv, 'ftr-ic ftr-me')}</span></span>
+          <span class="ftr-end ftr-next">${t.next ? this.img('q', 'ftr-ic') : this.img(t.lv, 'ftr-ic')}<small>${t.next ? '???' : '끝'}</small><small class="num">${t.next ? this.kg(t.next[1], true) : ''}</small></span>
         </span></button>`;
     } catch (e) { return ''; }
   },
