@@ -1210,9 +1210,9 @@ const VolTier = {
       return `<button type="button" class="fit-tier" onclick="VolTier.open('${Fitness._dateStr(d)}')">
         <span class="ftr-hd"><span class="ftr-lv num">Lv.${t.lv} ${t.now ? esc(t.now[0]) : '시작 전'}</span><span class="ftr-tot">총볼륨 <b class="num">${this.kg(s.all)}</b></span><span class="ftr-rk num">${r && r.rank ? `${r.rank.toLocaleString('ko-KR')}등 / ${r.total.toLocaleString('ko-KR')}명` : ''}</span></span>
         <span class="ftr-trk">
-          <span class="ftr-end ftr-prev">${prev ? this.img(t.lv - 1, 'ftr-ic') : this.img(0, 'ftr-ic')}<small>${prev ? esc(prev[0]) : '시작'}</small><small class="num">${prev ? this.kg(prev[1], true) : '0kg'}</small></span>
+          <span class="ftr-end ftr-prev"><small class="ftr-nm">${prev ? `<b class="num">Lv.${t.lv - 1}</b> ${esc(prev[0])}` : '시작'}</small>${prev ? this.img(t.lv - 1, 'ftr-ic') : this.img(0, 'ftr-ic')}<small class="num">${prev ? this.kg(prev[1], true) : '0kg'}</small></span>
           <span class="ftr-line"><i class="ftr-fill" style="width:${t.next ? t.pct.toFixed(1) : 100}%"></i><span class="ftr-run" style="left:${t.next ? t.pct.toFixed(1) : 100}%">${this.img(t.lv, 'ftr-ic ftr-me')}</span></span>
-          <span class="ftr-end ftr-next">${t.next ? this.img('q', 'ftr-ic') : this.img(t.lv, 'ftr-ic')}<small>${t.next ? '???' : '끝'}</small><small class="num">${t.next ? this.kg(t.next[1], true) : ''}</small></span>
+          <span class="ftr-end ftr-next"><small class="ftr-nm">${t.next ? `<b class="num">Lv.${t.lv + 1}</b> ???` : '끝'}</small>${t.next ? this.img('q', 'ftr-ic') : this.img(t.lv, 'ftr-ic')}<small class="num">${t.next ? this.kg(t.next[1], true) : ''}</small></span>
         </span></button>`;
     } catch (e) { return ''; }
   },
