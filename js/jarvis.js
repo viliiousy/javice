@@ -277,7 +277,7 @@ const JARVIS = {
     this.history.push({role:'user',content:userMsg});
     const msgs=this.history.slice(-12);
     const ctx=await this._buildCtx(), sys=this._buildSys(ctx);
-    const data=await this.chat({ max_tokens:1200, messages:[{role:'system',content:sys},...msgs] });
+    const data=await this.chat({ max_tokens:2400, messages:[{role:'system',content:sys},...msgs] });
     const text=data.choices?.[0]?.message?.content||'';
     this.history.push({role:'assistant',content:text});
     return text;

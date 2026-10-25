@@ -1263,9 +1263,11 @@ const JarvisActions = {
   // 실행했다고 말하는데 명령이 없다 — 바로 그 일이 "100 익스텐션" 때 일어났다
   _claims(t) { return /(바꿨|바꾸었|변경했|변경되|추가했|추가되|삭제했|지웠|뺐|기록했|기록되|완료했|체크했|켰|껐|설정했|등록했|저장했|옮겼|교체했|넣었|만들었|해제했)/.test(String(t || '')); },
 
+  _asksNutrition(t) { return /(영양|칼로리|열량|탄수화물|단백질|지방)/.test(String(t || '')) && /(알\s*수\s*없|모르|알려\s*주|어렵|없어)/.test(String(t || '')); },
+
   async runAll(actions) {
     const out = [];
-    for (const a of actions.slice(0, 10)) out.push({ type: a.type, ...(await this.exec(a)) });
+    for (const a of actions.slice(0, 20)) out.push({ type: a.type, ...(await this.exec(a)) });
     return out;
   },
   // 결과로 보낼 말을 만든다. 하나라도 실패하면 모델의 말 대신 실행 결과를 그대로 보여 준다.
@@ -1293,15 +1295,19 @@ const JarvisActions = {
   async handle(J, raw) {
     let p = this.parse(raw);
     // 했다고 말하면서 명령이 없으면 한 번만 다시 묻는다
-    if (!p.actions.length && this._claims(p.response) && J && J.history) {
+    // 식단을 말했는데 '영양 정보를 몰라서 못 넣는다·알려 달라' 고 미루면 — 추정해서 넣으라고 한 번 더 시킨다
+    const askNut = !p.actions.length && this._asksNutrition(p.response);
+    if (!p.actions.length && (askNut || this._claims(p.response)) && J && J.history) {
       try {
         J._setStatus?.('다시 확인 중...');
         const ctx = await this.ctx(), sys = this.sys(ctx);
-        const fix = '[앱] 방금 답에서 실행했다고 했지만 actions 가 비어 있어 실제로는 아무것도 바뀌지 않았습니다. 사용자의 요청을 실행하는 actions 를 넣어 JSON 으로 다시 답하세요. 실행할 방법이 없으면 할 수 없다고 답하세요.';
-        const d = await J.chat({ max_tokens: 1200, messages: [{ role: 'system', content: sys }, ...J.history.slice(-12), { role: 'user', content: fix }] });
+        const fix = askNut
+          ? '[앱] 영양 정보를 사용자에게 묻지 마세요. 말한 음식마다 일반적인 한국 기준 1회 제공량으로 열량·단백질·탄수화물·지방을 당신이 추정해서, 음식마다 log_food 하나씩 actions 에 넣어 JSON 으로 다시 답하세요. 양(반 줄·1.5인분·300ml 등)은 그만큼 곱하고, 어제·요일은 date 에 YYYY-MM-DD 로 넣으세요.'
+          : '[앱] 방금 답에서 실행했다고 했지만 actions 가 비어 있어 실제로는 아무것도 바뀌지 않았습니다. 사용자의 요청을 실행하는 actions 를 넣어 JSON 으로 다시 답하세요. 실행할 방법이 없으면 할 수 없다고 답하세요.';
+        const d = await J.chat({ max_tokens: 2400, messages: [{ role: 'system', content: sys }, ...J.history.slice(-12), { role: 'user', content: fix }] });
         const raw2 = d.choices?.[0]?.message?.content || '';
         const p2 = this.parse(raw2);
-        if (p2.actions.length || !this._claims(p2.response)) { p = p2; if (J.history.length && J.history[J.history.length - 1].role === 'assistant') J.history[J.history.length - 1].content = raw2; }
+        if (p2.actions.length || (!askNut && !this._claims(p2.response))) { p = p2; if (J.history.length && J.history[J.history.length - 1].role === 'assistant') J.history[J.history.length - 1].content = raw2; }
       } catch (e) { console.warn('[JARVIS retry]', e); }
     }
     let text, results = [];
@@ -1353,6 +1359,7 @@ const JarvisActions = {
     return `당신은 Bashy(자기관리 앱)의 AI 비서입니다. 한국어 존댓말로 짧게 답합니다. 사용자: 수훈님.
 사용자 말은 음성 인식으로 들어와 잘못 들린 글자가 섞일 수 있습니다(예: '백 익스텐션'→'100 익스텐션', '원 암'→'1암', '덤벨'→'덤블'). 아래 상태에 있는 실제 이름 중 가장 가까운 것으로 이해하고, 이름은 상태에 적힌 그대로 쓰세요(모르면 들은 대로 — 앱이 비슷한 것을 찾습니다).
 앱을 바꾸거나 조회하는 요청은 반드시 actions 로 합니다. actions 없이 '했습니다' 라고 말하지 마세요. 앱이 실행 결과를 사용자에게 직접 알려 주므로 response 는 "바꾸겠습니다" 정도로 짧게 씁니다. 앱으로 할 수 없는 일은 할 수 없다고 말합니다.
+식단 기록(log_food)의 열량·단백질·탄수·지방은 당신이 추정해서 넣습니다 — 사용자에게 영양 정보를 묻거나 몰라서 못 넣는다고 하지 마세요. 처음 보는 음식도 비슷한 음식의 일반적인 한국 기준 1회 제공량으로 어림합니다. 여러 음식을 말하면 음식마다 log_food 하나씩(최대 20개), 양(반 줄·반 그릇·1.5인분·2개·300ml)은 그만큼 곱합니다. '어제·그제·○요일' 은 현재 상태의 now 날짜로 계산해 date 에 YYYY-MM-DD 로 넣습니다.
 운동 변경의 scope 는 기본 "day"(그날만), 사용자가 '앞으로·계속·루틴에·플랜에' 라고 하면 "plan". date 는 YYYY-MM-DD(생략=오늘). sets 는 "3×12" 또는 "30분", w 는 kg. 요일(dow·days)은 0=일 … 6=토.
 
 현재 상태: ${JSON.stringify(ctx)}
@@ -1371,7 +1378,7 @@ actions (괄호 안 필드, ?는 생략 가능):
 [스마트홈] home(cmd:"list|status|on|off|toggle|level|temp|open|close|scene|start|dock",device?,value?) — device 는 상태 home.devices 의 이름 그대로(괄호 앞). '거실 불' 처럼 방+종류도 됨. 불·전등·라이트=조명. 대상 없이 '불 꺼' 는 켜진 조명 각각에 off. level 은 0~100, temp 는 도. 잠금 해제는 하지 않음. home 이 '연결 안 됨'이면 설정 › 스마트홈 허브 › 스마트홈 연결을 안내
 [설정] setting(key:"theme|fx|tts",value)
 예) "100 익스텐션 대신 덤벨 로우 3세트 12회로" → {"response":"바꾸겠습니다","actions":[{"type":"ex_swap","from":"백 익스텐션","to":"덤벨 로우","sets":"3×12"}]}
-시각은 +09:00 ISO(예 2026-05-22T14:00:00+09:00). 식품 참고: 닭가슴살100g=165kcal/단31g, 달걀=77kcal/단6g, 흰밥200g=260kcal/탄57g, 삼겹살100g=331kcal, 치킨조각=213kcal, 김밥=420kcal, 아메리카노=5kcal, 프로틴=120kcal/단25g`;
+시각은 +09:00 ISO(예 2026-05-22T14:00:00+09:00). 식품 참고: 닭가슴살100g=165kcal/단31g, 달걀=77kcal/단6g, 흰밥200g=260kcal/탄57g, 삼겹살100g=331kcal, 치킨조각=213kcal, 김밥1줄=420kcal, 우동1그릇=450kcal, 감자탕1인분=700kcal/단40g, 공깃밥=300kcal, 약과1개=230kcal, 스트링치즈1개=70kcal/단6g, 아이스크림100g=250kcal, 맥주100ml=43kcal, 라면=500kcal, 소주1병=400kcal, 아메리카노=5kcal, 프로틴=120kcal/단25g`;
   },
 };
 
