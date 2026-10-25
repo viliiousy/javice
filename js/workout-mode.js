@@ -1085,29 +1085,43 @@ const NumIn = {
 
 // ── 들어 올린 무게 티어 ─────────────────────────────
 // 총 볼륨(무게 × 횟수의 합)을 '무엇을 들어 올린 셈인지' 로 바꿔 보여 준다. 오늘 · 이번 주 · 이번 달 · 지금까지.
-// 무게는 널리 알려진 어림값이다(아파트 한 동은 15층짜리 한 동을 어림한 값).
+// 단계는 js/vol-tier-data.js 의 약 300개(우유 → … → 태양). 2~3년 동안 쌓이는 구간은 배수 단계로 촘촘하게.
+// 그림은 img/vt/NNN.webp (단계마다 그림 번호를 따로 적어 배수 단계는 원래 그림을 다시 쓴다).
 const VolTier = {
-  T: [
-    ['고양이', 4.5, '마리'], ['골든 리트리버', 30, '마리'], ['성인 남성', 70, '명'], ['그랜드 피아노', 450, '대'], ['젖소', 650, '마리'],
-    ['승용차', 1500, '대'], ['아프리카 코끼리', 6000, '마리'], ['티라노사우루스', 8000, '마리'], ['시내버스', 11000, '대'], ['전차', 60000, '대'],
-    ['대왕고래', 150000, '마리'], ['빈 보잉 747', 180000, '대'], ['자유의 여신상', 225000, '개'], ['발사대 위 우주왕복선', 2030000, '대'],
-    ['에펠탑', 7300000, '개'], ['아파트 한 동', 10000000, '동'], ['타이타닉호', 52000000, '척'], ['항공모함', 100000000, '척'],
-    ['엠파이어 스테이트 빌딩', 365000000, '채'], ['기자의 대피라미드', 5900000000, '개'], ['달', 7.35e22, '개'], ['지구', 5.97e24, '개'],
-  ],
-  kg(v) {
-    if (v < 10000) return (v < 10 ? Math.round(v * 10) / 10 : Math.round(v)).toLocaleString('ko-KR') + 'kg';
-    const t = v / 1000;
-    if (t < 1e8) return (t < 100 ? Math.round(t * 10) / 10 : Math.round(t)).toLocaleString('ko-KR') + '톤';
-    return t.toExponential(2).replace('e+', '×10^') + '톤';
+  get T() { return typeof VT_DATA !== 'undefined' ? VT_DATA : [['고양이', 4.5]]; },
+  IMG: 'img/vt/',
+  // 한국식 큰 수: 52,000 → '5만 2,000'
+  _ko(n) {
+    n = Math.floor(n);
+    if (n < 10000) return n.toLocaleString('ko-KR');
+    const U = [['경', 1e16], ['조', 1e12], ['억', 1e8], ['만', 1e4]];
+    let out = [], r = n;
+    for (const [u, v] of U) { if (r >= v) { const q = Math.floor(r / v); out.push(q.toLocaleString('ko-KR') + u); r -= q * v; if (out.length >= 2) { r = 0; break; } } }
+    if (r && out.length < 2) out.push(r.toLocaleString('ko-KR'));
+    return out.join(' ');
   },
-  // v kg → { lv, now:[이름,kg,단위] | null, n(몇 개), next, pct(다음까지 %) }
+  // 무게 글자: 450kg · 6톤 · 1,234톤 560kg · 5만 2,000톤 · 5.97×10²¹톤
+  kg(v, short) {
+    v = Number(v) || 0;
+    if (v < 1000) return (v < 10 ? Math.round(v * 10) / 10 : Math.round(v)).toLocaleString('ko-KR') + 'kg';
+    const t = Math.floor(v / 1000), r = Math.round(v - t * 1000);
+    if (t >= 1e16) { const e = Math.floor(Math.log10(t)); return (t / 10 ** e).toFixed(2) + '×10' + String(e).replace(/\d/g, d => '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]) + '톤'; }
+    return this._ko(t) + '톤' + (!short && r && t < 100000 ? ' ' + r.toLocaleString('ko-KR') + 'kg' : '');
+  },
+  // v kg → { lv(1~300, 0=시작 전), now:[이름,kg] | null, next, n(몇 개), pct(다음까지 %) }
   tier(v) {
-    let i = -1; for (let k = 0; k < this.T.length; k++) if (v >= this.T[k][1]) i = k;
-    const now = i >= 0 ? this.T[i] : null, next = this.T[i + 1] || null;
-    const n = now ? v / now[1] : 0;
-    return { lv: i + 1, now, next, n, pct: next ? Math.min(100, v / next[1] * 100) : 100 };
+    const T = this.T; let i = -1;
+    for (let k = 0; k < T.length; k++) if (v >= T[k][1]) i = k; else break;
+    const now = i >= 0 ? T[i] : null, next = T[i + 1] || null;
+    const lo = now ? now[1] : 0;
+    return { lv: i + 1, now, next, n: now ? v / now[1] : 0, pct: next ? Math.max(0, Math.min(100, (v - lo) / (next[1] - lo) * 100)) : 100 };
   },
   cnt(n) { return n >= 100 ? Math.round(n).toLocaleString('ko-KR') : n >= 10 ? (Math.round(n * 10) / 10).toString() : (Math.round(n * 100) / 100).toString(); },
+  img(lv, cls = 'vt-ic') {
+    if (!lv) return `<span class="${cls} vt-ic0"></span>`;
+    const ic = (this.T[lv - 1] && this.T[lv - 1][2]) || lv;
+    return `<span class="${cls}"><img src="${this.IMG}${String(ic).padStart(3, '0')}.webp" alt="" loading="lazy" onerror="this.remove()"></span>`;
+  },
   // 기간별 볼륨 — 기록 칸(gl_fit_log_날짜)을 한 번에 훑는다(1분 기억)
   sums(base) {
     const key = Fitness._dateStr(base || new Date());
@@ -1129,26 +1143,29 @@ const VolTier = {
     this._c = { key, t: Date.now(), v };
     return v;
   },
-  line(v) { const t = this.tier(v); return t.now ? `${t.now[0]} ${this.cnt(t.n)}${t.now[2]}` : (v > 0 ? `${this.T[0][0]}까지 ${Math.round(t.pct)}%` : '아직 기록 없음'); },
+  line(v) { const t = this.tier(v); return t.now ? `${t.now[0]} 넘음` : (v > 0 ? `${this.T[0][0]}까지 ${Math.floor(t.pct)}%` : '아직 기록 없음'); },
   // 오늘의 운동 카드 아래 한 줄
   chip(d) {
     try {
       const s = this.sums(d); if (!s.all) return '';
       const t = this.tier(s.all);
-      return `<button type="button" class="fit-tier" onclick="VolTier.open('${Fitness._dateStr(d)}')"><span class="ftr-lv num">Lv.${t.lv}</span><span class="ftr-tx">지금까지 <b class="num">${this.kg(s.all)}</b> · ${esc(this.line(s.all))}</span>${t.next ? `<span class="ftr-bar"><i style="width:${t.pct.toFixed(1)}%"></i></span>` : ''}</button>`;
+      return `<button type="button" class="fit-tier" onclick="VolTier.open('${Fitness._dateStr(d)}')">${this.img(t.lv, 'ftr-ic')}<span class="ftr-tx"><span class="ftr-lv num">Lv.${t.lv} ${t.now ? esc(t.now[0]) : ''}</span><span>지금까지 <b class="num">${this.kg(s.all)}</b></span></span>${t.next ? `<span class="ftr-bar"><i style="width:${t.pct.toFixed(1)}%"></i></span>` : ''}</button>`;
     } catch (e) { return ''; }
   },
   open(ds) {
     const d = ds ? new Date(ds + 'T00:00:00') : new Date(); this._c = null;
     const s = this.sums(d), t = this.tier(s.all);
-    const row = (lb, v) => { const r = this.tier(v); return `<div class="vt-row"><span class="vt-lb">${lb}</span><b class="vt-kg num">${this.kg(v)}</b><span class="vt-eq">${esc(this.line(v))}</span>${r.next ? `<span class="vt-next">다음: ${esc(r.next[0])} ${Math.floor(r.pct)}%</span>` : ''}</div>`; };
-    const ladder = this.T.map(([n, kg], i) => `<li class="${i < t.lv ? 'got' : ''}${i === t.lv ? ' nx' : ''}"><span class="num">${i + 1}</span><b>${esc(n)}</b><em class="num">${this.kg(kg)}</em></li>`).join('');
+    const row = (lb, v) => { const r = this.tier(v); return `<div class="vt-row">${this.img(r.lv, 'vt-ic vt-ic-s')}<span class="vt-lb">${lb}</span><b class="vt-kg num">${this.kg(v)}</b><span class="vt-eq">${r.lv ? `Lv.${r.lv} · ` : ''}${esc(this.line(v))}</span></div>`; };
+    const ladder = this.T.map(([n, kg], i) => `<li class="${i < t.lv ? 'got' : ''}${i === t.lv ? ' nx' : ''}">${this.img(i + 1, 'vt-ic vt-ic-l')}<span class="vt-n num">${i + 1}</span><b>${esc(n)}</b><em class="num">${this.kg(kg)}</em></li>`).join('');
     App.openModal('@dumbbell 들어 올린 무게', `<div class="fz fz-vt">
-      <div class="vt-hero"><span class="vt-lv num">Lv.${t.lv}</span><b>${t.now ? esc(t.now[0]) : '시작 전'}</b><small>지금까지 ${this.kg(s.all)} · ${s.days}일 기록</small>
-        ${t.next ? `<div class="vt-bar"><i style="width:${t.pct.toFixed(1)}%"></i></div><small>다음 단계 ${esc(t.next[0])} · ${this.kg(Math.max(0, t.next[1] - s.all))} 남음</small>` : ''}</div>
-      ${row('오늘', s.day)}${row('이번 주', s.week)}${row('이번 달', s.month)}${row('지금까지', s.all)}
+      <div class="vt-hero">${this.img(t.lv, 'vt-ic vt-ic-h')}<div class="vt-hx"><span class="vt-lv num">Lv.${t.lv} / ${this.T.length}</span><b>${t.now ? esc(t.now[0]) : '시작 전'}</b>${t.now ? `<small class="num">${this.kg(t.now[1])}</small>` : ''}</div></div>
+      <div class="vt-tot"><span>지금까지 총 볼륨</span><b class="num">${this.kg(s.all)}</b><small>${s.days}일 기록</small></div>
+      ${t.next ? `<div class="vt-bar"><i style="width:${t.pct.toFixed(1)}%"></i></div><p class="vt-left">다음 Lv.${t.lv + 1} <b>${esc(t.next[0])}</b>(${this.kg(t.next[1])})까지 <b class="num">${this.kg(Math.max(0, t.next[1] - s.all))}</b> 남음</p>` : ''}
+      ${row('오늘', s.day)}${row('이번 주', s.week)}${row('이번 달', s.month)}
       <p class="pg-note">볼륨 = 무게 × 횟수를 모두 더한 값입니다. 맨몸 운동(무게 0)과 유산소는 들어가지 않습니다. 비교 대상의 무게는 널리 알려진 어림값입니다.</p>
+      <div class="vt-lh">전체 ${this.T.length}단계</div>
       <ol class="vt-ladder">${ladder}</ol>
       <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div></div>`);
+    setTimeout(() => { const nx = document.querySelector('.vt-ladder li.nx'); const box = document.querySelector('.vt-ladder'); if (nx && box) box.scrollTop = nx.offsetTop - box.offsetTop - 120; }, 60);
   },
 };
