@@ -1123,23 +1123,59 @@ const VolTier = {
     return `<span class="${cls}"><img src="${this.IMG}${String(ic).padStart(3, '0')}.webp" alt="" loading="lazy" onerror="this.remove()"></span>`;
   },
   // 기간별 볼륨 — 기록 칸(gl_fit_log_날짜)을 한 번에 훑는다(1분 기억)
+  // ── 티어에 넣는 볼륨의 상한(기록 자체는 그대로, 레벨 계산에만) ──
+  // 레벨만 올리려고 말이 안 되는 무게·횟수를 적는 것을 막는다. 상한을 넘은 부분은 세지 않는다.
+  //   ① 한 세트 무게: 기구마다 사람이 들 수 있는 정도까지(덤벨 70 · 케틀벨 64 · 바벨 320 · 하체 머신 500 · 그 밖 머신 250 · 케이블 150 …)
+  //   ② 한 세트 횟수: 50회까지
+  //   ③ 갑자기 늘린 무게: 그 종목의 지난 최고 무게 × 1.5 + 10kg 까지만(처음 기록은 ①만)
+  //   ④ 하루 40톤 · 한 주(월~일) 150톤까지 — 선수급 훈련도 이 안에 든다
+  CAP: { dumbbell: 70, kettlebell: 64, barbell: 320, machine: 250, machineLeg: 500, cable: 150, bar: 100, band: 60, trx: 50, etc: 100, body: 100 },
+  REPS: 50, DAY: 40000, WEEK: 150000,
+  _cap(n) {
+    const e = PlanGen.equipOf(n);
+    if (e === 'machine' && PlanGen.partOf(n) === '하체') return this.CAP.machineLeg;
+    return this.CAP[e] || this.CAP.body;
+  },
   sums(base) {
     const key = Fitness._dateStr(base || new Date());
     if (this._c && this._c.key === key && Date.now() - this._c.t < 60000) return this._c.v;
     const pre = UserStore.key(PlanGen.LOG_PREFIX), d0 = base ? new Date(base) : new Date();
     const today = Fitness._dateStr(d0), mon = Fitness._dateStr(WorkoutHistory._monday(d0)), m1 = today.slice(0, 8) + '01';
-    const v = { day: 0, week: 0, month: 0, all: 0, days: 0 };
+    const v = { day: 0, week: 0, month: 0, all: 0, days: 0, raw: 0, cut: 0, cutSets: 0 };
+    const days = [];
     for (let k = 0; k < localStorage.length; k++) {
       const key2 = localStorage.key(k); if (!key2 || !key2.startsWith(pre)) continue;
       const ds = key2.slice(pre.length); if (!/^\d{4}-\d{2}-\d{2}$/.test(ds) || ds > today) continue;
       let L; try { L = JSON.parse(localStorage.getItem(key2) || '{}') || {}; } catch (e) { continue; }
-      let s = 0; Object.values(L).forEach(ss => (ss || []).forEach(x => { s += (Number(x.w) || 0) * (Number(x.r) || 0); }));
-      if (!s) continue;
-      v.all += s; v.days++;
+      days.push([ds, L]);
+    }
+    days.sort((a, b) => a[0] < b[0] ? -1 : 1);   // 지난 최고 무게를 따라가려면 날짜 순서대로
+    const best = {}, wk = {}, capOf = {};
+    for (const [ds, L] of days) {
+      let s = 0, raw = 0; const dayBest = {};
+      for (const [n, ss] of Object.entries(L)) {
+        if (!(n in capOf)) capOf[n] = this._cap(n);
+        for (const x of ss || []) {
+          const w = Number(x.w) || 0, r = Number(x.r) || 0; if (!(w > 0 && r > 0)) continue;
+          raw += w * r;
+          let wc = Math.min(w, capOf[n]);
+          if (best[n]) wc = Math.min(wc, best[n] * 1.5 + 10);
+          const rc = Math.min(r, this.REPS);
+          if (wc < w || rc < r) v.cutSets++;
+          s += wc * rc; dayBest[n] = Math.max(dayBest[n] || 0, wc);
+        }
+      }
+      for (const n in dayBest) best[n] = Math.max(best[n] || 0, dayBest[n]);
+      if (!raw) continue;
+      s = Math.min(s, this.DAY);
+      const wkey = Fitness._dateStr(WorkoutHistory._monday(new Date(ds + 'T00:00:00')));
+      const room = Math.max(0, this.WEEK - (wk[wkey] || 0)); s = Math.min(s, room); wk[wkey] = (wk[wkey] || 0) + s;
+      v.raw += raw; v.all += s; v.days++;
       if (ds === today) v.day += s;
       if (ds >= mon) v.week += s;
       if (ds >= m1) v.month += s;
     }
+    v.cut = Math.max(0, v.raw - v.all);
     this._c = { key, t: Date.now(), v };
     return v;
   },
@@ -1162,7 +1198,8 @@ const VolTier = {
       <div class="vt-tot"><span>지금까지 총 볼륨</span><b class="num">${this.kg(s.all)}</b><small>${s.days}일 기록</small></div>
       ${t.next ? `<div class="vt-bar"><i style="width:${t.pct.toFixed(1)}%"></i></div><p class="vt-left">다음 Lv.${t.lv + 1} <b>${esc(t.next[0])}</b>(${this.kg(t.next[1])})까지 <b class="num">${this.kg(Math.max(0, t.next[1] - s.all))}</b> 남음</p>` : ''}
       ${row('오늘', s.day)}${row('이번 주', s.week)}${row('이번 달', s.month)}
-      <p class="pg-note">볼륨 = 무게 × 횟수를 모두 더한 값입니다. 맨몸 운동(무게 0)과 유산소는 들어가지 않습니다. 비교 대상의 무게는 널리 알려진 어림값입니다.</p>
+      ${s.cut > 0 ? `<p class="vt-cut">비정상적으로 큰 기록(${s.cutSets}세트)의 <b class="num">${this.kg(s.cut)}</b>은 레벨에 넣지 않았습니다. 기록은 그대로 남아 있습니다.</p>` : ''}
+      <p class="pg-note">볼륨 = 무게 × 횟수를 모두 더한 값입니다. 맨몸 운동(무게 0)과 유산소는 들어가지 않습니다. 레벨에는 한 세트 무게(기구별 상한)·50회·지난 최고의 1.5배, 하루 40톤·한 주 150톤까지만 셉니다. 비교 대상의 무게는 널리 알려진 어림값입니다.</p>
       <div class="vt-lh">전체 ${this.T.length}단계</div>
       <ol class="vt-ladder">${ladder}</ol>
       <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div></div>`);
