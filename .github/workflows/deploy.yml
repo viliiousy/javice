@@ -37,3 +37,9 @@ jobs:
 
       - name: Deploy to Vercel
         run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+
+      - name: 옛 배포 지우기 (최근 10개만 남김 — Vercel 배포 저장 공간 한도)
+        if: success()
+        continue-on-error: true
+        env: { VERCEL_TOKEN: '${{ secrets.VERCEL_TOKEN }}', KEEP: '10' }
+        run: node .github/scripts/prune-deploys.mjs

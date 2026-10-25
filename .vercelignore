@@ -10,3 +10,4 @@ extension/
 docs/
 scripts/
 *.md
+.github/
