@@ -400,7 +400,7 @@ const WorkoutMode = {
       return { name: x.name, sets: x.sets, key: x.key, sess: x.sess, th, cardio, done: done.includes(i), sug: PlanGen.suggest(x.name, x.sets, ds),
         rows: Array.from({ length: cardio ? 1 : n }, (_, k) => {
           const L = (log[x.name] || [])[k], P = prev && prev.sets[Math.min(k, prev.sets.length - 1)];
-          return L ? { w: L.w, r: L.r, ok: true, ...(L.t ? { t: L.t } : {}), ...(L.u ? { u: 1 } : {}) } : { w: nw ?? (P ? P.w : ''), r: nw != null ? this._reps(x.sets) : (P ? P.r : this._reps(x.sets)), ok: false };
+          return L ? { w: L.w, r: L.r, ok: true } : { w: nw ?? (P ? P.w : ''), r: nw != null ? this._reps(x.sets) : (P ? P.r : this._reps(x.sets)), ok: false };
         }) };
     });
   },
@@ -593,8 +593,7 @@ const WorkoutMode = {
   setDone(k) {
     const S = this.st, x = S.ex[S.cur], r = x.rows[k]; if (!r) return;
     r.ok = !r.ok;
-    // 세트를 체크한 시각 — '들어 올린 무게' 는 이 시각이 있는 세트만, 세트 사이 간격·운동 시간이 말이 되는 만큼 센다(VolTier.sums)
-    if (r.ok) { r.t = Date.now(); delete r.u; } else delete r.t;
+    if (r.ok) { const m = VolTier.warn(x.name, x.rows.filter(q => q.ok), S.ds); if (m) App.showToast(m); }
     try { Haptic.success(); } catch (e) {}
     this._saveLog();
     if (r.ok) {
@@ -805,7 +804,7 @@ const WorkoutMode = {
     const S = this.st, L = PlanGen.log(S.ds);
     S.ex.forEach(e => {
       if (e.cardio) return;
-      const ok = e.rows.filter(r => r.ok && Number(r.r) > 0).map(r => ({ w: Number(r.w) || 0, r: Number(r.r), ...(r.t ? { t: r.t } : r.u ? { u: 1 } : {}) }));
+      const ok = e.rows.filter(r => r.ok && Number(r.r) > 0).map(r => ({ w: Number(r.w) || 0, r: Number(r.r) }));
       if (ok.length) L[e.name] = ok; else if (!(S.snapLog || {})[e.name]) delete L[e.name];
     });
     PlanGen.saveLog(S.ds, L);
@@ -1129,31 +1128,55 @@ const VolTier = {
   // 기간별 볼륨 — 기록 칸(gl_fit_log_날짜)을 한 번에 훑는다(1분 기억)
   // ── 티어에 넣는 볼륨의 상한(기록 자체는 그대로, 레벨 계산에만) ──
   // 레벨만 올리려고 말이 안 되는 무게·횟수를 적는 것을 막는다. 상한을 넘은 부분은 세지 않는다.
-  //   ① 한 세트 무게: 기구마다 사람이 들 수 있는 정도까지(덤벨 70 · 케틀벨 64 · 바벨 320 · 하체 머신 500 · 그 밖 머신 250 · 케이블 150 …)
+  //   기준 = 사람이 할 수 있는 최고치(정상급 보디빌더·역도 기록). 그보다 큰 것은 기록으로만 남고 세지 않는다.
+  //   ① 한 세트 무게: 기구마다 최정상 보디빌더가 실제로 다룬 무게까지
+  //      (덤벨 91 — 로니 콜먼 200lb 덤벨 프레스 · 바벨 365 — 800lb 스쿼트·데드 · 하체 머신 1,045 — 2,300lb 레그 프레스 · 그 밖 머신 300 · 케이블 180 …)
   //   ② 한 세트 횟수: 50회까지
   //   ③ 갑자기 늘린 무게: 그 종목의 지난 최고 무게 × 1.5 + 10kg 까지만(처음 기록은 ①만)
   //   ④ 하루 40톤 · 한 주(월~일) 150톤까지 — 선수급 훈련도 이 안에 든다
-  CAP: { dumbbell: 70, kettlebell: 64, barbell: 320, machine: 250, machineLeg: 500, cable: 150, bar: 100, band: 60, trx: 50, etc: 100, body: 100 },
+  CAP: { dumbbell: 91, kettlebell: 92, barbell: 365, machine: 300, machineLeg: 1045, cable: 180, bar: 100, band: 60, trx: 50, etc: 120, body: 100 },
   REPS: 50, DAY: 40000, WEEK: 150000,
+  // 기록을 저장할 때 미리 알려 준다 — 이 운동의 이 세트들 중 '들어 올린 무게' 에서 빠질 것이 있으면 짧은 안내 한 줄, 없으면 ''
+  //   카드 기록 시트·AI 비서·운동 모드 체크에서 부른다. ds 날짜의 다른 기록과 합쳐 하루·한 주 상한도 본다.
+  warn(n, sets, ds) {
+    try {
+      sets = (sets || []).map(x => ({ w: Number(x.w) || 0, r: Number(x.r) || 0 })).filter(x => x.w > 0 && x.r > 0);
+      if (!sets.length) return '';
+      const cap = this._cap(n), pre = UserStore.key(PlanGen.LOG_PREFIX);
+      let best = 0, day = 0, week = 0;
+      const mon = Fitness._dateStr(WorkoutHistory._monday(new Date(ds + 'T00:00:00')));
+      for (let k = 0; k < localStorage.length; k++) {
+        const key = localStorage.key(k); if (!key || !key.startsWith(pre)) continue;
+        const d = key.slice(pre.length); if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+        let L; try { L = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) { continue; }
+        for (const [m, ss] of Object.entries(L)) for (const x of ss || []) {
+          const w = Number(x && x.w) || 0, r = Number(x && x.r) || 0; if (!(w > 0 && r > 0)) continue;
+          if (m === n && d < ds) best = Math.max(best, Math.min(w, cap));
+          if (m === n && d === ds) continue;   // 이 운동의 그날 기록은 지금 저장하는 것으로 바뀐다
+          if (d === ds) day += w * r;
+          if (d >= mon && d <= ds) week += w * r;
+        }
+      }
+      const add = sets.reduce((t, x) => t + x.w * x.r, 0), top = Math.max(...sets.map(x => x.w));
+      if (top > cap) return `${top}kg 은 사람이 이 기구로 들 수 있는 최고(${cap}kg)를 넘어 들어 올린 무게에는 ${cap}kg 까지만 셉니다`;
+      if (best && top > best * 1.5 + 10) return `지난 최고 ${best}kg 에서 갑자기 많이 늘어 들어 올린 무게에는 ${Math.round(best * 1.5 + 10)}kg 까지만 셉니다`;
+      if (sets.some(x => x.r > this.REPS)) return `한 세트 ${this.REPS}회를 넘는 부분은 들어 올린 무게에 넣지 않습니다`;
+      if (day + add > this.DAY) return `하루 ${this.DAY / 1000}톤(최정상 선수의 하루 훈련량)을 넘는 부분은 들어 올린 무게에 넣지 않습니다`;
+      if (week + add > this.WEEK) return `한 주 ${this.WEEK / 1000}톤을 넘는 부분은 들어 올린 무게에 넣지 않습니다`;
+      return '';
+    } catch (e) { return ''; }
+  },
   _cap(n) {
     const e = PlanGen.equipOf(n);
     if (e === 'machine' && PlanGen.partOf(n) === '하체') return this.CAP.machineLeg;
     return this.CAP[e] || this.CAP.body;
   },
-  // ── 들어 올린 무게에 넣는 기록 ──
-  //   운동 모드에서 세트를 하나씩 체크한 기록만 넣는다(세트마다 체크 시각 t 가 남는다).
-  //   ⑤ 너무 빠른 체크: 바로 앞 세트 체크로부터 '횟수 × 2초 + 20초' 가 안 지났으면 그 세트는 세지 않는다(한꺼번에 몰아 체크 방지)
-  //   ⑥ 운동 시간: 그날 첫 체크~마지막 체크(+3분) 1분당 500kg 까지만 — 실제로 운동한 시간만큼만 센다
-  //   오늘의 운동 카드의 '기록' 시트·AI 비서로 적은 기록(u)은 남기만 하고 넣지 않는다.
-  //   VT_FROM 이전 날짜의 기록(이 규칙이 생기기 전)은 예전처럼 센다.
-  VT_FROM: '2026-10-26', GAP: 20, PERMIN: 500,
-  _ok(ds, x) { return x.t ? 'm' : (ds < this.VT_FROM && !x.u) ? 'old' : ''; },
   sums(base) {
     const key = Fitness._dateStr(base || new Date());
     if (this._c && this._c.key === key && Date.now() - this._c.t < 60000) return this._c.v;
     const pre = UserStore.key(PlanGen.LOG_PREFIX), d0 = base ? new Date(base) : new Date();
     const today = Fitness._dateStr(d0), mon = Fitness._dateStr(WorkoutHistory._monday(d0)), m1 = today.slice(0, 8) + '01';
-    const v = { day: 0, week: 0, month: 0, all: 0, allY: 0, days: 0, raw: 0, cut: 0, cutSets: 0, unvSets: 0, unvKg: 0, fastSets: 0, timeKg: 0 };
+    const v = { day: 0, week: 0, month: 0, all: 0, allY: 0, days: 0, raw: 0, cut: 0, cutSets: 0 };
     const days = [];
     for (let k = 0; k < localStorage.length; k++) {
       const key2 = localStorage.key(k); if (!key2 || !key2.startsWith(pre)) continue;
@@ -1164,37 +1187,22 @@ const VolTier = {
     days.sort((a, b) => a[0] < b[0] ? -1 : 1);   // 지난 최고 무게를 따라가려면 날짜 순서대로
     const best = {}, wk = {}, capOf = {};
     for (const [ds, L] of days) {
-      // 운동 모드 세트를 체크 순서대로 늘어놓고, 앞 세트와 간격이 너무 짧은 세트는 뺀다
-      const timed = [];
-      for (const [n, ss] of Object.entries(L)) for (const x of ss || []) if (x && x.t && Number(x.w) > 0 && Number(x.r) > 0) timed.push(x);
-      timed.sort((a, b) => a.t - b.t);
-      const fast = new Set(); let prevT = 0;
-      for (const x of timed) { if (prevT && (x.t - prevT) / 1000 < Math.min(Number(x.r), this.REPS) * 2 + this.GAP) fast.add(x); prevT = x.t; }
-      let s = 0, sm = 0, raw = 0; const dayBest = {};
+      let s = 0, raw = 0; const dayBest = {};
       for (const [n, ss] of Object.entries(L)) {
         if (!(n in capOf)) capOf[n] = this._cap(n);
         for (const x of ss || []) {
-          const w = Number(x && x.w) || 0, r = Number(x && x.r) || 0; if (!(w > 0 && r > 0)) continue;
-          const how = this._ok(ds, x);
-          if (!how) { v.unvSets++; v.unvKg += w * r; continue; }
-          if (fast.has(x)) { v.fastSets++; v.unvKg += w * r; continue; }
+          const w = Number(x.w) || 0, r = Number(x.r) || 0; if (!(w > 0 && r > 0)) continue;
           raw += w * r;
           let wc = Math.min(w, capOf[n]);
           if (best[n]) wc = Math.min(wc, best[n] * 1.5 + 10);
           const rc = Math.min(r, this.REPS);
           if (wc < w || rc < r) v.cutSets++;
-          if (how === 'm') sm += wc * rc; else s += wc * rc;
-          dayBest[n] = Math.max(dayBest[n] || 0, wc);
+          s += wc * rc; dayBest[n] = Math.max(dayBest[n] || 0, wc);
         }
       }
       for (const n in dayBest) best[n] = Math.max(best[n] || 0, dayBest[n]);
       if (!raw) continue;
-      if (sm) {
-        const ts = timed.filter(x => !fast.has(x)).map(x => x.t);
-        const room = ts.length ? ((Math.max(...ts) - Math.min(...ts)) / 60000 + 3) * this.PERMIN : 0;
-        if (sm > room) { v.timeKg += sm - room; sm = room; }
-      }
-      s = Math.min(s + sm, this.DAY);
+      s = Math.min(s, this.DAY);
       const wkey = Fitness._dateStr(WorkoutHistory._monday(new Date(ds + 'T00:00:00')));
       const room = Math.max(0, this.WEEK - (wk[wkey] || 0)); s = Math.min(s, room); wk[wkey] = (wk[wkey] || 0) + s;
       v.raw += raw; v.all += s; v.days++;
@@ -1203,7 +1211,7 @@ const VolTier = {
       if (ds >= mon) v.week += s;
       if (ds >= m1) v.month += s;
     }
-    v.cut = Math.max(0, v.raw - v.all - v.timeKg);
+    v.cut = Math.max(0, v.raw - v.all);
     this._c = { key, t: Date.now(), v };
     return v;
   },
@@ -1277,12 +1285,10 @@ const VolTier = {
       <div class="vt-rank">${r && r.rank ? `<b class="num">${r.rank.toLocaleString('ko-KR')}등</b><span>전체 ${r.total.toLocaleString('ko-KR')}명 중 · 이 단계에 ${(L[t.lv] || 1).toLocaleString('ko-KR')}명</span>` : '<span>순위를 불러오는 중…</span>'}</div>
       ${r && r.total && r.avgLv != null ? this._cmp(s.all, r) : ''}
       ${t.next ? `<div class="vt-bar"><i style="width:${t.pct.toFixed(1)}%"></i></div><p class="vt-left">다음 Lv.${t.lv + 1}(${this.kg(t.next[1])})까지 <b class="num">${this.kg(Math.max(0, t.next[1] - s.all))}</b> 남음 — 무엇인지는 닿으면 보입니다</p>` : ''}
-      <p class="vt-rule"><b>운동 모드</b>에서 세트를 하나씩 체크한 기록만 들어갑니다. 세트 사이에 실제로 쉬고, 운동한 시간에 맞는 만큼만 셉니다. 카드의 ‘기록’ 이나 AI 비서로 적은 운동은 기록으로만 남고 여기에는 더해지지 않습니다.</p>
-      ${s.unvSets || s.fastSets || s.timeKg ? `<p class="vt-cut">들어가지 않은 기록 <b class="num">${this.kg(s.unvKg + s.timeKg)}</b> — ${[s.unvSets ? `운동 모드 밖에서 적은 ${s.unvSets}세트` : '', s.fastSets ? `너무 빨리 체크한 ${s.fastSets}세트` : '', s.timeKg ? `운동 시간보다 많은 ${this.kg(s.timeKg, true)}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
       ${s.cut > 0 ? `<p class="vt-cut">비정상적으로 큰 기록(${s.cutSets}세트)의 <b class="num">${this.kg(s.cut)}</b>은 레벨에 넣지 않았습니다. 기록은 그대로 남아 있습니다.</p>` : ''}
       <div class="vt-lh"><span>전체 ${this.T.length}단계</span><span>인원 · 무게</span></div>
       <ol class="vt-ladder">${ladder}</ol>
-      <p class="pg-note">총볼륨 = 운동 모드에서 체크한 세트의 무게 × 횟수를 모두 더한 값입니다. 바로 앞 세트 체크로부터 ‘횟수×2초+20초’ 안에 체크한 세트, 운동 시간(첫 체크~마지막 체크) 1분당 500kg 을 넘는 부분은 세지 않습니다. 맨몸 운동(무게 0)과 유산소는 들어가지 않고, 한 세트 무게(기구별 상한)·50회·지난 최고의 1.5배, 하루 40톤·한 주 150톤까지만 셉니다. 순위에는 숫자만 올라가고 이름은 공유되지 않습니다. 비교 대상의 무게는 널리 알려진 어림값입니다.</p>
+      <p class="pg-note">총볼륨 = 지금까지 든 무게 × 횟수를 모두 더한 값입니다. 운동 모드든 직접 적은 기록이든 모두 들어가지만, 사람이 할 수 있는 최고치(최정상 보디빌더 기준)를 넘는 것은 빼고 셉니다 — 한 세트 무게(기구별 상한: 덤벨 91·바벨 365·하체 머신 1,045kg 등)·50회·지난 최고의 1.5배+10kg, 하루 40톤·한 주 150톤. 맨몸 운동(무게 0)과 유산소는 들어가지 않습니다. 순위에는 숫자만 올라가고 이름은 공유되지 않습니다. 비교 대상의 무게는 널리 알려진 어림값입니다.</p>
       <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div>`;
     };
     App.openModal('@dumbbell 들어 올린 무게', `<div class="fz fz-vt" id="vtBody">${body(this.rank())}</div>`);

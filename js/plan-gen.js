@@ -436,7 +436,6 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
         <div class="lg-sum-i"><span>지난번 · <span class="num">${prev.ds.slice(5).replace('-', '/')}</span></span><b class="num">${prev.sets.map(s => `${s.w || 0}×${s.r || 0}`).join('  ')}</b></div>
         ${nx != null ? `<div class="lg-sum-i lg-next"><span>오늘 권장</span><b class="num">${nx}<small>kg</small></b></div>` : ''}
       </div>` : `<p class="fz-note">처음 기록입니다. 2~3회 더 할 수 있는 무게로 시작하세요.</p>`}
-      <p class="lg-vt">여기서 적은 기록은 ‘들어 올린 무게’ 에 더해지지 않습니다 — 운동 모드에서 세트를 체크해야 들어갑니다.</p>
       <div class="lg-head"><span>세트</span><span>무게 kg</span><span></span><span>횟수</span></div>
       <div id="lgRows" class="lg-rows">${Array.from({ length: n }, (_, i) => this._lgRow(i, cur[i])).join('')}</div>
       <button class="fz-act" onclick="PlanGen._lgAdd()">${ic('plus')}<span>세트 추가</span></button>
@@ -467,19 +466,13 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
   _lgAdd() { const b = document.getElementById('lgRows'); if (b) b.insertAdjacentHTML('beforeend', this._lgRow(b.children.length)); },
   _lgSave() {
     const { name, ds } = this._lg || {}; if (!name) return;
-    const L = this.log(ds), old = L[name] || [];
-    // 운동 모드에서 체크한 세트(t)는 무게·횟수를 그대로 두면 그 표시를 지킨다. 새로 적거나 고친 세트는 u(들어 올린 무게에 넣지 않음)
-    const sets = [...document.querySelectorAll('#lgRows .lg-row')].map((r, i) => {
-      const s = { w: Number(r.querySelector('.lg-w').value) || 0, r: Number(r.querySelector('.lg-r').value) || 0 }, o = old[i];
-      if (o && Number(o.w) === s.w && Number(o.r) === s.r) { if (o.t) s.t = o.t; else if (o.u) s.u = 1; } else s.u = 1;
-      return s;
-    }).filter(s => s.r > 0);
-    const add = sets.some(s => s.u && s.w > 0);
-    if (sets.length) L[name] = sets; else delete L[name];
+    const sets = [...document.querySelectorAll('#lgRows .lg-row')].map(r => ({ w: Number(r.querySelector('.lg-w').value) || 0, r: Number(r.querySelector('.lg-r').value) || 0 })).filter(s => s.r > 0);
+    const L = this.log(ds); if (sets.length) L[name] = sets; else delete L[name];
     this.saveLog(ds, L);
     App.closeModal();
     try { Fitness.render(new Date(ds + 'T00:00:00')); } catch (e) {}
-    App.showToast(sets.length ? `${sets.length}세트 기록됨${add ? ' · 들어 올린 무게에는 운동 모드 기록만 더해집니다' : ''}` : '기록을 지웠습니다', 'success');
+    const vw = sets.length && typeof VolTier !== 'undefined' ? VolTier.warn(name, sets, ds) : '';
+    App.showToast(sets.length ? `${sets.length}세트 기록됨${vw ? ' · ' + vw : ''}` : '기록을 지웠습니다', vw ? '' : 'success');
   },
 
   // ── 운동 교체 ───────────────────────────

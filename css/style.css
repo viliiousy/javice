@@ -3888,8 +3888,3 @@ html.dark .vt-ic img, html.dark .ftr-ic img{ filter:invert(1); }
 .fz-vt .vt-cn{ font-size:12px; font-weight:600; color:var(--text); line-height:1.3; word-break:keep-all; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:2.6em; }
 .fz-vt .vt-cv{ font-size:13px; font-weight:700; color:var(--text); }
 .fz-vt .vt-cs{ font-size:10.5px; color:var(--text3); }
-
-/* 들어 올린 무게 — 어떤 기록이 들어가는지 */
-.fz-vt .vt-rule{ margin:12px 0 0; font-size:12.5px; line-height:1.55; color:var(--text3); }
-.fz-vt .vt-rule b{ color:var(--text2); font-weight:600; }
-.lg-vt{ margin:0 0 10px; font-size:12px; line-height:1.5; color:var(--text3); }
