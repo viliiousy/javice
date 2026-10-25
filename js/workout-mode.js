@@ -1251,46 +1251,73 @@ const VolTier = {
   // 오늘의 운동 카드 아래 진행 칸 — 한 줄(주황 진행줄)이 이전 단계 아이콘 밑에서 다음 단계 아이콘 밑까지 이어진다.
   //   위: 'Lv.N 이름'  가운데: 아이콘(지금 단계는 진행도만큼 오른쪽에)  줄  아래: 무게(지금 단계는 내 총볼륨)
   //   등수는 이 칸을 눌러 여는 '들어 올린 무게' 시트에서 보여 준다.
-  // 그날 운동을 하나라도 체크하면 그날 든 무게만큼을 한 줄로 — '+8톤 200kg · 비즈니스 제트기만큼'
-  //   그날 볼륨은 총볼륨에 넣는 것과 같은 기준(상한 적용)이고, 그 무게 아래로 가장 가까운 단계의 사물과 아이콘을 보여 준다.
-  _dayLine(d, s) {
+  // 그날 든 무게(체크한 운동 기준). 하나도 체크 안 했으면 0
+  _dayVol(d, s) {
     try {
-      if (!(s.day > 0)) return '';
+      if (!(s.day > 0)) return 0;
       const list = Fitness.exercisesFor(d).list, chk = Fitness._checked(d);
-      if (!chk.some(i => i < list.length)) return '';   // 운동을 하나라도 체크했으면 바로 보여 준다
-      const dt = this.tier(s.day), ds = Fitness._dateStr(d), isT = ds === Fitness._dateStr(new Date());
-      const when = isT ? '오늘' : `${d.getMonth() + 1}/${d.getDate()}`;
-      return `<span class="ftr-day">${dt.now ? this.img(dt.lv, 'ftr-dic') : ''}<span class="ftr-dt">${when} <b class="num">+${this.kg(s.day)}</b>${dt.now ? ` · <em>${esc(dt.now[0])}</em>만큼 들었어요` : ''}</span></span>`;
-    } catch (e) { return ''; }
+      const live = typeof WorkoutMode !== 'undefined' && WorkoutMode.st && WorkoutMode.st.ds === Fitness._dateStr(d);
+      return (live || chk.some(i => i < list.length) || !list.length) ? s.day : 0;
+    } catch (e) { return 0; }
   },
+  // 오늘의 운동 카드 아래 진행 칸 — 한 줄(주황 진행줄)이 이전 단계 아이콘 밑에서 다음 단계 아이콘 밑까지 이어진다.
+  //   위: 'Lv.N 이름'  가운데: 아이콘  줄  아래: 무게(지금 단계는 내 총볼륨). 등수는 칸을 눌러 여는 시트에서.
+  //   그날 든 무게는 이전↔지금, 지금↔다음 중 넓은 틈 가운데에 '+720kg' 과 그 무게만 한 사물 아이콘으로.
+  //   값이 바뀌면(세트·운동 체크) 숫자가 올라가고 줄·아이콘이 미끄러진다 — 직전에 보여 준 값을 기억해 거기서부터.
+  _shown: null,
   chip(d) {
     try {
       const s = this.sums(d); if (!s.all) return '';
+      const ds = Fitness._dateStr(d);
       const t = this.tier(s.all), prev = t.lv > 1 ? this.T[t.lv - 2] : null;
-      // 지금 단계(글자·아이콘·총볼륨)는 한 세로줄에. 양 끝(이전·다음)과 겹치지 않는 32%~68% 구간을 출발·도착점으로 삼고,
-      // 진행도 0~100%를 그 안에 나눠 놓는다. 주황 줄은 거기까지 채운다.
-      const p = t.next ? t.pct : 100, pl = 32 + p * 0.36;
+      const pos = v => { const q = this.tier(v); return 32 + (q.next ? q.pct : 100) * 0.36; };
+      const pl = pos(s.all), dv = this._dayVol(d, s);
+      const was = this._shown && this._shown.ds === ds ? this._shown : null;
+      const same = was && was.lv === t.lv, up = was && t.lv > was.lv;
+      const fromPl = same ? was.pl : pl, fromAll = was ? was.all : s.all, fromDay = was ? was.day : dv;
+      this._shown = { ds, all: s.all, day: dv, lv: t.lv, pl };
       if (!this._syncing) { this._syncing = true; setTimeout(() => this.sync().finally(() => { this._syncing = false; }), 300); }
-      // 이름은 한 줄로 — 칸(80px)에 안 들어가면 글자를 줄인다(한글 1em, 영문·숫자·공백 0.55em 으로 어림)
       const nm = (lv, name) => {
-        const w = [...`Lv.${lv} ${name}`].reduce((t, c) => t + (/[\u3131-\uD79D]/.test(c) ? 1 : 0.58), 0);
-        const fs = Math.max(8.5, Math.min(10.5, 78 / w));   // 8.5px 보다 작아지면 끝을 … 로 줄인다
+        const w = [...`Lv.${lv} ${name}`].reduce((a, c) => a + (/[ㄱ-힝]/.test(c) ? 1 : 0.58), 0);
+        const fs = Math.max(8.5, Math.min(10.5, 78 / w));
         return `<span class="ftr-nmi" style="font-size:${fs.toFixed(1)}px"><b class="num">Lv.${lv}</b> ${name}</span>`;
       };
-      return `<button type="button" class="fit-tier" onclick="VolTier.open('${Fitness._dateStr(d)}')" aria-label="들어 올린 무게 Lv.${t.lv}">
+      const mid = pl >= 50 ? pl / 2 : (pl + 100) / 2, dt = dv > 0 ? this.tier(dv) : null;
+      const day = dv > 0 ? `<span class="ftr-dv num" style="left:${mid.toFixed(1)}%" data-cu="kg" data-from="${fromDay}" data-to="${dv}">+${this.kg(fromDay, true)}</span>
+          <span class="ftr-at ftr-dm" style="left:${mid.toFixed(1)}%" title="${dt && dt.now ? esc(dt.now[0]) + '만큼' : ''}">${dt && dt.now ? this.img(dt.lv, 'ftr-ic ftr-dic') : '<span class="ftr-ic ftr-dic ftr-d0"></span>'}</span>` : '';
+      if (up) setTimeout(() => { try { App.showToast(`Lv.${t.lv} ${t.now[0]} 달성!`, 'success'); Haptic.success(); } catch (e) {} }, 700);
+      return `<button type="button" class="fit-tier${up ? ' ftr-up' : ''}" data-anim="1" onclick="VolTier.open('${ds}')" aria-label="들어 올린 무게 Lv.${t.lv}${dv > 0 ? ', 오늘 ' + this.kg(dv) : ''}">
         <span class="ftr-trk">
           <span class="ftr-nm" style="left:0%">${prev ? nm(t.lv - 1, esc(prev[0])) : '시작'}</span>
-          <span class="ftr-nm ftr-cur" style="left:${pl.toFixed(1)}%">${t.now ? nm(t.lv, esc(t.now[0])) : '시작 전'}</span>
+          <span class="ftr-nm ftr-cur ftr-mv" style="left:${fromPl.toFixed(1)}%" data-left="${pl.toFixed(1)}">${t.now ? nm(t.lv, esc(t.now[0])) : '시작 전'}</span>
           <span class="ftr-nm" style="left:100%">${t.next ? nm(t.lv + 1, '???') : '끝'}</span>
           <span class="ftr-at" style="left:0%">${prev ? this.img(t.lv - 1, 'ftr-ic ftr-dim') : this.img(0, 'ftr-ic')}</span>
           <span class="ftr-at" style="left:100%">${t.next ? this.img('q', 'ftr-ic') : this.img(t.lv, 'ftr-ic')}</span>
-          <span class="ftr-at ftr-me" style="left:${pl.toFixed(1)}%">${this.img(t.lv, 'ftr-ic')}</span>
-          <span class="ftr-bar"><i style="width:${pl.toFixed(1)}%"></i></span>
+          <span class="ftr-at ftr-me ftr-mv" style="left:${fromPl.toFixed(1)}%" data-left="${pl.toFixed(1)}">${this.img(t.lv, 'ftr-ic')}</span>
+          ${day}
+          <span class="ftr-bar"><i class="ftr-mv" style="width:${fromPl.toFixed(1)}%" data-width="${pl.toFixed(1)}"></i></span>
           <span class="ftr-v" style="left:0%">${prev ? this.kg(prev[1], true) : '0kg'}</span>
-          <span class="ftr-v ftr-cur" style="left:${pl.toFixed(1)}%">${this.kg(s.all)}</span>
+          <span class="ftr-v ftr-cur ftr-mv" style="left:${fromPl.toFixed(1)}%" data-left="${pl.toFixed(1)}" data-cu="kgl" data-from="${fromAll}" data-to="${s.all}">${this.kg(fromAll)}</span>
           <span class="ftr-v" style="left:100%">${t.next ? this.kg(t.next[1], true) : ''}</span>
-        </span>${this._dayLine(d, s)}</button>`;
+        </span></button>`;
     } catch (e) { return ''; }
+  },
+  // 화면에 막 그린 칸을 움직인다: data-left/data-width 로 미끄러지고, data-cu 숫자는 from→to 로 올라간다
+  anim(root) {
+    const els = (root || document).querySelectorAll('[data-cu],[data-left],[data-width]'); if (!els.length) return;
+    const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      els.forEach(el => { if (el.dataset.left) el.style.left = el.dataset.left + '%'; if (el.dataset.width) el.style.width = el.dataset.width + '%'; delete el.dataset.left; delete el.dataset.width; });
+      els.forEach(el => {
+        if (!el.dataset.cu) return;
+        const a = Number(el.dataset.from) || 0, b = Number(el.dataset.to) || 0, kind = el.dataset.cu; delete el.dataset.cu;
+        const fmt = v => kind === 'n' ? Math.round(v).toLocaleString('ko-KR') : kind === 'kg' ? '+' + this.kg(v, true) : this.kg(v);
+        if (a === b || reduce) { el.textContent = fmt(b); return; }
+        el.classList.add('cu-on'); const t0 = performance.now(), T = 900;
+        const step = now => { const k = Math.min(1, (now - t0) / T), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(a + (b - a) * e); if (k < 1) requestAnimationFrame(step); else el.classList.remove('cu-on'); };
+        requestAnimationFrame(step);
+      });
+    }));
   },
   // 내 볼륨 · 평균 볼륨 · 모두 합친 볼륨을 아이콘으로 나란히 — 각각 어느 단계 사물만큼인지
   _cmp(mine, r) {

@@ -109,6 +109,8 @@ const Fitness = {
     this._renameAuto();
     try { if (typeof WorkoutMode!=='undefined') WorkoutMode.staleCheck(); } catch(e) {}
     const d    = new Date(date);
+    // 다 그린 뒤 들어 올린 무게·총 볼륨 숫자가 올라가고 줄이 미끄러지게
+    setTimeout(()=>{ try{ if(typeof VolTier!=='undefined') VolTier.anim(document.getElementById('fitnessWrap')); }catch(e){} }, 0);
     const dow  = planIdx!==null ? planIdx : d.getDay();
     const { plan, list:allEx } = planIdx!==null && planIdx!==d.getDay() ? { plan:this.planFor(dow), list:this.planFor(dow).exercises.map((x,i)=>({...x,pi:i,key:'p'+i})) } : this.exercisesFor(d);
     const chk  = this._checked(d);
@@ -1008,11 +1010,19 @@ const Fitness = {
   },
 
   // 그날 총 볼륨 · 세트 · 소모 열량 (누르면 추이)
-  _totHtml(d){ try{ const t=WorkoutHistory.day(this._dateStr(d), true), b={ kcal:t.kcal }; return (b.kcal||t.sets) ? `<button type="button" class="fit-burn fit-tot" onclick="WorkoutHistory.openAll()">
-        <span class="ft-c"><b class="num">${Math.round(t.vol).toLocaleString('ko-KR')}</b><i>kg</i><small>총 볼륨</small></span>
-        <span class="ft-c"><b class="num">${t.sets}</b><i>세트</i><small>${t.reps}회</small></span>
-        <span class="ft-c"><b class="num">${b.kcal.toLocaleString('ko-KR')}</b><i>kcal</i><small>소모 열량(추정)</small></span>
-        <span class="ft-go">추이</span></button>${typeof VolTier!=='undefined'?VolTier.chip(d):''}` : (typeof VolTier!=='undefined'?VolTier.chip(d):''); }catch(e){ return ''; } },
+  // 직전에 보여 준 값(같은 날) — 바뀌면 거기서부터 숫자가 올라간다
+  _totShown: null,
+  _totHtml(d){ try{ const ds=this._dateStr(d), t=WorkoutHistory.day(ds, true), b={ kcal:t.kcal };
+    const w=this._totShown&&this._totShown.ds===ds?this._totShown:{vol:t.vol,sets:t.sets,kcal:b.kcal}; this._totShown={ds,vol:t.vol,sets:t.sets,kcal:b.kcal};
+    const cu=(k,v)=>`data-cu="n" data-from="${Math.round(w[k]||0)}" data-to="${Math.round(v)}"`;
+    // 그날 총 볼륨만 한 사물(들어 올린 무게 단계) 아이콘 — 오른쪽에
+    const vt=typeof VolTier!=='undefined'&&t.vol>=70?VolTier.tier(t.vol):null;
+    const vic=vt&&vt.now?`<span class="ft-vic" title="${esc(vt.now[0])}만큼">${VolTier.img(vt.lv,'ftr-ic')}<small>${esc(vt.now[0])}</small></span>`:'';
+    return (b.kcal||t.sets) ? `<button type="button" class="fit-burn fit-tot" onclick="WorkoutHistory.openAll()">
+        <span class="ft-c"><b class="num" ${cu('vol',t.vol)}>${Math.round(w.vol||0).toLocaleString('ko-KR')}</b><i>kg</i><small>총 볼륨</small></span>
+        <span class="ft-c"><b class="num" ${cu('sets',t.sets)}>${w.sets||0}</b><i>세트</i><small>${t.reps}회</small></span>
+        <span class="ft-c"><b class="num" ${cu('kcal',b.kcal)}>${Math.round(w.kcal||0).toLocaleString('ko-KR')}</b><i>kcal</i><small>소모 열량(추정)</small></span>
+        ${vic}<span class="ft-go">추이</span></button>${typeof VolTier!=='undefined'?VolTier.chip(d):''}` : (typeof VolTier!=='undefined'?VolTier.chip(d):''); }catch(e){ return ''; } },
 
   // ── 운동 소모 열량(추정) ─────────────────
   // 그날 한 운동만 센다: 체크했거나 무게 기록이 있는 종목.

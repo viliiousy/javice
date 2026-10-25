@@ -3898,10 +3898,20 @@ html.dark .vt-ic img, html.dark .ftr-ic img{ filter:invert(1); }
 @media (hover:hover){ .lg-sw:hover .lg-row{ transform:translateX(-72px); } .lg-sw:hover .lg-del{ opacity:1 !important; pointer-events:auto !important; } }
 .lg-hint{ margin:2px 0 0; font-size:11.5px; color:var(--text3); }
 
-/* 들어 올린 무게 칸 — 그날 운동을 끝내면 그날 든 무게와 같은 단계의 사물 한 줄 */
-.fit-tier .ftr-day{ display:flex; align-items:center; justify-content:center; gap:8px; margin:8px 0 0; padding-top:10px; border-top:1px dashed var(--border); font-size:12.5px; color:var(--text2); }
-.fit-tier .ftr-dic{ width:28px; height:28px; flex:none; display:inline-flex; }
-.fit-tier .ftr-dic img{ width:100%; height:100%; object-fit:contain; }
-html.dark .fit-tier .ftr-dic img{ filter:invert(1); }
-.fit-tier .ftr-dt b{ color:var(--accent); font-weight:700; }
-.fit-tier .ftr-dt em{ font-style:normal; font-weight:600; color:var(--text); }
+/* 들어 올린 무게 칸 — 그날 든 무게: 넓은 틈 가운데 '+720kg' 과 그 무게만 한 사물 */
+.fit-tier .ftr-dv{ position:absolute; transform:translateX(-50%); bottom:74px; font-size:11px; font-weight:700; color:var(--accent); white-space:nowrap; }
+.fit-tier .ftr-dm{ top:40px; }
+.fit-tier .ftr-dic{ width:26px; height:26px; opacity:.85; }
+.fit-tier .ftr-d0{ display:block; }
+/* 값이 바뀔 때 미끄러지기·숫자 올라가기 */
+.fit-tier .ftr-mv{ transition:left .9s cubic-bezier(.2,.8,.2,1), width .9s cubic-bezier(.2,.8,.2,1); }
+.fit-tier .cu-on{ color:var(--accent); }
+.fit-tier.ftr-up .ftr-me .ftr-ic{ animation:ftrPop .9s .5s both; }
+@keyframes ftrPop{ 0%{ transform:scale(1); } 40%{ transform:scale(1.35); } 100%{ transform:scale(1); } }
+@media (prefers-reduced-motion:reduce){ .fit-tier .ftr-mv{ transition:none; } .fit-tier.ftr-up .ftr-me .ftr-ic{ animation:none; } }
+/* 오늘의 운동 합계 줄 — 총 볼륨만 한 사물 아이콘 */
+.fit-tot .ft-vic{ display:flex; flex-direction:column; align-items:center; gap:1px; flex:none !important; margin-left:auto; max-width:72px; }
+.fit-tot .ft-vic .ftr-ic{ width:30px; height:30px; }
+.fit-tot .ft-vic small{ font-size:10px; color:var(--text3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:72px; }
+.fit-tot .ft-vic + .ft-go{ margin-left:8px; }
+.fit-tot .cu-on{ color:var(--accent); }
