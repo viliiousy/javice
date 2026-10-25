@@ -3804,3 +3804,6 @@ html:not(.card-free) .card-head.cl-hold{ position:relative; }
   html.card-free .card-inbody .ib-tile, html.card-grid .card-inbody .ib-tile{ padding-right:8px !important; }
   html.card-free .card-inbody .ib-tile + .ib-tile, html.card-grid .card-inbody .ib-tile + .ib-tile{ padding-left:8px !important; }
 }
+/* 운동 고르기: 기구 칩(부위 칩 아래 한 줄, 조금 작게) */
+.ex-eqs{ margin-top:-3px; }
+.ex-eqs .ex-part{ font-size:12px; padding:3px 9px; opacity:.92; }

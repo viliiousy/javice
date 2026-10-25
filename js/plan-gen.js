@@ -16,12 +16,29 @@ const PlanGen = {
 
   EQUIP: [
     ['dumbbell', '덤벨'], ['barbell', '바벨·랙'], ['machine', '머신'], ['cable', '케이블'],
-    ['bar', '철봉(풀업바)'], ['band', '밴드'], ['kettlebell', '케틀벨'], ['trx', 'TRX·링'],
+    ['bar', '철봉·딥스바'], ['band', '밴드'], ['kettlebell', '케틀벨'], ['trx', 'TRX·링'], ['etc', '기타 기구'],
   ],
+  // 이름만으로는 틀리게 나오는 종목 — 기구를 직접 적는다(2026-10, 플랜핏 운동 가이드의 기구 분류와 맞춰 봄)
+  EQ_FIX: {
+    '고릴라 로우':'dumbbell', '레니게이드 로우':'dumbbell', '인클라인 로우':'dumbbell', '루 레이즈':'dumbbell', '숄더 투 숄더 프레스':'dumbbell',
+    '아놀드 프레스':'dumbbell', '웨이터 컬':'dumbbell', '컨센트레이션 컬':'dumbbell', '크로스 바디 해머 컬':'dumbbell', '조트맨 컬':'dumbbell',
+    '데빌 프레스':'dumbbell', 'B-Stance 루마니안 데드리프트':'dumbbell', '오버헤드 덤벨 트라이셉스 익스텐션':'dumbbell',
+    '리버스 그립 오버 헤드 프레스':'barbell', '박스 스쿼트':'barbell', '제르셔 스쿼트':'barbell', '퍼즈 스쿼트':'barbell', '바벨 핵 스쿼트':'barbell', '메도우스 로우':'barbell',
+    '버티컬 트랙션':'machine', '투웨이 로우':'machine', '플레이트 로디드 시티드 로우':'machine', '버티컬 체스트 프레스':'machine', '스탠딩 체스트 프레스':'machine',
+    '잭해머 푸쉬다운':'machine', '해머 벤치 프레스':'machine', '바이킹 프레스':'machine', '글루트 햄 레이즈':'machine', '리버스 브이 스쿼트':'machine',
+    '버티컬 레그프레스':'machine', '벨트 스쿼트':'machine', '브이 스쿼트':'machine', '브이 스쿼트 굿모닝':'machine', '스쿼트 프레스':'machine',
+    '캡틴스 체어 레그 레이즈':'machine', '토르소 로테이션':'machine', '펙 플라이 머신':'machine',
+    '스키 에르그':'machine', '스텝 밀':'machine', '스텝퍼':'machine', '스핀 바이크':'machine', '싸이클':'machine', '에어 바이크':'machine',
+    '트레드밀 러닝':'machine', '인클라인 트레드밀 러닝':'machine', '좌식 싸이클':'machine', '무동력 트레드밀':'machine',
+    '베이지안 컬':'cable', '페이스 어웨이 베이지안 컬':'cable', '케이블 사이드 밴드':'cable', '암 크로스오버':'body',
+    '딥스':'bar', '중량 딥스':'bar',
+  },
 
   // 운동 이름 → 쓰는 기구. 이름에 기구가 들어 있어서 규칙으로 충분하다.
   equipOf(n) {
     n = String(n || '');
+    if (this.EQ_FIX[n]) return this.EQ_FIX[n];
+    if (/짐볼|보수볼|메디신볼|스텝 ?박스|박스 점프|배틀 로프|슬레드|리스트 롤러|악력기|AB 슬라이드|줄넘기|큰줄|훌라후프/.test(n)) return 'etc';
     if (/덤벨|고블릿/.test(n) && !/케틀벨/.test(n)) return 'dumbbell';
     if (/케틀벨/.test(n)) return 'kettlebell';
     if (/밴드/.test(n)) return 'band';
@@ -105,12 +122,17 @@ const PlanGen = {
   ban(name) { const b = this.bans(); if (!b.includes(name)) { b.push(name); UserStore.set(this.BAN_KEY, JSON.stringify(b)); window.FirebaseSync?.scheduleSave?.(); } },
 
   // 이 사람이 쓸 수 있는 기구 (맨몸은 늘 가능)
-  ALL_EQUIP: ['dumbbell', 'barbell', 'machine', 'cable', 'bar', 'band', 'kettlebell', 'trx'],
+  ALL_EQUIP: ['dumbbell', 'barbell', 'machine', 'cable', 'bar', 'band', 'kettlebell', 'trx', 'etc'],
   // 운동 장소: 이름을 붙여 여러 곳(헬스장 A·회사 헬스장·집…)을 두고, 장소마다 보유 운동기구를 따로 저장한다.
   // 예전 설정(loc: gym/home/body + equip)은 첫 장소로 옮겨 온다. '추천하지 않을 기구'(exclude)는 장소와 상관없이 사람에게 붙는다.
   places(p) {
     p = p || this.profile() || {};
-    if (Array.isArray(p.places) && p.places.length) return p.places;
+    // '기타 기구'(박스·짐볼·배틀 로프 …)는 2026-10 에 생겼다 — 그 전에 만든 장소는 머신이 있으면(헬스장) 있는 것으로 본다
+    if (Array.isArray(p.places) && p.places.length) return p.places.map(pl => {
+      if (!pl || pl.v2) return pl;
+      const eq = pl.equip || [];
+      return Object.assign(pl, { v2: 1, equip: eq.includes('machine') && !eq.includes('etc') ? eq.concat('etc') : eq });
+    });
     const loc = p.loc || 'gym';
     return [{ id: 'pl_' + loc, name: loc === 'gym' ? '헬스장' : loc === 'home' ? '집' : '집 (맨몸)',
       equip: loc === 'gym' ? this.ALL_EQUIP.slice() : loc === 'body' ? (p.equip || []).filter(e => e === 'bar' || e === 'band') : (p.equip || []).slice() }];
@@ -311,7 +333,7 @@ const PlanGen = {
   _addPlace() {
     const name = prompt('운동 장소 이름 (예: 회사 헬스장, 집)'); if (!name || !name.trim()) return;
     const id = 'pl_' + Date.now().toString(36);
-    this._p.places = (this._p.places || this.places(this._p)).concat({ id, name: name.trim().slice(0, 20), equip: this.ALL_EQUIP.slice() });
+    this._p.places = (this._p.places || this.places(this._p)).concat({ id, name: name.trim().slice(0, 20), equip: this.ALL_EQUIP.slice(), v2: 1 });
     this._p.place = id; this._paint();
   },
   _togglePlaceEq(e) {

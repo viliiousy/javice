@@ -51,7 +51,7 @@ const FitSettings = {
   addPlace() {
     const name = prompt('운동 장소 이름 (예: 회사 헬스장, 동네 헬스장, 집)'); if (!name || !name.trim()) return;
     const p = this._p(), id = 'pl_' + Date.now().toString(36);
-    p.places.push({ id, name: name.trim().slice(0, 20), equip: PlanGen.ALL_EQUIP.slice() });
+    p.places.push({ id, name: name.trim().slice(0, 20), equip: PlanGen.ALL_EQUIP.slice(), v2: 1 });
     p.place = id; this._save(p);
     App.showToast('새 장소를 만들었습니다 — 없는 기구를 눌러 꺼 주세요');
   },
