@@ -1085,8 +1085,8 @@ const NumIn = {
 
 // ── 들어 올린 무게 티어 ─────────────────────────────
 // 총 볼륨(무게 × 횟수의 합)을 '무엇을 들어 올린 셈인지' 로 바꿔 보여 준다. 오늘 · 이번 주 · 이번 달 · 지금까지.
-// 단계는 js/vol-tier-data.js 의 300개(고양이 → … → 태양). 꾸준히 2~3년 하면 '아파트 한 동(1만 톤)' 언저리에 닿도록
-// 수백~수만 톤 구간을 촘촘하게 두었다. 그림은 img/vt/NNN.webp.
+// 단계는 js/vol-tier-data.js 의 약 300개(우유 → … → 태양). 2~3년 동안 쌓이는 구간은 배수 단계로 촘촘하게.
+// 그림은 img/vt/NNN.webp (단계마다 그림 번호를 따로 적어 배수 단계는 원래 그림을 다시 쓴다).
 const VolTier = {
   get T() { return typeof VT_DATA !== 'undefined' ? VT_DATA : [['고양이', 4.5]]; },
   IMG: 'img/vt/',
@@ -1119,7 +1119,8 @@ const VolTier = {
   cnt(n) { return n >= 100 ? Math.round(n).toLocaleString('ko-KR') : n >= 10 ? (Math.round(n * 10) / 10).toString() : (Math.round(n * 100) / 100).toString(); },
   img(lv, cls = 'vt-ic') {
     if (!lv) return `<span class="${cls} vt-ic0"></span>`;
-    return `<span class="${cls}"><img src="${this.IMG}${String(lv).padStart(3, '0')}.webp" alt="" loading="lazy" onerror="this.remove()"></span>`;
+    const ic = (this.T[lv - 1] && this.T[lv - 1][2]) || lv;
+    return `<span class="${cls}"><img src="${this.IMG}${String(ic).padStart(3, '0')}.webp" alt="" loading="lazy" onerror="this.remove()"></span>`;
   },
   // 기간별 볼륨 — 기록 칸(gl_fit_log_날짜)을 한 번에 훑는다(1분 기억)
   sums(base) {
@@ -1142,7 +1143,7 @@ const VolTier = {
     this._c = { key, t: Date.now(), v };
     return v;
   },
-  line(v) { const t = this.tier(v); return t.now ? `${t.now[0]} ${this.cnt(t.n)}개 분량` : (v > 0 ? `${this.T[0][0]}까지 ${Math.floor(t.pct)}%` : '아직 기록 없음'); },
+  line(v) { const t = this.tier(v); return t.now ? `${t.now[0]} 넘음` : (v > 0 ? `${this.T[0][0]}까지 ${Math.floor(t.pct)}%` : '아직 기록 없음'); },
   // 오늘의 운동 카드 아래 한 줄
   chip(d) {
     try {
