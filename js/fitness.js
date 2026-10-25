@@ -475,6 +475,7 @@ const Fitness = {
     const i=chk.indexOf(idx);
     if (i===-1) chk.push(idx); else chk.splice(i,1);
     this._save(chk,d);
+    if (window.VolTier) VolTier._c = null;   // 체크를 바꾸면 들어 올린 무게도 바로 다시 센다
     this.render(d);
   },
 

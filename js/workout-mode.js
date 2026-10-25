@@ -1167,6 +1167,19 @@ const VolTier = {
       return '';
     } catch (e) { return ''; }
   },
+  // 그날 운동 목록에 있는데 체크가 안 된 운동 이름들. CHK_FROM 이전 날짜는 예전처럼 기록만 있으면 센다(지난 기록이 갑자기 빠지지 않게).
+  CHK_FROM: '2026-10-26',
+  _unchecked(ds) {
+    if (ds < this.CHK_FROM) return new Set();
+    try {
+      const d = new Date(ds + 'T00:00:00'), { list } = Fitness.exercisesFor(d), chk = new Set(Fitness._checked(d));
+      const on = new Set(list.filter((_, i) => chk.has(i)).map(x => x.name));
+      // 운동 모드로 지금 하는 중이면 세트를 체크한 운동은 (종목을 다 끝내기 전이라도) 센다
+      const st = typeof WorkoutMode !== 'undefined' && WorkoutMode.st;
+      if (st && st.ds === ds) st.ex.forEach(e => { if (e.rows.some(r => r.ok)) on.add(e.name); });
+      return new Set(list.map(x => x.name).filter(n => !on.has(n)));
+    } catch (e) { return new Set(); }
+  },
   _cap(n) {
     const e = PlanGen.equipOf(n);
     if (e === 'machine' && PlanGen.partOf(n) === '하체') return this.CAP.machineLeg;
@@ -1189,7 +1202,9 @@ const VolTier = {
     const best = {}, wk = {}, capOf = {};
     for (const [ds, L] of days) {
       let s = 0, raw = 0; const dayBest = {};
+      const off = this._unchecked(ds);   // 그날 목록에서 체크를 푼 운동은 세지 않는다(체크를 풀면 볼륨·레벨도 되돌아간다)
       for (const [n, ss] of Object.entries(L)) {
+        if (off.has(n)) continue;
         if (!(n in capOf)) capOf[n] = this._cap(n);
         for (const x of ss || []) {
           const w = Number(x.w) || 0, r = Number(x.r) || 0; if (!(w > 0 && r > 0)) continue;

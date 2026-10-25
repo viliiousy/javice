@@ -502,6 +502,9 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
     const sets = [...document.querySelectorAll('#lgRows .lg-row')].map(r => ({ w: Number(r.querySelector('.lg-w').value) || 0, r: Number(r.querySelector('.lg-r').value) || 0 })).filter(s => s.r > 0);
     const L = this.log(ds); if (sets.length) L[name] = sets; else delete L[name];
     this.saveLog(ds, L);
+    // 기록을 적으면 그 운동을 체크한다(체크한 운동만 들어 올린 무게에 들어간다). 기록을 지우면 체크도 푼다.
+    try { const d = new Date(ds + 'T00:00:00'), list = Fitness.exercisesFor(d).list, i = list.findIndex(x => x.name === name), chk = Fitness._checked(d);
+      if (i >= 0) { const k = chk.indexOf(i); if (sets.length && k < 0) chk.push(i); if (!sets.length && k >= 0) chk.splice(k, 1); Fitness._save(chk, d); } } catch (e) {}
     App.closeModal();
     try { Fitness.render(new Date(ds + 'T00:00:00')); } catch (e) {}
     const vw = sets.length && typeof VolTier !== 'undefined' ? VolTier.warn(name, sets, ds) : '';
