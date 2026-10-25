@@ -731,6 +731,8 @@ module.exports = async (req, res) => {
       const G = require('../lib/gate');
       send(res, await G[body.act](body)); return;
     }
+    // 들어 올린 무게 순위 · 레벨별 인원 (lib/vt-rank.js)
+    if (body.act === 'vt') { const r = await require('../lib/vt-rank').vt(body); if (r.code) { res.status(r.code).json(r); return; } send(res, r); return; }
     if (body.act === 'stMine') {
       const me = await uidFromIdToken(body.idToken);
       if (!me) { res.status(401).json({ error: '로그인이 필요합니다' }); return; }

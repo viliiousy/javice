@@ -3814,46 +3814,60 @@ html:not(.card-free) .card-head.cl-hold{ position:relative; }
 .wk-time .wk-tnum i{ font-style:normal; font-size:17px; color:#8B8F97; }
 .wk-time .wk-note{ margin:6px 0 0; text-align:center; }
 /* 들어 올린 무게 티어 — 오늘의 운동 카드 아래 한 줄 + 시트 */
-.fit-tier{ display:grid; grid-template-columns:40px 1fr; align-items:center; column-gap:10px; row-gap:8px; width:100%; margin-top:10px; padding:10px 12px; border:1px solid var(--border); border-radius:14px; background:none; font:inherit; color:var(--text2); text-align:left; cursor:pointer; }
-.fit-tier .ftr-ic, .vt-ic{ display:block; border-radius:10px; background:none; overflow:hidden; flex:none; }
 /* 아이콘은 투명 바탕의 먹색 선 — 어두운 화면에서는 밝은 선으로 뒤집는다 */
-html.dark .vt-ic img, html.dark .fit-tier .ftr-ic img{ filter:invert(1); }
-.fit-tier .ftr-ic{ width:40px; height:40px; }
-.fit-tier .ftr-ic img, .vt-ic img{ width:100%; height:100%; object-fit:contain; display:block; }
+html.dark .vt-ic img, html.dark .ftr-ic img{ filter:invert(1); }
 .vt-ic0{ background:var(--border); }
-.fit-tier .ftr-tx{ display:flex; flex-direction:column; gap:1px; min-width:0; font-size:13px; }
-.fit-tier .ftr-tx > span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.fit-tier .ftr-lv{ font-size:12px; font-weight:700; color:var(--accent); }
-.fit-tier .ftr-tx b{ color:var(--text); font-weight:600; }
-.fit-tier .ftr-bar, .fz-vt .vt-bar{ grid-column:1 / -1; height:4px; border-radius:2px; background:var(--border); overflow:hidden; }
-.fit-tier .ftr-bar i, .fz-vt .vt-bar i{ display:block; height:100%; background:var(--accent); border-radius:2px; }
 .fz-vt .vt-hero{ display:flex; align-items:center; gap:16px; padding:4px 0 14px; }
 .fz-vt .vt-ic-h{ width:88px; height:88px; border-radius:0; }
 .fz-vt .vt-hx{ display:flex; flex-direction:column; gap:3px; min-width:0; }
 .fz-vt .vt-lv{ font-size:12px; font-weight:700; color:var(--accent); }
 .fz-vt .vt-hx b{ font-size:24px; font-weight:700; letter-spacing:-.5px; color:var(--text); line-height:1.2; }
 .fz-vt .vt-hx small{ font-size:13px; color:var(--text3); }
-.fz-vt .vt-tot{ display:flex; align-items:baseline; gap:8px; padding:12px 0 10px; border-top:1px solid var(--border); }
-.fz-vt .vt-tot span{ font-size:13px; color:var(--text3); }
-.fz-vt .vt-tot b{ font-size:20px; font-weight:700; color:var(--text); }
-.fz-vt .vt-tot small{ margin-left:auto; font-size:12px; color:var(--text3); }
 .fz-vt .vt-left{ font-size:12.5px; color:var(--text3); margin:8px 0 6px; }
 .fz-vt .vt-left b{ color:var(--text2); font-weight:600; }
-.fz-vt .vt-row{ display:grid; grid-template-columns:36px 56px 1fr; column-gap:10px; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); }
-.fz-vt .vt-ic-s{ width:36px; height:36px; border-radius:9px; grid-row:span 2; }
-.fz-vt .vt-lb{ font-size:13px; color:var(--text3); grid-row:span 2; }
-.fz-vt .vt-kg{ font-size:16px; font-weight:600; color:var(--text); }
-.fz-vt .vt-eq{ grid-column:3; font-size:12.5px; color:var(--text2); }
-.fz-vt .vt-lh{ margin:16px 0 6px; font-size:12px; font-weight:600; color:var(--text3); }
-.fz-vt .vt-ladder{ list-style:none; margin:0; padding:0; max-height:46vh; overflow:auto; border-top:1px solid var(--border); }
-.fz-vt .vt-ladder li{ display:grid; grid-template-columns:32px 30px 1fr auto; gap:8px; align-items:center; padding:6px 0; font-size:13px; color:var(--text3); border-bottom:1px solid var(--border); }
-.fz-vt .vt-ic-l{ width:30px; height:30px; opacity:.3; }
-.fz-vt .vt-ladder li.got .vt-ic-l{ opacity:1; }
-.fz-vt .vt-ladder .vt-n{ font-size:11.5px; text-align:right; }
-.fz-vt .vt-ladder li b{ font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.fz-vt .vt-ladder li em{ font-style:normal; font-size:12px; text-align:right; }
-.fz-vt .vt-ladder li.got{ color:var(--text); }
-.fz-vt .vt-ladder li.got .vt-n{ color:var(--accent); font-weight:700; }
-.fz-vt .vt-ladder li.nx{ background:color-mix(in srgb, var(--accent) 8%, transparent); color:var(--accent); }
 .fz-vt .vt-cut{ margin:12px 0 0; padding:10px 12px; border-radius:10px; background:color-mix(in srgb, var(--accent) 8%, transparent); font-size:12.5px; color:var(--text2); }
 .fz-vt .vt-cut b{ color:var(--text); }
+
+/* 들어 올린 무게 — 오늘의 운동 카드 아래: 이전 단계 ──(지금 단계가 걸어감)── 다음 단계(?) */
+.fit-tier{ display:block; width:100%; margin-top:10px; padding:12px 14px 10px; border:1px solid var(--border); border-radius:14px; background:none; font:inherit; color:var(--text2); text-align:left; cursor:pointer; }
+.fit-tier .ftr-hd{ display:flex; align-items:baseline; gap:8px; font-size:12.5px; }
+.fit-tier .ftr-lv{ font-weight:700; color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.fit-tier .ftr-tot{ color:var(--text3); white-space:nowrap; }
+.fit-tier .ftr-tot b{ color:var(--text); font-weight:600; }
+.fit-tier .ftr-rk{ margin-left:auto; color:var(--text3); white-space:nowrap; font-size:12px; }
+.fit-tier .ftr-trk{ display:grid; grid-template-columns:56px 1fr 56px; align-items:center; gap:6px; margin-top:8px; }
+.fit-tier .ftr-end{ display:flex; flex-direction:column; align-items:center; gap:2px; min-width:0; }
+.fit-tier .ftr-end small{ font-size:10.5px; color:var(--text3); max-width:56px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ftr-ic{ display:block; width:36px; height:36px; flex:none; }
+.ftr-ic img{ width:100%; height:100%; object-fit:contain; display:block; }
+.fit-tier .ftr-prev .ftr-ic{ opacity:.45; }
+.fit-tier .ftr-line{ position:relative; height:44px; }
+.fit-tier .ftr-line::before{ content:""; position:absolute; left:0; right:0; top:50%; border-top:1.5px dashed var(--border); }
+.fit-tier .ftr-fill{ position:absolute; left:0; top:calc(50% - 1px); height:2px; background:var(--accent); border-radius:1px; transition:width 1.1s cubic-bezier(.2,.8,.2,1); }
+.fit-tier .ftr-run{ position:absolute; top:50%; transform:translate(-50%,-50%); transition:left 1.1s cubic-bezier(.2,.8,.2,1); }
+.fit-tier .ftr-me{ width:40px; height:40px; animation:ftrWalk 1.6s ease-in-out infinite; }
+@keyframes ftrWalk{ 0%,100%{ transform:translateY(0) rotate(-2deg); } 50%{ transform:translateY(-3px) rotate(2deg); } }
+@media (prefers-reduced-motion: reduce){ .fit-tier .ftr-me{ animation:none; } .fit-tier .ftr-run, .fit-tier .ftr-fill{ transition:none; } }
+.vt-q{ display:flex !important; align-items:center; justify-content:center; border:1.5px dashed var(--border2, #c9ccd1); border-radius:50% !important; color:var(--text3); font-weight:600; font-size:15px; line-height:1; }
+.ftr-ic.vt-q{ width:30px; height:30px; margin:3px; }
+.fz-vt .vt-tot{ display:flex; align-items:baseline; gap:8px; padding:12px 0 4px; border-top:1px solid var(--border); }
+.fz-vt .vt-tot span{ font-size:13px; color:var(--text3); }
+.fz-vt .vt-tot b{ font-size:22px; font-weight:700; color:var(--text); }
+.fz-vt .vt-rank{ display:flex; align-items:baseline; gap:8px; padding:0 0 10px; font-size:12.5px; color:var(--text3); }
+.fz-vt .vt-rank b{ font-size:15px; color:var(--accent); font-weight:700; }
+.fz-vt .vt-lh{ display:flex; justify-content:space-between; margin:16px 0 6px; font-size:12px; font-weight:600; color:var(--text3); }
+.fz-vt .vt-ladder{ list-style:none; margin:0; padding:0; max-height:52vh; overflow:auto; border-top:1px solid var(--border); }
+.fz-vt .vt-ladder li{ display:grid; grid-template-columns:30px 30px 1fr auto auto; gap:8px; align-items:center; padding:6px 0; font-size:13px; color:var(--text3); border-bottom:1px solid var(--border); }
+.fz-vt .vt-ic-l{ width:30px; height:30px; }
+.fz-vt .vt-ic-l.vt-q{ width:24px; height:24px; margin:3px; font-size:12px; }
+.fz-vt .vt-ladder .vt-n{ font-size:11.5px; text-align:right; }
+.fz-vt .vt-ladder li b{ font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fz-vt .vt-ladder li.no b{ letter-spacing:2px; color:var(--text3); }
+.fz-vt .vt-ladder .vt-ppl{ font-size:11.5px; color:var(--text3); }
+.fz-vt .vt-ladder li em{ font-style:normal; font-size:12px; text-align:right; min-width:64px; }
+.fz-vt .vt-ladder li.got{ color:var(--text); }
+.fz-vt .vt-ladder li.got .vt-n{ color:var(--accent); font-weight:700; }
+.fz-vt .vt-ladder li.me{ background:color-mix(in srgb, var(--accent) 9%, transparent); }
+.fz-vt .vt-ladder li.nx em{ color:var(--accent); }
+.vt-ic{ display:block; overflow:hidden; flex:none; }
+.vt-ic img{ width:100%; height:100%; object-fit:contain; display:block; }
