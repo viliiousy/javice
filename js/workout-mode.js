@@ -1143,7 +1143,7 @@ const VolTier = {
     if (this._c && this._c.key === key && Date.now() - this._c.t < 60000) return this._c.v;
     const pre = UserStore.key(PlanGen.LOG_PREFIX), d0 = base ? new Date(base) : new Date();
     const today = Fitness._dateStr(d0), mon = Fitness._dateStr(WorkoutHistory._monday(d0)), m1 = today.slice(0, 8) + '01';
-    const v = { day: 0, week: 0, month: 0, all: 0, days: 0, raw: 0, cut: 0, cutSets: 0 };
+    const v = { day: 0, week: 0, month: 0, all: 0, allY: 0, days: 0, raw: 0, cut: 0, cutSets: 0 };
     const days = [];
     for (let k = 0; k < localStorage.length; k++) {
       const key2 = localStorage.key(k); if (!key2 || !key2.startsWith(pre)) continue;
@@ -1173,6 +1173,7 @@ const VolTier = {
       const wkey = Fitness._dateStr(WorkoutHistory._monday(new Date(ds + 'T00:00:00')));
       const room = Math.max(0, this.WEEK - (wk[wkey] || 0)); s = Math.min(s, room); wk[wkey] = (wk[wkey] || 0) + s;
       v.raw += raw; v.all += s; v.days++;
+      if (ds < today) v.allY += s;   // 어제까지(모두 합친 총볼륨에 쓴다)
       if (ds === today) v.day += s;
       if (ds >= mon) v.week += s;
       if (ds >= m1) v.month += s;
@@ -1191,9 +1192,9 @@ const VolTier = {
       if (!force && r0 && r0.v === Math.round(s.all) && Date.now() - r0.at < 600000) return r0;
       const u = typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser; if (!u) return r0;
       const idToken = await u.getIdToken();
-      const res = await fetch(Platform.api('/api/hub'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ act: 'vt', idToken, v: Math.round(s.all), lv: t.lv }) });
+      const res = await fetch(Platform.api('/api/hub'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ act: 'vt', idToken, v: Math.round(s.all), vy: Math.round(s.allY), lv: t.lv }) });
       const j = await res.json(); if (!j || !j.ok) return r0;
-      const r = { rank: j.rank, total: j.total, levels: j.levels || {}, v: Math.round(s.all), at: Date.now() };
+      const r = { rank: j.rank, total: j.total, levels: j.levels || {}, avgLv: j.avgLv, avgV: j.avgV, sumY: j.sumY, v: Math.round(s.all), at: Date.now() };
       try { localStorage.setItem(this.RK, JSON.stringify(r)); } catch (e) {}
       return r;
     } catch (e) { return this.rank(); }
@@ -1237,6 +1238,7 @@ const VolTier = {
       return `<div class="vt-hero">${this.img(t.lv, 'vt-ic vt-ic-h')}<div class="vt-hx"><span class="vt-lv num">Lv.${t.lv} / ${this.T.length}</span><b>${t.now ? esc(t.now[0]) : '시작 전'}</b>${t.now ? `<small class="num">${this.kg(t.now[1])}</small>` : ''}</div></div>
       <div class="vt-tot"><span>지금까지 총볼륨</span><b class="num">${this.kg(s.all)}</b></div>
       <div class="vt-rank">${r && r.rank ? `<b class="num">${r.rank.toLocaleString('ko-KR')}등</b><span>전체 ${r.total.toLocaleString('ko-KR')}명 중 · 이 단계에 ${(L[t.lv] || 1).toLocaleString('ko-KR')}명</span>` : '<span>순위를 불러오는 중…</span>'}</div>
+      ${r && r.total && r.avgLv != null ? `<div class="vt-all"><span>운동한 사람 <b class="num">${r.total.toLocaleString('ko-KR')}명</b></span><span>평균 <b class="num">Lv.${Math.round(r.avgLv || 0)}</b> · <b class="num">${this.kg(r.avgV || 0, true)}</b></span><span>모두 합쳐 어제까지 <b class="num">${this.kg(r.sumY || 0, true)}</b></span></div>` : ''}
       ${t.next ? `<div class="vt-bar"><i style="width:${t.pct.toFixed(1)}%"></i></div><p class="vt-left">다음 Lv.${t.lv + 1}(${this.kg(t.next[1])})까지 <b class="num">${this.kg(Math.max(0, t.next[1] - s.all))}</b> 남음 — 무엇인지는 닿으면 보입니다</p>` : ''}
       ${s.cut > 0 ? `<p class="vt-cut">비정상적으로 큰 기록(${s.cutSets}세트)의 <b class="num">${this.kg(s.cut)}</b>은 레벨에 넣지 않았습니다. 기록은 그대로 남아 있습니다.</p>` : ''}
       <div class="vt-lh"><span>전체 ${this.T.length}단계</span><span>인원 · 무게</span></div>
