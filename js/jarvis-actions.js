@@ -831,12 +831,12 @@ const JarvisActions = {
       if (!name) return { ok: false, msg: '어느 운동인지 알려 주세요' };
       let sets = Array.isArray(a.sets) ? a.sets : [];
       if (!sets.length && (a.r || a.reps)) sets = Array.from({ length: Number(a.n || a.count) || 1 }, () => ({ w: a.w, r: a.r || a.reps }));
-      sets = sets.map(s => ({ w: Number(s.w ?? s.kg) || 0, r: Number(s.r ?? s.reps) || 0 })).filter(s => s.r > 0).slice(0, 20);
+      sets = sets.map(s => ({ w: Number(s.w ?? s.kg) || 0, r: Number(s.r ?? s.reps) || 0, u: 1 })).filter(s => s.r > 0).slice(0, 20);   // u: 들어 올린 무게에 넣지 않음(운동 모드 기록만 넣는다)
       if (!sets.length) return { ok: false, msg: '무게와 횟수를 알려 주세요 (예: 60kg 10회 3세트)' };
       const L = PlanGen.log(ds); L[name] = sets; PlanGen.saveLog(ds, L);
       if (!f.miss) { const chk = Fitness._checked(d); if (!chk.includes(f.i)) { chk.push(f.i); Fitness._save(chk, d); } }
       this._rerender();
-      return { ok: true, msg: `'${name}' ${sets.map(s => s.w ? `${s.w}kg×${s.r}` : `${s.r}회`).join(', ')} 기록했습니다${f.miss ? ' (그날 목록에는 없는 운동이라 기록만 남겼습니다)' : ''}` };
+      return { ok: true, msg: `'${name}' ${sets.map(s => s.w ? `${s.w}kg×${s.r}` : `${s.r}회`).join(', ')} 기록했습니다${f.miss ? ' (그날 목록에는 없는 운동이라 기록만 남겼습니다)' : ''}${sets.some(s => s.w > 0) ? '\n들어 올린 무게에는 운동 모드에서 체크한 세트만 더해집니다' : ''}` };
     },
     workout_start(a) {
       const ds = this._ds(this._date(a.date));
