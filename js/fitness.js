@@ -151,7 +151,8 @@ const Fitness = {
     // 제목도 '오늘의 운동' 그대로여서, 지금 보고 있는 게 언제인지 알 수가 없었다.
     // 요일 줄: 요일 아래에 그날 루틴 이름을 작게 적는다 (시안 06)
     const shortNm = p => p.src==='multi' ? `${p.sessions.length}회` : p.src==='none' ? '—' : String(p.name||'').replace(/^DAY\s*[ABC]\s*/,'').replace(/^내 루틴 · /,'').slice(0,4) || '—';
-    const tabs = DOW.map((dn,i)=>`<button class="fit-day${i===dow?' on':''}${i===0?' sun':''}" onclick="Fitness.pickDay(${i}, '${Fitness._dateStr(date)}')"><b>${dn}</b><span>${esc(shortNm(this.planFor(i)))}</span></button>`).join('');
+    // 한 주는 월요일부터(월 화 수 목 금 토 일) — 토요일은 파랑, 일요일은 빨강
+    const tabs = [1,2,3,4,5,6,0].map(i=>`<button class="fit-day${i===dow?' on':''}${i===0?' sun':''}${i===6?' sat':''}" onclick="Fitness.pickDay(${i}, '${Fitness._dateStr(date)}')"><b>${DOW[i]}</b><span>${esc(shortNm(this.planFor(i)))}</span></button>`).join('');
     const container = document.getElementById('fitnessWrap');
     const ds = Fitness._dateStr(date);
     if (this._ed && this._ed.ds !== ds) this._ed = null;   // 다른 날로 옮기면 수정은 접는다
@@ -269,9 +270,10 @@ const Fitness = {
   },
 
   // 같은 주(일요일 시작)의 i 요일 날짜. DOW[0] 이 '일' 이므로 getDay() 와 자리가 같다.
+  // 그 주(월요일 시작)의 i 요일(0=일 … 6=토) 날짜 — 일요일은 그 주의 마지막 날
   _dowDate(i, base) {
     const d = new Date(base);
-    d.setDate(d.getDate() + (i - d.getDay()));
+    d.setDate(d.getDate() + (((i + 6) % 7) - ((d.getDay() + 6) % 7)));
     return d;
   },
 

@@ -3036,7 +3036,8 @@ html.dark .exm-media{ background:#eeeff1; }
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:0; }
 .fit-day b{ font-size:13px; font-weight:600; color:var(--text2); }
 .fit-day span{ font-size:10.5px; white-space:nowrap; overflow:hidden; max-width:100%; }
-.fit-day.sun b{ color:var(--red); }
+.fit-day.sun b{ color:#e5484d; }
+.fit-day.sat b{ color:#3b82f6; }
 .fit-day.on{ background:var(--text); color:var(--card); }
 .fit-day.on b, .fit-day.on span{ color:var(--card); font-weight:600; }
 .fit-prog{ display:flex; align-items:center; gap:12px; margin:2px 0 6px; }
@@ -3829,25 +3830,8 @@ html.dark .vt-ic img, html.dark .ftr-ic img{ filter:invert(1); }
 .fz-vt .vt-cut b{ color:var(--text); }
 
 /* 들어 올린 무게 — 오늘의 운동 카드 아래: 이전 단계 ──(지금 단계가 걸어감)── 다음 단계(?) */
-.fit-tier{ display:block; width:100%; margin-top:10px; padding:12px 14px 10px; border:1px solid var(--border); border-radius:14px; background:none; font:inherit; color:var(--text2); text-align:left; cursor:pointer; }
-.fit-tier .ftr-hd{ display:flex; align-items:baseline; gap:8px; font-size:12.5px; }
-.fit-tier .ftr-lv{ font-weight:700; color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
-.fit-tier .ftr-tot{ color:var(--text3); white-space:nowrap; }
-.fit-tier .ftr-tot b{ color:var(--text); font-weight:600; }
-.fit-tier .ftr-rk{ margin-left:auto; color:var(--text3); white-space:nowrap; font-size:12px; }
-.fit-tier .ftr-trk{ display:grid; grid-template-columns:76px 1fr 76px; align-items:end; gap:8px; margin-top:10px; }
-.fit-tier .ftr-end{ display:flex; flex-direction:column; align-items:center; gap:2px; min-width:0; }
-.fit-tier .ftr-end small{ font-size:10.5px; line-height:1.3; color:var(--text3); max-width:76px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.fit-tier .ftr-end small.num{ color:var(--text2); font-weight:600; }
 .ftr-ic{ display:block; width:36px; height:36px; flex:none; }
 .ftr-ic img{ width:100%; height:100%; object-fit:contain; display:block; }
-.fit-tier .ftr-prev .ftr-ic{ opacity:.45; }
-.fit-tier .ftr-line{ position:relative; height:52px; }
-.fit-tier .ftr-line::before{ content:""; position:absolute; left:0; right:0; bottom:6px; border-top:2px solid var(--border); border-radius:1px; }
-.fit-tier .ftr-fill{ position:absolute; left:0; bottom:6px; height:2px; background:var(--accent); border-radius:1px; }
-.fit-tier .ftr-run{ position:absolute; bottom:12px; transform:translateX(-50%); }
-.fit-tier .ftr-run::after{ content:""; position:absolute; left:50%; bottom:-9px; width:8px; height:8px; margin-left:-4px; border-radius:50%; background:var(--accent); }
-.fit-tier .ftr-me{ width:36px; height:36px; }
 .vt-q{ display:flex !important; align-items:center; justify-content:center; border:1.5px dashed var(--border2, #c9ccd1); border-radius:50% !important; color:var(--text3); font-weight:600; font-size:15px; line-height:1; }
 .ftr-ic.vt-q{ width:30px; height:30px; margin:3px; }
 .fz-vt .vt-tot{ display:flex; align-items:baseline; gap:8px; padding:12px 0 4px; border-top:1px solid var(--border); }
@@ -3872,7 +3856,21 @@ html.dark .vt-ic img, html.dark .ftr-ic img{ filter:invert(1); }
 .vt-ic{ display:block; overflow:hidden; flex:none; }
 .vt-ic img{ width:100%; height:100%; object-fit:contain; display:block; }
 
-.fit-tier .ftr-end .ftr-nm{ margin-bottom:3px; color:var(--text2); }
-.fit-tier .ftr-end .ftr-nm b{ font-weight:700; color:var(--text3); }
-.fit-tier .ftr-end .ftr-ic{ margin-bottom:2px; }
-.fit-tier .ftr-end .ftr-nm{ white-space:normal; text-align:center; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:keep-all; }
+
+/* 들어 올린 무게 진행 칸 — 위 글자 / 아이콘 / 주황 줄 / 아래 무게, 세 지점(이전·지금·다음)이 같은 줄 위에 */
+.fit-tier{ display:block; width:100%; margin-top:10px; padding:10px 14px 12px; border:1px solid var(--border); border-radius:14px; background:none; font:inherit; color:var(--text2); text-align:left; cursor:pointer; }
+.fit-tier .ftr-title{ display:block; font-size:12px; font-weight:600; color:var(--text3); }
+.fit-tier .ftr-trk{ position:relative; display:block; height:104px; margin:6px 38px 0; }
+.fit-tier .ftr-nm, .fit-tier .ftr-v, .fit-tier .ftr-at, .fit-tier .ftr-dot{ position:absolute; transform:translateX(-50%); }
+.fit-tier .ftr-nm{ bottom:74px; width:80px; text-align:center; font-size:10.5px; line-height:1.3; color:var(--text2); word-break:keep-all; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.fit-tier .ftr-nm b{ font-weight:700; color:var(--text3); }
+.fit-tier .ftr-nm.ftr-cur{ color:var(--text); font-weight:600; }
+.fit-tier .ftr-nm.ftr-cur b{ color:var(--accent); }
+.fit-tier .ftr-at{ top:34px; }
+.fit-tier .ftr-me{ z-index:1; }
+.fit-tier .ftr-dim{ opacity:.45; }
+.fit-tier .ftr-bar{ position:absolute; left:0; right:0; top:78px; height:3px; border-radius:2px; background:var(--border); overflow:hidden; }
+.fit-tier .ftr-bar i{ display:block; height:100%; background:var(--accent); border-radius:2px; }
+.fit-tier .ftr-dot{ top:75px; width:9px; height:9px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 2px var(--card, #fff); z-index:1; }
+.fit-tier .ftr-v{ top:88px; white-space:nowrap; font-size:11px; font-weight:600; color:var(--text2); font-variant-numeric:tabular-nums; }
+.fit-tier .ftr-v.ftr-cur{ color:var(--accent); }
