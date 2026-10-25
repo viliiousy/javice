@@ -47,7 +47,7 @@ const VoiceChat = {
   // ── 켜기/끄기 ─────────────────────────
   async start() {
     this.init();
-    if (this.active) return;
+    if (this.active || this._starting) return;   // 권한 확인 중에 또 눌러도 한 번만 시작한다
     if (!this.supported()) {
       const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
       App.showToast(ios ? '이 브라우저는 음성 대화를 지원하지 않습니다. 키보드의 마이크 단추로 말해 주세요'
@@ -55,15 +55,20 @@ const VoiceChat = {
       document.getElementById('jInput')?.focus();
       return;
     }
+    // 누르자마자 음성 화면을 띄운다 — 권한 확인을 기다리는 동안 '안 눌렸나' 싶어 한 번 더 누르는 일이 없게
+    this._starting = true; this._t0 = Date.now();
+    this._mount(true); this._set('prep');
     if (this._nSR) {
       try {
         const p = await this._nSR.requestPermissions();
         if (p && p.speechRecognition && p.speechRecognition !== 'granted') {
+          this._starting = false; this.state = 'off'; this._mount(false);
           App.showToast('설정 → Bashy 에서 마이크·음성 인식을 허용해 주세요', 'error'); return;
         }
-      } catch (e) { App.showToast('음성 인식을 시작하지 못했습니다', 'error'); return; }
+      } catch (e) { this._starting = false; this.state = 'off'; this._mount(false); App.showToast('음성 인식을 시작하지 못했습니다', 'error'); return; }
       this._bindNative();
     }
+    this._starting = false;
     try { JARVIS._stopSpeak?.(); } catch (e) {}
     // 웹 speechSynthesis 는 사용자 손짓 안에서 한 번 깨워 두어야 이후 자동 읽기가 막히지 않는다.
     if (!this._nTTS && window.speechSynthesis) { try { const u = new SpeechSynthesisUtterance(''); speechSynthesis.speak(u); } catch (e) {} }
@@ -89,6 +94,8 @@ const VoiceChat = {
   },
 
   toggle() { this.active ? this.stop() : this.start(); },
+  // 종료 단추: 켠 지 1초 안의 터치는 무시한다(시작하려고 두 번 누른 손가락이 끄지 않게)
+  end() { if (this._starting || Date.now() - (this._t0 || 0) < 1000) return; this.stop(); },
 
   // 동그라미: 말하는 중이면 끊고 듣기, 듣는 중이고 들은 말이 있으면 바로 보내기
   tap() {
@@ -100,8 +107,8 @@ const VoiceChat = {
   _set(st) {
     if (this.state === st) return;
     this.state = st;
-    const lab = { listen: '듣는 중', think: '생각 중', speak: '말하는 중' }[st] || '';
-    const hint = { listen: '말씀이 끝나면 저절로 보냅니다', think: '답을 만드는 중입니다', speak: '누르면 끊고 바로 말할 수 있습니다' }[st] || '';
+    const lab = { prep: '준비 중', listen: '듣는 중', think: '생각 중', speak: '말하는 중' }[st] || '';
+    const hint = { prep: '마이크를 켜는 중입니다', listen: '말씀이 끝나면 저절로 보냅니다', think: '답을 만드는 중입니다', speak: '누르면 끊고 바로 말할 수 있습니다' }[st] || '';
     const p = document.getElementById('jVoicePanel');
     if (p) {
       p.dataset.st = st;
@@ -336,12 +343,12 @@ const VoiceChat = {
       p = document.createElement('div');
       p.id = 'jVoicePanel'; p.className = 'vc-panel';
       p.innerHTML = `
-        <button type="button" class="vc-orb" onclick="VoiceChat.tap()" aria-label="지금 보내기">${Icons.svg('mic')}</button>
+        <button type="button" class="vc-end" onclick="VoiceChat.end()">종료</button>
         <div class="vc-mid" aria-live="polite">
           <div class="vc-state">듣는 중</div>
           <div id="jVoiceLine" class="vc-line vc-hint">말씀하세요</div>
         </div>
-        <button type="button" class="vc-end" onclick="VoiceChat.stop()">종료</button>`;
+        <button type="button" class="vc-orb" onclick="VoiceChat.tap()" aria-label="지금 보내기">${Icons.svg('mic')}</button>`;
       wrap.prepend(p);
     }
     if (p) p.hidden = !on;
@@ -354,7 +361,7 @@ const VoiceChat = {
     const st = document.createElement('style'); st.id = 'vcStyle';
     st.textContent = `
 #jarvisPanel.vc-mode .j-input-row, #jarvisPanel.vc-mode #jVoiceBar, #jarvisPanel.vc-mode .j-chips{ display:none !important; }
-.vc-panel{ display:flex; align-items:center; gap:16px; min-height:72px; padding:8px 0; --vc-lv:0; }
+.vc-panel{ display:flex; align-items:center; gap:12px; min-height:72px; padding:8px 0; --vc-lv:0; }
 .vc-panel[hidden]{ display:none; }
 .vc-orb{ position:relative; flex:none; width:56px; height:56px; border-radius:50%; border:0; padding:0; cursor:pointer;
   display:flex; align-items:center; justify-content:center; background:var(--accent); color:#101113; -webkit-tap-highlight-color:transparent; }
@@ -362,6 +369,7 @@ const VoiceChat = {
 .vc-orb::before{ content:''; position:absolute; inset:0; border-radius:50%; background:var(--accent); opacity:.22; transform:scale(1); transition:transform .08s linear; }
 .vc-panel[data-st="listen"] .vc-orb::before{ animation:vcPulse 1.6s ease-in-out infinite; }
 .vc-panel.vc-has-lv[data-st="listen"] .vc-orb::before{ animation:none; transform:scale(calc(1 + var(--vc-lv) * .6)); }
+.vc-panel[data-st="prep"] .vc-orb::before{ animation:vcPulse 1.6s ease-in-out infinite; }
 .vc-panel[data-st="think"] .vc-orb{ background:var(--border); color:var(--text3); }
 .vc-panel[data-st="think"] .vc-orb::before{ opacity:1; background:none; border:2px solid transparent; border-top-color:var(--accent); inset:-4px; animation:vcSpin .9s linear infinite; }
 .vc-panel[data-st="speak"] .vc-orb::before{ animation:vcPulse .9s ease-in-out infinite; }
