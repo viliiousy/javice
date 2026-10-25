@@ -6,3 +6,7 @@ node_modules/
 # 태블릿 허브 안드로이드 래퍼와 PC 크롬 확장도 웹 배포와 상관없다.
 hub-app/
 extension/
+# 문서·스크립트도 웹에 필요 없다(배포마다 Vercel 저장 공간을 먹는다)
+docs/
+scripts/
+*.md

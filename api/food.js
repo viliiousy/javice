@@ -27,14 +27,16 @@ function brandRank(x) {
   return x.maker ? 2 : 0;
 }
 
-// ── 우리 쪽에 저장해 둔 식약처 DB (data/food-db.json) ─────────────
+// ── 우리 쪽에 저장해 둔 식약처 DB (data/food-db.json.gz) ─────────────
 // 식약처 서버는 한 번 묻는 데 2~3초 걸린다. 그래서 일주일에 한 번 새벽에 전부 받아(.github/workflows/food-sync.yml)
 // 함수 안에 같이 싣고, 여기서 바로 찾는다. 파일이 없거나 여기서 못 찾으면 예전처럼 식약처에 직접 묻는다.
 let DB = null, DBN = null;
 function db() {
   if (DB !== null) return DB;
   try {
-    const j = require('../data/food-db.json');
+    // 배포 용량을 줄이려고 gzip 으로 둔다(29MB → 8MB). 배포가 하루 수십 번이라 원본이면 Vercel 저장 한도를 금방 채운다.
+    const fs = require('fs'), path = require('path'), zlib = require('zlib');
+    const j = JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(__dirname, '..', 'data', 'food-db.json.gz'))).toString('utf8'));
     const C = j.cls || [], G = j.grp || [];
     DB = j.r.map(a => ({ name: a[0], kcal: a[1], protein: a[2], carb: a[3], fat: a[4], per: a[5], unit: a[6] ? 'mL' : 'g',
                          pack: a[7], maker: a[8] || '', cls: C[a[9]] || '', group: G[a[10]] || '' }));

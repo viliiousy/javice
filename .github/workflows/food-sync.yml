@@ -1,4 +1,4 @@
-# 식약처 식품영양성분DB를 일주일에 한 번 새벽에 통째로 받아 data/food-db.json 에 저장한다.
+# 식약처 식품영양성분DB를 일주일에 한 번 새벽에 통째로 받아 data/food-db.json.gz 로 저장한다.
 # 식약처는 '실시간' 갱신이라고 하지만 실제 데이터는 몇 주~몇 달에 한 번 바뀐다(공공데이터포털 수정일 기준).
 # 식단 검색은 이 파일에서 바로 찾고(수십 ms), 여기 없을 때만 식약처에 직접 묻는다.
 name: food-sync
@@ -31,7 +31,8 @@ jobs:
         run: |
           git config user.name "bashy-bot"
           git config user.email "bot@bashy.app"
-          git add data/food-db.json
+          gzip -9 -n -f data/food-db.json   # data/food-db.json.gz 로 (배포 용량 줄이기)
+          git add -A data
           if git diff --cached --quiet; then echo "바뀐 것 없음"; exit 0; fi
           git commit -m "식약처 식품영양성분DB 동기화 ($(date -u +%F))"
           for i in 1 2 3; do git pull --rebase -q origin main && git push -q origin HEAD:main && break; sleep 5; done
