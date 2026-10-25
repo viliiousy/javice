@@ -229,3 +229,15 @@ html[data-ui="v2"] .nt .set-link:last-child{ border-bottom:0; }
 .rm-wheel .whl-sc{ height:160px; }
 .rm-wheel .whl-pad{ height:60px; }
 .rm-wheel .whl-sel{ top:60px; }
+
+/* ── 반복 요일: 고른 날은 주황으로 꽉 채우고 위에 체크 표시(주식 '담김' 처럼 확실하게), 안 고른 날은 점선 ── */
+html[data-ui="v2"] .hb-sheet .day-pick-btn{ position:relative; background:none !important; border:1px dashed var(--border2, #c9ccd1) !important; color:var(--text4) !important; }
+html[data-ui="v2"] .hb-sheet .day-pick-btn:has(input:checked){ background:var(--accent) !important; border:1px solid var(--accent) !important; color:#fff !important; font-weight:700; }
+html[data-ui="v2"].dark .hb-sheet .day-pick-btn:has(input:checked){ background:var(--accent) !important; border-color:var(--accent) !important; }
+html[data-ui="v2"] .hb-sheet .day-pick-btn:has(input:checked)::after{
+  content:""; position:absolute; top:-5px; right:-5px; width:16px; height:16px; border-radius:50%;
+  background:var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff6a1a' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/11px no-repeat;
+  box-shadow:0 0 0 1.5px var(--accent); }
+.hb-sheet .day-sum{ display:flex !important; flex-direction:row !important; align-items:center !important; justify-content:flex-start !important; gap:5px; margin-top:8px; font-size:12.5px; color:var(--text3); text-align:left; }
+.hb-sheet .day-sum svg{ color:var(--accent); flex:none; }
+.hb-sheet .day-sum b{ color:var(--accent); font-weight:700; }

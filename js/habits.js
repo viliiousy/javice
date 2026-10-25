@@ -287,6 +287,14 @@ const Habits = {
 
   // 예전엔 365일을 도는 동안 날마다 목록 전체를 다시 파싱했다(습관 8개면 한 번 그릴 때 3천 번).
   // 목록은 한 번만 읽고, 날짜별 체크는 _days(같은 그리기 안에서 습관끼리 나눠 쓰는 표)에 담아 둔다.
+  // 반복 요일 아래 한 줄: 무엇이 골라졌는지 글로도 보여 준다(주식 '담김' 처럼 확실하게)
+  _daySum(box) {
+    if (!box) return;
+    const on = [...box.querySelectorAll('input:checked')].map(c => +c.value).sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));
+    const el = box.nextElementSibling; if (!el || !el.classList.contains('day-sum')) return;
+    const lbl = on.length === 7 || !on.length ? '매일' : on.length === 5 && [1,2,3,4,5].every(x => on.includes(x)) ? '평일' : on.length === 2 && [0,6].every(x => on.includes(x)) ? '주말' : on.map(d => this.DAYS_KO[d]).join('·');
+    el.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg><b>${lbl}</b> 반복${on.length && on.length < 7 ? ` · 주 ${on.length}회` : ''}${!on.length ? ' (하나도 안 고르면 매일로 저장)' : ''}`;
+  },
   streak(id, _days) {
     let n=0; const today=new Date();
     const h=this._listRO().find(x=>x.id===id);
@@ -606,13 +614,14 @@ const Habits = {
       this._catPickerHtml(this._pendingAddCat, 'hAddCat') + '</div>' +
       this._medRowHtml(this._pendingAddCat, null, undefined) +
       '<div class="modal-row"><label class="modal-lbl">반복 요일</label>' +
-      '<div class="day-picker">' + dayBtns + '</div>' +
+      '<div class="day-picker" onchange="Habits._daySum(this)">' + dayBtns + '</div><div class="day-sum"></div>' +
       `<div class="hb-meta">시작일 <span class="num">${baseDateStr}</span>${dateLabel}</div></div>` +
       '<div class="modal-btns hb-acts">' +
       '<button id="btnHabitAdd" class="btn-sm accent hb-go">추가</button>' +
       '<div class="hb-acts-sub"><button onclick="App.closeModal()" class="btn-sm hb-ghost">취소</button></div>' +
       '</div></div>'
     );
+    setTimeout(()=>{ document.querySelectorAll('.day-picker').forEach(b=>this._daySum(b)); },0);
     setTimeout(()=>{
       document.getElementById('habitName')?.focus();
       Habits._rmWheel();
@@ -665,9 +674,9 @@ const Habits = {
         ${this._catPickerHtml(this._catOf(h),'hEditCat')}</div>
       ${this._medRowHtml(this._catOf(h), h.time, h.notify)}
       <div class="modal-row"><label class="modal-lbl">반복 요일</label>
-        <div class="day-picker">
+        <div class="day-picker" onchange="Habits._daySum(this)">
           ${this.DAYS_KO.map((d,i)=>`<label class="day-pick-btn"><input type="checkbox" value="${i}" ${(h.days||[]).includes(i)?'checked':''} class="day-edit-chk"><span>${d}</span></label>`).join('')}
-        </div>
+        </div><div class="day-sum"></div>
       </div>
       <div class="modal-btns hb-acts">
         <button onclick="Habits._saveEdit('${id}')" class="btn-sm accent hb-go">저장</button>
@@ -676,6 +685,7 @@ const Habits = {
           <button onclick="App.closeModal()" class="btn-sm hb-ghost">취소</button>
         </div>
       </div></div>`);
+    setTimeout(()=>{ document.querySelectorAll('.day-picker').forEach(b=>this._daySum(b)); },0);
     setTimeout(()=>this._rmWheel(), 60);
   },
 
