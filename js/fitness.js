@@ -206,7 +206,9 @@ const Fitness = {
             ${typeof Icons!=='undefined'?Icons.svg('dumbbell','fx-ic'):''}${src?`<span class="fx-img">${ExMedia.poseHtml(src)}</span>`:''}
           </button>
           <div class="fx-tx"><div class="fx-nm">${esc(ex.name)}</div><div class="fx-sets num">${esc(ex.sets||'')}</div>${this._logLine(ex, dsx)}</div>
-          <button type="button" class="fx-act" onclick="event.stopPropagation();PlanGen.openLog('${A(ex.name)}','${A(ex.sets||'')}','${dsx}')" aria-label="무게 기록">${typeof Icons!=='undefined'?Icons.svg('pen','fx-aic'):'기록'}</button>
+          ${typeof PlanGen!=='undefined' && PlanGen.timed(ex.name)
+            ? `<button type="button" class="fx-act" onclick="event.stopPropagation();Fitness.timeSheet('${A(ex.name)}','${dsx}')" aria-label="운동 시간 고치기">${typeof Icons!=='undefined'?Icons.svg('pen','fx-aic'):'시간'}</button>`
+            : `<button type="button" class="fx-act" onclick="event.stopPropagation();PlanGen.openLog('${A(ex.name)}','${A(ex.sets||'')}','${dsx}')" aria-label="무게 기록">${typeof Icons!=='undefined'?Icons.svg('pen','fx-aic'):'기록'}</button>`}
         </div>`;}).join(''); })()}
       </div>
       ${plan.from ? `<p class="fit-from">${plan.from.slice(5).replace('-','/')} 계획을 오늘 하는 중 · <a href="javascript:Fitness.undoFrom('${dsx}')">되돌리기</a></p>` : ''}
@@ -225,6 +227,7 @@ const Fitness = {
   // 그날 기록(무게×횟수)이 있으면 그것을, 없으면 지난 기록으로 본 오늘 권장 무게를 한 줄로
   _logLine(ex, ds) {
     if (typeof PlanGen==='undefined') return '';
+    if (PlanGen.timed(ex.name)) return '';   // 유산소·스포츠는 시간만(위 줄) — 무게 권장·기록 줄 없음
     const L = PlanGen.log(ds)[ex.name];
     if (L && L.length) return `<div class="fx-log num">${L.map(s=>s.w?`${s.w}kg×${s.r}`:`${s.r}회`).join(' · ')}</div>`;
     const sg = PlanGen.suggest(ex.name, ex.sets, ds);
@@ -624,6 +627,15 @@ const Fitness = {
     FirebaseSync?.scheduleSave(); this._syncMyEx();
   },
   delMyEx(n){ UserStore.set(this.MYEX_KEY, JSON.stringify(this.myEx().filter(x=>x.n!==n))); FirebaseSync?.scheduleSave(); this._syncMyEx(); },
+  defMin(n){ return typeof PlanGen!=='undefined' && PlanGen.partOf(n)==='스포츠' ? 60 : 30; },
+  // 오늘의 운동 줄에서 유산소·스포츠의 시간 고치기(무게 기록 대신) — 그날 목록에 저장한다
+  timeSheet(name, ds){
+    const d=new Date(ds+'T00:00:00'); const list=this.exercisesFor(d).list; const i=list.findIndex(x=>x.name===name); if(i<0) return;
+    const cur=+(String(list[i].sets||'').match(/(\d+)\s*분/)||[])[1]||this.defMin(name);
+    NumIn.open({ title:name+' 시간', unit:'분', dec:false, cur,
+      done:val=>{ const m=Math.max(1,Math.min(600,Math.round(Number(val)||0))); if(!m) return;
+        this.applyList(ds, list.map((e,k)=>({ ...e, sets:k===i?`${m}분`:e.sets })), 'day'); this.render(d); try{ Haptic.light(); }catch(e){} } });
+  },
   defSets(n){ const p=typeof PlanGen!=='undefined'?PlanGen.partOf(n):null; return p==='스포츠' ? '60분' : p==='유산소' ? '30분' : this.DEFAULT_SETS; },
   // 운동 만들기 시트 — 지금 열린 창(고르기·교체) 위에 얹어서, 고르던 목록이 날아가지 않게 한다
   makeEx(name, done){
@@ -997,7 +1009,7 @@ const Fitness = {
         <span class="ft-c"><b class="num">${Math.round(t.vol).toLocaleString('ko-KR')}</b><i>kg</i><small>총 볼륨</small></span>
         <span class="ft-c"><b class="num">${t.sets}</b><i>세트</i><small>${t.reps}회</small></span>
         <span class="ft-c"><b class="num">${b.kcal.toLocaleString('ko-KR')}</b><i>kcal</i><small>소모 열량(추정)</small></span>
-        <span class="ft-go">추이</span></button>` : ''; }catch(e){ return ''; } },
+        <span class="ft-go">추이</span></button>${typeof VolTier!=='undefined'?VolTier.chip(d):''}` : (typeof VolTier!=='undefined'?VolTier.chip(d):''); }catch(e){ return ''; } },
 
   // ── 운동 소모 열량(추정) ─────────────────
   // 그날 한 운동만 센다: 체크했거나 무게 기록이 있는 종목.

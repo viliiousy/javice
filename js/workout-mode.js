@@ -493,7 +493,8 @@ const WorkoutMode = {
             ${S.ex.length > 1 ? `<button class="wk-tool wk-tool-del" onclick="WorkoutMode.delEx(${S.cur}, this)">삭제</button>` : ''}
           </div>
         </div>
-        ${x.cardio ? `<p class="wk-note">${esc(x.sets || '시간')} — 세트 없이 시간으로 합니다. 끝나면 아래 ‘완료’ 를 눌러 주세요.</p>` : `
+        ${x.cardio ? `<div class="wk-time"><button type="button" class="inp wk-num wk-tnum" onclick="WorkoutMode.pickTime()" aria-label="운동 시간 바꾸기"><b class="num">${+(String(x.sets || '').match(/(\d+)\s*분/) || [])[1] || Fitness.defMin(x.name)}</b><i>분</i></button>
+          <p class="wk-note">세트 없이 시간으로 합니다. 숫자를 눌러 한 시간을 고치고, 끝나면 아래 ‘완료’ 를 눌러 주세요.</p></div>` : `
         <div class="wk-sets">
           <div class="wk-sh"><span>세트</span><span>kg</span><span>회</span><span></span></div>
           ${x.rows.map((r, k) => `<div class="wk-sw" data-k="${k}"><div class="wk-set${r.ok ? ' ok' : ''}${k === nowK ? ' now' : ''}">
@@ -573,6 +574,14 @@ const WorkoutMode = {
     this.paint(); this._persist();
   },
   // 무게·횟수: 키패드(소수점 포함) 또는 자릿수별 스크롤. 고른 방식은 계정에 남아 다음에도 그 방식으로 열린다.
+  // 유산소·스포츠: 세트 대신 '몇 분' — 숫자판으로 고친다
+  pickTime() {
+    if (!this.st) return;
+    const x = this.st.ex[this.st.cur];
+    const cur = +(String(x.sets || '').match(/(\d+)\s*분/) || [])[1] || Fitness.defMin(x.name);
+    NumIn.open({ title: x.name + ' 시간', unit: '분', dec: false, cur,
+      done: val => { const m = Math.max(1, Math.min(600, Math.round(Number(val) || 0))); if (!m) return; x.sets = `${m}분`; this.paint(); this._persist(); } });
+  },
   pickVal(k, f) {
     if (!this.st) return;
     const x = this.st.ex[this.st.cur], v = x.rows[k][f];
@@ -1071,5 +1080,75 @@ const NumIn = {
     this.close();
     try { Haptic.light(); } catch (e) {}
     try { this.o.done(v); } catch (e) { console.warn(e); }
+  },
+};
+
+// ── 들어 올린 무게 티어 ─────────────────────────────
+// 총 볼륨(무게 × 횟수의 합)을 '무엇을 들어 올린 셈인지' 로 바꿔 보여 준다. 오늘 · 이번 주 · 이번 달 · 지금까지.
+// 무게는 널리 알려진 어림값이다(아파트 한 동은 15층짜리 한 동을 어림한 값).
+const VolTier = {
+  T: [
+    ['고양이', 4.5, '마리'], ['골든 리트리버', 30, '마리'], ['성인 남성', 70, '명'], ['그랜드 피아노', 450, '대'], ['젖소', 650, '마리'],
+    ['승용차', 1500, '대'], ['아프리카 코끼리', 6000, '마리'], ['티라노사우루스', 8000, '마리'], ['시내버스', 11000, '대'], ['전차', 60000, '대'],
+    ['대왕고래', 150000, '마리'], ['빈 보잉 747', 180000, '대'], ['자유의 여신상', 225000, '개'], ['발사대 위 우주왕복선', 2030000, '대'],
+    ['에펠탑', 7300000, '개'], ['아파트 한 동', 10000000, '동'], ['타이타닉호', 52000000, '척'], ['항공모함', 100000000, '척'],
+    ['엠파이어 스테이트 빌딩', 365000000, '채'], ['기자의 대피라미드', 5900000000, '개'], ['달', 7.35e22, '개'], ['지구', 5.97e24, '개'],
+  ],
+  kg(v) {
+    if (v < 10000) return (v < 10 ? Math.round(v * 10) / 10 : Math.round(v)).toLocaleString('ko-KR') + 'kg';
+    const t = v / 1000;
+    if (t < 1e8) return (t < 100 ? Math.round(t * 10) / 10 : Math.round(t)).toLocaleString('ko-KR') + '톤';
+    return t.toExponential(2).replace('e+', '×10^') + '톤';
+  },
+  // v kg → { lv, now:[이름,kg,단위] | null, n(몇 개), next, pct(다음까지 %) }
+  tier(v) {
+    let i = -1; for (let k = 0; k < this.T.length; k++) if (v >= this.T[k][1]) i = k;
+    const now = i >= 0 ? this.T[i] : null, next = this.T[i + 1] || null;
+    const n = now ? v / now[1] : 0;
+    return { lv: i + 1, now, next, n, pct: next ? Math.min(100, v / next[1] * 100) : 100 };
+  },
+  cnt(n) { return n >= 100 ? Math.round(n).toLocaleString('ko-KR') : n >= 10 ? (Math.round(n * 10) / 10).toString() : (Math.round(n * 100) / 100).toString(); },
+  // 기간별 볼륨 — 기록 칸(gl_fit_log_날짜)을 한 번에 훑는다(1분 기억)
+  sums(base) {
+    const key = Fitness._dateStr(base || new Date());
+    if (this._c && this._c.key === key && Date.now() - this._c.t < 60000) return this._c.v;
+    const pre = UserStore.key(PlanGen.LOG_PREFIX), d0 = base ? new Date(base) : new Date();
+    const today = Fitness._dateStr(d0), mon = Fitness._dateStr(WorkoutHistory._monday(d0)), m1 = today.slice(0, 8) + '01';
+    const v = { day: 0, week: 0, month: 0, all: 0, days: 0 };
+    for (let k = 0; k < localStorage.length; k++) {
+      const key2 = localStorage.key(k); if (!key2 || !key2.startsWith(pre)) continue;
+      const ds = key2.slice(pre.length); if (!/^\d{4}-\d{2}-\d{2}$/.test(ds) || ds > today) continue;
+      let L; try { L = JSON.parse(localStorage.getItem(key2) || '{}') || {}; } catch (e) { continue; }
+      let s = 0; Object.values(L).forEach(ss => (ss || []).forEach(x => { s += (Number(x.w) || 0) * (Number(x.r) || 0); }));
+      if (!s) continue;
+      v.all += s; v.days++;
+      if (ds === today) v.day += s;
+      if (ds >= mon) v.week += s;
+      if (ds >= m1) v.month += s;
+    }
+    this._c = { key, t: Date.now(), v };
+    return v;
+  },
+  line(v) { const t = this.tier(v); return t.now ? `${t.now[0]} ${this.cnt(t.n)}${t.now[2]}` : (v > 0 ? `${this.T[0][0]}까지 ${Math.round(t.pct)}%` : '아직 기록 없음'); },
+  // 오늘의 운동 카드 아래 한 줄
+  chip(d) {
+    try {
+      const s = this.sums(d); if (!s.all) return '';
+      const t = this.tier(s.all);
+      return `<button type="button" class="fit-tier" onclick="VolTier.open('${Fitness._dateStr(d)}')"><span class="ftr-lv num">Lv.${t.lv}</span><span class="ftr-tx">지금까지 <b class="num">${this.kg(s.all)}</b> · ${esc(this.line(s.all))}</span>${t.next ? `<span class="ftr-bar"><i style="width:${t.pct.toFixed(1)}%"></i></span>` : ''}</button>`;
+    } catch (e) { return ''; }
+  },
+  open(ds) {
+    const d = ds ? new Date(ds + 'T00:00:00') : new Date(); this._c = null;
+    const s = this.sums(d), t = this.tier(s.all);
+    const row = (lb, v) => { const r = this.tier(v); return `<div class="vt-row"><span class="vt-lb">${lb}</span><b class="vt-kg num">${this.kg(v)}</b><span class="vt-eq">${esc(this.line(v))}</span>${r.next ? `<span class="vt-next">다음: ${esc(r.next[0])} ${Math.floor(r.pct)}%</span>` : ''}</div>`; };
+    const ladder = this.T.map(([n, kg], i) => `<li class="${i < t.lv ? 'got' : ''}${i === t.lv ? ' nx' : ''}"><span class="num">${i + 1}</span><b>${esc(n)}</b><em class="num">${this.kg(kg)}</em></li>`).join('');
+    App.openModal('@dumbbell 들어 올린 무게', `<div class="fz fz-vt">
+      <div class="vt-hero"><span class="vt-lv num">Lv.${t.lv}</span><b>${t.now ? esc(t.now[0]) : '시작 전'}</b><small>지금까지 ${this.kg(s.all)} · ${s.days}일 기록</small>
+        ${t.next ? `<div class="vt-bar"><i style="width:${t.pct.toFixed(1)}%"></i></div><small>다음 단계 ${esc(t.next[0])} · ${this.kg(Math.max(0, t.next[1] - s.all))} 남음</small>` : ''}</div>
+      ${row('오늘', s.day)}${row('이번 주', s.week)}${row('이번 달', s.month)}${row('지금까지', s.all)}
+      <p class="pg-note">볼륨 = 무게 × 횟수를 모두 더한 값입니다. 맨몸 운동(무게 0)과 유산소는 들어가지 않습니다. 비교 대상의 무게는 널리 알려진 어림값입니다.</p>
+      <ol class="vt-ladder">${ladder}</ol>
+      <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div></div>`);
   },
 };
