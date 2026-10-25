@@ -477,8 +477,30 @@ const Fitness = {
     const i=chk.indexOf(idx);
     if (i===-1) chk.push(idx); else chk.splice(i,1);
     this._save(chk,d);
+    this._autoLog(idx, d, i===-1);
     if (window.VolTier) VolTier._c = null;   // 체크를 바꾸면 들어 올린 무게도 바로 다시 센다
     this.render(d);
+  },
+
+  // 카드에서 운동을 체크했는데 그날 기록(무게×횟수)이 없으면 계획한 세트를 권장 무게로 적어 둔다(a:1 = 자동).
+  //   그래야 체크하자마자 총 볼륨·들어 올린 무게가 늘어난다. 체크를 풀면 자동으로 적은 기록만 지운다(손으로 적은 기록은 그대로).
+  _autoLog(idx, d, on) {
+    try {
+      if (typeof PlanGen==='undefined') return;
+      const ex = this.exercisesFor(d).list[idx]; if (!ex || PlanGen.timed(ex.name)) return;
+      const ds = this._dateStr(d), L = PlanGen.log(ds), cur = L[ex.name];
+      if (on) {
+        if (cur && cur.length) return;
+        const m = String(ex.sets||'').match(/^(\d+)/), n = Math.max(1, Math.min(10, m ? +m[1] : 3)), reps = PlanGen._range(ex.sets)[0] || 10;
+        const last = PlanGen.last(ex.name, ds);
+        const w = Number(ex.w) > 0 ? Number(ex.w) : (PlanGen.nextWeight(ex.name, ex.sets, ds) ?? (last ? Number(last.sets[0].w) || 0 : 0));
+        if (!(w > 0)) return;   // 맨몸·처음 하는 운동은 무게를 모르니 적지 않는다
+        L[ex.name] = Array.from({ length: n }, () => ({ w, r: reps, a: 1 }));
+        PlanGen.saveLog(ds, L);
+      } else if (cur && cur.length && cur.every(x => x && x.a)) {
+        delete L[ex.name]; PlanGen.saveLog(ds, L);
+      }
+    } catch (e) {}
   },
 
   // ── 종목 고르기 ───────────────────────

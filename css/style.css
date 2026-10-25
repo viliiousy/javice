@@ -3910,8 +3910,18 @@ html.dark .vt-ic img, html.dark .ftr-ic img{ filter:invert(1); }
 @keyframes ftrPop{ 0%{ transform:scale(1); } 40%{ transform:scale(1.35); } 100%{ transform:scale(1); } }
 @media (prefers-reduced-motion:reduce){ .fit-tier .ftr-mv{ transition:none; } .fit-tier.ftr-up .ftr-me .ftr-ic{ animation:none; } }
 /* 오늘의 운동 합계 줄 — 총 볼륨만 한 사물 아이콘 */
-.fit-tot .ft-vic{ display:flex; flex-direction:column; align-items:center; gap:1px; flex:none !important; margin-left:auto; max-width:72px; }
-.fit-tot .ft-vic .ftr-ic{ width:30px; height:30px; }
-.fit-tot .ft-vic small{ font-size:10px; color:var(--text3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:72px; }
+.fit-tot .ft-vic{ display:flex; align-items:center; gap:4px; flex:none !important; margin-left:auto; max-width:96px; height:22px; align-self:center; }
+.fit-tot .ft-vic .ftr-ic{ width:22px; height:22px; }
+.fit-tot .ft-vic small{ font-size:10.5px; color:var(--text3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
 .fit-tot .ft-vic + .ft-go{ margin-left:8px; }
 .fit-tot .cu-on{ color:var(--accent); }
+
+/* 체크하자마자 — 늘어난 만큼 '+600kg' 이 떠오르고, 줄이 한 번 빛난다 */
+.fit-tier .ftr-float{ position:absolute; transform:translateX(-50%); bottom:74px; font-size:13px; font-weight:800; color:var(--accent); white-space:nowrap; pointer-events:none; animation:ftrFloat 1.4s ease-out both; z-index:2; }
+@keyframes ftrFloat{ 0%{ opacity:0; transform:translate(-50%, 14px) scale(.8); } 20%{ opacity:1; transform:translate(-50%, 0) scale(1.1); } 100%{ opacity:0; transform:translate(-50%, -26px) scale(1); } }
+.fit-tier.ftr-gain .ftr-bar i{ animation:ftrGlow 1.2s ease-out; }
+@keyframes ftrGlow{ 0%{ box-shadow:0 0 0 0 var(--accent); filter:brightness(1.6); } 100%{ box-shadow:0 0 0 0 transparent; filter:none; } }
+.fit-tier.ftr-gain .ftr-dm .ftr-ic{ animation:ftrPop .8s both; }
+.fit-tier.ftr-gain .ftr-dv{ animation:ftrPopC .8s both; }
+@keyframes ftrPopC{ 0%{ transform:translateX(-50%) scale(1); } 40%{ transform:translateX(-50%) scale(1.3); } 100%{ transform:translateX(-50%) scale(1); } }
+@media (prefers-reduced-motion:reduce){ .fit-tier .ftr-float, .fit-tier.ftr-gain .ftr-bar i, .fit-tier.ftr-gain .ftr-dm .ftr-ic, .fit-tier.ftr-gain .ftr-dv{ animation:none; } .fit-tier .ftr-float{ display:none; } }

@@ -1283,10 +1283,12 @@ const VolTier = {
         return `<span class="ftr-nmi" style="font-size:${fs.toFixed(1)}px"><b class="num">Lv.${lv}</b> ${name}</span>`;
       };
       const mid = pl >= 50 ? pl / 2 : (pl + 100) / 2, dt = dv > 0 ? this.tier(dv) : null;
-      const day = dv > 0 ? `<span class="ftr-dv num" style="left:${mid.toFixed(1)}%" data-cu="kg" data-from="${fromDay}" data-to="${dv}">+${this.kg(fromDay, true)}</span>
+      const gain = was && dv > was.day ? dv - was.day : 0;
+      const pop = gain ? `<span class="ftr-float num" style="left:${mid.toFixed(1)}%">+${this.kg(gain, true)}</span>` : '';
+      const day = dv > 0 ? `${pop}<span class="ftr-dv num" style="left:${mid.toFixed(1)}%" data-cu="kg" data-from="${fromDay}" data-to="${dv}">+${this.kg(fromDay, true)}</span>
           <span class="ftr-at ftr-dm" style="left:${mid.toFixed(1)}%" title="${dt && dt.now ? esc(dt.now[0]) + '만큼' : ''}">${dt && dt.now ? this.img(dt.lv, 'ftr-ic ftr-dic') : '<span class="ftr-ic ftr-dic ftr-d0"></span>'}</span>` : '';
       if (up) setTimeout(() => { try { App.showToast(`Lv.${t.lv} ${t.now[0]} 달성!`, 'success'); Haptic.success(); } catch (e) {} }, 700);
-      return `<button type="button" class="fit-tier${up ? ' ftr-up' : ''}" data-anim="1" onclick="VolTier.open('${ds}')" aria-label="들어 올린 무게 Lv.${t.lv}${dv > 0 ? ', 오늘 ' + this.kg(dv) : ''}">
+      return `<button type="button" class="fit-tier${up ? ' ftr-up' : ''}${gain ? ' ftr-gain' : ''}" data-anim="1" onclick="VolTier.open('${ds}')" aria-label="들어 올린 무게 Lv.${t.lv}${dv > 0 ? ', 오늘 ' + this.kg(dv) : ''}">
         <span class="ftr-trk">
           <span class="ftr-nm" style="left:0%">${prev ? nm(t.lv - 1, esc(prev[0])) : '시작'}</span>
           <span class="ftr-nm ftr-cur ftr-mv" style="left:${fromPl.toFixed(1)}%" data-left="${pl.toFixed(1)}">${t.now ? nm(t.lv, esc(t.now[0])) : '시작 전'}</span>
