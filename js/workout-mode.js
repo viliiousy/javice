@@ -1108,6 +1108,7 @@ const VolTier = {
     if (v < 1000) return (v < 10 ? Math.round(v * 10) / 10 : Math.round(v)).toLocaleString('ko-KR') + 'kg';
     const t = Math.floor(v / 1000), r = Math.round(v - t * 1000);
     if (t >= 1e16) { const e = Math.floor(Math.log10(t)); return (t / 10 ** e).toFixed(2) + '×10' + String(e).replace(/\d/g, d => '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]) + '톤'; }
+    if (short && t < 100 && r >= 100) return (Math.floor(v / 100) / 10).toLocaleString('ko-KR') + '톤';   // 짧게 쓸 때 9.5톤처럼(9톤으로 뭉개지지 않게)
     return this._ko(t) + '톤' + (!short && r && t < 100000 ? ' ' + r.toLocaleString('ko-KR') + 'kg' : '');
   },
   // v kg → { lv(1~300, 0=시작 전), now:[이름,kg] | null, next, n(몇 개), pct(다음까지 %) }
@@ -1235,6 +1236,18 @@ const VolTier = {
   // 오늘의 운동 카드 아래 진행 칸 — 한 줄(주황 진행줄)이 이전 단계 아이콘 밑에서 다음 단계 아이콘 밑까지 이어진다.
   //   위: 'Lv.N 이름'  가운데: 아이콘(지금 단계는 진행도만큼 오른쪽에)  줄  아래: 무게(지금 단계는 내 총볼륨)
   //   등수는 이 칸을 눌러 여는 '들어 올린 무게' 시트에서 보여 준다.
+  // 그날 운동을 다 끝냈으면(목록의 운동을 모두 체크) 그날 든 무게만큼을 한 줄로 — '+8톤 200kg · 비즈니스 제트기만큼'
+  //   그날 볼륨은 총볼륨에 넣는 것과 같은 기준(상한 적용)이고, 그 무게 아래로 가장 가까운 단계의 사물과 아이콘을 보여 준다.
+  _dayLine(d, s) {
+    try {
+      if (!(s.day > 0)) return '';
+      const list = Fitness.exercisesFor(d).list, chk = Fitness._checked(d);
+      if (!list.length || chk.filter(i => i < list.length).length < list.length) return '';
+      const dt = this.tier(s.day), ds = Fitness._dateStr(d), isT = ds === Fitness._dateStr(new Date());
+      const when = isT ? '오늘' : `${d.getMonth() + 1}/${d.getDate()}`;
+      return `<span class="ftr-day">${dt.now ? this.img(dt.lv, 'ftr-dic') : ''}<span class="ftr-dt">${when} <b class="num">+${this.kg(s.day)}</b>${dt.now ? ` · <em>${esc(dt.now[0])}</em>만큼 들었어요` : ''}</span></span>`;
+    } catch (e) { return ''; }
+  },
   chip(d) {
     try {
       const s = this.sums(d); if (!s.all) return '';
@@ -1261,7 +1274,7 @@ const VolTier = {
           <span class="ftr-v" style="left:0%">${prev ? this.kg(prev[1], true) : '0kg'}</span>
           <span class="ftr-v ftr-cur" style="left:${pl.toFixed(1)}%">${this.kg(s.all)}</span>
           <span class="ftr-v" style="left:100%">${t.next ? this.kg(t.next[1], true) : ''}</span>
-        </span></button>`;
+        </span>${this._dayLine(d, s)}</button>`;
     } catch (e) { return ''; }
   },
   // 내 볼륨 · 평균 볼륨 · 모두 합친 볼륨을 아이콘으로 나란히 — 각각 어느 단계 사물만큼인지
