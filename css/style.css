@@ -3858,9 +3858,9 @@ html.dark .vt-ic img, html.dark .ftr-ic img{ filter:invert(1); }
 
 
 /* 들어 올린 무게 진행 칸 — 위 글자 / 아이콘 / 주황 줄 / 아래 무게, 세 지점(이전·지금·다음)이 같은 줄 위에 */
-.fit-tier{ display:block; width:100%; margin-top:10px; padding:10px 14px 12px; border:1px solid var(--border); border-radius:14px; background:none; font:inherit; color:var(--text2); text-align:left; cursor:pointer; }
+.fit-tier{ display:block; width:100%; margin-top:10px; padding:10px 14px 8px; border:1px solid var(--border); border-radius:14px; background:none; font:inherit; color:var(--text2); text-align:left; cursor:pointer; }
 .fit-tier .ftr-title{ display:block; font-size:12px; font-weight:600; color:var(--text3); }
-.fit-tier .ftr-trk{ position:relative; display:block; height:104px; margin:6px 38px 0; }
+.fit-tier .ftr-trk{ position:relative; display:block; height:104px; margin:0 38px; }
 .fit-tier .ftr-nm, .fit-tier .ftr-v, .fit-tier .ftr-at, .fit-tier .ftr-dot{ position:absolute; transform:translateX(-50%); }
 .fit-tier .ftr-nm{ bottom:74px; width:80px; text-align:center; font-size:10.5px; line-height:1.3; color:var(--text2); word-break:keep-all; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .fit-tier .ftr-nm b{ font-weight:700; color:var(--text3); }
