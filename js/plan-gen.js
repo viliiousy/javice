@@ -439,14 +439,47 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
       <div class="lg-head"><span>세트</span><span>무게 kg</span><span></span><span>횟수</span></div>
       <div id="lgRows" class="lg-rows">${Array.from({ length: n }, (_, i) => this._lgRow(i, cur[i])).join('')}</div>
       <button class="fz-act" onclick="PlanGen._lgAdd()">${ic('plus')}<span>세트 추가</span></button>
+      <p class="lg-hint">세트를 왼쪽으로 밀면 삭제</p>
       <details class="lg-hist"><summary>지난 기록 · 그래프${ic('down', 'fz-ic-end')}</summary><div class="wh">${typeof WorkoutHistory!=='undefined' ? WorkoutHistory.html(name) : ''}</div></details>
       <div class="modal-btns"><button class="btn-sm accent" onclick="PlanGen._lgSave()">저장</button><button class="btn-sm" onclick="App.closeModal()">취소</button></div></div>`);
+    this._lgBind();
   },
   _lgRow(i, s) {
     s = s || {};
-    return `<div class="lg-row"><span class="lg-n num">${i + 1}</span>
+    return `<div class="lg-sw"><div class="lg-row"><span class="lg-n num">${i + 1}</span>
       <input class="inp inp-sm lg-w num" readonly inputmode="none" placeholder="–" aria-label="${i + 1}세트 무게 kg" value="${s.w ?? ''}" onclick="PlanGen._lgPick(this,'w')">
-      <span class="lg-x">×</span><input class="inp inp-sm lg-r num" readonly inputmode="none" placeholder="–" aria-label="${i + 1}세트 횟수" value="${s.r ?? ''}" onclick="PlanGen._lgPick(this,'r')"></div>`;
+      <span class="lg-x">×</span><input class="inp inp-sm lg-r num" readonly inputmode="none" placeholder="–" aria-label="${i + 1}세트 횟수" value="${s.r ?? ''}" onclick="PlanGen._lgPick(this,'r')"></div><button type="button" class="lg-del" onclick="PlanGen._lgDel(this)">삭제</button></div>`;
+  },
+  // 세트 줄을 왼쪽으로 밀면 '삭제' 가 나온다(운동 모드와 같은 방식). 민 그 세트를 지우고 번호를 다시 매긴다.
+  _lgBind() {
+    document.querySelectorAll('#lgRows .lg-sw').forEach(w => {
+      if (w._b) return; w._b = 1;
+      const row = w.querySelector('.lg-row'); w.classList.remove('open'); row.style.transform = '';
+      let sx = 0, sy = 0, dx = 0, on = false;
+      row.addEventListener('touchstart', e => {
+        document.querySelectorAll('#lgRows .lg-sw.open').forEach(o => { if (o !== w) { o.classList.remove('open'); o.querySelector('.lg-row').style.transform = ''; } });
+        sx = e.touches[0].clientX; sy = e.touches[0].clientY; dx = 0; on = false;
+      }, { passive: true });
+      row.addEventListener('touchmove', e => {
+        const mx = e.touches[0].clientX - sx, my = e.touches[0].clientY - sy;
+        if (!on && Math.abs(mx) > 10 && Math.abs(mx) > Math.abs(my) * 1.5) on = true;
+        if (!on) return;
+        e.preventDefault(); w.classList.add('sw'); dx = Math.min(0, Math.max(-96, mx + (w.classList.contains('open') ? -72 : 0))); row.style.transform = `translateX(${dx}px)`;
+      }, { passive: false });
+      row.addEventListener('touchend', () => {
+        if (!on) return;
+        w.classList.remove('sw');
+        if (dx < -40) { w.classList.add('open'); row.style.transform = 'translateX(-72px)'; } else { w.classList.remove('open'); row.style.transform = ''; }
+      });
+    });
+  },
+  _lgDel(btn) {
+    btn.closest('.lg-sw')?.remove();
+    try { Haptic.light(); } catch (e) {}
+    document.querySelectorAll('#lgRows .lg-sw').forEach((w, i) => {
+      w.querySelector('.lg-n').textContent = i + 1;
+      w.querySelector('.lg-w').setAttribute('aria-label', `${i + 1}세트 무게 kg`); w.querySelector('.lg-r').setAttribute('aria-label', `${i + 1}세트 횟수`);
+    });
   },
   // 기록 창의 무게·횟수도 운동 모드처럼 숫자 휠로. 고른 값은 아래 줄(빈 칸·같은 값)에도 채운다.
   _lgPick(el, f) {
@@ -454,16 +487,16 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
     const cur = Number(el.value) || 0, cls = f === 'w' ? '.lg-w' : '.lg-r';
     const html = document.getElementById('modalBody').innerHTML, title = document.getElementById('modalTitle').textContent;
     const back = (v) => {
-      App.openModal('@dumbbell ' + title.trim(), html);
+      App.openModal('@dumbbell ' + title.trim(), html); this._lgBind();
       const rs = [...document.querySelectorAll('#lgRows .lg-row')];
       for (let j = k; j < rs.length; j++) { const inp = rs[j].querySelector(cls); if (j === k || !inp.value || inp.value === el.value) { inp.value = v; inp.setAttribute('value', v); } }
     };
-    const cancel = () => App.openModal('@dumbbell ' + title.trim(), html);
+    const cancel = () => { App.openModal('@dumbbell ' + title.trim(), html); this._lgBind(); };
     const W = typeof Wheel !== 'undefined' ? Wheel : null; if (!W) return;
     if (f === 'w') W.open({ title: `${k + 1}세트 무게`, unit: 'kg', cols: [{ vals: Array.from({ length: 301 }, (_, i) => i), cur: Math.floor(cur) }, { vals: [0, 0.5], cur: cur % 1 >= 0.5 ? 0.5 : 0, fmt: v => v ? '.5' : '.0' }], done: ([a, b]) => back(a + b), cancel });
     else W.open({ title: `${k + 1}세트 횟수`, unit: '회', cols: [{ vals: Array.from({ length: 61 }, (_, i) => i), cur: cur || 10 }], done: ([a]) => back(a), cancel });
   },
-  _lgAdd() { const b = document.getElementById('lgRows'); if (b) b.insertAdjacentHTML('beforeend', this._lgRow(b.children.length)); },
+  _lgAdd() { const b = document.getElementById('lgRows'); if (b) { b.insertAdjacentHTML('beforeend', this._lgRow(b.children.length)); this._lgBind(); } },
   _lgSave() {
     const { name, ds } = this._lg || {}; if (!name) return;
     const sets = [...document.querySelectorAll('#lgRows .lg-row')].map(r => ({ w: Number(r.querySelector('.lg-w').value) || 0, r: Number(r.querySelector('.lg-r').value) || 0 })).filter(s => s.r > 0);
