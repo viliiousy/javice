@@ -1226,6 +1226,18 @@ const VolTier = {
         </span></button>`;
     } catch (e) { return ''; }
   },
+  // 내 볼륨 · 평균 볼륨 · 모두 합친 볼륨을 아이콘으로 나란히 — 각각 어느 단계 사물만큼인지
+  _cmp(mine, r) {
+    const card = (lb, v, sub, me) => {
+      const t = this.tier(v), got = !me && t.lv > 0;
+      return `<div class="vt-cc${me ? ' me' : ''}"><span class="vt-cl">${lb}</span>${this.img(t.lv, 'vt-ic vt-ic-c')}<b class="vt-cn">${t.now ? esc(t.now[0]) : '시작 전'}</b><span class="vt-cv num">${this.kg(v, true)}</span><span class="vt-cs">${sub}</span></div>`;
+    };
+    return `<div class="vt-cmp">
+      ${card('내 볼륨', mine, `Lv.${this.tier(mine).lv}`, true)}
+      ${card('평균 볼륨', r.avgV || 0, `운동한 ${r.total.toLocaleString('ko-KR')}명`)}
+      ${card('모두 합친 볼륨', r.sumY || 0, '어제까지')}
+    </div>`;
+  },
   open(ds) {
     const d = ds ? new Date(ds + 'T00:00:00') : new Date(); this._c = null;
     const s = this.sums(d), t = this.tier(s.all);
@@ -1238,7 +1250,7 @@ const VolTier = {
       return `<div class="vt-hero">${this.img(t.lv, 'vt-ic vt-ic-h')}<div class="vt-hx"><span class="vt-lv num">Lv.${t.lv} / ${this.T.length}</span><b>${t.now ? esc(t.now[0]) : '시작 전'}</b>${t.now ? `<small class="num">${this.kg(t.now[1])}</small>` : ''}</div></div>
       <div class="vt-tot"><span>지금까지 총볼륨</span><b class="num">${this.kg(s.all)}</b></div>
       <div class="vt-rank">${r && r.rank ? `<b class="num">${r.rank.toLocaleString('ko-KR')}등</b><span>전체 ${r.total.toLocaleString('ko-KR')}명 중 · 이 단계에 ${(L[t.lv] || 1).toLocaleString('ko-KR')}명</span>` : '<span>순위를 불러오는 중…</span>'}</div>
-      ${r && r.total && r.avgLv != null ? `<div class="vt-all"><span>운동한 사람 <b class="num">${r.total.toLocaleString('ko-KR')}명</b></span><span>평균 <b class="num">Lv.${Math.round(r.avgLv || 0)}</b> · <b class="num">${this.kg(r.avgV || 0, true)}</b></span><span>모두 합쳐 어제까지 <b class="num">${this.kg(r.sumY || 0, true)}</b></span></div>` : ''}
+      ${r && r.total && r.avgLv != null ? this._cmp(s.all, r) : ''}
       ${t.next ? `<div class="vt-bar"><i style="width:${t.pct.toFixed(1)}%"></i></div><p class="vt-left">다음 Lv.${t.lv + 1}(${this.kg(t.next[1])})까지 <b class="num">${this.kg(Math.max(0, t.next[1] - s.all))}</b> 남음 — 무엇인지는 닿으면 보입니다</p>` : ''}
       ${s.cut > 0 ? `<p class="vt-cut">비정상적으로 큰 기록(${s.cutSets}세트)의 <b class="num">${this.kg(s.cut)}</b>은 레벨에 넣지 않았습니다. 기록은 그대로 남아 있습니다.</p>` : ''}
       <div class="vt-lh"><span>전체 ${this.T.length}단계</span><span>인원 · 무게</span></div>
