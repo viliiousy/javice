@@ -3815,7 +3815,9 @@ html:not(.card-free) .card-head.cl-hold{ position:relative; }
 .wk-time .wk-note{ margin:6px 0 0; text-align:center; }
 /* 들어 올린 무게 티어 — 오늘의 운동 카드 아래 한 줄 + 시트 */
 .fit-tier{ display:grid; grid-template-columns:40px 1fr; align-items:center; column-gap:10px; row-gap:8px; width:100%; margin-top:10px; padding:10px 12px; border:1px solid var(--border); border-radius:14px; background:none; font:inherit; color:var(--text2); text-align:left; cursor:pointer; }
-.fit-tier .ftr-ic, .vt-ic{ display:block; border-radius:10px; background:#f2f3f5; overflow:hidden; flex:none; }
+.fit-tier .ftr-ic, .vt-ic{ display:block; border-radius:10px; background:none; overflow:hidden; flex:none; }
+/* 아이콘은 투명 바탕의 먹색 선 — 어두운 화면에서는 밝은 선으로 뒤집는다 */
+html.dark .vt-ic img, html.dark .fit-tier .ftr-ic img{ filter:invert(1); }
 .fit-tier .ftr-ic{ width:40px; height:40px; }
 .fit-tier .ftr-ic img, .vt-ic img{ width:100%; height:100%; object-fit:contain; display:block; }
 .vt-ic0{ background:var(--border); }
@@ -3826,7 +3828,7 @@ html:not(.card-free) .card-head.cl-hold{ position:relative; }
 .fit-tier .ftr-bar, .fz-vt .vt-bar{ grid-column:1 / -1; height:4px; border-radius:2px; background:var(--border); overflow:hidden; }
 .fit-tier .ftr-bar i, .fz-vt .vt-bar i{ display:block; height:100%; background:var(--accent); border-radius:2px; }
 .fz-vt .vt-hero{ display:flex; align-items:center; gap:16px; padding:4px 0 14px; }
-.fz-vt .vt-ic-h{ width:96px; height:96px; border-radius:22px; }
+.fz-vt .vt-ic-h{ width:88px; height:88px; border-radius:0; }
 .fz-vt .vt-hx{ display:flex; flex-direction:column; gap:3px; min-width:0; }
 .fz-vt .vt-lv{ font-size:12px; font-weight:700; color:var(--accent); }
 .fz-vt .vt-hx b{ font-size:24px; font-weight:700; letter-spacing:-.5px; color:var(--text); line-height:1.2; }
@@ -3845,8 +3847,8 @@ html:not(.card-free) .card-head.cl-hold{ position:relative; }
 .fz-vt .vt-lh{ margin:16px 0 6px; font-size:12px; font-weight:600; color:var(--text3); }
 .fz-vt .vt-ladder{ list-style:none; margin:0; padding:0; max-height:46vh; overflow:auto; border-top:1px solid var(--border); }
 .fz-vt .vt-ladder li{ display:grid; grid-template-columns:32px 30px 1fr auto; gap:8px; align-items:center; padding:6px 0; font-size:13px; color:var(--text3); border-bottom:1px solid var(--border); }
-.fz-vt .vt-ic-l{ width:32px; height:32px; border-radius:8px; opacity:.45; filter:grayscale(1); }
-.fz-vt .vt-ladder li.got .vt-ic-l{ opacity:1; filter:none; }
+.fz-vt .vt-ic-l{ width:30px; height:30px; opacity:.3; }
+.fz-vt .vt-ladder li.got .vt-ic-l{ opacity:1; }
 .fz-vt .vt-ladder .vt-n{ font-size:11.5px; text-align:right; }
 .fz-vt .vt-ladder li b{ font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .fz-vt .vt-ladder li em{ font-style:normal; font-size:12px; text-align:right; }
