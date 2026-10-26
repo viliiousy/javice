@@ -65,7 +65,7 @@ const Fitness = {
   _rtRO() { const v = UserStore.json(this.ROUTINE_KEY, null); return (v && typeof v === 'object') ? v : {}; },
   picks(dow) {
     const v = this._dpRO()[dow], R = this._rtRO();
-    const ok = p => ['A','B','C','cardio','rest','none'].includes(p) || R[p] || String(p).startsWith('part:');   // 예전 Hevy 루틴 id 는 무시
+    const ok = p => ['A','B','C','cardio','rest','none'].includes(p) || R[p] || String(p).startsWith('part:') || String(p).startsWith('sport:');   // 예전 Hevy 루틴 id 는 무시
     let a = (Array.isArray(v) ? v : [v]).filter(p => p && ok(p));
     if (a.length > 1) a = a.filter(p => p !== 'rest' && p !== 'none');
     return a.length ? a : [this._defaultFor(dow)];
@@ -87,7 +87,7 @@ const Fitness = {
   // 한 회차의 계획
   _planOne(pick, dow) {
     const R = this._rtRO();
-    if (!['A','B','C','cardio','rest','none'].includes(pick) && !R[pick] && !String(pick).startsWith('part:')) pick = this._defaultFor(dow);
+    if (!['A','B','C','cardio','rest','none'].includes(pick) && !R[pick] && !String(pick).startsWith('part:') && !String(pick).startsWith('sport:')) pick = this._defaultFor(dow);
     const P = this._planOne0(pick, R); P.pick = pick; return P;
   },
   _planOne0(pick, R) {
@@ -96,6 +96,8 @@ const Fitness = {
       const parts = pick.slice(5).split(',').filter(Boolean);
       return { name: parts.join('·'), exercises: PlanGen.dayFor(parts), src: 'part', parts };
     }
+    // 스포츠 하나로 고른 날: 그 종목 한 줄(시간 운동)
+    if (String(pick).startsWith('sport:')) { const n = pick.slice(6); return { name:n, exercises:[{ name:n, sets:this.defSets(n) }], src:'day' }; }
     if (R[pick]) return { name:R[pick].name, exercises:(R[pick].exercises||[]).map(x=>({ name:x.name, sets:x.sets||'', ...(x.w?{w:x.w}:{}) })), src:'routine', rid:pick };
     if (pick === 'none')   return { name:'계획 없음', exercises:[], src:'none' };
     if (pick === 'rest')   return { name:'휴식', exercises:[], src:'day' };
@@ -284,12 +286,17 @@ const Fitness = {
     const dp = this.dayPlan();
     const R = this.routines();
     const DOW = ['일','월','화','수','목','금','토'];
+    // 고르는 칸이 길어져 묶음(optgroup)으로 나눈다 — 루틴 만들기의 부위 칩(삼두·이두·전완근·유산소·스포츠)과 같은 범위
+    const part = ps => ['part:' + ps.join(','), ps.join(' + ')];
+    const SP = (typeof EX_DB !== 'undefined' && EX_DB['스포츠']) || [];
     const OPTS = [
-      ...Object.entries(R).map(([id,r]) => [id, '내 루틴 · ' + r.name]),
-      ...[['가슴'],['등'],['하체'],['어깨'],['팔'],['복근'],['가슴','어깨'],['가슴','팔'],['등','팔'],['어깨','팔'],['팔','복근'],['가슴','복근'],['등','복근'],['어깨','복근'],['하체','복근'],['전신'],['전신','유산소']]
-        .map(ps => ['part:' + ps.join(','), '부위 · ' + ps.join(' + ')]),
-      ['none','계획 없음'], ['rest','휴식'], ['cardio','유산소'],
-      ['A','홈트 DAY A 푸시'],['B','홈트 DAY B 풀'],['C','홈트 DAY C 하체+코어'],
+      ['g:기본'], ['none','계획 없음'], ['rest','휴식'],
+      ...(Object.keys(R).length ? [['g:내 루틴'], ...Object.entries(R).map(([id,r]) => [id, r.name])] : []),
+      ['g:부위 하나'], ...[['가슴'],['등'],['하체'],['어깨'],['팔'],['삼두'],['이두'],['전완근'],['복근'],['전신']].map(part),
+      ['g:부위 둘'], ...[['가슴','삼두'],['등','이두'],['가슴','어깨'],['가슴','팔'],['등','팔'],['어깨','팔'],['하체','복근'],['팔','복근'],['가슴','복근'],['등','복근'],['어깨','복근'],['전완근','이두']].map(part),
+      ['g:유산소'], ['cardio','유산소'], ...[['전신','유산소'],['하체','유산소'],['복근','유산소']].map(part),
+      ['g:홈트'], ['A','홈트 DAY A 푸시'],['B','홈트 DAY B 풀'],['C','홈트 DAY C 하체+코어'],
+      ...(SP.length ? [['g:스포츠'], ...SP.map(n => ['sport:' + n, n])] : []),
     ];
     this._dpOpts = OPTS;
     const rows = DOW.map((d,i) => `<div class="dp-row${i===new Date().getDay()?' dp-today':''}" data-dow="${i}">
@@ -318,7 +325,12 @@ const Fitness = {
     setTimeout(()=>document.querySelectorAll('.dp-ss').forEach(b=>this._dpNum(b)), 0);
   },
   _dpSel(cur, k) {
-    const opts = (this._dpOpts||[]).map(([v,l]) => `<option value="${v}"${cur===v?' selected':''}>${esc(l)}</option>`).join('');
+    let opts = '', open = false;
+    for (const [v,l] of (this._dpOpts||[])) {
+      if (l === undefined && String(v).startsWith('g:')) { opts += (open ? '</optgroup>' : '') + `<optgroup label="${esc(v.slice(2))}">`; open = true; continue; }
+      opts += `<option value="${v}"${cur===v?' selected':''}>${esc(l)}</option>`;
+    }
+    if (open) opts += '</optgroup>';
     return `<div class="dp-s"><span class="dp-n num">${k+1}</span><label class="dp-sw"><select class="inp inp-sm dp-sel">${opts}</select>${this._ic('down','dp-chev')}</label>`
       + `<button type="button" class="dp-x" onclick="Fitness._dpDel(this)" aria-label="이 회차 빼기">${this._ic('x') || '✕'}</button></div>`;
   },

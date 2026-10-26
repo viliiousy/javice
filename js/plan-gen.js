@@ -211,6 +211,8 @@ const PlanGen = {
     '팔':   ['biceps', 'triceps', 'hammer', 'triceps'],
     '복근': ['core', 'core', 'core'],
     '전신': ['squat', 'hpush', 'hrow', 'vpush', 'hinge', 'core'],   // 큰 동작을 부위마다 하나씩
+    '삼두': ['triceps', 'triceps', 'triceps', 'triceps'],
+    '이두': ['biceps', 'hammer', 'biceps', 'hammer'],
   },
   CARDIO: ['트레드밀 러닝', '인클라인 트레드밀 러닝', '싸이클', '로잉 머신', '엘립티컬 머신', '스텝 밀', '걷기', '줄넘기'],
   // 운동 이름들 → 그날 한 부위 이름. 고른 운동만 보고 판단한다(유산소·스포츠는 따로 붙인다).
@@ -250,8 +252,14 @@ const PlanGen = {
     const order = [];   // 부위를 번갈아: 가슴1, 삼두1, 가슴2 …
     for (let i = 0; order.length < 40 && lists.some(l => l[i]); i++) lists.forEach(l => { if (l[i]) order.push(l[i]); });
     const used = new Set(), out = [];
+    // 슬롯이 없는 부위(전완근 등)는 그 부위 운동 목록에서 앞에서부터 고른다
+    for (const pt of parts) if (!this.PART_SLOTS[pt] && typeof EX_DB !== 'undefined' && EX_DB[pt]) {
+      const ns = EX_DB[pt].filter(x => this.allowed(x, p)); const L = (ns.length ? ns : EX_DB[pt]).slice(0, 4);
+      L.forEach((x, k) => order.splice(Math.min(order.length, k * (parts.length) + parts.indexOf(pt)), 0, 'name:' + x));
+    }
     for (const sl of order) {
       if (out.length >= n) break;
+      if (sl.startsWith('name:')) { const name = sl.slice(5); if (!used.has(name)) { used.add(name); out.push({ name, sets: out.length < 2 && p.goal !== 'lose' ? mainSet : accSet }); } continue; }
       const pool = (this.POOL[sl] || []).filter(x => !used.has(x));
       const name = pool.find(x => this.allowed(x, p)) || pool.find(x => this.pickerOk(x));
       if (!name) continue;
