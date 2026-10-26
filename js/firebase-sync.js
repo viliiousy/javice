@@ -26,7 +26,7 @@ const FirebaseSync = {
   ready() { return !!(this._uid && this._dbUrl); },
 
   // 계정마다 따로 두지 않는 기기 공용 칸(AI 키·디자인 설정 등). 사용자 데이터(u_<id>_*)는 계정별 접두사가 있어 안전하다.
-  DEVICE_KEYS: ['gl_ai_key','gl_ai_prov','gl_ai_key_openai','gl_ai_key_anthropic','gl_ai_key_gemini','gl_ai_key_xai','gl_aiu_show','gl_cat_colors','gl_top_info','gl_home_cats','hub_cfg_v1','gl_hub_mode','gl_wx_ask','gl_wx_gps','gl_wx_geo','gl_wx_geo_a'],
+  DEVICE_KEYS: ['gl_ai_key','gl_ai_prov','gl_ai_key_openai','gl_ai_key_anthropic','gl_ai_key_gemini','gl_ai_key_xai','gl_aiu_show','gl_cat_colors','gl_top_info','gl_home_cats','hub_cfg_v1','gl_hub_mode','gl_wx_ask','gl_wx_gps','gl_wx_geo','gl_wx_geo_a','gl_wx_city'],
   SECRET_KEYS: ['gl_ai_key','gl_ai_key_openai','gl_ai_key_anthropic','gl_ai_key_gemini','gl_ai_key_xai','hub_cfg_v1'],
 
   // 같은 기기에서 다른 구글 계정으로 들어오면, 앞 사람의 AI 키·설정이 새 계정에 보이고
@@ -137,7 +137,7 @@ const FirebaseSync = {
     }
   },
 
-  EXTRAS: ['gl_ai_key','gl_ai_prov','gl_ai_key_openai','gl_ai_key_anthropic','gl_ai_key_gemini','gl_ai_key_xai','gl_aiu_show','gl_ui','gl_haptic','gl_tts','gl_dark','gl_cat_colors','gl_top_info','gl_home_cats','gl_top_overdue','gl_wx_ask','gl_wx_gps','gl_wx_geo_a'],
+  EXTRAS: ['gl_ai_key','gl_ai_prov','gl_ai_key_openai','gl_ai_key_anthropic','gl_ai_key_gemini','gl_ai_key_xai','gl_aiu_show','gl_haptic','gl_tts','gl_dark','gl_cat_colors','gl_top_info','gl_home_cats','gl_top_overdue','gl_wx_ask','gl_wx_gps','gl_wx_geo_a','gl_wx_city'],
   _allLocal() {
     const data = UserStore.getAllData();
     this.EXTRAS.forEach(k => { const v=localStorage.getItem(k); if(v!=null) data[k]=v; });

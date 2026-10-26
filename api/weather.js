@@ -82,6 +82,7 @@ module.exports = async function handler(req, res) {
   if (cors(req, res)) return;
   const q = req.query || {}, h = req.headers || {};
   let lat = Number(q.lat), lon = Number(q.lon), city = '';
+  if (q.city) { try { city = String(q.city).slice(0, 40); } catch (e) {} }   // 사용자가 고른 도시 이름
   if (!isFinite(lat) || !isFinite(lon) || (!lat && !lon)) {
     lat = Number(h['x-vercel-ip-latitude']); lon = Number(h['x-vercel-ip-longitude']);
     try { city = decodeURIComponent(h['x-vercel-ip-city'] || ''); } catch (e) {}

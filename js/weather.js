@@ -28,72 +28,84 @@ const Weather = {
   //     예전엔 웹뷰의 위치 기능을 써서 iOS 가 앱을 켤 때마다 "bashy.app 이(가) 위치를 사용하려고 합니다" 를 다시 물었다.
   //   웹: 브라우저가 이미 허락돼 있으면 조용히 받고, 아직이면 이 계정에서 처음 한 번만 묻는다.
   //   묻지 않는 기기에서는 계정에 저장된 마지막 좌표(5km 단위)를 그대로 쓴다.
-  GEO_KEY: 'gl_wx_geo', GEO_ON: 'gl_wx_gps', ASK_KEY: 'gl_wx_ask',
-  get gpsOn() { return localStorage.getItem(this.GEO_ON) !== '0'; },
-  setGps(on) {
-    localStorage.setItem(this.GEO_ON, on ? '1' : '0');
-    if (on) localStorage.removeItem(this.ASK_KEY);          // 설정에서 다시 켜면 한 번 더 물어도 된다
-    else { localStorage.setItem(this.ASK_KEY, 'no'); localStorage.removeItem(this.GEO_KEY); localStorage.removeItem(this.GEO_ACCT); }
-    this.H = null; localStorage.removeItem(this.HIST_KEY); this.load(true); this.loadHist(true);
+  // 날씨 위치는 사용자가 고른 도시로 본다(gl_wx_city — 계정에 저장돼 다른 기기에도 따라간다).
+  //   도시를 고를 때만: ① 도시 이름으로 찾기(Open-Meteo 지명 검색) ② '지금 위치로 찾기' — 위치를 딱 한 번 받아 가장 가까운 도시 이름으로.
+  //   그 뒤로는 위치(GPS)를 다시 묻지 않는다. 아직 안 골랐으면 예전에 받아 둔 좌표, 그것도 없으면 접속 위치(시·구 수준)로.
+  GEO_KEY: 'gl_wx_geo', GEO_ON: 'gl_wx_gps', ASK_KEY: 'gl_wx_ask', CITY_KEY: 'gl_wx_city',
+  GEO_ACCT: 'gl_wx_geo_a',
+  get gpsOn() { return false; },
+  setGps() {},
+  city() { try { const c = JSON.parse(localStorage.getItem(this.CITY_KEY) || 'null'); return c && isFinite(c.lat) && isFinite(c.lon) ? c : null; } catch (e) { return null; } },
+  setCity(c) {
+    try { if (c) localStorage.setItem(this.CITY_KEY, JSON.stringify({ name: c.name, sub: c.sub || '', lat: Math.round(c.lat * 100) / 100, lon: Math.round(c.lon * 100) / 100 })); else localStorage.removeItem(this.CITY_KEY); } catch (e) {}
+    try { window.FirebaseSync?.scheduleSave?.(); } catch (e) {}
+    this.H = null; try { localStorage.removeItem(this.HIST_KEY); localStorage.removeItem(this.KEY); } catch (e) {}
+    this.load(true); this.loadHist(true);
   },
-  GEO_ACCT: 'gl_wx_geo_a',   // 계정에 저장되는 마지막 좌표 {lat, lon} — 자리가 바뀔 때만 고쳐 쓴다
   geo() {
-    if (!this.gpsOn) return null;
-    try {
-      const g = JSON.parse(localStorage.getItem(this.GEO_KEY) || 'null'); if (g) return g;
-      const a = JSON.parse(localStorage.getItem(this.GEO_ACCT) || 'null');
-      return a && a.lat != null ? { lat: a.lat, lon: a.lon, at: 0 } : null;
-    } catch (e) { return null; }
+    const c = this.city(); if (c) return { lat: c.lat, lon: c.lon, at: Date.now() };
+    try { const a = JSON.parse(localStorage.getItem(this.GEO_ACCT) || 'null'); return a && a.lat != null ? { lat: a.lat, lon: a.lon, at: 0 } : null; } catch (e) { return null; }
   },
-  _q() { const g = this.geo(); return g ? `lat=${g.lat}&lon=${g.lon}` : ''; },
+  _q() { const g = this.geo(), c = this.city(); return g ? `lat=${g.lat}&lon=${g.lon}${c ? '&city=' + encodeURIComponent(c.name) : ''}` : ''; },
   _nGeo() { try { return window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.Geolocation || null : null; } catch (e) { return null; } },
-  // 지금 이 기기의 허락 상태: 'granted' | 'denied' | 'prompt'
-  async _perm() {
-    const N = this._nGeo();
-    try {
-      if (N) { const p = await N.checkPermissions(); return p.coarseLocation === 'granted' || p.location === 'granted' ? 'granted' : (p.location === 'denied' ? 'denied' : 'prompt'); }
-      if (navigator.permissions && navigator.permissions.query) return (await navigator.permissions.query({ name: 'geolocation' })).state;
-    } catch (e) {}
-    return 'prompt';
-  },
   async _pos(N) {
     if (N) {
-      try {
-        const p = await N.getCurrentPosition({ enableHighAccuracy: false, maximumAge: 30 * 60000, timeout: 8000 });
-        return p && p.coords ? p.coords : null;
-      } catch (e) { return null; }
+      try { await N.requestPermissions?.({ permissions: ['coarseLocation'] }); } catch (e) {}
+      try { const p = await N.getCurrentPosition({ enableHighAccuracy: false, maximumAge: 30 * 60000, timeout: 10000 }); return p && p.coords ? p.coords : null; } catch (e) { return null; }
     }
     if (!navigator.geolocation) return null;
-    return new Promise(res => navigator.geolocation.getCurrentPosition(p => res(p.coords), () => res(null),
-      { enableHighAccuracy: false, maximumAge: 30 * 60000, timeout: 8000 }));
+    return new Promise(res => navigator.geolocation.getCurrentPosition(p => res(p.coords), () => res(null), { enableHighAccuracy: false, maximumAge: 30 * 60000, timeout: 10000 }));
   },
-  locate() {
-    if (!this.gpsOn) return Promise.resolve(null);
-    const g0 = this.geo(); if (g0 && Date.now() - g0.at < 30 * 60000) return Promise.resolve(g0);
-    if (this._locP) return this._locP;
-    this._locP = (async () => {
-      const N = this._nGeo();
-      if (!N && !navigator.geolocation) return g0 || null;
-      const st = await this._perm(), ask = localStorage.getItem(this.ASK_KEY);
-      if (st === 'denied') { if (!ask) localStorage.setItem(this.ASK_KEY, 'no'); return g0 || null; }
-      // 아직 허락 전: 앱은 이 계정이 '아니오' 라고 한 적 없으면 한 번(운영체제가 기억), 웹은 이 계정에서 처음일 때만
-      if (st !== 'granted' && (ask === 'no' || (!N && ask))) return g0 || null;
-      // 계정 기록을 아직 못 받았으면(새 기기 첫 실행) 이번엔 묻지 않는다 — 받아 온 뒤 '이미 물었음' 이면 다시 묻지 않게
-      try { if (st !== 'granted' && !ask && typeof FirebaseSync !== 'undefined' && FirebaseSync.ready && FirebaseSync.ready() && !FirebaseSync._synced) return g0 || null; } catch (e) {}
-      const c = await this._pos(N);
-      if (st !== 'granted') localStorage.setItem(this.ASK_KEY, c ? 'yes' : 'no');
-      if (!c) return g0 || null;
-      const r = v => Math.round(v * 20) / 20;
-      const g = { lat: r(c.latitude), lon: r(c.longitude), at: Date.now() };
-      const moved = !g0 || g0.lat !== g.lat || g0.lon !== g.lon;
-      try { localStorage.setItem(this.GEO_KEY, JSON.stringify(moved || !g0 ? g : { ...g0, at: g.at })); } catch (e) {}
-      if (moved) {
-        this.H = null; try { localStorage.removeItem(this.HIST_KEY); } catch (e) {}
-        try { localStorage.setItem(this.GEO_ACCT, JSON.stringify({ lat: g.lat, lon: g.lon })); } catch (e) {}
-      }
-      return g;
-    })().finally(() => { setTimeout(() => { this._locP = null; }, 1000); });
-    return this._locP;
+  locate() { return Promise.resolve(this.geo()); },   // 자동으로 위치를 묻지 않는다
+  // ── 도시 고르기 ──
+  pick() {
+    const c = this.city();
+    App.openModal('@sun 날씨 볼 도시', `<div class="fz fz-wxc">
+      <p class="fz-note">${c ? `지금: <b>${esc(c.name)}</b>${c.sub ? ' · ' + esc(c.sub) : ''}` : '아직 도시를 고르지 않았습니다 — 지금은 접속 위치로 봅니다'}</p>
+      <input id="wxcQ" class="inp" type="search" placeholder="도시 이름 (예: 수원, 강남구, Tokyo)" autocomplete="off" oninput="Weather._find(this.value)">
+      <div id="wxcList" class="wxc-list"></div>
+      <button type="button" class="fz-act" onclick="Weather._here(this)"><span>지금 위치로 찾기</span><small>위치를 이번 한 번만 씁니다</small></button>
+      ${c ? `<button type="button" class="fz-act" onclick="Weather.setCity(null);App.closeModal();App.showToast('접속 위치로 봅니다')"><span>도시 지우기</span><small>접속 위치(시·구 수준)로 보기</small></button>` : ''}
+    </div>`);
+    setTimeout(() => document.getElementById('wxcQ')?.focus(), 200);
+  },
+  _find(q) {
+    clearTimeout(this._ft); q = String(q || '').trim();
+    const box = document.getElementById('wxcList'); if (!box) return;
+    if (q.length < 1) { box.innerHTML = ''; return; }
+    this._ft = setTimeout(async () => {
+      // 두 지명 검색을 합친다: Open-Meteo(인구 순, '수원'→'수원시' 도 같이) + OpenStreetMap(구·군 이름에 강함). 큰 도시가 위로
+      const om = async n => { try { const j = await (await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(n)}&count=8&language=ko&format=json`)).json();
+        return (j.results || []).map(x => ({ name: x.name, sub: [x.admin1, x.country].filter(Boolean).join(' · '), lat: x.latitude, lon: x.longitude, rank: x.population || 0 })); } catch (e) { return []; } };
+      const osm = async n => { try { const j = await (await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(n)}&format=jsonv2&accept-language=ko&limit=6&addressdetails=1`)).json();
+        const big = { city: 800000, borough: 500000, county: 300000, province: 900000, state: 900000, town: 100000, municipality: 200000, district: 200000 };
+        return (j || []).filter(x => big[x.addresstype] || x.addresstype === 'village' || x.addresstype === 'suburb').map(x => { const a = x.address || {};
+          return { name: x.name, sub: [a.city !== x.name ? a.city : '', a.province || a.state, a.country].filter(Boolean).join(' · '), lat: Number(x.lat), lon: Number(x.lon), rank: big[x.addresstype] || Math.round((x.importance || 0) * 1000) }; }); } catch (e) { return []; } };
+      try {
+        const extra = /[시구군도]$/.test(q) || !/[가-힣]/.test(q) ? [] : [om(q + '시')];
+        const all = (await Promise.all([om(q), osm(q), ...extra])).flat();
+        const seen = new Set(), r = [];
+        for (const x of all.sort((a, b) => b.rank - a.rank)) {
+          const k = x.name + '|' + Math.round(x.lat * 10) + '|' + Math.round(x.lon * 10); if (seen.has(k)) continue; seen.add(k); r.push(x); if (r.length >= 8) break;
+        }
+        this._res = r;
+        box.innerHTML = r.length ? r.map((x, i) => `<button type="button" class="wxc-it" onclick="Weather._choose(${i})"><b>${esc(x.name)}</b><small>${esc(x.sub)}</small></button>`).join('') : '<p class="fz-note">찾는 도시가 없습니다 — 다른 이름(시·구 단위, 영어)으로 찾아 보세요</p>';
+      } catch (e) { box.innerHTML = '<p class="fz-note">도시를 찾지 못했습니다 — 인터넷 연결을 확인해 주세요</p>'; }
+    }, 300);
+  },
+  _choose(i) { const x = (this._res || [])[i]; if (!x) return; this.setCity(x); App.closeModal(); App.showToast(`${x.name} 날씨로 봅니다`, 'success'); },
+  async _here(btn) {
+    if (btn) { btn.disabled = true; btn.querySelector('span').textContent = '위치 확인 중…'; }
+    const c = await this._pos(this._nGeo());
+    if (!c) { if (btn) { btn.disabled = false; btn.querySelector('span').textContent = '지금 위치로 찾기'; } App.showToast('위치를 받지 못했습니다 — 도시 이름으로 찾아 주세요', 'error'); return; }
+    let name = '', sub = '';
+    try {
+      const j = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${c.latitude}&longitude=${c.longitude}&localityLanguage=ko`)).json();
+      name = j.locality || j.city || ''; sub = [j.principalSubdivision, j.countryName].filter(Boolean).join(' · ');
+      if (j.city && j.locality && j.city !== j.locality) { name = `${j.city} ${j.locality}`; }
+    } catch (e) {}
+    this.setCity({ name: name || '내 위치', sub, lat: c.latitude, lon: c.longitude });
+    App.closeModal(); App.showToast(`${name || '내 위치'} 날씨로 봅니다`, 'success');
   },
   cached() { try { const v = JSON.parse(localStorage.getItem(this.KEY) || 'null'); return v && v.ok ? v : null; } catch (e) { return null; } },
   async load(force) {

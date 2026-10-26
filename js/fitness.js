@@ -208,7 +208,7 @@ const Fitness = {
           <button type="button" class="fx-th${src?'':' none'}" ${info?`onclick="event.stopPropagation();${info}"`:'tabindex="-1"'} aria-label="${esc(ex.name)} 자세 보기">
             ${typeof Icons!=='undefined'?Icons.svg('dumbbell','fx-ic'):''}${src?`<span class="fx-img">${ExMedia.poseHtml(src)}</span>`:''}
           </button>
-          <div class="fx-tx"><div class="fx-nm">${esc(ex.name)}</div><div class="fx-sets num">${esc(ex.sets||'')}</div>${this._logLine(ex, dsx)}</div>
+          <div class="fx-tx"><div class="fx-nm">${esc(ex.name)}</div><div class="fx-sets num">${esc(this.setsLabel(ex.sets||''))}</div>${this._logLine(ex, dsx)}</div>
           ${typeof PlanGen!=='undefined' && PlanGen.timed(ex.name)
             ? `<button type="button" class="fx-act" onclick="event.stopPropagation();Fitness.timeSheet('${A(ex.name)}','${dsx}')" aria-label="운동 시간 고치기">${typeof Icons!=='undefined'?Icons.svg('pen','fx-aic'):'시간'}</button>`
             : `<button type="button" class="fx-act" onclick="event.stopPropagation();PlanGen.openLog('${A(ex.name)}','${A(ex.sets||'')}','${dsx}')" aria-label="무게 기록">${typeof Icons!=='undefined'?Icons.svg('pen','fx-aic'):'기록'}</button>`}
@@ -232,7 +232,7 @@ const Fitness = {
     if (typeof PlanGen==='undefined') return '';
     if (PlanGen.timed(ex.name)) return '';   // 유산소·스포츠는 시간만(위 줄) — 무게 권장·기록 줄 없음
     const L = PlanGen.log(ds)[ex.name];
-    if (L && L.length) return `<div class="fx-log num">${L.map(s=>s.w?`${s.w}kg×${s.r}`:`${s.r}회`).join(' · ')}</div>`;
+    if (L && L.length) return `<div class="fx-log num">${esc(this.setsLine(L))}</div>`;
     const sg = PlanGen.suggest(ex.name, ex.sets, ds);
     return sg ? `<div class="fx-log fx-sug">${esc(sg)}</div>` : '';
   },
@@ -658,10 +658,25 @@ const Fitness = {
   // 오늘의 운동 줄에서 유산소·스포츠의 시간 고치기(무게 기록 대신) — 그날 목록에 저장한다
   timeSheet(name, ds){
     const d=new Date(ds+'T00:00:00'); const list=this.exercisesFor(d).list; const i=list.findIndex(x=>x.name===name); if(i<0) return;
-    const cur=+(String(list[i].sets||'').match(/(\d+)\s*분/)||[])[1]||this.defMin(name);
-    NumIn.open({ title:name+' 시간', unit:'분', dec:false, cur,
+    const c=this.cardio(list[i].sets, name);
+    const save=(m, kmh)=>{ this.applyList(ds, list.map((e,k)=>({ ...e, sets:k===i?this.cardioSets(name, m, kmh):e.sets })), 'day'); this.render(d); try{ Haptic.light(); }catch(e){} };
+    NumIn.open({ title:name+' 시간', unit:'분', dec:false, cur:c.min,
       done:val=>{ const m=Math.max(1,Math.min(600,Math.round(Number(val)||0))); if(!m) return;
-        this.applyList(ds, list.map((e,k)=>({ ...e, sets:k===i?`${m}분`:e.sets })), 'day'); this.render(d); try{ Haptic.light(); }catch(e){} } });
+        if(this.isRun(name)||this.isTread(name)) setTimeout(()=>this.speedSheet(name, c.kmh, kmh=>save(m, kmh), ()=>save(m, c.kmh)), 250); else save(m, null); } });
+  },
+  cardioSets(name, m, kmh){ return `${m}분${kmh?` · ${this.speedTxt(name, kmh)}`:''}`; },
+  // 러닝: 페이스(1km 에 몇 분 몇 초) · 트레드밀: 속도(km/h) — 숫자 바퀴로 고른다
+  speedSheet(name, kmh, done, cancel){
+    const W=typeof Wheel!=='undefined'?Wheel:null; if(!W){ done(kmh); return; }
+    if(this.isTread(name)){
+      const v=kmh||8;
+      W.open({ title:`${name} 속도`, unit:'km/h', cols:[{ vals:Array.from({length:23},(_,k)=>k+2), cur:Math.floor(v) },{ vals:[0,0.5], cur:v%1>=0.5?0.5:0, fmt:x=>x?'.5':'.0' }],
+        done:([a,b])=>done(a+b), cancel });
+    } else {
+      const sec=kmh?Math.round(3600/kmh):360;
+      W.open({ title:`${name} 페이스 (1km)`, unit:'/km', cols:[{ vals:Array.from({length:13},(_,k)=>k+3), cur:Math.min(15,Math.max(3,Math.floor(sec/60))), fmt:x=>x+'분' },{ vals:Array.from({length:12},(_,k)=>k*5), cur:Math.round((sec%60)/5)*5%60, fmt:x=>String(x).padStart(2,'0')+'초' }],
+        done:([a,b])=>done(Math.round(3600/(a*60+b)*10)/10), cancel });
+    }
   },
   defSets(n){ const p=typeof PlanGen!=='undefined'?PlanGen.partOf(n):null; return p==='스포츠' ? '60분' : p==='유산소' ? '30분' : this.DEFAULT_SETS; },
   // 운동 만들기 시트 — 지금 열린 창(고르기·교체) 위에 얹어서, 고르던 목록이 날아가지 않게 한다
@@ -1034,7 +1049,7 @@ const Fitness = {
   // 그날 총 볼륨 · 세트 · 소모 열량 (누르면 추이)
   // 직전에 보여 준 값(같은 날) — 바뀌면 거기서부터 숫자가 올라간다
   _totShown: null,
-  _totHtml(d){ try{ const ds=this._dateStr(d), t=WorkoutHistory.day(ds, true), b={ kcal:t.kcal };
+  _totHtml(d){ try{ const ds=this._dateStr(d), t=WorkoutHistory.day(ds, true), b={ kcal:this.burn(d, true).kcal };   // 소모 열량은 오늘 목록을 전부 했을 때
     const w=this._totShown&&this._totShown.ds===ds?this._totShown:{vol:t.vol,sets:t.sets,kcal:b.kcal}; this._totShown={ds,vol:t.vol,sets:t.sets,kcal:b.kcal};
     const cu=(k,v)=>`data-cu="n" data-from="${Math.round(w[k]||0)}" data-to="${Math.round(v)}"`;
     // 그날 총 볼륨만 한 사물(들어 올린 무게 단계) 아이콘 — 오른쪽에
@@ -1043,7 +1058,7 @@ const Fitness = {
     return (b.kcal||t.sets) ? `<button type="button" class="fit-burn fit-tot" onclick="WorkoutHistory.openAll()">
         <span class="ft-c"><b class="num" ${cu('vol',t.vol)}>${Math.round(w.vol||0).toLocaleString('ko-KR')}</b><i>kg</i><small>총 볼륨</small></span>
         <span class="ft-c"><b class="num" ${cu('sets',t.sets)}>${w.sets||0}</b><i>세트</i><small>${t.reps}회</small></span>
-        <span class="ft-c"><b class="num" ${cu('kcal',b.kcal)}>${Math.round(w.kcal||0).toLocaleString('ko-KR')}</b><i>kcal</i><small>소모 열량(추정)</small></span>
+        <span class="ft-c"><b class="num" ${cu('kcal',b.kcal)}>${Math.round(w.kcal||0).toLocaleString('ko-KR')}</b><i>kcal</i><small>전부 하면(추정)</small></span>
         ${vic}<span class="ft-go">추이</span></button>${typeof VolTier!=='undefined'?VolTier.chip(d):''}` : (typeof VolTier!=='undefined'?VolTier.chip(d):''); }catch(e){ return ''; } },
 
   // ── 운동 소모 열량(추정) ─────────────────
@@ -1055,7 +1070,9 @@ const Fitness = {
     try { const r = typeof InBody!=='undefined' && InBody.getRecords().filter(x=>Number(x.wt)>25).pop(); const w = Number(r && r.wt); if (w > 25) return w; } catch(e) {}
     return 70;
   },
-  burn(date=new Date()) {
+  // all=true: 체크와 상관없이 그날 목록을 전부 했을 때(오늘의 운동 '소모 열량(추정)' 에 보인다).
+  //   식단의 '+ 운동' 은 실제로 한 것만(all=false) 센다.
+  burn(date=new Date(), all=false) {
     const d=new Date(date), ds=this._dateStr(d);
     let list=[]; try { list=this.exercisesFor(d).list; } catch(e) { return { kcal:0, items:[], kg:this.weightKg() }; }
     const chk=this._checked(d), log=typeof PlanGen!=='undefined' ? PlanGen.log(ds) : {}, kg=this.weightKg();
@@ -1063,21 +1080,60 @@ const Fitness = {
     // 목록에 없는데 기록만 있는 운동(운동 모드에서 추가·교체한 것)도 센다
     Object.keys(log).forEach(n=>{ if(!seen.has(n)&&(log[n]||[]).length) list=list.concat([{ name:n, sets:'' }]); });
     list.forEach((x,i)=>{
-      const L=log[x.name]||[], done=chk.includes(i);
+      const L=log[x.name]||[], done=all||chk.includes(i);
       if(!done && !L.length) return;
       const timed=typeof PlanGen!=='undefined' && PlanGen.timed(x.name);
-      let kcal, info;
+      let kcal, info, min=0, kmh=null;
       if(timed){
-        const min=+(String(x.sets||'').match(/(\d+)\s*분/)||[])[1] || (PlanGen.partOf(x.name)==='스포츠'?60:30);
-        const met=(typeof EX_MET!=='undefined' && EX_MET[x.name]) || (PlanGen.partOf(x.name)==='스포츠'?6:6);
-        kcal=(met-1)*kg*min/60; info=`${min}분`;
+        const c=this.cardio(x.sets, x.name); min=c.min; kmh=c.kmh;
+        // 달리기·트레드밀은 속도(페이스)로 MET 를 정한다. 없으면 종목 MET
+        const met = kmh ? this.speedMet(kmh) : ((typeof EX_MET!=='undefined' && EX_MET[x.name]) || 6);
+        kcal=(met-1)*kg*min/60; info=`${min}분${kmh?` · ${this.speedTxt(x.name, kmh)}`:''}`;
       } else {
+        // 근력·맨몸: (MET−1) × 몸무게 × 시간. 한 세트 + 쉬는 시간 = 2.5분. 종목 MET(버피·풀업 등)가 있으면 그것, 없으면 5
         const n=L.length || (typeof WorkoutMode!=='undefined' ? WorkoutMode._nSets(x.sets) : 3);
-        kcal=(5-1)*kg*(n*2.5)/60; info=`${n}세트`;
+        const met=(typeof EX_MET!=='undefined' && EX_MET[x.name]) || 5;
+        kcal=(met-1)*kg*(n*2.5)/60; info=`${n}세트`;
       }
-      items.push({ name:x.name, kcal:Math.round(kcal), info });
+      items.push({ name:x.name, kcal:Math.round(kcal), info, min, kmh });
     });
     return { kcal:items.reduce((t,x)=>t+x.kcal,0), items, kg };
+  },
+  // 식단에 더해 줄 열량: 운동(한 것만) + 도보(걸음, 유산소와 겹치는 걸음 뺌). 설정의 반영 방식(절반·전부·안 함)을 둘 다에 쓴다
+  bonus(date=new Date(), s=null) {
+    try { s = s || Diet.getSettings(); } catch(e) { s = {}; }
+    const bm=s.burnMode||'half', f=v=>bm==='off'?0:bm==='full'?v:Math.round(v/2/10)*10;
+    const b=this.burn(date), w=typeof Steps!=='undefined' ? Steps.kcal(date) : { steps:0, kcal:0 };
+    const ex=f(b.kcal), walk=f(w.kcal);
+    return { burn:b, walk:w, ex, walkB:walk, total:ex+walk, mode:bm };
+  },
+  // ── 유산소 시간·속도 ── sets 예: '30분' · '30분 · 5\'30"/km' · '30분 · 10km/h'
+  isTread(n){ return /트레드밀|런닝머신|러닝머신/.test(String(n||'')); },
+  isRun(n){ return !this.isTread(n) && /러닝|달리기|조깅|마라톤/.test(String(n||'')); },
+  cardio(sets, name){
+    const t=String(sets||''), min=+(t.match(/(\d+)\s*분/)||[])[1] || this.defMin(name);
+    let kmh=null; const k=t.match(/([\d.]+)\s*km\/h/); const p=t.match(/(\d+)['′:](\d{1,2})["″]?\s*\/\s*km/);
+    if(k) kmh=Number(k[1]); else if(p){ const sec=(+p[1])*60+(+p[2]); if(sec>0) kmh=Math.round(3600/sec*10)/10; }
+    return { min, kmh: kmh>0 ? kmh : null };
+  },
+  // 속도 → MET (걷기 4km/h 3.0 · 5km/h 3.5 · 6km/h 4.3 · 달리기는 대략 km/h × 1.0)
+  speedMet(v){
+    if(v>=7.5) return Math.max(7, Math.min(23, v*1.0+0.5));
+    const T=[[3,2.5],[4,3.0],[5,3.5],[6,4.3],[7.5,7.5]];
+    for(let i=1;i<T.length;i++) if(v<=T[i][0]){ const [a,ma]=T[i-1],[b,mb]=T[i]; return ma+(mb-ma)*(v-a)/(b-a); }
+    return 2.5;
+  },
+  paceTxt(kmh){ const sec=Math.round(3600/kmh); return `${Math.floor(sec/60)}'${String(sec%60).padStart(2,'0')}"/km`; },
+  speedTxt(name, kmh){ return this.isTread(name) ? `${kmh}km/h` : this.paceTxt(kmh); },
+  // '4×10-12' → '4세트 10-12회', '3×12' → '3세트 12회'(시간 운동은 그대로)
+  setsLabel(sets){
+    const t=String(sets||'').trim(), m=t.match(/^(\d+)\s*[×xX*]\s*([\d\-~–]+)\s*(회)?$/);
+    return m ? `${m[1]}세트 ${m[2].replace(/[~–]/g,'-')}회` : t;
+  },
+  // 세트 기록 한 줄: 같은 무게·횟수가 이어지면 묶는다 — '18kg 10회 × 4세트' / '20kg 8회 × 2세트 · 18kg 10회'
+  setsLine(L){
+    const g=[]; for(const s of L||[]){ const w=Number(s.w)||0, r=Number(s.r)||0, last=g[g.length-1]; if(last&&last.w===w&&last.r===r) last.n++; else g.push({ w, r, n:1 }); }
+    return g.map(x=>`${x.w?x.w+'kg ':''}${x.r}회${x.n>1?` × ${x.n}세트`:''}`).join(' · ');
   },
 
   // ── 오늘 부위 바꾸기: 부위를 고르면 그날 운동을 그 부위로 다시 짠다(오늘만 / 앞으로 이 요일도) ──

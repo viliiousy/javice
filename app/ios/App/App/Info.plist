@@ -25,7 +25,7 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>지금 있는 곳의 날씨를 보여 주기 위해 대략적인 위치를 씁니다. 위치는 날씨를 찾는 데만 쓰고 저장하지 않습니다.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>인바디 앱 등이 건강 앱에 기록한 키·체중·체지방률·제지방량·BMI 를 읽어 Bashy 인바디 기록과 상단바 수치를 자동으로 채웁니다. 건강 데이터는 쓰거나 광고에 쓰지 않습니다.</string>
+	<string>인바디 앱 등이 건강 앱에 기록한 키·체중·체지방률·제지방량·BMI 와 하루 걸음 수를 읽어 Bashy 인바디 기록, 상단바 걸음 수, 걸으며 쓴 열량을 자동으로 채웁니다. 건강 데이터는 쓰거나 광고에 쓰지 않습니다.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Bashy 는 건강 앱에 데이터를 쓰지 않습니다. 인바디 기록을 채우려고 키·체중·체지방률·제지방량·BMI 를 읽기만 합니다.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>

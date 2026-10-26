@@ -33,6 +33,7 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "restCancel", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "healthRead", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "healthWatch", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "healthSteps", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "calAccess", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "calList", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "calEvents", returnType: CAPPluginReturnPromise),
@@ -124,6 +125,32 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
                 }
                 call.resolve(["ok": true, "data": out, "me": me])
             }
+        }
+    }
+
+    // 건강 앱 걸음 수 — 최근 days 일의 하루 합계 { "2026-10-26": 8432, … } (아이폰·애플워치 걸음을 건강 앱이 합친 값)
+    @objc func healthSteps(_ call: CAPPluginCall) {
+        guard HKHealthStore.isHealthDataAvailable(), let t = HKQuantityType.quantityType(forIdentifier: .stepCount) else {
+            call.resolve(["ok": false, "error": "unavailable"]); return
+        }
+        let days = max(1, min(60, call.getInt("days") ?? 2))
+        health.requestAuthorization(toShare: nil, read: [t]) { ok, err in
+            guard ok else { call.resolve(["ok": false, "error": err?.localizedDescription ?? "denied"]); return }
+            let cal = Calendar.current
+            let end = Date(), today = cal.startOfDay(for: end)
+            guard let start = cal.date(byAdding: .day, value: -(days - 1), to: today) else { call.resolve(["ok": false]); return }
+            var step = DateComponents(); step.day = 1
+            let q = HKStatisticsCollectionQuery(quantityType: t, quantitySamplePredicate: HKQuery.predicateForSamples(withStart: start, end: end),
+                                                options: .cumulativeSum, anchorDate: today, intervalComponents: step)
+            q.initialResultsHandler = { _, res, e in
+                let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"
+                var out: [String: Int] = [:]
+                res?.enumerateStatistics(from: start, to: end) { s, _ in
+                    out[f.string(from: s.startDate)] = Int((s.sumQuantity()?.doubleValue(for: .count()) ?? 0).rounded())
+                }
+                DispatchQueue.main.async { call.resolve(["ok": e == nil, "days": out]) }
+            }
+            self.health.execute(q)
         }
     }
 

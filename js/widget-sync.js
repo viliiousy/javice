@@ -63,8 +63,7 @@ const Widgets = {
       const dt = Diet.totals(Diet.getData()), ds = Diet.getSettings();
       out.kcal = { eat: Math.round(dt.cal || 0), goal: Number(ds.calorieGoal) || 0 };
       // 칼로리·운동 위젯
-      let burn = 0; try { burn = Fitness.burn(now).kcal || 0; } catch (e) {}
-      const bm = ds.burnMode || 'half', bonus = bm === 'off' ? 0 : bm === 'full' ? burn : Math.round(burn / 2 / 10) * 10;
+      let burn = 0, bonus = 0; try { const B = Fitness.bonus(now, ds); burn = B.burn.kcal + B.walk.kcal; bonus = B.total; } catch (e) {}
       out.body = { eat: Math.round(dt.cal || 0), goal: (Number(ds.calorieGoal) || 0) + bonus, burn: Math.round(burn),
         p: Math.round(dt.protein || 0), c: Math.round(dt.carb || 0), f: Math.round(dt.fat || 0),
         pg: Number(ds.proteinGoal) || 0, cg: Number(ds.carbGoal) || 0, fg: Number(ds.fatGoal) || 0 };

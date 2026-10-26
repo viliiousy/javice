@@ -197,8 +197,9 @@ const Diet = {
     // ── 시안 05: 남은 열량을 크게, 단·탄·지는 세 칸 막대, 끼니는 한 줄씩 ──
     const won=v=>Math.round(v).toLocaleString('ko-KR');
     // 운동으로 쓴 열량 — 설정(목표 › 운동 열량 반영)에 따라 절반(기본)·전부·안 함만큼 목표에 더한다
-    const burn=(typeof Fitness!=='undefined'&&Fitness.burn) ? Fitness.burn(date) : { kcal:0, items:[] };
-    const bm=s.burnMode||'half', bonus=bm==='off'?0:bm==='full'?burn.kcal:Math.round(burn.kcal/2/10)*10;
+    //   걸음(건강 앱)으로 쓴 열량도 같은 규칙으로 '+ 도보' 에 더한다(그날 유산소와 겹치는 걸음은 뺀다 — js/steps.js)
+    const B=(typeof Fitness!=='undefined'&&Fitness.bonus) ? Fitness.bonus(date, s) : { burn:{ kcal:0, items:[] }, walk:{ steps:0, kcal:0 }, ex:0, walkB:0, total:0 };
+    const burn=B.burn, walk=B.walk, bonus=B.total;
     const left=s.calorieGoal+bonus-t.cal, over=left<0;
     const mpct=(v,g)=>g?Math.min(100,Math.round(v/g*100)):0;
     const hour=new Date().getHours();
@@ -230,7 +231,7 @@ const Diet = {
 
     document.getElementById('dietWrap').innerHTML=`
       <div class="dk">
-        <div class="dk-sub">${isToday?'오늘 ':ds+' '}${over?'초과한 열량':'남은 열량'} · 목표 ${won(s.calorieGoal)}${bonus?` + 운동 ${won(bonus)}`:''}</div>
+        <div class="dk-sub">${isToday?'오늘 ':ds+' '}${over?'초과한 열량':'남은 열량'} · 목표 ${won(s.calorieGoal)}${B.ex?` + 운동 ${won(B.ex)}`:''}${B.walkB?` + 도보 ${won(B.walkB)}`:''}</div>
         <div class="dk-big"><span class="num${over?' over':''}">${won(Math.abs(left))}</span><span class="dk-u">kcal</span>
           <span class="dk-eat">먹음 <b class="num">${won(t.cal)}</b></span></div>
         <div class="dk-bar"><i style="width:${Math.min(100,pct)}%"${over?' class="over"':''}></i></div>
@@ -239,7 +240,7 @@ const Diet = {
           <div><span>탄수화물</span><b class="num">${this.macroTxt(t.carb,t,'')}<small> / ${s.carbGoal}g</small></b><em><i style="width:${mpct(t.carb,s.carbGoal)}%"></i></em></div>
           <div><span>지방</span><b class="num">${this.macroTxt(t.fat,t,'')}<small> / ${s.fatGoal}g</small></b><em><i style="width:${mpct(t.fat,s.fatGoal)}%"></i></em></div>
         </div>
-        ${burn.kcal?`<button type="button" class="dk-burn" onclick="Diet.showBurn('${ds}')"><span>운동 <b class="num">−${won(burn.kcal)}</b> kcal</span>${bonus?`<span class="dk-burn-plus"><b class="num">+${won(bonus)}</b> kcal 더 드셔도 됩니다</span>`:'<span class="dk-burn-plus">목표에 반영 안 함</span>'}</button>`:''}
+        ${burn.kcal||walk.kcal?`<button type="button" class="dk-burn" onclick="Diet.showBurn('${ds}')"><span>${burn.kcal?`운동 <b class="num">−${won(burn.kcal)}</b>`:''}${burn.kcal&&walk.kcal?' · ':''}${walk.kcal?`도보 <b class="num">−${won(walk.kcal)}</b>`:''} kcal</span>${bonus?`<span class="dk-burn-plus"><b class="num">+${won(bonus)}</b> kcal 더 드셔도 됩니다</span>`:'<span class="dk-burn-plus">목표에 반영 안 함</span>'}</button>`:''}
         ${t.unknown?`<div class="diet-macro-note">${t.unknown}개 음식은 영양정보가 없어 빠져 있어요 — 눌러서 채울 수 있어요</div>`:''}
       </div>
       <div class="dk-acts">
@@ -1248,13 +1249,13 @@ JSON 만 출력한다. 다른 말은 붙이지 마라.
   },
   // 운동 소모 열량 자세히
   showBurn(ds){
-    const d=new Date(ds+'T00:00:00'), b=Fitness.burn(d), s=this.getSettings(), bm=s.burnMode||'half';
+    const d=new Date(ds+'T00:00:00'), b=Fitness.burn(d), s=this.getSettings(), bm=s.burnMode||'half', w=typeof Steps!=='undefined'?Steps.kcal(d):{ steps:0, net:0, kcal:0 };
     const won=v=>Math.round(v).toLocaleString('ko-KR');
     const opt=(v,l,sub)=>`<button type="button" class="db-opt${bm===v?' on':''}" onclick="Diet.setBurnMode('${v}','${ds}')"><b>${l}</b><small>${sub}</small></button>`;
     App.openModal('@dumbbell 운동으로 쓴 열량',`<div class="dt db">
-      <div class="db-big"><span class="num">${won(b.kcal)}</span><i>kcal</i></div>
+      <div class="db-big"><span class="num">${won(b.kcal+w.kcal)}</span><i>kcal</i></div>
       <p class="db-note">몸무게 <span class="num">${b.kg}</span>kg 기준 추정치입니다. 가만히 있어도 쓰는 열량은 빼고, 운동으로 더 쓴 만큼만 셌습니다.</p>
-      <div class="db-list">${b.items.map(x=>`<div class="db-row"><span>${esc(x.name)}</span><small class="num">${esc(x.info)}</small><b class="num">${won(x.kcal)}</b></div>`).join('')}</div>
+      <div class="db-list">${b.items.map(x=>`<div class="db-row"><span>${esc(x.name)}</span><small class="num">${esc(x.info)}</small><b class="num">${won(x.kcal)}</b></div>`).join('')}${w.steps?`<div class="db-row"><span>도보</span><small class="num">${won(w.steps)}걸음${w.net<w.steps?` 중 ${won(w.net)}걸음(유산소 겹친 걸음 뺌)`:''}</small><b class="num">${won(w.kcal)}</b></div>`:''}</div>
       <div class="dt-sec-hd" style="margin-top:24px">식단 목표에 얼마나 더할까요</div>
       <div class="db-opts">${opt('half','절반','기본 · 추정치가 넉넉한 편이라')}${opt('full','전부','소모한 만큼 다')}${opt('off','안 함','목표 그대로')}</div>
       <div class="modal-btns"><button class="btn-sm" onclick="App.closeModal()">닫기</button></div>

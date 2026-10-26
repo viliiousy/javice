@@ -484,7 +484,7 @@ const WorkoutMode = {
         <div class="wk-stage">${th ? `<div class="wk-pose">${ExMedia.poseHtml(th, esc(x.name))}</div>` : `<div class="wk-pose none">${typeof Icons !== 'undefined' ? Icons.svg('dumbbell') : ''}<span>자세 그림 준비 중</span></div>`}</div>
         <div class="wk-ex-tx">
           <div class="wk-n">${S.cur + 1}<i>/${S.ex.length}</i>${part ? `<span class="wk-part">${esc(part)}</span>` : ''}</div>
-          <h2>${esc(x.name)}</h2><p>${esc(x.sets || '')}${x.sug ? ` · <em>${esc(x.sug)}</em>` : ''}</p>
+          <h2>${esc(x.name)}</h2><p>${esc(Fitness.setsLabel(x.sets || ''))}${x.sug ? ` · <em>${esc(x.sug)}</em>` : ''}</p>
           <div class="wk-tools">
             <button class="wk-tool" onclick="WorkoutMode.swap()">⇄ 운동 교체</button>
             <button class="wk-tool" onclick="WorkoutMode.addEx()">+ 운동 추가</button>
@@ -493,7 +493,7 @@ const WorkoutMode = {
             ${S.ex.length > 1 ? `<button class="wk-tool wk-tool-del" onclick="WorkoutMode.delEx(${S.cur}, this)">삭제</button>` : ''}
           </div>
         </div>
-        ${x.cardio ? `<div class="wk-time"><button type="button" class="inp wk-num wk-tnum" onclick="WorkoutMode.pickTime()" aria-label="운동 시간 바꾸기"><b class="num">${+(String(x.sets || '').match(/(\d+)\s*분/) || [])[1] || Fitness.defMin(x.name)}</b><i>분</i></button>
+        ${x.cardio ? `<div class="wk-time"><button type="button" class="inp wk-num wk-tnum" onclick="WorkoutMode.pickTime()" aria-label="운동 시간 바꾸기"><b class="num">${Fitness.cardio(x.sets, x.name).min}</b><i>분</i></button>${(() => { const c = Fitness.cardio(x.sets, x.name); return (Fitness.isRun(x.name) || Fitness.isTread(x.name)) ? `<button type="button" class="inp wk-num wk-tnum" onclick="WorkoutMode.pickSpeed()" aria-label="속도 바꾸기"><b class="num">${c.kmh ? Fitness.speedTxt(x.name, c.kmh) : (Fitness.isTread(x.name) ? '속도' : '페이스')}</b></button>` : ''; })()}
           <p class="wk-note">세트 없이 시간으로 합니다. 숫자를 눌러 한 시간을 고치고, 끝나면 아래 ‘완료’ 를 눌러 주세요.</p></div>` : `
         <div class="wk-sets">
           <div class="wk-sh"><span>세트</span><span>kg</span><span>회</span><span></span></div>
@@ -578,9 +578,16 @@ const WorkoutMode = {
   pickTime() {
     if (!this.st) return;
     const x = this.st.ex[this.st.cur];
-    const cur = +(String(x.sets || '').match(/(\d+)\s*분/) || [])[1] || Fitness.defMin(x.name);
-    NumIn.open({ title: x.name + ' 시간', unit: '분', dec: false, cur,
-      done: val => { const m = Math.max(1, Math.min(600, Math.round(Number(val) || 0))); if (!m) return; x.sets = `${m}분`; this.paint(); this._persist(); } });
+    const c = Fitness.cardio(x.sets, x.name);
+    const save = (m, kmh) => { x.sets = Fitness.cardioSets(x.name, m, kmh); this.paint(); this._persist(); };
+    NumIn.open({ title: x.name + ' 시간', unit: '분', dec: false, cur: c.min,
+      done: val => { const m = Math.max(1, Math.min(600, Math.round(Number(val) || 0))); if (!m) return;
+        if (Fitness.isRun(x.name) || Fitness.isTread(x.name)) setTimeout(() => Fitness.speedSheet(x.name, c.kmh, k => save(m, k), () => save(m, c.kmh)), 250); else save(m, null); } });
+  },
+  pickSpeed() {
+    if (!this.st) return;
+    const x = this.st.ex[this.st.cur], c = Fitness.cardio(x.sets, x.name);
+    Fitness.speedSheet(x.name, c.kmh, k => { x.sets = Fitness.cardioSets(x.name, c.min, k); this.paint(); this._persist(); }, () => {});
   },
   pickVal(k, f) {
     if (!this.st) return;

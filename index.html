@@ -46,7 +46,7 @@
       // 허브 모드: 태블릿·거치용으로 켜 두면 앱을 열자마자 허브 화면으로 간다 (설정 › 기기 · 허브)
       // 허브 모드는 자동으로 넘어가지 않는다 — 켜 두면 프로필 메뉴에 '허브 모드로 전환' 단추가 생긴다
       // 디자인 판: v2(새 디자인) 기본, v1 은 예전 모습. 프로필 메뉴 → 디자인 에서 바꾼다.
-      try{ document.documentElement.dataset.ui = localStorage.getItem('gl_ui') || 'v2'; }catch(e){ document.documentElement.dataset.ui='v2'; }
+      document.documentElement.dataset.ui='v2'; try{ localStorage.removeItem('gl_ui'); }catch(e){}   // 디자인은 새 디자인 하나뿐(예전 디자인 선택 없앰)
     })();
   </script>
 </head>
@@ -298,6 +298,7 @@
 <script src="js/card-sort.js"></script>
 <script src="js/card-layout.js"></script>
 <script src="js/top-info.js"></script>
+<script src="js/steps.js"></script>
 <script src="js/weather.js"></script>
 <script src="js/plan-gen.js"></script>
 <script src="js/vol-tier-data.js"></script>

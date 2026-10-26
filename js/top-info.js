@@ -6,9 +6,9 @@
 // AI 사용량 고리에 무엇을 보일지도 여기서 고른다(gl_aiu_show — AIUsage 가 읽는다).
 const TopInfo = {
   KEY: 'gl_top_info',
-  DEF: { kcal: true, wt: true, bf: false, bmi: false, ms: false, trend: true, stock: 'off' },
+  DEF: { kcal: true, steps: true, wt: true, bf: false, bmi: false, ms: false, trend: true, stock: 'off' },
   METRICS: [
-    ['kcal', '칼로리'], ['wt', '몸무게'], ['bf', '체지방'], ['bmi', 'BMI'], ['ms', '근육량'],
+    ['kcal', '칼로리'], ['steps', '걸음 수'], ['wt', '몸무게'], ['bf', '체지방'], ['bmi', 'BMI'], ['ms', '근육량'],
   ],
   get() {
     try { return { ...this.DEF, ...(JSON.parse(localStorage.getItem(this.KEY) || '{}') || {}) }; } catch { return { ...this.DEF }; }
@@ -46,7 +46,10 @@ const TopInfo = {
       out += `<div class="stat-chip stat-${k}" data-s="inbody" title="최근 기록">${lbl[k] ? `<span class="ti-lb">${lbl[k]}</span>` : ''}<b>${v}</b>${unit[k]}${this._trend(recs, k)}</div>`;
     }
     // 칼로리는 늘 왼쪽, 몸 수치(몸무게·체지방·BMI·근육량)는 한 묶음으로 오른쪽에 모은다
-    return (c.kcal ? calChip : '') + (out ? `<span class="ti-grp">${out}</span>` : '');
+    // 걸음 수(아이폰 건강 앱 — js/steps.js). 오늘 걸음이 있을 때만
+    let st = '';
+    try { if (c.steps && typeof Steps !== 'undefined') { const d = App.S && App.S.selDate ? new Date(App.S.selDate) : new Date(), n = Steps.get(d); if (n) st = `<div class="stat-chip stat-steps" data-s="diet" title="건강 앱 걸음 수"><b>${n.toLocaleString('ko-KR')}</b><span class="ti-lb">걸음</span></div>`; } } catch (e) {}
+    return (c.kcal ? calChip : '') + st + (out ? `<span class="ti-grp">${out}</span>` : '');
   },
 
   // 주식: 오늘 등락. 보유는 평가액 가중 평균, 관심종목은 앞 2개.
@@ -100,11 +103,11 @@ const TopInfo = {
     const c = this.get();
     const sw = (k) => Settings._sw(!!c[k], `TopInfo.toggle('${k}')`);
     return `<div class="set-h">상단바 오른쪽에 보일 것</div><p class="pg-note" style="margin:0 0 4px">직전 기록보다 오르면 빨간 ▲, 내리면 파란 ▼ 가 함께 붙습니다.</p>
-      ${this.METRICS.map(([k, n]) => Settings._item(n, sw(k))).join('')}
+      ${this.METRICS.map(([k, n]) => Settings._item(n, sw(k), k === 'steps' ? '아이폰 앱에서 건강 앱의 하루 걸음 수를 읽어 옵니다(처음 한 번 허락) · 걸은 만큼 식단에 \'+ 도보\' 열량이 더해집니다' : '')).join('')}
       ${Settings._item('주식·코인', Settings._seg(c.stock, [['off', '끔'], ['watch', '담은 종목'], ['hold', '보유 수익']], 'TopInfo.setStock'), '담은 종목: 경제 카드 맨 위 2개의 오늘 등락 · 보유 수익: 산 값 대비 총 수익(금액·%)')}
       <div class="set-h">AI 사용량 고리</div>
       <div class="set-pad">${typeof AIUsage !== 'undefined' ? AIUsage.trackHtml() : ''}</div>`;
   },
-  toggle(k) { this.set({ [k]: !this.get()[k] }); Settings._re('topinfo'); },
+  toggle(k) { this.set({ [k]: !this.get()[k] }); if (k === 'steps' && this.get().steps && typeof Steps !== 'undefined') Steps.refresh(true); Settings._re('topinfo'); },
   setStock(v) { this.set({ stock: v }); Settings._re('topinfo'); },
 };

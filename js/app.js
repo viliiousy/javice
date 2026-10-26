@@ -388,7 +388,7 @@ const App = {
     const calGoal = Number(ds.calorieGoal) || 0;
     // 운동으로 쓴 열량도 식단 카드와 같은 규칙(절반·전부·안 함)으로 더한다
     let calBonus = 0;
-    try { if (typeof Fitness!=='undefined' && Fitness.burn) { const bk = Fitness.burn(selDate).kcal, bm = ds.burnMode||'half'; calBonus = bm==='off'?0:bm==='full'?bk:Math.round(bk/2/10)*10; } } catch(e){}
+    try { if (typeof Fitness!=='undefined' && Fitness.bonus) calBonus = Fitness.bonus(selDate, ds).total; } catch(e){}   // 운동 + 도보
     const calLeft = calGoal + calBonus - dt.cal;
     const won = v => Math.round(v).toLocaleString('ko-KR');
     const calTxt = !calGoal      ? `<b>${won(dt.cal)}</b>kcal`
@@ -1455,22 +1455,9 @@ const App = {
     setTimeout(()=>{ this._updateSoundLabel(); this._updateUILabel(); },100);
   },
 
-  // 디자인 판 바꾸기: v2(새 디자인) ↔ v1(예전 모습). 예전 코드 전체는 ui-v1-backup 브랜치에도 남아 있다.
-  toggleUI() {
-    const cur = document.documentElement.dataset.ui === 'v1' ? 'v1' : 'v2';
-    const nx  = cur === 'v2' ? 'v1' : 'v2';
-    try { localStorage.setItem('gl_ui', nx); } catch(e){}
-    document.documentElement.dataset.ui = nx;
-    try { window.FirebaseSync?.scheduleSave?.(); } catch(e){}
-    document.getElementById('profileMenu')?.classList.add('hidden');
-    this._updateUILabel();
-    try { this._updateHeaderDate(this.S.selDate || new Date()); } catch(e){}
-    this.showToast(nx === 'v2' ? '새 디자인' : '예전 디자인', 'success');
-  },
-  _updateUILabel() {
-    const el = document.getElementById('uiLabel');
-    if (el) el.textContent = document.documentElement.dataset.ui === 'v1' ? '예전' : '새 디자인';
-  },
+  // 디자인은 새 디자인(v2) 하나뿐이다 — 예전 디자인 선택은 없앴다(두 판을 같이 두면 한쪽에서만 깨지는 일이 생겼다)
+  toggleUI() { document.documentElement.dataset.ui = 'v2'; },
+  _updateUILabel() {},
 
   toggleDarkMode() {
     const i = this.THEMES.indexOf(this._theme);

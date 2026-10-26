@@ -959,8 +959,8 @@ const JarvisActions = {
   // ── 식단 ──
   _dietLeft(d) {
     const s = Diet.getSettings(), t = Diet.totals(Diet.getData(d));
-    const b = (typeof Fitness !== 'undefined' && Fitness.burn) ? Fitness.burn(d) : { kcal: 0 };
-    const bm = s.burnMode || 'half', bonus = bm === 'off' ? 0 : bm === 'full' ? b.kcal : Math.round(b.kcal / 2 / 10) * 10;
+    let b = { kcal: 0 }, bonus = 0;
+    try { const B = Fitness.bonus(d, s); b = { kcal: B.burn.kcal + B.walk.kcal }; bonus = B.total; } catch (e) {}
     return { t, s, burn: b.kcal, bonus, left: s.calorieGoal + bonus - t.cal };
   },
   // 식단을 바꾸기 전 그날 기록을 남겨 둔다 — '되돌려 줘' 로 바로 앞 식단 변경을 취소한다
