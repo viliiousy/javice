@@ -302,7 +302,7 @@ const Fitness = {
     const rows = DOW.map((d,i) => `<div class="dp-row${i===new Date().getDay()?' dp-today':''}" data-dow="${i}">
         <span class="dp-d">${d}</span>
         <div class="dp-ss">${this.picks(i).map((cur,k)=>this._dpSel(cur,k)).join('')}
-          <button type="button" class="dp-add" onclick="Fitness._dpAdd(this)">${this._ic('plus')}<span>한 번 더</span></button>
+          <button type="button" class="dp-add" onclick="Fitness._dpAdd(this)">${this._ic('plus')}<span>루틴 추가</span></button>
         </div>
       </div>`).join('');
     const rlist = Object.entries(R).map(([id,r]) => `<div class="rt-row">
@@ -310,7 +310,7 @@ const Fitness = {
         <button class="rt-ed" onclick="Fitness.showRoutineEdit('${id}')">편집</button>
       </div>`).join('');
     App.openModal('@dumbbell 요일별 운동', `<div class="fz fz-dp">
-      <p class="fz-note">요일마다 할 루틴이나 부위(가슴·어깨 …)를 고릅니다. 루틴 이름은 아래 ‘내 루틴 › 편집’ 에서 직접 바꿀 수 있고, 하루에 두 번 이상 하면 ‘한 번 더’ 를 눌러 주세요.</p>
+      <p class="fz-note">요일을 누르고 부위(여러 개 가능)나 루틴·스포츠를 고릅니다. 하루에 두 번 이상 하면 ‘루틴 추가’ 를 눌러 주세요. <b>종목 추가</b>는 운동 하나, <b>루틴 추가</b>는 부위·루틴·스포츠 한 묶음을 더합니다.</p>
       <div class="dp-list">${rows}</div>
       <div class="rt-box">
         <div class="fz-lbl">내 루틴</div>
@@ -324,15 +324,60 @@ const Fitness = {
       </div></div>`);
     setTimeout(()=>document.querySelectorAll('.dp-ss').forEach(b=>this._dpNum(b)), 0);
   },
+  // 한 회차 = 고른 값 하나(부위 'part:가슴,삼두' · 내 루틴 id · 'sport:축구' · 휴식 …). 누르면 아래에 고르는 칸이 펼쳐진다.
   _dpSel(cur, k) {
-    let opts = '', open = false;
-    for (const [v,l] of (this._dpOpts||[])) {
-      if (l === undefined && String(v).startsWith('g:')) { opts += (open ? '</optgroup>' : '') + `<optgroup label="${esc(v.slice(2))}">`; open = true; continue; }
-      opts += `<option value="${v}"${cur===v?' selected':''}>${esc(l)}</option>`;
-    }
-    if (open) opts += '</optgroup>';
-    return `<div class="dp-s"><span class="dp-n num">${k+1}</span><label class="dp-sw"><select class="inp inp-sm dp-sel">${opts}</select>${this._ic('down','dp-chev')}</label>`
+    return `<div class="dp-s"><span class="dp-n num">${k+1}</span>`
+      + `<button type="button" class="dp-btn" onclick="Fitness._dpOpen(this)"><span class="dp-lbl">${esc(this.pickLabel(cur))}</span>${this._ic('down','dp-chev2')}</button>`
+      + `<input type="hidden" class="dp-sel" value="${esc(cur)}">`
       + `<button type="button" class="dp-x" onclick="Fitness._dpDel(this)" aria-label="이 회차 빼기">${this._ic('x') || '✕'}</button></div>`;
+  },
+  _dpOpen(btn) {
+    const s = btn.closest('.dp-s'), was = s.nextElementSibling && s.nextElementSibling.classList.contains('rp');
+    document.querySelectorAll('.fz-dp .rp').forEach(x => x.remove()); document.querySelectorAll('.fz-dp .dp-s.open').forEach(x => x.classList.remove('open'));
+    if (was) return;
+    s.classList.add('open');
+    s.insertAdjacentHTML('afterend', this.rpHtml(s.querySelector('.dp-sel').value));
+    const rp = s.nextElementSibling;
+    rp._set = v => { s.querySelector('.dp-sel').value = v; s.querySelector('.dp-lbl').textContent = this.pickLabel(v); };
+  },
+  // 고른 값 → 보이는 이름
+  pickLabel(v) {
+    v = String(v || 'none');
+    if (v.startsWith('part:')) return v.slice(5).split(',').join(' + ');
+    if (v.startsWith('sport:')) return v.slice(6);
+    const R = this._rtRO(); if (R[v]) return R[v].name;
+    return { none:'계획 없음', rest:'휴식', cardio:'유산소', A:'홈트 DAY A 푸시', B:'홈트 DAY B 풀', C:'홈트 DAY C 하체+코어' }[v] || v;
+  },
+  // 루틴 고르는 칸 — 부위는 눌러서 더하고 빼고(여러 개), 나머지(휴식·내 루틴·홈트·스포츠)는 하나만.
+  // 요일별 운동과 오늘의 운동 '루틴 추가' 가 같이 쓴다. 고르면 칸의 _set(값) 을 부른다.
+  RP_PARTS: ['가슴','등','하체','어깨','팔','삼두','이두','전완근','복근','전신','유산소'],
+  rpHtml(cur, opt = {}) {
+    cur = String(cur || 'none');
+    const on = cur.startsWith('part:') ? cur.slice(5).split(',') : cur === 'cardio' ? ['유산소'] : [];
+    const R = this._rtRO(), SP = (typeof EX_DB !== 'undefined' && EX_DB['스포츠']) || [];
+    const c = (v, l, sel, kind) => `<button type="button" class="rp-c${sel ? ' on' : ''}" data-k="${kind}" data-v="${esc(v)}" onclick="Fitness._rpTap(this)">${esc(l)}</button>`;
+    const one = [...(opt.noRest ? [] : [['rest','휴식'],['none','계획 없음']]), ...Object.entries(R).map(([id, r]) => [id, r.name]), ['A','홈트 DAY A 푸시'],['B','홈트 DAY B 풀'],['C','홈트 DAY C 하체+코어']];
+    return `<div class="rp">
+      <div class="rp-l">부위<small>눌러서 더하고 뺍니다 · 여러 개 가능</small></div>
+      <div class="rp-cs">${this.RP_PARTS.map(p => c(p, p, on.includes(p), 'p')).join('')}</div>
+      <div class="rp-l">루틴</div>
+      <div class="rp-cs">${one.map(([v, l]) => c(v, l, cur === v, 'o')).join('')}</div>
+      ${SP.length ? `<button type="button" class="rp-l rp-more${cur.startsWith('sport:') ? ' open' : ''}" onclick="this.classList.toggle('open')">스포츠<small>${SP.length}종</small>${this._ic('down','rp-chev')}</button>
+      <div class="rp-cs rp-sp">${SP.map(n => c('sport:' + n, n, cur === 'sport:' + n, 'o')).join('')}</div>` : ''}
+    </div>`;
+  },
+  _rpTap(b) {
+    const rp = b.closest('.rp'); let v;
+    if (b.dataset.k === 'p') {
+      b.classList.toggle('on');
+      rp.querySelectorAll('.rp-c[data-k="o"].on').forEach(x => x.classList.remove('on'));
+      const ps = [...rp.querySelectorAll('.rp-c[data-k="p"].on')].map(x => x.dataset.v);
+      v = !ps.length ? (rp.dataset.empty || 'none') : ps.length === 1 && ps[0] === '유산소' ? 'cardio' : 'part:' + ps.join(',');
+    } else {
+      rp.querySelectorAll('.rp-c.on').forEach(x => x.classList.remove('on')); b.classList.add('on'); v = b.dataset.v;
+    }
+    try { Haptic.light(); } catch (e) {}
+    rp.dataset.v = v; if (rp._set) rp._set(v);
   },
   _dpNum(box) {
     const ss = box.querySelectorAll('.dp-s');
@@ -344,11 +389,13 @@ const Fitness = {
     const R = this.routines(), used = [...box.querySelectorAll('.dp-sel')].map(x=>x.value);
     const next = Object.keys(R).find(id => !used.includes(id)) || 'cardio';
     btn.insertAdjacentHTML('beforebegin', this._dpSel(next, 0)); this._dpNum(box);
+    const all = box.querySelectorAll('.dp-s'); this._dpOpen(all[all.length - 1].querySelector('.dp-btn'));
   },
   _dpDel(btn) {
     const box = btn.closest('.dp-ss'), ss = box.querySelectorAll('.dp-s');
-    if (ss.length <= 1) { const sel = ss[0]?.querySelector('select'); if (sel) sel.value = 'none'; return; }
-    btn.closest('.dp-s').remove(); this._dpNum(box);
+    const s = btn.closest('.dp-s'), rp = s.nextElementSibling && s.nextElementSibling.classList.contains('rp') ? s.nextElementSibling : null;
+    if (ss.length <= 1) { s.querySelector('.dp-sel').value = 'none'; s.querySelector('.dp-lbl').textContent = this.pickLabel('none'); rp?.remove(); return; }
+    rp?.remove(); s.remove(); this._dpNum(box);
   },
   _ic(n, c){ return typeof ExMedia!=='undefined' && ExMedia.ic ? ExMedia.ic(n, c) : ''; },
 
@@ -381,7 +428,7 @@ const Fitness = {
         <input id="rtName" class="inp" placeholder="예: 상체 A, 하체 데이" value="${r?esc(r.name):''}"></div>
       <div class="modal-row"><label class="modal-lbl">하는 요일</label><div class="day-picker">${days}</div>
         <div class="rt-mode"><span>그 요일에 다른 운동이 있으면</span>
-          <button type="button" class="rt-m on" data-m="add" onclick="Fitness._rtSetMode('add')">같은 날 한 번 더</button>
+          <button type="button" class="rt-m on" data-m="add" onclick="Fitness._rtSetMode('add')">같은 날 루틴 추가</button>
           <button type="button" class="rt-m" data-m="replace" onclick="Fitness._rtSetMode('replace')">바꾸기</button></div></div>
       <div class="fz-lbl fz-lbl-sec">운동</div>`,
       r ? `<button onclick="Fitness.delRoutine('${id}')" class="btn-danger">루틴 삭제</button>` : '');
@@ -754,7 +801,7 @@ const Fitness = {
     this._cart=[]; this._rid=undefined; this._freeDs=null;
     this._addDate = date ? new Date(date) : new Date();
     const same=this._dateStr(this._addDate)===this._dateStr(new Date());
-    this._openPicker(same?'오늘 한 운동 추가':`${this._addDate.getMonth()+1}/${this._addDate.getDate()} 운동 추가`, '', '');
+    this._openPicker(same?'오늘 종목 추가':`${this._addDate.getMonth()+1}/${this._addDate.getDate()} 종목 추가`, '', '');
   },
   _openPicker(title, head, extraBtn) {
     this._hits=null; this._part=null; this._eq=null; this._q='';
@@ -1022,8 +1069,27 @@ const Fitness = {
   edDel(i){ if(!this._ed) return; this._ed.list.splice(i,1); this._ed.dirty=true; this._edPaint(); },
   edAdd(){
     const favs=this.getFavs();
-    this.pickOne({ title:'운동 추가', recLabel: favs.length?'즐겨찾기':'', recommend:favs.map(n=>({ n })),
+    this.pickOne({ title:'종목 추가', recLabel: favs.length?'즐겨찾기':'', recommend:favs.map(n=>({ n })),
       onPick:n=>{ this._ed.list.push({ name:n, sets:this.defSets(n), w:'' }); this._ed.dirty=true; this._edPaint(); } });
+  },
+  // 루틴 추가 — 부위(여러 개)·내 루틴·홈트·스포츠 한 묶음을 오늘 목록 끝에 더한다(이미 있는 종목은 건너뜀)
+  edAddSet(){
+    if(!this._ed) return;
+    App.openModal('@dumbbell 루틴 추가', `<p class="fz-note">오늘 목록 끝에 한 묶음을 더합니다. 부위는 여러 개 고를 수 있습니다.</p>
+      <div class="fz">${this.rpHtml('', { noRest:true })}</div>
+      <div class="modal-btns"><button class="btn-sm accent" onclick="Fitness._edAddSetGo()">더하기</button><button class="btn-sm" onclick="App.closeModal()">취소</button></div>`);
+    const rp=document.querySelector('#modal .rp'); if(rp) rp.dataset.empty='';
+  },
+  _edAddSetGo(){
+    const rp=document.querySelector('#modal .rp'), v=rp&&rp.dataset.v;
+    if(!v||!this._ed){ App.showToast('부위나 루틴을 골라 주세요'); return; }
+    const P=this._planOne0(v, this._rtRO()), have=new Set(this._ed.list.map(x=>x.name));
+    const add=(P.exercises||[]).filter(x=>!have.has(x.name));
+    App.closeModal();
+    if(!add.length){ App.showToast('더할 새 운동이 없습니다'); return; }
+    add.forEach(x=>this._ed.list.push({ name:x.name, sets:x.sets||this.defSets(x.name), w:x.w??'' }));
+    this._ed.dirty=true; this._edPaint();
+    App.showToast(`${this.pickLabel(v)} ${add.length}종목을 더했습니다`,'success');
   },
   edReorder(keys){ const L=this._ed.list; this._ed.list=keys.map(k=>L[+k]).filter(Boolean); this._ed.dirty=true; this._edPaint(); },
   _renderEdit(container, tabs, plan){
@@ -1041,7 +1107,7 @@ const Fitness = {
           <button type="button" class="fx-act fx-x" onclick="event.stopPropagation();Fitness.edDel(${i})" aria-label="빼기">✕</button>
         </div>`; }).join('') || '<p class="pg-note" style="padding:12px 0">운동이 없습니다. 아래에서 추가해 주세요.</p>'}
       </div>
-      <button class="habit-add-btn" onclick="Fitness.edAdd()">+ 운동 추가</button>
+      <div class="fit-ed-adds"><button class="habit-add-btn" onclick="Fitness.edAdd()">+ 종목 추가</button><button class="habit-add-btn" onclick="Fitness.edAddSet()">+ 루틴 추가</button></div>
       <div class="fit-ed-btns"><span class="fit-ed-saved">${ed.saved?'바꾼 내용은 바로 저장됩니다 · 오늘만':'바꾸면 바로 저장됩니다'}</span>${ed.saved?`<button class="btn-sm" onclick="Fitness.edToPlan()">앞으로 이 요일에도</button>`:''}<button class="btn-sm accent" onclick="Fitness.toggleEdit()">완료</button></div>`;
     try { RowUI.paint(container.querySelector('.fit-list'), {
       edit: k => Fitness.edSets(+k), del: k => Fitness.edDel(+k), reorder: order => Fitness.edReorder(order),

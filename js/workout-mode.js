@@ -487,7 +487,7 @@ const WorkoutMode = {
           <h2>${esc(x.name)}</h2><p>${esc(Fitness.setsLabel(x.sets || ''))}${x.sug ? ` · <em>${esc(x.sug)}</em>` : ''}</p>
           <div class="wk-tools">
             <button class="wk-tool" onclick="WorkoutMode.swap()">⇄ 운동 교체</button>
-            <button class="wk-tool" onclick="WorkoutMode.addEx()">+ 운동 추가</button>
+            <button class="wk-tool" onclick="WorkoutMode.addEx()">+ 종목 추가</button>
             <button class="wk-tool" onclick="WorkoutHistory.open('${A(x.name)}')">기록 · 그래프</button>
             ${em ? `<button class="wk-tool" onclick="ExMedia.open('${A(x.name)}')">자세 요령</button>` : ''}
             ${S.ex.length > 1 ? `<button class="wk-tool wk-tool-del" onclick="WorkoutMode.delEx(${S.cur}, this)">삭제</button>` : ''}
