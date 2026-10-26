@@ -471,7 +471,7 @@ const WorkoutMode = {
     const nowK = x.rows.findIndex(q => !q.ok);
     // 운동 순서: 지금 운동 앞의 것은 위에, 뒤의 것은 아래에 (예: 3번째면 1·2 → 지금 운동 → 4·5·6·7)
     // 목록 줄을 왼쪽으로 밀면 '삭제' 가 나온다(세트 줄과 같은 손짓)
-    const li = (a, b) => S.ex.slice(a, b).map((e, j) => { const i = a + j; return `<div class="wk-sw wk-lsw"><button class="wk-li${e.done ? ' done' : ''}" onclick="WorkoutMode.go(${i})">
+    const li = (a, b) => S.ex.slice(a, b).map((e, j) => { const i = a + j; return `<div class="wk-sw wk-lsw"><button class="wk-li${e.done ? ' done' : ''}" data-i="${i}" onclick="WorkoutMode.go(${i})">
           <span>${i + 1}</span><b>${esc(e.name)}</b><i>${e.done ? '완료' : e.rows.filter(r => r.ok).length + '/' + e.rows.length}</i></button><button class="wk-sdel" onclick="WorkoutMode.delEx(${i})">삭제</button></div>`; }).join('');
     el.innerHTML = `
       <div class="wk-top">
@@ -488,7 +488,6 @@ const WorkoutMode = {
           <div class="wk-tools">
             <button class="wk-tool" onclick="WorkoutMode.swap()">⇄ 운동 교체</button>
             <button class="wk-tool" onclick="WorkoutMode.addEx()">+ 운동 추가</button>
-            ${S.ex.length > 1 ? `<button class="wk-tool" onclick="WorkoutMode.order()">↕ 순서</button>` : ''}
             <button class="wk-tool" onclick="WorkoutHistory.open('${A(x.name)}')">기록 · 그래프</button>
             ${em ? `<button class="wk-tool" onclick="ExMedia.open('${A(x.name)}')">자세 요령</button>` : ''}
             ${S.ex.length > 1 ? `<button class="wk-tool wk-tool-del" onclick="WorkoutMode.delEx(${S.cur}, this)">삭제</button>` : ''}
@@ -516,6 +515,7 @@ const WorkoutMode = {
       <div id="wkRest" class="wk-rest" hidden></div>`;
     if (keep) { const b1 = el.querySelector('.wk-body'); if (b1) b1.scrollTop = keep; }
     this._bindSwipe(el);
+    this._bindHold(el);
     this._time();
     clearTimeout(this._lt); this._lt = setTimeout(() => this.live(), 300);
   },
@@ -614,36 +614,47 @@ const WorkoutMode = {
     const x = this.st.ex[this.st.cur], l = x.rows[x.rows.length - 1] || {};
     x.rows.push({ w: l.w ?? '', r: l.r ?? '', ok: false }); this.paint(); this._persist();
   },
-  // 운동 순서 바꾸기 — 끝낸 운동까지 전부 한 목록에. 오른쪽 ≡ 를 잡고 끌어 옮기고 '저장'.
-  // 지금 하던 운동은 그대로 지금 운동으로 남는다(자리만 옮겨 감). 끝낼 때 '오늘만 / 플랜에도' 를 묻는 건 기존 그대로.
-  order() {
-    const S = this.st; if (!S || S.ex.length < 2) return;
-    const row = (e, i) => `<div class="wko-r${e.done ? ' done' : ''}${i === S.cur ? ' cur' : ''}" data-i="${i}">
-        <span class="wko-n num">${i + 1}</span><b>${esc(e.name)}</b>
-        <i>${i === S.cur ? '지금' : e.done ? '완료' : e.rows.filter(r => r.ok).length + '/' + e.rows.length}</i>
-        <span class="wko-h" aria-label="끌어서 옮기기">≡</span></div>`;
-    App.openModal('운동 순서', `<p class="wko-tip">오른쪽 ≡ 를 잡고 위아래로 끌어 옮기세요. 끝낸 운동도 옮길 수 있습니다.</p>
-      <div class="wko" id="wkOrd">${S.ex.map(row).join('')}</div>
-      <div class="wko-btns"><button class="btn-sm" onclick="App.closeModal()">취소</button><button class="btn-sm accent" onclick="WorkoutMode._orderSave()">저장</button></div>`);
-    const box = document.getElementById('wkOrd'); if (box) this._orderDrag(box);
-  },
-  _orderDrag(box) {
-    let drag = null, sy = 0, base = 0;
-    const num = () => box.querySelectorAll('.wko-r').forEach((r, k) => { r.querySelector('.wko-n').textContent = k + 1; });
-    box.addEventListener('pointerdown', e => {
-      const h = e.target.closest('.wko-h'); if (!h) return;
-      drag = h.closest('.wko-r'); sy = e.clientY; base = 0;
-      drag.classList.add('drag'); box.classList.add('dragging');
-      try { h.setPointerCapture(e.pointerId); } catch (er) {}
-      try { Haptic.light(); } catch (er) {}
-      e.preventDefault();
+  // 운동 순서 바꾸기 — 목록의 운동을 꾹 누르면(0.4초) 진동과 함께 순서 창이 열리고, 그 운동이 이미 들려 있다.
+  // 손을 떼지 않고 위아래로 끌어 옮기고, 떼면 그 자리로 저장하고 창이 닫힌다. 끝낸 운동도 옮길 수 있다.
+  // 화면 목록은 지금 운동의 그림을 사이에 두고 위·아래로 나뉘어 있어서, 옮기는 건 한 줄로 이어진 창에서 한다.
+  // 지금 하던 운동은 그대로 지금 운동으로 남는다. 끝낼 때 '오늘만 / 플랜에도' 를 묻는 건 기존 그대로.
+  HOLD: 400,
+  _bindHold(el) {
+    el.querySelectorAll('.wk-li[data-i]').forEach(b => {
+      let t = null, sx = 0, sy = 0, on = false;
+      const clear = () => { clearTimeout(t); t = null; };
+      b.addEventListener('pointerdown', e => {
+        if (e.button > 0 || (this.st && this.st.ex.length < 2)) return;
+        sx = e.clientX; sy = e.clientY; on = false; clear();
+        t = setTimeout(() => { t = null; on = true; this._holdOn = true; this.order(Number(b.dataset.i), e.clientY); }, this.HOLD);
+      });
+      b.addEventListener('pointermove', e => { if (t && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) clear(); });
+      b.addEventListener('pointerup', clear); b.addEventListener('pointercancel', clear);
+      b.addEventListener('contextmenu', e => e.preventDefault());
+      // 들고 있는 동안은 화면이 스크롤되지 않게, 손을 뗀 뒤의 '누름'(그 운동으로 가기)도 막는다
+      b.addEventListener('touchmove', e => { if (on) e.preventDefault(); }, { passive: false });
+      b.addEventListener('touchend', e => { if (on) { e.preventDefault(); on = false; } });
+      b.addEventListener('click', e => { if (this._holdOn) { e.preventDefault(); e.stopImmediatePropagation(); this._holdOn = false; } }, true);
     });
-    box.addEventListener('pointermove', e => {
-      if (!drag) return; e.preventDefault();
+  },
+  order(i, y) {
+    const S = this.st; if (!S || S.ex.length < 2) return;
+    const row = (e, k) => `<div class="wko-r${e.done ? ' done' : ''}${k === S.cur ? ' cur' : ''}" data-i="${k}">
+        <span class="wko-n num">${k + 1}</span><b>${esc(e.name)}</b>
+        <i>${k === S.cur ? '지금' : e.done ? '완료' : e.rows.filter(r => r.ok).length + '/' + e.rows.length}</i>
+        <span class="wko-h" aria-hidden="true">≡</span></div>`;
+    App.openModal('운동 순서', `<p class="wko-tip">끌어서 옮기고 손을 떼면 저장됩니다. 끝낸 운동도 옮길 수 있습니다.</p>
+      <div class="wko" id="wkOrd">${S.ex.map(row).join('')}</div>`);
+    const box = document.getElementById('wkOrd'); if (!box) return;
+    try { Haptic.medium(); } catch (er) {}
+    const num = () => box.querySelectorAll('.wko-r').forEach((r, k) => { r.querySelector('.wko-n').textContent = k + 1; });
+    const drag = box.querySelector(`.wko-r[data-i="${i}"]`); if (!drag) return;
+    let sy = y, base = 0;
+    drag.classList.add('drag'); box.classList.add('dragging');
+    const move = e => {
+      e.preventDefault();
       let dy = e.clientY - sy - base;
-      const hgt = drag.offsetHeight;
-      // 반 줄 넘게 끌면 이웃과 자리를 바꾼다
-      const prev = drag.previousElementSibling, next = drag.nextElementSibling;
+      const hgt = drag.offsetHeight, prev = drag.previousElementSibling, next = drag.nextElementSibling;
       if ((dy < -hgt / 2 && prev) || (dy > hgt / 2 && next)) {
         const t0 = drag.offsetTop;
         if (dy < 0) box.insertBefore(drag, prev); else box.insertBefore(next, drag);
@@ -651,21 +662,33 @@ const WorkoutMode = {
         try { Haptic.light(); } catch (er) {}
       }
       drag.style.transform = `translateY(${dy}px)`;
-    });
-    const up = () => { if (!drag) return; drag.style.transform = ''; drag.classList.remove('drag'); box.classList.remove('dragging'); drag = null; };
-    box.addEventListener('pointerup', up); box.addEventListener('pointercancel', up);
+    };
+    const tmove = e => { if (e.touches && e.touches[0]) move({ clientY: e.touches[0].clientY, preventDefault: () => e.preventDefault() }); };
+    let fin = false;
+    const pmove = e => { if (e.pointerType !== 'touch') move(e); }, pup = e => { if (e.pointerType !== 'touch') up(); };
+    const up = () => {
+      if (fin) return; fin = true;
+      setTimeout(() => { this._holdOn = false; }, 400);
+      document.removeEventListener('pointermove', pmove); document.removeEventListener('pointerup', pup); document.removeEventListener('pointercancel', pup);
+      document.removeEventListener('touchmove', tmove); document.removeEventListener('touchend', up); document.removeEventListener('touchcancel', up);
+      drag.style.transform = ''; drag.classList.remove('drag'); box.classList.remove('dragging');
+      setTimeout(() => this._orderSave(), 120);
+    };
+    // 창이 열리는 동안 손가락은 원래 줄 위에 있다 — 문서 전체에서 따라간다(터치는 touchmove 로, 마우스는 pointermove 로)
+    document.addEventListener('pointermove', pmove, { passive: false }); document.addEventListener('pointerup', pup); document.addEventListener('pointercancel', pup);
+    document.addEventListener('touchmove', tmove, { passive: false }); document.addEventListener('touchend', up); document.addEventListener('touchcancel', up);
   },
   _orderSave() {
     const S = this.st, box = document.getElementById('wkOrd'); if (!S || !box) return;
     const idx = [...box.querySelectorAll('.wko-r')].map(r => Number(r.dataset.i));
-    const curEx = S.ex[S.cur];
+    App.closeModal();
     if (idx.length === S.ex.length && idx.some((v, k) => v !== k)) {
+      const curEx = S.ex[S.cur];
       S.ex = idx.map(i => S.ex[i]);
       S.cur = Math.max(0, S.ex.indexOf(curEx));
       this._persist(); this.paint();
       App.showToast('운동 순서를 바꿨습니다');
     }
-    App.closeModal();
   },
   // 운동 종목 빼기 — 목록에서 밀어서 '삭제', 또는 지금 운동의 '삭제' 단추(한 번 더 눌러 확인)
   delEx(i, btn) {
