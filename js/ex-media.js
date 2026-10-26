@@ -127,8 +127,21 @@ const ExMedia = {
       if (typeof EX_DB !== 'undefined') for (const [p, ns] of Object.entries(EX_DB)) if (ns.includes(n)) { part = p; break; }
       return { id: EX_AUTO[n], ko: n, en: '', part, cues: [] };
     }
+    // 이름이 조금 다르게 들어온 운동(AI 가 짠 루틴 등) — 띄어쓰기·표기 차이를 지우고 같은 운동을 찾는다
+    //   푸시업→푸쉬업, 트라이셉스→트라이셉, 덤벨 플랫 프레스→덤벨 벤치 프레스, 인클라인 덤벨 프레스→인클라인 덤벨 벤치 프레스, 케이블 푸시다운→케이블 트라이셉 푸쉬다운
+    if (!this._nz) {
+      this._nz = new Map();
+      const add = k => { const z = this._norm(k); if (z && !this._nz.has(z)) this._nz.set(z, k); };
+      for (const k of this._all().keys()) add(k);
+      if (typeof EX_AUTO !== 'undefined') for (const k of Object.keys(EX_AUTO)) add(k);
+    }
+    const z = this._norm(n);
+    const cands = [z, z.replace('플랫', ''), z.replace(/(덤벨|바벨|케이블|스미스머신)프레스$/, '$1벤치프레스'), z.replace('플랫프레스', '벤치프레스'),
+      z.replace(/^(케이블|로프|바)?푸쉬다운$/, '케이블트라이셉푸쉬다운'), z.replace('트라이셉스', '트라이셉'), z.replace(/^팔굽혀펴기$/, '푸쉬업')];
+    for (const c of cands) { const k = this._nz.get(c); if (k && k !== n) return this.find(k); }
     return null;
   },
+  _norm(s) { return String(s || '').replace(/\s+/g, '').replace(/푸시/g, '푸쉬').replace(/트라이셉스/g, '트라이셉').toLowerCase(); },
   img(e) { return this.DIR + e.id + '.webp'; },
   // 정렬해 둔 두 프레임(시작·끝 자세, 정사각형 두 칸) — img/exf/. 바닥·기구가 같은 자리에 오도록 맞춰 둔 그림이다.
   FDIR: 'img/exf/',

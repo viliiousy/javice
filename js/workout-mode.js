@@ -639,9 +639,9 @@ const WorkoutMode = {
   },
   order(i, y) {
     const S = this.st; if (!S || S.ex.length < 2) return;
-    const th = n => { let t = typeof ExMedia !== 'undefined' ? ExMedia.thumbFor(n) : ''; return t ? `<span class="wko-th">${ExMedia.poseHtml(t, '')}</span>` : `<span class="wko-th none">${typeof Icons !== 'undefined' ? Icons.svg('dumbbell') : ''}</span>`; };
+    const th = (n, f) => { let t = (typeof ExMedia !== 'undefined' ? ExMedia.thumbFor(n) : '') || f || ''; return t ? `<span class="wko-th">${ExMedia.poseHtml(t, '')}</span>` : `<span class="wko-th none">${typeof Icons !== 'undefined' ? Icons.svg('dumbbell') : ''}</span>`; };
     const row = (e, k) => `<div class="wko-r${e.done ? ' done' : ''}${k === S.cur ? ' cur' : ''}" data-i="${k}">
-        <span class="wko-n num">${k + 1}</span>${th(e.name)}<b>${esc(e.name)}</b>
+        <span class="wko-n num">${k + 1}</span>${th(e.name, e.th)}<b>${esc(e.name)}</b>
         <i>${k === S.cur ? '지금' : e.done ? '완료' : e.rows.filter(r => r.ok).length + '/' + e.rows.length}</i>
         <span class="wko-h" aria-hidden="true">≡</span></div>`;
     // 팝업 창이 아니라 운동 화면 위에 바로 순서 화면을 깐다
