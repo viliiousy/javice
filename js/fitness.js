@@ -162,7 +162,7 @@ const Fitness = {
     const container = document.getElementById('fitnessWrap');
     const ds = Fitness._dateStr(date);
     if (this._ed && this._ed.ds !== ds) this._ed = null;   // 다른 날로 옮기면 수정은 접는다
-    this._headBtns(!!this._ed, ds, isToday);
+    this._nEx = allEx.length; this._headBtns(!!this._ed, ds, isToday);
     if (this._ed) { this._renderEdit(container, tabs, plan); return; }
 
     if (!allEx.length) {
@@ -196,6 +196,8 @@ const Fitness = {
     const dsx = Fitness._dateStr(date);
     // 다음에 할 운동 = 아직 안 한 것 중 첫 번째
     const nextI = allEx.findIndex((_,i)=>!on(i));
+    // 종목마다 예상 소모 열량(전부 했을 때) — 끝낸 종목은 기록한 세트로
+    let bk = {}; try { bk = Object.fromEntries(this.burn(d, true).items.map(x=>[x.name, x.kcal])); } catch(e) {}
     container.innerHTML=`
       <div class="fit-days">${tabs}</div>
       <div class="fit-prog"><div class="fit-prog-bar"><i style="width:${pct}%"></i></div><span class="num">${done} / ${allEx.length}</span></div>
@@ -212,7 +214,7 @@ const Fitness = {
           <button type="button" class="fx-th${src?'':' none'}" ${info?`onclick="event.stopPropagation();${info}"`:'tabindex="-1"'} aria-label="${esc(ex.name)} 자세 보기">
             ${typeof Icons!=='undefined'?Icons.svg('dumbbell','fx-ic'):''}${src?`<span class="fx-img">${ExMedia.poseHtml(src)}</span>`:''}
           </button>
-          <div class="fx-tx"><div class="fx-nm">${esc(ex.name)}</div><div class="fx-sets num">${esc(this.setsLabel(ex.sets||''))}</div>${this._logLine(ex, dsx)}</div>
+          <div class="fx-tx"><div class="fx-nm">${esc(ex.name)}</div><div class="fx-sets num">${esc(this.setsLabel(ex.sets||''))}${bk[ex.name]?`<span class="fx-kc"> · 약 ${bk[ex.name].toLocaleString('ko-KR')}kcal</span>`:''}</div>${this._logLine(ex, dsx)}</div>
           ${typeof PlanGen!=='undefined' && PlanGen.timed(ex.name)
             ? `<button type="button" class="fx-act" onclick="event.stopPropagation();Fitness.timeSheet('${A(ex.name)}','${dsx}')" aria-label="운동 시간 고치기">${typeof Icons!=='undefined'?Icons.svg('pen','fx-aic'):'시간'}</button>`
             : `<button type="button" class="fx-act" onclick="event.stopPropagation();PlanGen.openLog('${A(ex.name)}','${A(ex.sets||'')}','${dsx}')" aria-label="무게 기록">${typeof Icons!=='undefined'?Icons.svg('pen','fx-aic'):'기록'}</button>`}
@@ -226,7 +228,21 @@ const Fitness = {
       </div>`;
     // 운동 체크가 바뀌면 식단 카드의 '더 먹어도 되는 열량' 도 같이 바뀐다
     try { if (typeof Diet!=='undefined' && document.getElementById('dietWrap')) Diet.render(d); } catch(e) {}
-    // 평소에는 보기·체크만 — 교체·순서·빼기는 '수정' 에서
+    // 평소에는 보기·체크만 — 운동 줄을 꾹 누르면 수정(교체·순서·세트·빼기·추가)으로 들어간다
+    this._bindHoldEdit(container);
+  },
+  _bindHoldEdit(container) {
+    container.querySelectorAll('.fit-list .fx[data-row]').forEach(row => {
+      let t = null, sx = 0, sy = 0;
+      const clear = () => { clearTimeout(t); t = null; };
+      row.addEventListener('pointerdown', e => { if (e.button > 0 || e.target.closest('.fx-th,.fx-edit,button')) return; sx = e.clientX; sy = e.clientY; clear();
+        t = setTimeout(() => { t = null; this._holdFired = Date.now(); try { Haptic.medium(); } catch (er) {} this.toggleEdit(); }, 450); });
+      row.addEventListener('pointermove', e => { if (t && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) clear(); });
+      row.addEventListener('pointerup', clear); row.addEventListener('pointercancel', clear); row.addEventListener('pointerleave', clear);
+      row.addEventListener('contextmenu', e => e.preventDefault());
+      // 꾹 누른 뒤 손을 떼며 생기는 '누름' 이 체크로 이어지지 않게
+      row.addEventListener('click', e => { if (this._holdFired && Date.now() - this._holdFired < 800) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+    });
   },
 
   undoFrom(ds) { const d=new Date(ds+'T00:00:00'); this._save([], d); UserStore.set(this._orderKey(ds), '[]'); UserStore.set(PlanGen.SWAP_PREFIX+ds, '{}'); UserStore.set(this._fromKey(ds), ''); UserStore.set(this._xsKey(ds), ''); FirebaseSync?.scheduleSave(); this.render(new Date(ds+'T00:00:00')); },
@@ -725,7 +741,7 @@ const Fitness = {
     const d=new Date(ds+'T00:00:00'); const list=this.exercisesFor(d).list; const i=list.findIndex(x=>x.name===name); if(i<0) return;
     const c=this.cardio(list[i].sets, name);
     const save=(m, kmh)=>{ this.applyList(ds, list.map((e,k)=>({ ...e, sets:k===i?this.cardioSets(name, m, kmh):e.sets })), 'day'); this.render(d); try{ Haptic.light(); }catch(e){} };
-    NumIn.open({ title:name+' 시간', unit:'분', dec:false, cur:c.min,
+    NumIn.open({ title:name+' 시간', unit:'분', dec:false, hm:true, cur:c.min,
       done:val=>{ const m=Math.max(1,Math.min(600,Math.round(Number(val)||0))); if(!m) return;
         if(this.isRun(name)||this.isTread(name)) setTimeout(()=>this.speedSheet(name, c.kmh, kmh=>save(m, kmh), ()=>save(m, c.kmh)), 250); else save(m, null); } });
   },
@@ -1112,7 +1128,7 @@ const Fitness = {
     const ed=this._ed;
     container.innerHTML=`
       <div class="fit-days">${tabs}</div>
-      <div class="fit-ed-note">꾹 눌러 끌면 순서가 바뀝니다 · 세트·무게를 누르면 바꿉니다</div>
+      <div class="fit-ed-note">꾹 눌러 끌면 순서 · 왼쪽으로 밀면 삭제 · 세트·무게를 누르면 바꿉니다</div>
       <div class="fit-list fit-ed">
       ${(()=>{ let prevS=-1; return ed.list.map((x,i)=>{ const src=this._thumb(x, plan);
         const head = plan&&plan.src==='multi' && x.sess!==prevS ? (prevS=x.sess, `<div class="fx-sess"><span class="num">${x.sess!=null?x.sess+1:'+'}</span><b>${esc(x.sess!=null?(plan.sessions[x.sess]?.name||''):'추가한 운동')}</b></div>`) : '';
@@ -1122,7 +1138,6 @@ const Fitness = {
           <div class="fx-tx"><div class="fx-nm">${esc(x.name)}${x.orig?'<span class="fx-sw">교체됨</span>':''}</div>
             <button type="button" class="fx-cfg num" onclick="event.stopPropagation();Fitness.edSets(${i})">${this._edSetsLabel(x)}</button></div>
           <button type="button" class="fx-act" onclick="event.stopPropagation();Fitness.edSwap(${i})" aria-label="운동 교체">⇄</button>
-          <button type="button" class="fx-act fx-x" onclick="event.stopPropagation();Fitness.edDel(${i})" aria-label="빼기">✕</button>
         </div>`; }).join(''); })() || '<p class="pg-note" style="padding:12px 0">운동이 없습니다. 아래에서 추가해 주세요.</p>'}
       </div>
       <div class="fit-ed-adds"><button class="habit-add-btn" onclick="Fitness.edAdd()">+ 종목 추가</button><button class="habit-add-btn" onclick="Fitness.edAddSet()">+ 루틴 추가</button></div>
@@ -1133,7 +1148,8 @@ const Fitness = {
   },
   _headBtns(editing, dsx, isToday){
     const eb=document.getElementById('fitEditBtn'), sb=document.getElementById('fitStartBtn');
-    if(eb){ eb.textContent=editing?'완료':'수정'; eb.classList.toggle('accent', !!editing); }
+    // 수정은 운동 줄을 꾹 눌러 들어간다 — 단추는 수정 중(완료)과, 꾹 누를 줄이 없는 빈 날(수정)에만
+    if(eb){ eb.textContent=editing?'완료':'수정'; eb.hidden=!editing && this._nEx>0; eb.classList.toggle('accent', !!editing); }
     if(sb){
       sb.hidden=!!editing;
       const sv=typeof WorkoutMode!=='undefined'&&WorkoutMode.saved();

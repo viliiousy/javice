@@ -325,7 +325,7 @@ const WorkoutMode = {
     document.getElementById('wkIdle')?.remove(); document.getElementById('wkEnd')?.remove();
     S._scoped = true; S.endAt = S.lastAct;
     if (S.planNames && S.ex.map(e => e.name).join('|') !== S.planNames.join('|')) {
-      try { Fitness.applyList(S.ds, S.ex.map(e => ({ name: e.name, sets: e.sets, sess: e.sess })), 'day'); } catch (e) {}
+      try { Fitness.applyList(S.ds, this._fullList(), 'day'); } catch (e) {}
     }
     S.autoEnded = true;
     this._finishSave();
@@ -404,17 +404,39 @@ const WorkoutMode = {
         }) };
     });
   },
-  confirmStart(ds) {
-    ds = ds || Fitness._dateStr(new Date());
-    const ex = this._build(ds);
-    if (!ex.length) { App.showToast('계획된 운동이 없습니다 — ‘+ 운동 추가’ 나 루틴을 먼저 정해 주세요'); return; }
-    const todo = ex.filter(e => !e.done);
+  // 하루에 루틴(회차)이 둘 이상이면 회차별로 나눠 보여 주고, 아직 안 끝난 첫 회차를 골라 둔다(눌러서 바꿀 수 있음)
+  _sessions(ex) {
+    const ss = [...new Set(ex.map(e => e.sess).filter(v => v != null))];
+    if (ss.length < 2) return null;
+    let plan = {}; try { plan = Fitness.exercisesFor(new Date(this._cfDs + 'T00:00:00')).plan || {}; } catch (e) {}
+    return ss.map(si => ({ si, name: (plan.sessions && plan.sessions[si] && plan.sessions[si].name) || `${si + 1}회차`, ex: ex.filter(e => e.sess === si) }));
+  },
+  confirmStart(ds, pick) {
+    ds = ds || Fitness._dateStr(new Date()); this._cfDs = ds;
+    const all = this._build(ds);
+    if (!all.length) { App.showToast('계획된 운동이 없습니다 — ‘+ 종목 추가’ 나 루틴을 먼저 정해 주세요'); return; }
+    const SS = this._sessions(all);
+    let sel = null;
+    if (SS) {
+      sel = pick != null ? Number(pick) : (SS.find(x => x.ex.some(e => !e.done)) || SS[SS.length - 1]).si;
+      // 회차가 없는 운동(그날 따로 넣은 것)은 마지막 회차와 같이 한다
+      const last = SS[SS.length - 1].si;
+      all.forEach(e => { if (e.sess == null) e._lastSess = last; });
+    }
+    const inSel = e => sel == null || e.sess === sel || (e.sess == null && e._lastSess === sel);
+    const todo = all.filter(e => inSel(e) && !e.done);
     const sets = todo.reduce((t, e) => t + (e.cardio ? 0 : e.rows.length), 0);
     const cardioMin = todo.filter(e => e.cardio).reduce((t, e) => t + (+(String(e.sets || '').match(/(\d+)\s*분/) || [])[1] || 30), 0);
     const pf = this.prefs();
     const mins = Math.round((sets * 45 + Math.max(0, sets - 1) * (pf.timer ? pf.rest : 30)) / 60) + cardioMin;
     const vol = todo.reduce((t, e) => t + e.rows.reduce((a, r) => a + (Number(r.w) || 0) * (Number(r.r) || 0), 0), 0);
     const k = n => Math.round(n).toLocaleString('ko-KR');
+    const li = e => `<li class="${e.done ? 'done' : ''}"><b>${esc(e.name)}</b><span>${e.done ? '완료' : e.cardio ? esc(e.sets || '시간') : `${e.rows.length}세트 · ${e.rows[0].w ? e.rows[0].w + 'kg × ' : ''}${e.rows[0].r}회`}</span></li>`;
+    const list = SS ? SS.map(x => { const ex = all.filter(e => e.sess === x.si || (e.sess == null && e._lastSess === x.si)), dn = ex.every(e => e.done);
+        return `<button type="button" class="wk-cf-ss${x.si === sel ? ' on' : ''}${dn ? ' fin' : ''}" onclick="WorkoutMode.confirmStart('${ds}', ${x.si})">
+          <span class="wk-cf-ck">${x.si === sel ? '✓' : ''}</span><b>${x.si + 1}회차 · ${esc(x.name)}</b><small>${dn ? '완료' : ex.filter(e => e.done).length + '/' + ex.length}</small></button>
+          <ol class="wk-cf-list${x.si === sel ? '' : ' off'}">${ex.map(li).join('')}</ol>`; }).join('')
+      : `<ol class="wk-cf-list">${todo.map(li).join('')}</ol>`;
     App.openModal('@dumbbell 운동을 시작하시겠습니까?', `
       <div class="wk-cf">
         <div><b class="num">${todo.length}</b><span>종목</span></div>
@@ -422,16 +444,19 @@ const WorkoutMode = {
         <div><b class="num">${mins}</b><span>예상 분</span></div>
         <div><b class="num">${vol ? k(vol) : '—'}</b><span>예상 볼륨 kg</span></div>
       </div>
-      <ol class="wk-cf-list">${todo.map(e => `<li><b>${esc(e.name)}</b><span>${e.cardio ? esc(e.sets || '시간') : `${e.rows.length}세트 · ${e.rows[0].w ? e.rows[0].w + 'kg × ' : ''}${e.rows[0].r}회`}</span></li>`).join('')}</ol>
+      ${SS ? '<p class="pg-note">오늘 루틴이 둘 이상입니다 — 할 회차를 눌러 고르세요.</p>' : ''}
+      ${list}
       <p class="pg-note">쉬는 시간 ${pf.timer ? this._fmt(pf.rest) : '타이머 끔'} · 소리 ${pf.sound ? '켬' : '끔'} — 운동 중 위쪽 단추에서 바꿀 수 있습니다.</p>
-      <div class="modal-btns"><button class="btn-sm accent" onclick="WorkoutMode.start('${ds}')">예, 시작</button><button class="btn-sm" onclick="App.closeModal()">아니오</button></div>`);
+      <div class="modal-btns"><button class="btn-sm accent" onclick="WorkoutMode.start('${ds}'${sel != null ? ', ' + sel : ''})">예, ${sel != null ? (sel + 1) + '회차 ' : ''}시작</button><button class="btn-sm" onclick="App.closeModal()">아니오</button></div>`);
   },
 
-  start(ds) {
-    ds = ds || Fitness._dateStr(new Date());
-    const ex = this._build(ds);
+  start(ds, only) {
+    ds = ds || Fitness._dateStr(new Date()); this._cfDs = ds;
+    let ex = this._build(ds);
     if (!ex.length) return;
-    this.st = { ds, t0: Date.now(), cur: Math.max(0, ex.findIndex(e => !e.done)), restEnd: 0, ex,
+    // 회차를 골랐으면 그 회차 운동만(회차 없는 운동은 마지막 회차와 함께)
+    if (only != null) { const SS = this._sessions(ex), last = SS ? SS[SS.length - 1].si : null; ex = ex.filter(e => e.sess === only || (e.sess == null && only === last)); if (!ex.length) return; }
+    this.st = { ds, t0: Date.now(), cur: Math.max(0, ex.findIndex(e => !e.done)), restEnd: 0, ex, only: only ?? null,
       snapLog: PlanGen.log(ds), snapChk: Fitness._checked(new Date(ds + 'T00:00:00')), snapSwap: UserStore.get(PlanGen.SWAP_PREFIX + ds) || '{}',
       snapDay: UserStore.get(Fitness._dayKey(ds)) || '', planNames: ex.map(e => e.name) };
     this._open();
@@ -581,7 +606,7 @@ const WorkoutMode = {
     const x = this.st.ex[this.st.cur];
     const c = Fitness.cardio(x.sets, x.name);
     const save = (m, kmh) => { x.sets = Fitness.cardioSets(x.name, m, kmh); this.paint(); this._persist(); };
-    NumIn.open({ title: x.name + ' 시간', unit: '분', dec: false, cur: c.min,
+    NumIn.open({ title: x.name + ' 시간', unit: '분', dec: false, hm: true, cur: c.min,
       done: val => { const m = Math.max(1, Math.min(600, Math.round(Number(val) || 0))); if (!m) return;
         if (Fitness.isRun(x.name) || Fitness.isTread(x.name)) setTimeout(() => Fitness.speedSheet(x.name, c.kmh, k => save(m, k), () => save(m, c.kmh)), 250); else save(m, null); } });
   },
@@ -899,6 +924,15 @@ const WorkoutMode = {
     });
     PlanGen.saveLog(S.ds, L);
   },
+  // 저장할 그날 전체 목록 — 한 회차만 했으면 다른 회차는 그대로 두고 이 회차 자리만 바꾼다
+  _fullList() {
+    const S = this.st, mine = S.ex.map(e => ({ name: e.name, sets: e.sets, sess: e.sess }));
+    if (S.only == null) return mine;
+    const full = Fitness.exercisesFor(new Date(S.ds + 'T00:00:00')).list.map(x => ({ name: x.name, sets: x.sets, sess: x.sess, ...(x.w != null && x.w !== '' ? { w: x.w } : {}) }));
+    const at = full.findIndex(x => x.sess === S.only), rest = full.filter(x => x.sess !== S.only);
+    rest.splice(at < 0 ? rest.length : at, 0, ...mine);
+    return rest;
+  },
   _check() {
     const S = this.st, d = new Date(S.ds + 'T00:00:00');
     const list = Fitness.exercisesFor(d).list;
@@ -955,7 +989,7 @@ const WorkoutMode = {
       Fitness.askScope(S.ds, scope => {
         if (!scope) return;   // 취소 — 운동 화면 그대로
         S._scoped = true;
-        App.showToast(Fitness.applyList(S.ds, S.ex.map(e => ({ name: e.name, sets: e.sets, sess: e.sess })), scope), 'success');
+        App.showToast(Fitness.applyList(S.ds, this._fullList(), scope), 'success');
         this._finishSave();
       });
       return;
@@ -1113,6 +1147,7 @@ const NumIn = {
       <div class="ni-seg"><button type="button" data-m="pad">키패드</button><button type="button" data-m="wheel">스크롤</button></div>
       <div class="ni-disp"><b class="num" id="niV"></b><span>${esc(o.unit || '')}</span></div>
       <div id="niBody"></div>
+      ${o.hm ? `<div class="ni-step"><button type="button" class="btn-sm" onclick="NumIn.step(-10)">−10분</button><button type="button" class="btn-sm" onclick="NumIn.step(10)">+10분</button></div>` : ''}
       ${o.note ? `<p class="pg-note ni-note">${esc(o.note)}</p>` : ''}
       <div class="modal-btns"><button class="btn-sm" onclick="NumIn.close()">취소</button><button class="btn-sm accent" onclick="NumIn.ok()">확인</button></div></div></div>`;
     document.body.appendChild(ov);
@@ -1127,7 +1162,16 @@ const NumIn = {
     try { Haptic.light(); } catch (e) {}
     this.paint();
   },
-  _show() { const v = document.getElementById('niV'); if (v) { v.textContent = this.s === '' ? '0' : this.s; v.classList.toggle('dim', this.s === ''); } },
+  _show() { const v = document.getElementById('niV'); if (!v) return;
+    v.textContent = this.s === '' ? '0' : this.s; v.classList.toggle('dim', this.s === '');
+    // 시간(분)은 60분이 넘으면 '1시간 30분' 도 같이
+    if (this.o.hm) { const n = Number(this.s) || 0, u = v.nextElementSibling; if (u) u.textContent = n >= 60 ? `분 · ${Math.floor(n / 60)}시간${n % 60 ? ' ' + (n % 60) + '분' : ''}` : '분'; } },
+  // ±10분 — 키패드·스크롤 어느 쪽이든 값만 바꾸고 다시 그린다
+  step(dv) {
+    const n = Math.max(0, Math.min(600, (Number(this.s) || 0) + dv));
+    this.s = String(n); this.fresh = true; try { Haptic.select(); } catch (e) {}
+    if (this.mode === 'wheel') this.paint(); else this._show();
+  },
   paint() {
     document.querySelectorAll('.ni-seg button').forEach(b => b.classList.toggle('on', b.dataset.m === this.mode));
     const box = document.getElementById('niBody'); if (!box) return;
@@ -1140,6 +1184,14 @@ const NumIn = {
     }
     const v = Math.max(0, Number(this.s) || 0), I = Math.floor(v), D = v - I;
     const dg = (n) => Array.from({ length: 10 }, (_, i) => i);
+    if (this.o.hm) {   // 시간 · 분 두 칸
+      const H = Math.min(10, Math.floor(I / 60)), M = I % 60;
+      box.innerHTML = `<div class="ni-wh"></div><div class="ni-lab"><span>시간</span><span>분</span></div>`;
+      Wheel.inline(box.querySelector('.ni-wh'), [{ vals: Array.from({ length: 11 }, (_, i) => i), cur: H, fmt: x => x + '' }, { vals: Array.from({ length: 60 }, (_, i) => i), cur: M, fmt: x => String(x).padStart(2, '0') }], vals => {
+        this.s = String(vals[0] * 60 + vals[1]); this._show();
+      });
+      return;
+    }
     const cols = this.o.dec
       ? [{ vals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cur: Math.floor(I / 100) % 10, fmt: x => x + '' },
          { vals: dg(), cur: Math.floor(I / 10) % 10 },

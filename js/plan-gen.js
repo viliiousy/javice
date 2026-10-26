@@ -490,19 +490,18 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
     });
   },
   // 기록 창의 무게·횟수도 운동 모드처럼 숫자 휠로. 고른 값은 아래 줄(빈 칸·같은 값)에도 채운다.
+  // 기록 창의 무게·횟수 — 운동 모드와 같은 숫자 입력(키패드 / 스크롤, 고른 방식은 기억). 고른 값은 아래 줄(빈 칸·같은 값)에도 채운다.
+  // 숫자 입력은 자기 시트로 이 창 위에 뜨므로 기록 창은 그대로 남는다.
   _lgPick(el, f) {
     const rows = [...document.querySelectorAll('#lgRows .lg-row')], k = rows.indexOf(el.closest('.lg-row'));
-    const cur = Number(el.value) || 0, cls = f === 'w' ? '.lg-w' : '.lg-r';
-    const html = document.getElementById('modalBody').innerHTML, title = document.getElementById('modalTitle').textContent;
-    const back = (v) => {
-      App.openModal('@dumbbell ' + title.trim(), html); this._lgBind();
-      const rs = [...document.querySelectorAll('#lgRows .lg-row')];
-      for (let j = k; j < rs.length; j++) { const inp = rs[j].querySelector(cls); if (j === k || !inp.value || inp.value === el.value) { inp.value = v; inp.setAttribute('value', v); } }
-    };
-    const cancel = () => { App.openModal('@dumbbell ' + title.trim(), html); this._lgBind(); };
-    const W = typeof Wheel !== 'undefined' ? Wheel : null; if (!W) return;
-    if (f === 'w') W.open({ title: `${k + 1}세트 무게`, unit: 'kg', cols: [{ vals: Array.from({ length: 301 }, (_, i) => i), cur: Math.floor(cur) }, { vals: [0, 0.5], cur: cur % 1 >= 0.5 ? 0.5 : 0, fmt: v => v ? '.5' : '.0' }], done: ([a, b]) => back(a + b), cancel });
-    else W.open({ title: `${k + 1}세트 횟수`, unit: '회', cols: [{ vals: Array.from({ length: 61 }, (_, i) => i), cur: cur || 10 }], done: ([a]) => back(a), cancel });
+    const cls = f === 'w' ? '.lg-w' : '.lg-r', old = el.value;
+    if (typeof NumIn === 'undefined') return;
+    NumIn.open({ title: `${k + 1}세트 ${f === 'w' ? '무게' : '횟수'}`, unit: f === 'w' ? 'kg' : '회', dec: f === 'w', cur: el.value === '' ? (f === 'r' ? 10 : '') : Number(el.value),
+      note: `아래 세트(빈 칸·같은 값)도 같은 ${f === 'w' ? '무게' : '횟수'}로 채웁니다`,
+      done: v => {
+        const rs = [...document.querySelectorAll('#lgRows .lg-row')];
+        for (let j = k; j < rs.length; j++) { const inp = rs[j].querySelector(cls); if (j === k || !inp.value || inp.value === old) { inp.value = v; inp.setAttribute('value', v); } }
+      } });
   },
   _lgAdd() { const b = document.getElementById('lgRows'); if (b) { b.insertAdjacentHTML('beforeend', this._lgRow(b.children.length)); this._lgBind(); } },
   _lgSave() {
