@@ -670,12 +670,12 @@ const Fitness = {
     const W=typeof Wheel!=='undefined'?Wheel:null; if(!W){ done(kmh); return; }
     if(this.isTread(name)){
       const v=kmh||8;
-      W.open({ title:`${name} 속도`, unit:'km/h', cols:[{ vals:Array.from({length:23},(_,k)=>k+2), cur:Math.floor(v) },{ vals:[0,0.5], cur:v%1>=0.5?0.5:0, fmt:x=>x?'.5':'.0' }],
-        done:([a,b])=>done(a+b), cancel });
+      W.open({ title:`${name} 속도`, unit:'km/h', cols:[{ vals:Array.from({length:23},(_,k)=>k+2), cur:Math.floor(v) },{ vals:Array.from({length:10},(_,k)=>k), cur:Math.round((v%1)*10)%10, fmt:x=>'.'+x }],
+        done:([a,b])=>done(Math.round((a+b/10)*10)/10), cancel });   // 0.1km/h 단위
     } else {
       const sec=kmh?Math.round(3600/kmh):360;
-      W.open({ title:`${name} 페이스 (1km)`, unit:'/km', cols:[{ vals:Array.from({length:13},(_,k)=>k+3), cur:Math.min(15,Math.max(3,Math.floor(sec/60))), fmt:x=>x+'분' },{ vals:Array.from({length:12},(_,k)=>k*5), cur:Math.round((sec%60)/5)*5%60, fmt:x=>String(x).padStart(2,'0')+'초' }],
-        done:([a,b])=>done(Math.round(3600/(a*60+b)*10)/10), cancel });
+      W.open({ title:`${name} 페이스 (1km)`, unit:'/km', cols:[{ vals:Array.from({length:13},(_,k)=>k+3), cur:Math.min(15,Math.max(3,Math.floor(sec/60))), fmt:x=>x+'분' },{ vals:Array.from({length:60},(_,k)=>k), cur:sec%60, fmt:x=>String(x).padStart(2,'0')+'초' }],
+        done:([a,b])=>done(Math.round(3600/Math.max(60,a*60+b)*100)/100), cancel });   // 1초 단위(속도는 소수 둘째 자리까지 기억해 페이스가 그대로 돌아오게)
     }
   },
   defSets(n){ const p=typeof PlanGen!=='undefined'?PlanGen.partOf(n):null; return p==='스포츠' ? '60분' : p==='유산소' ? '30분' : this.DEFAULT_SETS; },
@@ -1113,7 +1113,7 @@ const Fitness = {
   cardio(sets, name){
     const t=String(sets||''), min=+(t.match(/(\d+)\s*분/)||[])[1] || this.defMin(name);
     let kmh=null; const k=t.match(/([\d.]+)\s*km\/h/); const p=t.match(/(\d+)['′:](\d{1,2})["″]?\s*\/\s*km/);
-    if(k) kmh=Number(k[1]); else if(p){ const sec=(+p[1])*60+(+p[2]); if(sec>0) kmh=Math.round(3600/sec*10)/10; }
+    if(k) kmh=Number(k[1]); else if(p){ const sec=(+p[1])*60+(+p[2]); if(sec>0) kmh=Math.round(3600/sec*100)/100; }
     return { min, kmh: kmh>0 ? kmh : null };
   },
   // 속도 → MET (걷기 4km/h 3.0 · 5km/h 3.5 · 6km/h 4.3 · 달리기는 대략 km/h × 1.0)
