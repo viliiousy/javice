@@ -76,8 +76,10 @@ const Fitness = {
     if (a.length > 1) a = a.filter(p => p !== 'rest' && p !== 'none');
     dp[dow] = !a.length ? 'none' : a.length === 1 ? a[0] : a;
   },
-  planFor(dow) {
-    const ps = this.picks(dow);
+  planFor(dow, extra) {
+    let ps = this.picks(dow);
+    // 그날만 더한 회차(오늘의 운동 › 루틴 추가) — 휴식·계획 없음 위에 더하면 그 회차만 남는다
+    if (extra && extra.length) { ps = [...ps, ...extra]; if (ps.length > 1) ps = ps.filter(p => p !== 'rest' && p !== 'none'); }
     if (ps.length === 1) return this._planOne(ps[0], dow);
     const ss = ps.map(p => this._planOne(p, dow));
     return { name: ss.map(x => x.name).join(' + '), src:'multi',
@@ -227,7 +229,7 @@ const Fitness = {
     // 평소에는 보기·체크만 — 교체·순서·빼기는 '수정' 에서
   },
 
-  undoFrom(ds) { const d=new Date(ds+'T00:00:00'); this._save([], d); UserStore.set(this._orderKey(ds), '[]'); UserStore.set(PlanGen.SWAP_PREFIX+ds, '{}'); UserStore.set(this._fromKey(ds), ''); FirebaseSync?.scheduleSave(); this.render(new Date(ds+'T00:00:00')); },
+  undoFrom(ds) { const d=new Date(ds+'T00:00:00'); this._save([], d); UserStore.set(this._orderKey(ds), '[]'); UserStore.set(PlanGen.SWAP_PREFIX+ds, '{}'); UserStore.set(this._fromKey(ds), ''); UserStore.set(this._xsKey(ds), ''); FirebaseSync?.scheduleSave(); this.render(new Date(ds+'T00:00:00')); },
 
   // 그날 기록(무게×횟수)이 있으면 그것을, 없으면 지난 기록으로 본 오늘 권장 무게를 한 줄로
   _logLine(ex, ds) {
@@ -472,11 +474,15 @@ const Fitness = {
   // 줄마다 pi(계획 몇 번째) 또는 ci(직접 추가 몇 번째)와 key 를 달아 둔다 — 순서를 바꿔도 교체·삭제가 제자리를 찾게.
   _fromKey(ds){ return 'gl_fit_from_'+ds; },
   _orderKey(ds){ return 'gl_fit_order_'+ds; },
+  // 그날만 더한 회차(루틴 추가) — ['part:이두', 'sport:축구' …]
+  _xsKey(ds){ return 'gl_fit_xs_'+ds; },
+  extraPicks(ds){ const v=UserStore.json(this._xsKey(ds), null); return Array.isArray(v)?v:[]; },
+  setExtraPicks(ds, a){ UserStore.set(this._xsKey(ds), a&&a.length?JSON.stringify(a):''); FirebaseSync?.scheduleSave(); },
   planOn(date) {
     const d = new Date(date), ds = this._dateStr(d);
     const from = UserStore.get(this._fromKey(ds));
     const dow = from ? new Date(from+'T00:00:00').getDay() : d.getDay();
-    return { ...this.planFor(dow), from: from || null };
+    return { ...this.planFor(dow, this.extraPicks(ds)), from: from || null };
   },
   exercisesFor(date) {
     const d = new Date(date), ds = this._dateStr(d);
@@ -981,6 +987,7 @@ const Fitness = {
         msg=`앞으로 ${DOW[dow]}요일에 '${name}' 으로 합니다`;
       }
       UserStore.set(this._dayKey(ds), '');
+      UserStore.set(this._xsKey(ds), '');   // 그날만 더한 회차도 이제 플랜(요일)에 들어갔다
     } else UserStore.set(this._dayKey(ds), JSON.stringify(items));
     // 그날 걸어 둔 교체·추가·순서는 이제 목록에 다 들어갔다
     UserStore.set(this._orderKey(ds), '[]');
@@ -1075,7 +1082,7 @@ const Fitness = {
   // 루틴 추가 — 부위(여러 개)·내 루틴·홈트·스포츠 한 묶음을 오늘 목록 끝에 더한다(이미 있는 종목은 건너뜀)
   edAddSet(){
     if(!this._ed) return;
-    App.openModal('@dumbbell 루틴 추가', `<p class="fz-note">오늘 목록 끝에 한 묶음을 더합니다. 부위는 여러 개 고를 수 있습니다.</p>
+    App.openModal('@dumbbell 루틴 추가', `<p class="fz-note">오늘 운동에 회차를 하나 더합니다(1회차 다음 2회차로 따로). 부위는 여러 개 고를 수 있습니다.</p>
       <div class="fz">${this.rpHtml('', { noRest:true })}</div>
       <div class="modal-btns"><button class="btn-sm accent" onclick="Fitness._edAddSetGo()">더하기</button><button class="btn-sm" onclick="App.closeModal()">취소</button></div>`);
     const rp=document.querySelector('#modal .rp'); if(rp) rp.dataset.empty='';
@@ -1083,13 +1090,22 @@ const Fitness = {
   _edAddSetGo(){
     const rp=document.querySelector('#modal .rp'), v=rp&&rp.dataset.v;
     if(!v||!this._ed){ App.showToast('부위나 루틴을 골라 주세요'); return; }
-    const P=this._planOne0(v, this._rtRO()), have=new Set(this._ed.list.map(x=>x.name));
-    const add=(P.exercises||[]).filter(x=>!have.has(x.name));
+    const P=this._planOne0(v, this._rtRO()), ed=this._ed;
     App.closeModal();
-    if(!add.length){ App.showToast('더할 새 운동이 없습니다'); return; }
-    add.forEach(x=>this._ed.list.push({ name:x.name, sets:x.sets||this.defSets(x.name), w:x.w??'' }));
-    this._ed.dirty=true; this._edPaint();
-    App.showToast(`${this.pickLabel(v)} ${add.length}종목을 더했습니다`,'success');
+    if(!(P.exercises||[]).length){ App.showToast('더할 운동이 없습니다'); return; }
+    // 이어 붙이지 않고 새 회차로: 그날만 더한 회차에 넣고, 목록의 운동에 회차 번호를 단다(카드·운동 모드에서 따로 묶여 보인다)
+    const d=new Date(ed.ds+'T00:00:00'), before=this.planOn(d);
+    this.setExtraPicks(ed.ds, [...this.extraPicks(ed.ds), v]);
+    const after=this.planOn(d);
+    let si=null;
+    if(after.src==='multi'){
+      si=after.sessions.length-1;
+      // 한 회차뿐이던 날이 두 회차가 되면 원래 운동은 1회차
+      if(before.src!=='multi') ed.list.forEach(x=>{ if(x.sess==null) x.sess=0; });
+    } else ed.list.length=0;   // 휴식·계획 없음이던 날 — 그 회차만 남는다
+    P.exercises.forEach(x=>ed.list.push({ name:x.name, sets:x.sets||this.defSets(x.name), w:x.w??'', ...(si!=null?{sess:si}:{}) }));
+    ed.dirty=true; this._edPaint();
+    App.showToast(`${si!=null?si+1+'회차로 ':''}${this.pickLabel(v)}을(를) 더했습니다`,'success');
   },
   edReorder(keys){ const L=this._ed.list; this._ed.list=keys.map(k=>L[+k]).filter(Boolean); this._ed.dirty=true; this._edPaint(); },
   _renderEdit(container, tabs, plan){
@@ -1098,14 +1114,16 @@ const Fitness = {
       <div class="fit-days">${tabs}</div>
       <div class="fit-ed-note">꾹 눌러 끌면 순서가 바뀝니다 · 세트·무게를 누르면 바꿉니다</div>
       <div class="fit-list fit-ed">
-      ${ed.list.map((x,i)=>{ const src=this._thumb(x, plan); return `<div class="fx fx-ed" data-row data-i="${i}" data-label="${esc(x.name)}">
+      ${(()=>{ let prevS=-1; return ed.list.map((x,i)=>{ const src=this._thumb(x, plan);
+        const head = plan&&plan.src==='multi' && x.sess!==prevS ? (prevS=x.sess, `<div class="fx-sess"><span class="num">${x.sess!=null?x.sess+1:'+'}</span><b>${esc(x.sess!=null?(plan.sessions[x.sess]?.name||''):'추가한 운동')}</b></div>`) : '';
+        return head + `<div class="fx fx-ed" data-row data-i="${i}" data-label="${esc(x.name)}">
           <span class="fx-grip" aria-hidden="true"><i></i><i></i><i></i></span>
           <span class="fx-th${src?'':' none'}">${typeof Icons!=='undefined'?Icons.svg('dumbbell','fx-ic'):''}${src?`<span class="fx-img">${ExMedia.poseHtml(src)}</span>`:''}</span>
           <div class="fx-tx"><div class="fx-nm">${esc(x.name)}${x.orig?'<span class="fx-sw">교체됨</span>':''}</div>
             <button type="button" class="fx-cfg num" onclick="event.stopPropagation();Fitness.edSets(${i})">${this._edSetsLabel(x)}</button></div>
           <button type="button" class="fx-act" onclick="event.stopPropagation();Fitness.edSwap(${i})" aria-label="운동 교체">⇄</button>
           <button type="button" class="fx-act fx-x" onclick="event.stopPropagation();Fitness.edDel(${i})" aria-label="빼기">✕</button>
-        </div>`; }).join('') || '<p class="pg-note" style="padding:12px 0">운동이 없습니다. 아래에서 추가해 주세요.</p>'}
+        </div>`; }).join(''); })() || '<p class="pg-note" style="padding:12px 0">운동이 없습니다. 아래에서 추가해 주세요.</p>'}
       </div>
       <div class="fit-ed-adds"><button class="habit-add-btn" onclick="Fitness.edAdd()">+ 종목 추가</button><button class="habit-add-btn" onclick="Fitness.edAddSet()">+ 루틴 추가</button></div>
       <div class="fit-ed-btns"><span class="fit-ed-saved">${ed.saved?'바꾼 내용은 바로 저장됩니다 · 오늘만':'바꾸면 바로 저장됩니다'}</span>${ed.saved?`<button class="btn-sm" onclick="Fitness.edToPlan()">앞으로 이 요일에도</button>`:''}<button class="btn-sm accent" onclick="Fitness.toggleEdit()">완료</button></div>`;
