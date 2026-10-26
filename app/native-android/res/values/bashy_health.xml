@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Health Connect 권한 창의 '개인정보처리방침' 링크 (@capgo/capacitor-health 가 읽는다) -->
+    <string name="health_connect_privacy_policy_url">https://bashy.app/privacy.html</string>
+</resources>

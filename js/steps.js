@@ -1,18 +1,67 @@
 // js/steps.js — 하루 걸음 수(아이폰 건강 앱) · 걸으며 쓴 열량
 //
-// 아이폰 앱에서만 건강 앱의 걸음 수를 읽는다(BashyNative.healthSteps — 하루 합계). 읽은 값은 계정에 날짜별로 저장해서
+// 아이폰 앱은 건강 앱, 갤럭시(안드로이드 앱)는 Health Connect 의 하루 걸음 합계를 읽는다(HealthBridge.steps). 읽은 값은 계정에 날짜별로 저장해서
 // 웹·태블릿에서도 같은 걸음 수가 보인다. 상단바 '걸음' 칩(설정 › 디자인 › 상단바 정보)과 식단의 '+ 도보' 에 쓴다.
 //
 // 열량: 걸음 × 몸무게(kg) × 0.0005 kcal — 가만히 있을 때보다 더 쓴 몫(70kg 이면 만 보에 약 350kcal).
 // 그날 체크한 유산소(걷기·러닝·트레드밀 등)는 이미 운동 열량으로 센다 → 그 시간에 걸었을 걸음(분당 걷기 110 · 달리기 160)을
 // 걸음 수에서 빼고 남은 걸음만 도보 열량으로 센다(같은 걸음을 두 번 세지 않게).
+// ── 건강 데이터 다리: 아이폰은 애플 건강(BashyNative — 우리 네이티브 코드), 갤럭시·안드로이드는 Health Connect(@capgo/capacitor-health) ──
+//   삼성 헬스 › 설정 › Health Connect 를 켜 두면 삼성 헬스의 걸음·체중·체지방이 Health Connect 로 들어오고, Bashy 는 거기서 읽기만 한다.
+const HealthBridge = {
+  plat() { try { const p = window.Capacitor?.getPlatform?.(), P = window.Capacitor?.Plugins || {};
+    if (p === 'ios' && P.BashyNative && P.BashyNative.healthRead) return 'ios';
+    if (p === 'android' && P.Health) return 'android'; } catch (e) {} return null; },
+  avail() { return !!this.plat(); },
+  name() { return this.plat() === 'android' ? '삼성 헬스(Health Connect)' : '애플 건강'; },
+  app() { return this.plat() === 'android' ? 'Health Connect' : '건강 앱'; },
+  _iso(t) { return new Date(t).toISOString(); },
+  async _hc(read) {
+    const H = window.Capacitor.Plugins.Health;
+    const a = await H.isAvailable().catch(() => ({ available: false }));
+    if (!a || !a.available) return { ok: false, error: 'Health Connect 가 없거나 꺼져 있습니다', install: true };
+    const st = await H.requestAuthorization({ read }).catch(e => ({ readAuthorized: [], error: e && e.message }));
+    const ok = (st.readAuthorized || []).filter(x => read.includes(x));
+    return ok.length ? { ok: true, H, granted: ok } : { ok: false, error: '권한이 없습니다' };
+  },
+  // 최근 days 일 걸음 { 'YYYY-MM-DD': n }
+  async steps(days) {
+    const p = this.plat(); if (!p) return { ok: false };
+    if (p === 'ios') return window.Capacitor.Plugins.BashyNative.healthSteps({ days });
+    const c = await this._hc(['steps']); if (!c.ok) return c;
+    const d0 = new Date(); d0.setHours(0, 0, 0, 0); d0.setDate(d0.getDate() - (days - 1));
+    const r = await c.H.queryAggregated({ dataType: 'steps', startDate: this._iso(d0), endDate: this._iso(Date.now()), bucket: 'day', aggregation: 'sum' });
+    const out = {};
+    for (const x of (r && r.samples) || []) out[Steps._ds(new Date(x.startDate))] = Math.round(Number(x.value) || 0);
+    return { ok: true, days: out };
+  },
+  // 체성분: 아이폰 healthRead 와 같은 모양 { ok, data:{ wt:[{t,v}], bf:[…], ht:[{v}] }, me:{} }
+  async body(days) {
+    const p = this.plat(); if (!p) return { ok: false };
+    if (p === 'ios') return window.Capacitor.Plugins.BashyNative.healthRead({ days });
+    const c = await this._hc(['weight', 'bodyFat', 'height']); if (!c.ok) return c;
+    const start = this._iso(Date.now() - days * 86400000), end = this._iso(Date.now());
+    const rd = async (t, lim) => { if (!c.granted.includes(t)) return [];
+      try { const r = await c.H.readSamples({ dataType: t, startDate: t === 'height' ? this._iso(0) : start, endDate: end, limit: lim || 2000, ascending: true });
+        return ((r && r.samples) || []).map(x => ({ t: new Date(x.startDate).getTime(), v: Number(x.value), src: x.sourceName || '' })); } catch (e) { return []; } };
+    const [wt, bf, ht] = await Promise.all([rd('weight'), rd('bodyFat'), rd('height', 1000)]);
+    // 키는 cm 로(Health Connect 는 m 로 줄 수 있다), 가장 최근 한 건만
+    const h = ht.length ? ht[ht.length - 1] : null; if (h && h.v < 3) h.v = h.v * 100;
+    return { ok: true, data: { wt, bf, ht: h ? [h] : [] }, me: {} };
+  },
+  openSettings() {
+    try { if (this.plat() === 'android') window.Capacitor.Plugins.Health.openHealthConnectSettings(); else Settings.openExt('x-apple-health://'); } catch (e) {}
+  },
+};
+window.HealthBridge = HealthBridge;
+
 const Steps = {
   KEY: 'gl_steps',
   KCAL_PER_STEP_KG: 0.0005,
   _ds(d) { const x = new Date(d || Date.now()); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; },
   all() { try { return JSON.parse(UserStore.get(this.KEY) || '{}') || {}; } catch (e) { return {}; } },
   get(d) { const v = this.all()[this._ds(d)]; return Number(v) > 0 ? Math.round(v) : 0; },
-  avail() { try { const B = window.Capacitor?.Plugins?.BashyNative; return !!(B && B.healthSteps && window.Capacitor?.getPlatform?.() === 'ios'); } catch (e) { return false; } },
+  avail() { return HealthBridge.avail(); },
   on() { try { return typeof TopInfo === 'undefined' || TopInfo.get().steps !== false; } catch (e) { return true; } },
 
   // 건강 앱에서 최근 며칠 걸음을 받아 계정에 저장한다(5분에 한 번까지). 바뀌었으면 화면을 다시 그린다.
@@ -21,7 +70,7 @@ const Steps = {
     if (!force && this._at && Date.now() - this._at < 5 * 60000) return;
     if (this._busy) return; this._busy = true; this._at = Date.now();
     try {
-      const r = await window.Capacitor.Plugins.BashyNative.healthSteps({ days: this._first ? 2 : 7 });
+      const r = await HealthBridge.steps(this._first ? 2 : 7);
       this._first = true;
       if (!r || !r.ok || !r.days) return;
       const m = this.all(); let ch = false;

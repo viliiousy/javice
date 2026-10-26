@@ -49,8 +49,27 @@ if (!x.includes('<queries>')) {
     </queries>
 </manifest>`);
 }
+// 건강(Health Connect · @capgo/capacitor-health): Bashy 는 걸음·체중·체지방·키를 읽기만 한다.
+//   플러그인이 넣는 나머지 읽기·쓰기 권한은 빼 둔다(쓰지도 않는 건강 권한을 달라고 하지 않게 · 플레이 심사도 쓰는 것만 신고).
+{
+  const KEEP = ['READ_STEPS', 'READ_WEIGHT', 'READ_BODY_FAT', 'READ_HEIGHT'];
+  const ALL = ['STEPS', 'DISTANCE', 'ACTIVE_CALORIES_BURNED', 'HEART_RATE', 'WEIGHT', 'SLEEP', 'RESPIRATORY_RATE', 'OXYGEN_SATURATION', 'RESTING_HEART_RATE',
+    'HEART_RATE_VARIABILITY', 'VO2_MAX', 'BLOOD_PRESSURE', 'BLOOD_GLUCOSE', 'BODY_TEMPERATURE', 'HEIGHT', 'FLOORS_CLIMBED', 'BODY_FAT', 'BASAL_BODY_TEMPERATURE',
+    'BASAL_METABOLIC_RATE', 'TOTAL_CALORIES_BURNED', 'MINDFULNESS', 'HYDRATION', 'NUTRITION', 'EXERCISE'].flatMap(k => ['READ_' + k, 'WRITE_' + k]).concat(['READ_HEALTH_DATA_HISTORY', 'READ_HEALTH_DATA_IN_BACKGROUND']);
+  if (!x.includes('xmlns:tools')) x = x.replace('<manifest ', '<manifest xmlns:tools="http://schemas.android.com/tools" ');
+  for (const k of ALL) {
+    const name = `android.permission.health.${k}`;
+    if (x.includes(`"${name}"`)) continue;
+    x = x.replace('</manifest>', KEEP.includes(k) ? `    <uses-permission android:name="${name}" />\n</manifest>` : `    <uses-permission android:name="${name}" tools:node="remove" />\n</manifest>`);
+  }
+}
 // 세로 화면 앱 (태블릿은 허브 모드에서 가로로 쓰므로 막지 않는다)
 fs.writeFileSync(manPath, x);
+// Health Connect 는 안드로이드 8(API 26) 이상에서만 돈다 — 플러그인 최소 버전에 맞춘다
+{
+  const vp = A('variables.gradle');
+  if (fs.existsSync(vp)) fs.writeFileSync(vp, read(vp).replace(/minSdkVersion = \d+/, m => Number(m.match(/\d+/)[0]) < 26 ? 'minSdkVersion = 26' : m));
+}
 
 // 3) 아이콘: 적응형 아이콘 정의를 지우고 Bashy 아이콘(I10 밝은 판) PNG 로
 const res = path.join(main, 'res');

@@ -112,7 +112,8 @@ const InBody = {
   // 인바디 앱 → 건강 앱 → Bashy. 체중·체지방률·제지방량·BMI 는 날짜별 마지막 측정값, 키는 프로필로.
   // 골격근량은 건강 앱에 없어 실측 기록으로 추정(msEst)하고, 기초대사량은 손으로 넣은 값을 그대로 둔다.
   HEALTH_KEY: 'gl_health_on',
-  healthAvail() { const B = window.Capacitor?.Plugins?.BashyNative; return !!(B && B.healthRead && window.Capacitor?.getPlatform?.() === 'ios'); },
+  // 아이폰: 애플 건강 · 갤럭시(안드로이드 앱): Health Connect(삼성 헬스가 넘겨 준 값) — js/steps.js HealthBridge
+  healthAvail() { return typeof HealthBridge !== 'undefined' && HealthBridge.avail(); },
   healthOn() { return this.healthAvail() && localStorage.getItem(this.HEALTH_KEY) === '1'; },
   _watch(on) { const B = window.Capacitor?.Plugins?.BashyNative; if (B && B.healthWatch) B.healthWatch({ on }).catch(() => {}); },
   async healthConnect() {
@@ -121,7 +122,7 @@ const InBody = {
     const n = await this.healthSync(true, 3650);
     if (n == null) return;
     App.closeModal?.();
-    App.showToast(n ? `건강 앱에서 ${n}일치 기록을 가져왔습니다` : '건강 앱에 새 체성분 기록이 없습니다', 'success');
+    App.showToast(n ? `${HealthBridge.app()}에서 ${n}일치 기록을 가져왔습니다` : `${HealthBridge.app()}에 새 체성분 기록이 없습니다`, 'success');
   },
   healthOff() { localStorage.removeItem(this.HEALTH_KEY); this._watch(false); this.render(); App.showToast('건강 앱 자동 가져오기를 껐습니다'); },
   async healthSync(manual, days) {
@@ -129,9 +130,9 @@ const InBody = {
     if (!manual && Date.now() - (this._hsAt || 0) < 10 * 60000) return 0;
     this._hsAt = Date.now();
     let res;
-    try { res = await window.Capacitor.Plugins.BashyNative.healthRead({ days: days || 60 }); } catch (e) { res = { ok: false, error: e.message }; }
+    try { res = await HealthBridge.body(days || 60); } catch (e) { res = { ok: false, error: e.message }; }
     if (!res || !res.ok) {
-      if (manual) App.showToast('건강 앱을 읽지 못했습니다 — 건강 앱 › 프로필 › 앱 › Bashy 에서 항목을 켜 주세요', 'error', { label: '건강 앱 열기', fn: () => Settings.openExt('x-apple-health://') });
+      if (manual) App.showToast(HealthBridge.plat() === 'android' ? (res && res.install ? 'Health Connect 가 필요합니다 — 설치하거나 켠 뒤, 삼성 헬스 › 설정 › Health Connect 연동을 켜 주세요' : 'Health Connect 에서 Bashy 의 체중·체지방·키 읽기를 허용해 주세요') : '건강 앱을 읽지 못했습니다 — 건강 앱 › 프로필 › 앱 › Bashy 에서 항목을 켜 주세요', 'error', { label: `${HealthBridge.app()} 열기`, fn: () => HealthBridge.openSettings() });
       return null;
     }
     const D = res.data || {};
@@ -206,8 +207,8 @@ const InBody = {
   _healthLink() {
     if (!this.healthAvail()) return '';
     return this.healthOn()
-      ? `<div class="ib-import-link" onclick="InBody.healthSync(true,365).then(n=>{ if(n!=null) App.showToast(n?n+'일치 새 기록을 가져왔습니다':'새 기록이 없습니다','success'); })">애플 건강에서 지금 가져오기</div><div class="ib-import-link" onclick="InBody.healthOff()">자동 가져오기 끄기</div>`
-      : `<div class="ib-import-link" onclick="InBody.healthConnect()">애플 건강 연결 — 인바디 측정이 자동으로 들어옵니다</div>`;
+      ? `<div class="ib-import-link" onclick="InBody.healthSync(true,365).then(n=>{ if(n!=null) App.showToast(n?n+'일치 새 기록을 가져왔습니다':'새 기록이 없습니다','success'); })">${HealthBridge.app()}에서 지금 가져오기</div><div class="ib-import-link" onclick="InBody.healthOff()">자동 가져오기 끄기</div>`
+      : `<div class="ib-import-link" onclick="InBody.healthConnect()">${HealthBridge.name()} 연결 — 인바디 측정이 자동으로 들어옵니다</div>`;
   },
 
   // 예전 기본값은 '일주일'이었다. 인바디를 매일 재는 게 아니라 그 안에 기록이
@@ -599,7 +600,7 @@ const InBody = {
         <p>인바디 앱 › 설정에서 <b>건강 앱 연동</b>을 켜 두면, 인바디에서 잰 체중·체지방률·제지방량·BMI 가 건강 앱을 거쳐 여기로 들어옵니다. 골격근량은 건강 앱에 없어 지난 실측으로 추정합니다.</p>
         ${on ? `<p class="ib-src-m">${meta.at ? `건강 앱의 가장 최근 측정 <b class="num">${meta.latest ? ymd(meta.latest) : '없음'}</b> · 마지막 확인 ${ago(meta.at)}` : '아직 건강 앱을 확인하지 않았습니다 — 지금 가져오기를 눌러 주세요'}</p>
           <div class="ib-src-b"><button class="btn-sm" onclick="InBody.healthOff();App.closeModal()">자동 가져오기 끄기</button><button class="btn-sm accent" onclick="InBody._loadNow()">지금 가져오기</button></div>`
-        : ios ? `<button class="ib-go" onclick="InBody.healthConnect()">애플 건강 연결</button>`
+        : ios ? `<button class="ib-go" onclick="InBody.healthConnect()">${HealthBridge.name()} 연결</button>`
         : `<p class="ib-src-m">아이폰의 Bashy 앱에서 연결하면, 같은 계정의 웹·태블릿에도 함께 보입니다.</p>`}
       </div>`);
   },

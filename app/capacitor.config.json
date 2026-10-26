@@ -4,7 +4,20 @@
   "webDir": "www",
   "ios": {
     "contentInset": "never",
-    "limitsNavigationsToAppBoundDomains": false
+    "limitsNavigationsToAppBoundDomains": false,
+    "includePlugins": [
+      "@capacitor-community/text-to-speech",
+      "@capacitor-firebase/messaging",
+      "@capacitor/app",
+      "@capacitor/browser",
+      "@capacitor/geolocation",
+      "@capacitor/haptics",
+      "@capacitor/local-notifications",
+      "@capacitor/screen-orientation",
+      "@capacitor/status-bar",
+      "@capgo/capacitor-social-login",
+      "@capgo/capacitor-speech-recognition"
+    ]
   },
   "server": {
     "iosScheme": "capacitor"

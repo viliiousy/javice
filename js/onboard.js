@@ -142,7 +142,7 @@ const Onboard = {
     const hk = typeof InBody !== 'undefined' && InBody.healthAvail();
     const hkOn = hk && InBody.healthOn();
     return `${hk ? `<div class="ob-hk${hkOn ? ' on' : ''}">
-        <div><b>${hkOn ? '애플 건강 연결됨' : '애플 건강에서 불러오기'}</b><span>${hkOn ? '키·몸무게·체지방률·성별·나이를 채웠습니다. 인바디로 잴 때마다 자동으로 들어옵니다' : '인바디 앱·체중계가 건강 앱에 남긴 값으로 아래를 채우고, 앞으로 인바디 측정도 자동으로 기록합니다'}</span></div>
+        <div><b>${hkOn ? HealthBridge.name() + ' 연결됨' : HealthBridge.name() + '에서 불러오기'}</b><span>${hkOn ? '키·몸무게·체지방률·성별·나이를 채웠습니다. 인바디로 잴 때마다 자동으로 들어옵니다' : '인바디 앱·체중계가 건강 앱에 남긴 값으로 아래를 채우고, 앞으로 인바디 측정도 자동으로 기록합니다'}</span></div>
         ${hkOn ? '' : `<button class="ob-btn pri" onclick="Onboard._health()">연결</button>`}
       </div>` : ''}
       <div class="ob-row2">
