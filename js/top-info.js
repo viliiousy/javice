@@ -48,10 +48,29 @@ const TopInfo = {
     // 칼로리는 늘 왼쪽, 몸 수치(몸무게·체지방·BMI·근육량)는 한 묶음으로 오른쪽에 모은다
     // 걸음 수(아이폰 건강 앱 — js/steps.js). 오늘 걸음이 있을 때만
     let st = '';
-    try { if (c.steps && typeof Steps !== 'undefined') { const d = App.S && App.S.selDate ? new Date(App.S.selDate) : new Date(), n = Steps.get(d); if (n) st = `<div class="stat-chip stat-steps" data-s="diet" title="걸음 수(건강 앱)" aria-label="걸음 수 ${n}"><b>${n.toLocaleString('ko-KR')}</b><span class="ti-lb">걸음</span></div>`; } } catch (e) {}
+    //   걸음이 늘면 이전 숫자에서 올라가고, 늘어난 만큼 '👣 +320' 이 잠깐 떠올랐다 사라진다(같은 날짜일 때만)
+    try { if (c.steps && typeof Steps !== 'undefined') {
+      const d = App.S && App.S.selDate ? new Date(App.S.selDate) : new Date(), n = Steps.get(d), ds = Steps._ds(d);
+      const was = this._st && this._st.ds === ds ? this._st.n : n, gain = n - was;
+      this._st = { ds, n };
+      if (n) {
+        st = `<div class="stat-chip stat-steps" data-s="diet" title="걸음 수(건강 앱)" aria-label="걸음 수 ${n}"><b class="ti-stn" data-from="${was}" data-to="${n}">${was.toLocaleString('ko-KR')}</b><span class="ti-lb">걸음</span>${gain > 0 ? `<span class="ti-stp">👣 +${gain.toLocaleString('ko-KR')}</span>` : ''}</div>`;
+        if (gain) setTimeout(() => this._anim(), 30);
+      }
+    } } catch (e) {}
     return (c.kcal ? calChip : '') + st + (out ? `<span class="ti-grp">${out}</span>` : '');
   },
 
+  // 걸음 숫자 올라가기(0.9초)
+  _anim() {
+    document.querySelectorAll('.ti-stn[data-to]').forEach(el => {
+      const a = Number(el.dataset.from) || 0, b = Number(el.dataset.to) || 0; delete el.dataset.to;
+      if (a === b || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { el.textContent = b.toLocaleString('ko-KR'); return; }
+      const t0 = performance.now();
+      const step = now => { const k = Math.min(1, (now - t0) / 900), e = 1 - Math.pow(1 - k, 3); el.textContent = Math.round(a + (b - a) * e).toLocaleString('ko-KR'); if (k < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    });
+  },
   // 주식: 오늘 등락. 보유는 평가액 가중 평균, 관심종목은 앞 2개.
   stockChip() {
     const c = this.get();

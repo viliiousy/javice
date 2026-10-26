@@ -3944,4 +3944,9 @@ html.dark .vt-ic img, html.dark .ftr-ic img{ filter:invert(1); }
 
 /* 상단바 걸음 수 — 발자국 아이콘 + 숫자 */
 .stat-steps{ display:inline-flex; align-items:center; gap:3px; }
-.stat-steps .ti-foot{ width:16px; height:16px; flex:none; color:var(--text2); stroke-width:2; }
+
+
+.stat-steps{ position:relative; }
+.stat-steps .ti-stp{ position:absolute; left:50%; top:-2px; transform:translateX(-50%); font-size:11px; font-weight:700; color:var(--accent); white-space:nowrap; pointer-events:none; animation:tiStep 1.6s ease-out both; }
+@keyframes tiStep{ 0%{ opacity:0; transform:translate(-50%, 8px); } 20%{ opacity:1; transform:translate(-50%, 0); } 100%{ opacity:0; transform:translate(-50%, -16px); } }
+@media (prefers-reduced-motion:reduce){ .stat-steps .ti-stp{ display:none; } }

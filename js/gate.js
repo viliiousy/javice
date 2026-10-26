@@ -204,7 +204,8 @@ const Admin = {
       return;
     }
     if (this.tab === 'users') {
-      const A = U.filter(u => u.status !== 'pending');
+      // 마지막으로 접속한 사람이 위로(접속 기록이 없으면 맨 아래)
+      const A = U.filter(u => u.status !== 'pending').sort((x, y) => (Number(y.last) || 0) - (Number(x.last) || 0));
       b.innerHTML = `<p class="adm-sum">승인 <b class="num">${s.total}</b> · 차단 <b class="num">${s.blocked}</b></p>` + A.map(u => `<div class="adm-row${u.status === 'blocked' ? ' off' : ''}">
           <div class="adm-u"><b>${esc(Admin.title(u))}${u.admin ? ' <em>운영자</em>' : ''}${u.status === 'blocked' ? ' <em class="bad">차단됨</em>' : ''}</b>
             <span class="adm-id">${Admin.idLine(u)}</span>
