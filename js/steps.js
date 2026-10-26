@@ -59,7 +59,13 @@ const Steps = {
   KEY: 'gl_steps',
   KCAL_PER_STEP_KG: 0.0005,
   _ds(d) { const x = new Date(d || Date.now()); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; },
-  all() { try { return JSON.parse(UserStore.get(this.KEY) || '{}') || {}; } catch (e) { return {}; } },
+  // 아이폰·갤럭시를 같이 쓰는 사람: 기기마다 따로 저장하고(gl_steps_ios / gl_steps_android — 동기화 때 서로 덮지 않게),
+  // 그날 걸음은 둘 중 많은 쪽을 쓴다(폰을 두고 다닌 시간이 있으면 적게 잡히므로, 더하면 같은 걸음을 두 번 센다).
+  _rd(k) { try { return JSON.parse(UserStore.get(k) || '{}') || {}; } catch (e) { return {}; } },
+  _key(p) { return this.KEY + '_' + (p || HealthBridge.plat() || 'x'); },
+  all() { const out = {};
+    for (const k of [this.KEY, this.KEY + '_ios', this.KEY + '_android']) for (const [d, v] of Object.entries(this._rd(k))) { const n = Number(v) || 0; if (!(out[d] >= n)) out[d] = n; }
+    return out; },
   get(d) { const v = this.all()[this._ds(d)]; return Number(v) > 0 ? Math.round(v) : 0; },
   avail() { return HealthBridge.avail(); },
   on() { try { return typeof TopInfo === 'undefined' || TopInfo.get().steps !== false; } catch (e) { return true; } },
@@ -73,13 +79,13 @@ const Steps = {
       const r = await HealthBridge.steps(this._first ? 2 : 7);
       this._first = true;
       if (!r || !r.ok || !r.days) return;
-      const m = this.all(); let ch = false;
+      const K = this._key(), m = this._rd(K); let ch = false;
       for (const [k, v] of Object.entries(r.days)) { const n = Math.round(Number(v) || 0); if (m[k] !== n) { m[k] = n; ch = true; } }
       // 60일보다 오래된 날은 지운다
       const cut = this._ds(Date.now() - 60 * 86400000);
       for (const k of Object.keys(m)) if (k < cut) { delete m[k]; ch = true; }
       if (!ch) return;
-      UserStore.set(this.KEY, JSON.stringify(m)); window.FirebaseSync?.scheduleSave?.();
+      UserStore.set(K, JSON.stringify(m)); window.FirebaseSync?.scheduleSave?.();
       try { App._updateStatsBanner(); } catch (e) {}
       try { if (document.getElementById('dietWrap')) Diet.render(App.S && App.S.selDate ? new Date(App.S.selDate) : new Date()); } catch (e) {}
     } catch (e) { console.warn('[steps]', e); }

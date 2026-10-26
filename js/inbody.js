@@ -141,7 +141,7 @@ const InBody = {
     const byDay = {};
     for (const k of ['wt', 'bf', 'lbm', 'bmi']) for (const x of (D[k] || [])) {   // 오래된 것 → 최근 순이라 그날 마지막 값이 남는다
       const v = r1(x.v); if (!(v > 0)) continue;
-      (byDay[day(x.t)] ||= {})[k] = v;
+      const o = (byDay[day(x.t)] ||= {}); o[k] = v; if (!(o.t >= x.t)) o.t = x.t;   // t: 그날 마지막 측정 시각
     }
     // 건강 앱에서 본 가장 최근 측정일과 확인 시각을 남겨 둔다(값이 같아 바뀐 게 없어도 '연동은 됐다' 를 보여 주려고)
     const seen = Object.keys(byDay).sort();
@@ -151,7 +151,11 @@ const InBody = {
     for (const [dt, v] of Object.entries(byDay)) {
       if (!v.wt && !map[dt]) continue;            // 체중 없는 날은 새로 만들지 않는다
       const r = map[dt] || { dt };
+      // 아이폰·갤럭시를 같이 쓰면 같은 날 기록이 양쪽에서 온다. 날짜별 한 건으로 합치고, 더 늦게 잰 값을 남긴다
+      // (같은 측정이면 값이 같아 그대로, 늦게 잰 쪽이 이긴다 — 두 기기가 번갈아 서로 덮어쓰지 않게)
+      if (r.src === 'health' && r.mt && v.t && v.t < r.mt) continue;
       let ch = false;
+      if (v.t && r.mt !== v.t) { r.mt = v.t; }
       for (const k of ['wt', 'bf', 'lbm', 'bmi']) if (v[k] && Number(r[k]) !== v[k]) { r[k] = v[k]; ch = true; }
       if (ch) { r.src = 'health'; map[dt] = r; changed++; }
     }

@@ -3151,6 +3151,9 @@ html[data-ui="v2"] .dm, html[data-ui="v2"] .dm-list{ border-color:var(--v2-line)
 html.dark .hw i.lv1{ background:#3A1F14; color:#FF9A6B; } html.dark .hw i.lv2{ background:#5c2a15; color:#FFD9C7; }
 html.dark .hw i.lv3{ background:#8A3A1A; color:#FFD9C7; } html.dark .hw i.lv4{ background:#FF6A2B; color:#101113; }
 .hw.cur i{ box-shadow:inset 0 0 0 1.5px var(--text); }
+.hw.today span{ font-weight:700; }
+.hw.today i{ box-shadow:inset 0 0 0 2px var(--accent); }
+.hw.fut i{ opacity:.45; }
 .hw-sum{ margin-top:10px; font-size:12.5px; color:var(--text3); text-align:right; }
 .hw-sum b{ color:var(--text); font-size:15px; }
 html[data-ui="v2"] .habits-footer{ background:transparent; border-top:1px solid var(--v2-line); padding:16px 16px 8px; }
