@@ -166,7 +166,17 @@ const ExMedia = {
   has(e) { return !!e && (typeof EX_HAVE === 'undefined' || EX_HAVE.has(e.id)); },
   thumbFor(name) {
     const sp = this.sportImg(name); if (sp) return sp;
-    const e = this.find(name); return this.has(e) ? this.frames(e) : '';
+    const e = this.find(name); if (this.has(e)) return this.frames(e);
+    return this._homeImg(name);
+  },
+  // 홈트 플랜에만 그림이 있는 운동(해머 컬·행잉 니 레이즈 등) — 오늘의 운동 카드가 쓰는 그 그림을 어디서나 같이 쓴다
+  _homeImg(name) {
+    try {
+      if (typeof HomePlan === 'undefined' || !HomePlan.EX || !HomePlan.IMG) return '';
+      if (!this._hm) { this._hm = new Map();
+        for (const list of Object.values(HomePlan.EX)) for (const x of list || []) { const n = x.n || x.name, src = HomePlan.IMG[x.img]; if (n && src && !this._hm.has(this._norm(n))) this._hm.set(this._norm(n), src.replace('img/ex/', 'img/exf/')); } }
+      return this._hm.get(this._norm(name)) || '';
+    } catch (e) { return ''; }
   },
   // 스포츠 종목(주짓수·골프 …)은 자세 애니메이션 대신 같은 화풍의 사진 한 장 — 'still:' 로 표시해 poseHtml 이 멈춘 그림으로 그린다.
   // 사진이 아직 없으면 같은 틀의 이름 첫 글자 타일로 채운다(목록에서 통일감이 깨지지 않게).
