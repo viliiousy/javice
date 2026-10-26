@@ -639,13 +639,19 @@ const WorkoutMode = {
   },
   order(i, y) {
     const S = this.st; if (!S || S.ex.length < 2) return;
+    const th = n => { let t = typeof ExMedia !== 'undefined' ? ExMedia.thumbFor(n) : ''; return t ? `<span class="wko-th">${ExMedia.poseHtml(t, '')}</span>` : `<span class="wko-th none">${typeof Icons !== 'undefined' ? Icons.svg('dumbbell') : ''}</span>`; };
     const row = (e, k) => `<div class="wko-r${e.done ? ' done' : ''}${k === S.cur ? ' cur' : ''}" data-i="${k}">
-        <span class="wko-n num">${k + 1}</span><b>${esc(e.name)}</b>
+        <span class="wko-n num">${k + 1}</span>${th(e.name)}<b>${esc(e.name)}</b>
         <i>${k === S.cur ? '지금' : e.done ? '완료' : e.rows.filter(r => r.ok).length + '/' + e.rows.length}</i>
         <span class="wko-h" aria-hidden="true">≡</span></div>`;
-    App.openModal('운동 순서', `<p class="wko-tip">끌어서 옮기고 손을 떼면 저장됩니다. 끝낸 운동도 옮길 수 있습니다.</p>
-      <div class="wko" id="wkOrd">${S.ex.map(row).join('')}</div>`);
-    const box = document.getElementById('wkOrd'); if (!box) return;
+    // 팝업 창이 아니라 운동 화면 위에 바로 순서 화면을 깐다
+    const host = document.getElementById('wkMode'); if (!host) return;
+    host.querySelector('.wko-ov')?.remove();
+    const ov = document.createElement('div'); ov.className = 'wko-ov';
+    ov.innerHTML = `<div class="wko-hd"><b>순서 바꾸기</b><span>끌어서 옮기고 손을 떼면 저장됩니다</span></div>
+      <div class="wko" id="wkOrd">${S.ex.map(row).join('')}</div>`;
+    host.appendChild(ov);
+    const box = ov.querySelector('#wkOrd');
     try { Haptic.medium(); } catch (er) {}
     const num = () => box.querySelectorAll('.wko-r').forEach((r, k) => { r.querySelector('.wko-n').textContent = k + 1; });
     const drag = box.querySelector(`.wko-r[data-i="${i}"]`); if (!drag) return;
@@ -681,7 +687,7 @@ const WorkoutMode = {
   _orderSave() {
     const S = this.st, box = document.getElementById('wkOrd'); if (!S || !box) return;
     const idx = [...box.querySelectorAll('.wko-r')].map(r => Number(r.dataset.i));
-    App.closeModal();
+    box.closest('.wko-ov')?.remove();
     if (idx.length === S.ex.length && idx.some((v, k) => v !== k)) {
       const curEx = S.ex[S.cur];
       S.ex = idx.map(i => S.ex[i]);
