@@ -48,7 +48,7 @@ const TopInfo = {
     // 칼로리는 늘 왼쪽, 몸 수치(몸무게·체지방·BMI·근육량)는 한 묶음으로 오른쪽에 모은다
     // 걸음 수(아이폰 건강 앱 — js/steps.js). 오늘 걸음이 있을 때만
     let st = '';
-    try { if (c.steps && typeof Steps !== 'undefined') { const d = App.S && App.S.selDate ? new Date(App.S.selDate) : new Date(), n = Steps.get(d); if (n) st = `<div class="stat-chip stat-steps" data-s="diet" title="건강 앱 걸음 수"><b>${n.toLocaleString('ko-KR')}</b><span class="ti-lb">걸음</span></div>`; } } catch (e) {}
+    try { if (c.steps && typeof Steps !== 'undefined') { const d = App.S && App.S.selDate ? new Date(App.S.selDate) : new Date(), n = Steps.get(d); if (n) st = `<div class="stat-chip stat-steps" data-s="diet" title="걸음 수(건강 앱)" aria-label="걸음 수 ${n}">${typeof Icons !== 'undefined' ? Icons.svg('foot', 'ti-foot') : ''}<b>${n.toLocaleString('ko-KR')}</b></div>`; } } catch (e) {}
     return (c.kcal ? calChip : '') + st + (out ? `<span class="ti-grp">${out}</span>` : '');
   },
 
