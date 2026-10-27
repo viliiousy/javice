@@ -159,21 +159,89 @@ const FirebaseSync = {
     return data;
   },
 
+  // ── 세 갈래 합치기 ────────────────────────
+  // 같은 칸을 두 기기가 같이 바꿨을 때. 예전엔 '내 기기 것' 이 통째로 이겨 다른 기기에서 바꾼 것이 사라졌다
+  // (예: 아이폰이 오늘 걸음, 갤럭시가 어제 걸음을 같은 칸에 넣으면 한쪽만 남았다).
+  // base = 마지막으로 맞춘 값, mine = 이 기기, theirs = 서버. JSON 객체면 항목별로 합친다 —
+  // 내가 바꾼 항목은 내 것, 아니면 서버 것(서버에서 지운 항목은 지운다). 한 단계 아래 객체도 같은 규칙으로.
+  // 배열·글자는 나눌 수 없어 내 것이 이긴다(예전과 같음).
+  _merge3(base, mine, theirs) {
+    if (mine === theirs) return mine;
+    if (base === theirs) return mine;     // 서버는 그대로 — 내 것
+    if (base === mine) return theirs;     // 나는 그대로 — 서버 것
+    const P = v => { try { const o = JSON.parse(v); return o && typeof o === 'object' && !Array.isArray(o) ? o : null; } catch (e) { return null; } };
+    const b = P(base) || {}, m = P(mine), t = P(theirs);
+    if (!m || !t) return mine;
+    const eq = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+    const obj = v => v && typeof v === 'object' && !Array.isArray(v);
+    const merge = (b, m, t) => {
+      const out = {};
+      for (const k of new Set([...Object.keys(m), ...Object.keys(t), ...Object.keys(b)])) {
+        const inB = k in b, inM = k in m, inT = k in t;
+        if (inM && inT && obj(m[k]) && obj(t[k])) { out[k] = merge(obj(b[k]) ? b[k] : {}, m[k], t[k]); continue; }
+        const mineChanged = inM !== inB || (inM && !eq(m[k], b[k]));
+        if (mineChanged) { if (inM) out[k] = m[k]; continue; }   // 내가 바꾸거나 더하거나(지웠으면 뺀다)
+        if (inT) out[k] = t[k];                                  // 아니면 서버 것(서버가 지웠으면 빠진다)
+      }
+      return out;
+    };
+    return JSON.stringify(merge(b, m, t));
+  },
+
   _restore(remoteData) {
     if (!remoteData || typeof remoteData !== 'object') return 0;
-    // 이 기기에서 아직 못 올린 칸은 덮지 않는다(올린 뒤 다른 기기로 간다)
+    // 이 기기에서 아직 못 올린 칸은 덮지 않고 합친다(합친 값은 다음 저장 때 올라간다)
     const dirty = this._synced ? this._dirty() : {};
+    const base = this._synced || {};
     const synced = {};
     let n = 0;
     Object.entries(remoteData).forEach(([k,v]) => {
-      // '_' 로 시작하는 칸은 앱 데이터가 아니라 서버가 쓰는 자리다(_savedAt, _link).
+      // '_' 로 시작하는 칸은 앱 데이터가 아니라 서버가 쓰는 자리다(_savedAt, _link, _mod).
       if (!k || k.charAt(0)==='_' || v==null) return;
       synced[k] = String(v);
-      if (k in dirty) return;
+      if (k in dirty) {
+        if (dirty[k] != null && base[k] !== String(v)) { const mg = this._merge3(base[k], dirty[k], String(v)); if (mg !== dirty[k]) { localStorage.setItem(k, mg); n++; } }
+        return;
+      }
       if (localStorage.getItem(k) !== String(v)) { localStorage.setItem(k, String(v)); n++; }
     });
     this._synced = synced;
+    if (remoteData._mod && typeof remoteData._mod === 'object') this._modSeen = { ...remoteData._mod };
     return n;
+  },
+  // 바뀐 칸만 받아 합친다 — 칸마다 서버에 '바뀐 때' (_mod/칸) 를 남겨 두고, 그보다 새 칸만 가져온다.
+  // 예전엔 다른 기기에서 하나만 바꿔도 계정 전체(몇 년 치 기록)를 다시 받았다.
+  async _pull() {
+    if (!this.ready()) return false;
+    if (!this._modSeen || !this._synced) return this.load();
+    try {
+      const q = await this._q();
+      const r = await fetch(`${this._dbUrl}/users/${this._uid}/_mod.json${q}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const mod = (await r.json()) || {};
+      const ch = Object.keys(mod).filter(k => Number(mod[k]) > Number(this._modSeen[k] || 0));
+      if (!ch.length) return this.load();   // 바뀌었다는데 표시가 없다 = 옛 앱·서버가 쓴 것 → 통째로
+      if (ch.length > 60) return this.load();   // 너무 많이 바뀌었으면 통째로
+      const vals = await Promise.all(ch.map(k => fetch(`${this._dbUrl}/users/${this._uid}/${encodeURIComponent(k)}.json${q}`).then(x => x.ok ? x.json() : undefined).catch(() => undefined)));
+      const dirty = this._dirty();
+      let n = 0;
+      ch.forEach((k, i) => {
+        const v = vals[i]; if (v === undefined) return;   // 못 받은 칸은 다음에
+        this._modSeen[k] = Number(mod[k]);
+        if (v === null) {   // 다른 기기에서 지운 칸
+          if (!(k in dirty)) { if (localStorage.getItem(k) != null) { localStorage.removeItem(k); n++; } }
+          delete this._synced[k]; return;
+        }
+        const sv = typeof v === 'string' ? v : JSON.stringify(v), base = this._synced[k];
+        this._synced[k] = sv;
+        if (k in dirty) { if (dirty[k] != null && base !== sv) { const mg = this._merge3(base, dirty[k], sv); if (mg !== dirty[k]) { localStorage.setItem(k, mg); n++; } } return; }
+        if (localStorage.getItem(k) !== sv) { localStorage.setItem(k, sv); n++; }
+      });
+      try { const t = await fetch(`${this._dbUrl}/users/${this._uid}/_savedAt.json${q}`); if (t.ok) { const ts = parseInt(await t.json() || '0', 10); if (ts > this._lastSaveTs) this._lastSaveTs = ts; } } catch (e) {}
+      console.log('[FB] 바뀐 칸만 받기:', ch.length + '칸');
+      if (n && Object.keys(this._dirty()).length) this.scheduleSave();   // 합친 값은 다시 올린다
+      return n > 0;
+    } catch (e) { console.warn('[FB] 바뀐 칸 받기 실패 — 통째로:', e.message); return this.load(); }
   },
 
   async load() {
@@ -210,7 +278,7 @@ const FirebaseSync = {
           const remoteTs = parseInt(await r.json()||'0',10);
           if (remoteTs > this._lastSaveTs) {
             this._syncing = false;
-            const ok = await this.load();
+            const ok = await this._pull();
             this._syncing = true;
             if (ok) this._refreshUI(true);
           }
@@ -219,6 +287,9 @@ const FirebaseSync = {
       const data = this._collectData();
       const realKeys = Object.keys(data).filter(k => k !== '_savedAt');
       if(realKeys.length === 0) { this._syncing = false; return; }   // 바뀐 것이 없다
+      // 칸마다 '바뀐 때' 를 같이 남긴다 — 다른 기기는 이것보다 새 칸만 받아 간다(_pull)
+      const stamp = parseInt(data['_savedAt'], 10);
+      realKeys.forEach(k => { data['_mod/' + k] = stamp; });
       const res  = await fetch(`${this._dbUrl}/users/${this._uid}.json${await this._q()}`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -228,6 +299,7 @@ const FirebaseSync = {
       this._lastSaveTs = parseInt(data['_savedAt'],10);
       if (!this._synced) this._synced = {};
       realKeys.forEach(k => { if (data[k] === null) delete this._synced[k]; else this._synced[k] = data[k]; });
+      if (this._modSeen) realKeys.forEach(k => { this._modSeen[k] = stamp; });
       this._retry = 0;
       console.log('[FB] 저장 완료,', realKeys.length + '칸, ts:', this._lastSaveTs);
     } catch(e) {
@@ -255,8 +327,9 @@ const FirebaseSync = {
 
   startPolling() {
     if (this._pollTimer) return;
-    // 20초마다 다른 기기 변경 확인
-    this._pollTimer = setInterval(() => { if (!document.hidden) this._poll(); }, 20000);   // 화면이 가려져 있으면 쉬고, 돌아오면 바로 확인한다(아래)
+    // 다른 기기 변경: 서버가 바로 알려 준다(_listen, 변경 알림). 알림이 끊긴 때를 대비해 60초마다도 확인한다(예전엔 20초 폴링만).
+    this._listen();
+    this._pollTimer = setInterval(() => { if (!document.hidden) { this._poll(); if (!this._es) this._listen(); } }, 60000);   // 화면이 가려져 있으면 쉬고, 돌아오면 바로 확인한다(아래)
     // 앱 포커스 시 즉시 확인
     if (!this._visBound) this._visBound = true; else return;
     document.addEventListener('visibilitychange', () => {
@@ -265,6 +338,25 @@ const FirebaseSync = {
       }
     });
     console.log('[FB] 폴링 시작 (20초)');
+  },
+
+  // Firebase 변경 알림(EventSource) — _savedAt 이 바뀌면 바로 바뀐 칸만 받는다. 토큰이 끝나면 다시 붙는다.
+  async _listen() {
+    if (!this.ready() || typeof EventSource === 'undefined' || this._esBusy) return;
+    this._esBusy = true;
+    try {
+      try { this._es?.close(); } catch (e) {}
+      this._es = null;
+      const es = new EventSource(`${this._dbUrl}/users/${this._uid}/_savedAt.json${await this._q()}`);
+      const on = ev => { try { const j = JSON.parse(ev.data || 'null'); const ts = parseInt((j && j.data) || '0', 10); if (ts > this._lastSaveTs) this._poll(); } catch (e) {} };
+      es.addEventListener('put', on); es.addEventListener('patch', on);
+      const again = () => { try { es.close(); } catch (e) {} if (this._es === es) this._es = null; setTimeout(() => this._listen(), 5000); };
+      es.addEventListener('auth_revoked', again); es.addEventListener('cancel', again);
+      es.onerror = () => { if (es.readyState === 2) again(); };
+      this._es = es;
+      console.log('[FB] 변경 알림 연결');
+    } catch (e) { this._es = null; }
+    finally { this._esBusy = false; }
   },
 
   async _poll() {
@@ -276,8 +368,8 @@ const FirebaseSync = {
       if (!res.ok) return;
       const remoteTs = parseInt(await res.json()||'0',10);
       if (remoteTs > this._lastSaveTs) {
-        console.log('[FB] 원격 변경 감지, ts:', remoteTs, '→ 불러오기');
-        const ok = await this.load();
+        console.log('[FB] 원격 변경 감지, ts:', remoteTs, '→ 바뀐 칸만 받기');
+        const ok = await this._pull();
         if (ok) this._refreshUI();
       }
     } catch {}

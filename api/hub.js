@@ -479,8 +479,9 @@ async function uget(uid, sub, key, def) {
   try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return def; }
 }
 async function uset(uid, sub, patch) {
-  const body = { _savedAt: String(Date.now()) };
-  for (const [k, v] of Object.entries(patch)) body['u_' + sub + '_' + k] = JSON.stringify(v);
+  const ts = Date.now(), body = { _savedAt: String(ts) };
+  // 칸마다 '바뀐 때' 도 남긴다 — 앱은 이것보다 새 칸만 받아 간다(js/firebase-sync.js _pull)
+  for (const [k, v] of Object.entries(patch)) { body['u_' + sub + '_' + k] = JSON.stringify(v); body['_mod/u_' + sub + '_' + k] = ts; }
   const r = await fbFetch(`/users/${uid}.json`, { method: 'PATCH', body: JSON.stringify(body) });
   if (!r.ok) throw new Error('저장 실패 ' + r.status);
 }
