@@ -341,6 +341,11 @@ const WorkoutMode = {
   _persist() {
     const S = this.st; if (!S) return;
     if (!S.autoEnded) this._touch();
+    // 운동 중에 종목을 더하거나 빼거나 바꾸거나 순서를 바꾸면 그날 목록(오늘의 운동 카드)에 바로 반영한다.
+    // 예전엔 '끝내기' 에서 '오늘만/플랜에도' 를 고른 뒤에야 반영돼서, 운동 모드에서 더한 종목은 카드에 없고 완료 표시도 붙을 자리가 없었다.
+    const sig = S.ex.map(e => e.name + '|' + (e.sets || '')).join('\n');
+    if (S._listSig == null) S._listSig = (S.planSig != null ? S.planSig : sig);
+    if (sig !== S._listSig) { S._listSig = sig; try { Fitness.applyList(S.ds, this._fullList(), 'day'); this._check(); } catch (e) { console.warn('[wk sync]', e); } }
     const { ...keep } = S;
     UserStore.set(this.SESSION_KEY, JSON.stringify(keep)); window.FirebaseSync?.scheduleSave?.();
   },
@@ -459,7 +464,8 @@ const WorkoutMode = {
     if (only != null) { const SS = this._sessions(ex), last = SS ? SS[SS.length - 1].si : null; ex = ex.filter(e => e.sess === only || (e.sess == null && only === last)); if (!ex.length) return; }
     this.st = { ds, t0: Date.now(), cur: Math.max(0, ex.findIndex(e => !e.done)), restEnd: 0, ex, only: only ?? null,
       snapLog: PlanGen.log(ds), snapChk: Fitness._checked(new Date(ds + 'T00:00:00')), snapSwap: UserStore.get(PlanGen.SWAP_PREFIX + ds) || '{}',
-      snapDay: UserStore.get(Fitness._dayKey(ds)) || '', planNames: ex.map(e => e.name) };
+      snapDay: UserStore.get(Fitness._dayKey(ds)) || '', planNames: ex.map(e => e.name), planSig: ex.map(e => e.name + '|' + (e.sets || '')).join('\n'),
+      snapCustom: UserStore.get(Fitness._customKey(new Date(ds + 'T00:00:00'))) || '', snapOrder: UserStore.get(Fitness._orderKey(ds)) || '' };
     this._open();
   },
   _resume(sv) {
@@ -977,6 +983,8 @@ const WorkoutMode = {
     Fitness._save(S.snapChk || [], new Date(S.ds + 'T00:00:00'));
     if (S.snapSwap != null) UserStore.set(PlanGen.SWAP_PREFIX + S.ds, S.snapSwap);   // 이번에 바꾼 운동도 되돌린다
     if (S.snapDay != null) UserStore.set(Fitness._dayKey(S.ds), S.snapDay);
+    if (S.snapCustom != null) UserStore.set(Fitness._customKey(new Date(S.ds + 'T00:00:00')), S.snapCustom);   // 운동 중 바로 반영한 목록도 되돌린다
+    if (S.snapOrder != null) UserStore.set(Fitness._orderKey(S.ds), S.snapOrder);
     window.FirebaseSync?.scheduleSave?.();
     this._clearSaved(); this._stop(); this.st = null; this.close();
     try { Fitness.render(new Date(S.ds + 'T00:00:00')); } catch (e) {}
