@@ -46,6 +46,7 @@ jobs:
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
           BUILD_NUM: ${{ github.run_number }}
+          WEB_VER: ${{ github.sha }}
         run: |
           npm ci --no-audit --no-fund || npm install --no-audit --no-fund
           [ -n "$GOOGLE_SERVICES_JSON" ] && printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json || true

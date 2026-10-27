@@ -11,6 +11,8 @@ cd "$(dirname "$0")/.."                      # app/
 [ -f ios/App/App/GoogleService-Info.plist ] || { echo "GoogleService-Info.plist 가 없습니다 (ios/App/App/)"; exit 1; }
 
 npm ci --no-audit --no-fund
+# 화면 묶음 버전(커밋) — 앱 안 화면과 배포된 화면 업데이트(js/ota.js)를 견준다
+export WEB_VER=$(git rev-parse --short=7 HEAD)
 npm run sync
 
 # 빌드 번호는 매번 올라가야 한다 — 날짜+시각으로 둔다.

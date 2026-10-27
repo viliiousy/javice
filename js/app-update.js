@@ -8,14 +8,17 @@ const AppUpdate = {
   API: 'https://api.github.com/repos/viliiousy/javice/releases/tags/android-latest',
   APK: 'https://github.com/viliiousy/javice/releases/download/android-latest/bashy.apk',
   SKIP_KEY: 'gl_apk_skip',
-  get local() { return Number((window.BASHY_BUILD || {}).n) || 0; },
-  get on() { try { return window.Capacitor?.getPlatform?.() === 'android' && this.local > 0; } catch (e) { return false; } },
+  get local() { return this._nat || Number((window.BASHY_BUILD || {}).n) || 0; },
+  get on() { try { return window.Capacitor?.getPlatform?.() === 'android'; } catch (e) { return false; } },
   // how: 'manual'(설정에서 누름) · 'login'(로그인 직후) · 없음(앱을 열거나 돌아올 때, 30분에 한 번)
   async check(how) {
     if (!this.on) return;
     const force = how === 'manual' || how === 'login';
     if (!force && Date.now() - (this._t || 0) < 30 * 60e3) return;
     this._t = Date.now();
+    // 설치된 APK 의 빌드 번호는 앱(네이티브)에게 묻는다 — 화면 업데이트(js/ota.js)로 화면 파일이 바뀌면 build-info.js 의 번호는 APK 와 달라진다
+    try { const i = await window.Capacitor.Plugins.App.getInfo(); if (Number(i.build) > 0) this._nat = Number(i.build); } catch (e) {}
+    if (!this.local) return;
     try {
       const r = await fetch(this.API, { headers: { Accept: 'application/vnd.github+json' } });
       if (!r.ok) return;

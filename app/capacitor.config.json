@@ -16,7 +16,8 @@
       "@capacitor/screen-orientation",
       "@capacitor/status-bar",
       "@capgo/capacitor-social-login",
-      "@capgo/capacitor-speech-recognition"
+      "@capgo/capacitor-speech-recognition",
+      "@capgo/capacitor-updater"
     ]
   },
   "server": {
@@ -37,6 +38,16 @@
         "facebook": false,
         "twitter": false
       }
+    },
+    "CapacitorUpdater": {
+      "autoUpdate": false,
+      "appReadyTimeout": 15000,
+      "autoDeleteFailed": true,
+      "autoDeletePrevious": true,
+      "resetWhenUpdate": true,
+      "statsUrl": "",
+      "updateUrl": "",
+      "channelUrl": ""
     }
   },
   "experimental": {

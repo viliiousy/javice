@@ -14,11 +14,23 @@ concurrency:
   group: deploy-prod
   cancel-in-progress: true
 
+permissions:
+  contents: write   # 화면 묶음을 릴리스(web-latest)에 올린다
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # 배포 전 자동 검사 — 핵심 화면(운동·식단·습관·동기화…)을 브라우저로 실제로 돌려 본다. 하나라도 실패하면 배포하지 않는다.
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: 자동 검사 (tests/smoke.mjs)
+        run: |
+          npm i --no-save --no-package-lock playwright@1.56.0 >/dev/null
+          npx playwright install --with-deps chromium >/dev/null
+          node tests/smoke.mjs
 
       - name: Inject version
         run: |
@@ -43,3 +55,25 @@ jobs:
         continue-on-error: true
         env: { VERCEL_TOKEN: '${{ secrets.VERCEL_TOKEN }}', KEEP: '10' }
         run: node .github/scripts/prune-deploys.mjs
+
+      # 앱(아이폰·갤럭시) 화면 업데이트 — 같은 화면을 zip 으로 묶어 릴리스 web-latest 에 올린다(js/ota.js 가 받아 간다).
+      # 사이트(Vercel)가 아니라 깃허브 릴리스에 두는 건 Vercel 배포 저장 공간을 먹지 않게 하려고.
+      - name: 앱 화면 묶음 올리기 (web-latest)
+        if: success()
+        continue-on-error: true
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          V=${GITHUB_SHA::7}
+          git checkout -- index.html   # 사이트용 버전 문구 주입 전 상태로(앱은 앱 빌드 번호를 쓴다)
+          (cd app && WEB_VER=$V node scripts/build-www.mjs)
+          rm -f web-*.zip && (cd app/www && zip -qr "$GITHUB_WORKSPACE/web-$V.zip" .)
+          NM=$(node -e "const j=require('./app/ota-native.json');console.log(JSON.stringify({ios:j.ios||0,android:j.android||0}))")
+          echo "{\"v\":\"$V\",\"at\":\"$(date -u +%FT%TZ)\",\"url\":\"https://github.com/${{ github.repository }}/releases/download/web-latest/web-$V.zip\",\"nativeMin\":$NM}" > latest.json
+          cat latest.json; ls -l web-$V.zip
+          gh release view web-latest >/dev/null 2>&1 || gh release create web-latest --prerelease --latest=false --title "Bashy 앱 화면 (자동)" --notes "앱이 받아 가는 화면 묶음. 손대지 마세요."
+          gh release upload web-latest "web-$V.zip" --clobber
+          # 앱은 릴리스 본문에서 버전을 읽는다(깃허브 API 는 앱에서 바로 읽힌다 — 첨부 파일은 브라우저 제한(CORS)에 걸릴 수 있다)
+          gh release edit web-latest --notes "앱이 받아 가는 화면 묶음. 손대지 마세요.
+          OTA=$(cat latest.json)"
+          # 옛 묶음은 지운다(최근 3개만)
+          gh release view web-latest --json assets -q '.assets[].name' | grep '^web-.*\.zip$' | grep -v "web-$V.zip" | head -n -2 | while read a; do gh release delete-asset web-latest "$a" -y; done
