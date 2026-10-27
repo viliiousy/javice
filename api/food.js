@@ -40,10 +40,36 @@ function db() {
     const C = j.cls || [], G = j.grp || [];
     DB = j.r.map(a => ({ name: a[0], kcal: a[1], protein: a[2], carb: a[3], fat: a[4], per: a[5], unit: a[6] ? 'mL' : 'g',
                          pack: a[7], maker: a[8] || '', cls: C[a[9]] || '', group: G[a[10]] || '' }));
-    DBN = DB.map(x => canon(x.name));
+    // 찾을 때는 이름 + 제조사(프랜차이즈 이름)를 같이 본다 — 식약처 음식 DB 는 '버거_빅맥' 처럼 이름에 브랜드가 없고 제조사 칸에 '맥도날드' 가 있다.
+    // 그래서 '맥도날드 빅맥' 을 치면 아무것도 안 나왔다.
+    DBN = DB.map(x => canon(x.name) + '|' + canon(x.maker));
     DB.v = j.v;
   } catch (e) { DB = false; }
   return DB;
+}
+// ── 프랜차이즈 공식 영양정보 (data/franchise.json) ─────────────
+// 써브웨이·쉐이크쉑처럼 식약처 DB 에 없거나, 치킨·도시락처럼 빈 곳을 브랜드가 공개한 값으로 채운다.
+// 한 줄 = 한 번 먹는 양(15cm · 1개 · 1마리 · 1조각). per = 그 양의 g(모르면 1), kcal 등은 그 양 기준.
+let FR = null, FRN = null;
+function fr() {
+  if (FR !== null) return FR;
+  try {
+    const fs = require('fs'), path = require('path');
+    FR = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'franchise.json'), 'utf8'));
+    FRN = FR.map(x => canon(x.name) + '|' + canon(x.maker));
+  } catch (e) { FR = []; FRN = []; }
+  return FR;
+}
+function frSearch(q) {
+  const F = fr(); if (!F.length) return [];
+  const tk = tokens(q), core = tk.filter(t => !MODS.includes(t)), cq = canon(q);
+  if (!core.length) return [];
+  const out = [];
+  for (let i = 0; i < F.length; i++) { const n = FRN[i]; if (core.every(t => n.includes(t)) || n.startsWith(cq)) out.push(F[i]); }
+  // 이름이 질문에 가까운 순(브랜드만 쳤으면 브랜드 안 목록 순서 그대로)
+  const nameOnly = tk.filter(t => !F.some((x, i) => out.includes(x) && canon(x.maker) === t));
+  return out.map((x, i) => ({ x, c: cover(x.name, nameOnly.length ? nameOnly : tk), i }))
+    .sort((a, b) => b.c - a.c || a.i - b.i).map(o => o.x);
 }
 function localSearch(q) {
   const D = db(); if (!D) return null;
@@ -62,9 +88,9 @@ function order(list, q, tk) {
     // seg: 이름의 첫 갈래(밑줄 앞)가 질문과 같은가 — '달걀_삶은것' 은 '계란' 에 딱 맞고 '계란도시락' 은 아니다
     // gen: 품목대표(기본 음식) → 음식 → 가공·상용제품 순
     .map(x => { const s0 = canon(String(x.name).split(/[_(]/)[0]);
-      return { x, c: cover(x.name, tk), seg: s0 === cq ? 0 : (s0.startsWith(cq) ? 1 : 2), r: rank(canon(x.name), cq), b: brandRank(x),
+      return { x, c: cover(x.name + ' ' + (x.maker || ''), tk), seg: s0 === cq ? 0 : (s0.startsWith(cq) ? 1 : 2), r: rank(canon(x.name), cq), b: brandRank(x),
                gen: x.cls === '품목대표' ? 0 : (x.group === '음식' ? 1 : 2) }; })
-    .filter(o => coreTk.every(t => canon(o.x.name).includes(t)) || o.r <= 1)
+    .filter(o => coreTk.every(t => (canon(o.x.name) + '|' + canon(o.x.maker)).includes(t)) || o.r <= 1)
     .sort((a, b) => b.c - a.c || a.seg - b.seg || a.gen - b.gen || a.r - b.r || a.b - b.b || a.x.name.length - b.x.name.length)
     .map(o => o.x)
     // 이름이 같은 줄은 하나만(달걀국이 여섯 줄 나오던 것)
@@ -103,12 +129,13 @@ module.exports = async function handler(req, res) {
   if (hit && Date.now() - hit.t < TTL && !qy.live) { res.status(200).json(slice(hit.v, true)); return; }
 
   try {
-    // 1) 저장해 둔 DB 에서 바로 (수십 ms)
+    // 0) 프랜차이즈 공식값  1) 저장해 둔 식약처 DB (수십 ms) — 둘 다 있으면 공식값을 위에
+    const F = qy.live ? [] : frSearch(q);
     const L = qy.live ? null : localSearch(q);
     let v = null;
-    if (L && L.items.length) {
-      const all = order(L.items, q, L.tokens);
-      if (all.length) v = { total: Math.max(L.total, all.length), all, source: '식품의약품안전처 식품영양성분DB', from: 'local ' + (L.v || '') };
+    if ((L && L.items.length) || F.length) {
+      const all = F.concat(L && L.items.length ? order(L.items, q, L.tokens) : []);
+      if (all.length) v = { total: Math.max((L ? L.total : 0) + F.length, all.length), all, source: F.length ? '브랜드 공개 영양정보 · 식품의약품안전처 식품영양성분DB' : '식품의약품안전처 식품영양성분DB', from: 'local ' + ((L && L.v) || '') };
     }
     // 2) 없으면 식약처에 직접 (띄어쓰기·순서·표기가 달라도 찾도록 여러 모양으로 묻는다)
     if (!v) {
