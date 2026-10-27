@@ -87,7 +87,7 @@
   "functions": {
     "api/food.js": {
       "maxDuration": 60,
-      "includeFiles": "data/{food-db.json.gz,franchise.json}"
+      "includeFiles": "data/**"
     }
   }
 }
