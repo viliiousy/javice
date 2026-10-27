@@ -321,7 +321,7 @@ const Diet = {
 
   // 출처 표시. 예전 화면(v1)은 이모지로, v2 는 작은 글자 꼬리표로 보여 준다 —
   // 둘 다 같은 뜻(어디서 온 숫자인가)이고, 어느 쪽을 쓸지는 css/v2-diet.css 가 고른다.
-  SRC: { '🥗':'식약처', '🌍':'OFF', '📋':'성분표', '🤖':'AI 추정', '🏷️':'공식' },
+  SRC: { '🥗':'식약처', '🌍':'OFF', '📋':'성분표', '🤖':'AI 추정', '🏷️':'공식', '📎':'참고' },
   _em(e){ return e ? `<span class="dt-em">${e} </span>` : ''; },
   _srcTag(e){ const t=this.SRC[e]; return t ? `<span class="dt-src${e==='🤖'?' ai':''}">${t}</span>` : ''; },
 
@@ -703,7 +703,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
       note: (extra ? extra + ' · ' : '') + (grams !== base ? `${base}${unit}당 ${Math.round(x.kcal||0)}kcal` : ''),
     }; };
     // 프랜차이즈 공식값(data/franchise.json): 한 줄이 한 번 먹는 양 — '15cm(233g)' · '1마리' 그대로
-    if (x.sv) { const g = Number(x.pack) || 0; const f = mk(`${x.sv}${g && !/g\)?$/.test(x.sv) ? `(${g}${unit})` : ''}`, base); f.e = '🏷️'; f.note = x.note || ''; return f; }
+    if (x.sv) { const g = Number(x.pack) || 0; const f = mk(`${x.sv}${g && !/\d\s*(g|ml|mL)/.test(x.sv) ? `(${g}${unit})` : ''}`, base); f.e = x.e || '🏷️'; f.note = x.cls === '참고' ? '공식 확인 안 됨 · 다른 사이트 값' : (x.carb == null && x.fat == null ? '브랜드가 탄수·지방은 공개 안 함' : ''); return f; }
     const generic = x.cls === '품목대표' || x.group === '음식';
     if (generic) {
       const pc = this.PIECE.find(([re]) => re.test(String(x.name)));

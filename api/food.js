@@ -61,15 +61,20 @@ function fr() {
   return FR;
 }
 function frSearch(q) {
-  const F = fr(); if (!F.length) return [];
+  const F = fr(); if (!F.length) return { items: [], brand: false };
   const tk = tokens(q), core = tk.filter(t => !MODS.includes(t)), cq = canon(q);
-  if (!core.length) return [];
+  if (!core.length) return { items: [], brand: false };
   const out = [];
-  for (let i = 0; i < F.length; i++) { const n = FRN[i]; if (core.every(t => n.includes(t)) || n.startsWith(cq)) out.push(F[i]); }
-  // 이름이 질문에 가까운 순(브랜드만 쳤으면 브랜드 안 목록 순서 그대로)
-  const nameOnly = tk.filter(t => !F.some((x, i) => out.includes(x) && canon(x.maker) === t));
-  return out.map((x, i) => ({ x, c: cover(x.name, nameOnly.length ? nameOnly : tk), i }))
-    .sort((a, b) => b.c - a.c || a.i - b.i).map(o => o.x);
+  for (let i = 0; i < F.length; i++) { const n = FRN[i]; if (core.every(t => n.includes(t)) || n.startsWith(cq)) out.push([F[i], i]); }
+  // 브랜드 이름이 들어간 질문인가('한솥 치킨마요') — 아니면('김치찌개') 기본 음식 뒤로 보낸다
+  const makers = new Set(out.map(([x]) => canon(x.maker)));
+  const bt = core.filter(t => [...makers].some(m => m.includes(t) || t.includes(m)));
+  const rest = core.filter(t => !bt.includes(t)), rq = rest.join('');
+  const side = x => /소스|추가토핑|토핑|야채|빵|치즈\)/.test(x.cat || '') || /\((소스|추가토핑|빵|치즈|야채)\)$/.test(x.name) ? 1 : 0;
+  const items = out.map(([x, i]) => { const n = canon(x.name).replace(/®|™/g, '');
+      return { x, i, ex: rq && (n === rq || n.startsWith(rq)) ? 0 : 1, c: cover(x.name, rest.length ? rest : core), s: side(x), l: x.name.length }; })
+    .sort((a, b) => a.ex - b.ex || b.c - a.c || a.s - b.s || a.l - b.l || a.i - b.i).map(o => o.x);
+  return { items, brand: bt.length > 0 };
 }
 function localSearch(q) {
   const D = db(); if (!D) return null;
@@ -130,11 +135,13 @@ module.exports = async function handler(req, res) {
 
   try {
     // 0) 프랜차이즈 공식값  1) 저장해 둔 식약처 DB (수십 ms) — 둘 다 있으면 공식값을 위에
-    const F = qy.live ? [] : frSearch(q);
+    const FS = qy.live ? { items: [], brand: false } : frSearch(q), F = FS.items;
     const L = qy.live ? null : localSearch(q);
     let v = null;
     if ((L && L.items.length) || F.length) {
-      const all = F.concat(L && L.items.length ? order(L.items, q, L.tokens) : []);
+      const LO = L && L.items.length ? order(L.items, q, L.tokens) : [];
+      // 브랜드를 쳤으면 공식값을 맨 위에, 아니면 기본 음식 10개 뒤에
+      const all = FS.brand ? F.concat(LO) : LO.slice(0, 10).concat(F, LO.slice(10));
       if (all.length) v = { total: Math.max((L ? L.total : 0) + F.length, all.length), all, source: F.length ? '브랜드 공개 영양정보 · 식품의약품안전처 식품영양성분DB' : '식품의약품안전처 식품영양성분DB', from: 'local ' + ((L && L.v) || '') };
     }
     // 2) 없으면 식약처에 직접 (띄어쓰기·순서·표기가 달라도 찾도록 여러 모양으로 묻는다)
