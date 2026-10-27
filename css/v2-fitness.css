@@ -413,3 +413,6 @@ html[data-ui="v2"] .fit-list .fx-sess.fx-sess-n{ margin-top:12px; padding-top:16
 .pgm-b{ flex:none; height:30px; padding:0 10px; border-radius:15px; border:1px solid var(--v2-line, var(--border)); background:none; color:var(--text2); font:inherit; font-size:12px; cursor:pointer; }
 .rp-c.rp-new{ border-style:dashed; color:var(--accent); }
 .fz-lbl small{ font-weight:400; color:var(--text3); margin-left:6px; }
+.rt-set{ gap:8px; }
+.rt-set-go{ flex:1; min-width:0; border:0; background:none; padding:0; text-align:left; color:inherit; font:inherit; cursor:pointer; }
+.pgm-b.rt-del, .rt-ed.rt-del{ color:#E5484D; }

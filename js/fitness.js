@@ -329,6 +329,7 @@ const Fitness = {
     const rlist = Object.entries(R).map(([id,r]) => `<div class="rt-row">
         <span class="rt-nm">${esc(r.name)}</span><span class="rt-n"><span class="num">${(r.exercises||[]).length}</span>종목</span>
         <button class="rt-ed" onclick="Fitness.showRoutineEdit('${id}')">편집</button>
+        <button class="rt-ed rt-del" onclick="Fitness.delRoutine('${id}','dp')">삭제</button>
       </div>`).join('');
     App.openModal('@dumbbell 요일별 운동', `<div class="fz fz-dp">
       <p class="fz-note">요일을 누르고 부위(여러 개 가능)나 루틴·스포츠를 고릅니다. 하루에 두 번 이상 하면 ‘루틴 추가’ 를 눌러 주세요. <b>종목 추가</b>는 운동 하나, <b>루틴 추가</b>는 부위·루틴·스포츠 한 묶음을 더합니다.</p>
@@ -422,14 +423,18 @@ const Fitness = {
           <button type="button" class="rt-m on" data-m="add" onclick="Fitness._rtSetMode('add')">같은 날 루틴 추가</button>
           <button type="button" class="rt-m" data-m="replace" onclick="Fitness._rtSetMode('replace')">바꾸기</button></div></div>
       <div class="fz-lbl fz-lbl-sec">운동</div>`,
-      r ? `<button onclick="Fitness.delRoutine('${id}')" class="btn-danger">루틴 삭제</button>` : '');
+      r ? `<button onclick="Fitness.delRoutine('${id}','set')" class="btn-danger">루틴 삭제</button>` : '');
   },
   _rtSetMode(m) { this._rtMode = m; document.querySelectorAll('.rt-m').forEach(b => b.classList.toggle('on', b.dataset.m === m)); },
-  delRoutine(id) {
-    if (!confirm('이 루틴을 삭제할까요? 배정된 요일은 계획 없음이 됩니다.')) return;
-    const R = this.routines(); delete R[id]; this.saveRoutines(R);
+  // back: 지운 뒤 돌아갈 화면 — 'dp'(요일별 운동) · 'set'(설정 › 운동·루틴) · 없으면 닫기
+  delRoutine(id, back) {
+    const R = this.routines(); if (!R[id]) return;
+    if (!confirm(`'${R[id].name}' 루틴을 삭제할까요? 배정된 요일은 계획 없음이 되고, 루틴 묶음에서도 빠집니다.`)) return;
+    delete R[id]; this.saveRoutines(R);
     const dp = this.dayPlan(); for (let i=0;i<7;i++) { const a = this.picks(i); if (a.includes(id)) this._setPicks(dp, i, a.filter(x => x !== id)); } this.saveDayPlan(dp);
-    App.closeModal(); this.render(App?.S?.selDate || new Date());
+    try { const P = this.progs(); let ch = false; for (const g of Object.values(P)) if ((g.days||[]).includes(id)) { g.days = g.days.filter(x => x !== id); ch = true; } if (ch) this.saveProgs(P); } catch(e) {}
+    this.render(App?.S?.selDate || new Date());
+    if (back === 'dp') this.showDayPlan(); else if (back === 'set') Settings.open('workout'); else App.closeModal();
     App.showToast('루틴 삭제됨', 'success');
   },
   _commitRoutine() {
@@ -1105,16 +1110,27 @@ const Fitness = {
   // 그날 총 볼륨 · 세트 · 소모 열량 (누르면 추이)
   // 직전에 보여 준 값(같은 날) — 바뀌면 거기서부터 숫자가 올라간다
   _totShown: null,
-  _totHtml(d){ try{ const ds=this._dateStr(d), t=WorkoutHistory.day(ds, true), b={ kcal:this.burn(d, true).kcal };   // 소모 열량은 오늘 목록을 전부 했을 때
-    const w=this._totShown&&this._totShown.ds===ds?this._totShown:{vol:t.vol,sets:t.sets,kcal:b.kcal}; this._totShown={ds,vol:t.vol,sets:t.sets,kcal:b.kcal};
-    const cu=(k,v)=>`data-cu="n" data-from="${Math.round(w[k]||0)}" data-to="${Math.round(v)}"`;
-    // 그날 총 볼륨만 한 사물(들어 올린 무게 단계) 아이콘 — 오른쪽에
+  // 세 숫자 모두 '오늘 목록을 전부 했을 때' 추정치 — 이미 한 세트는 기록한 무게·횟수, 안 한 세트는 권장 무게·횟수로 센다.
+  // 실제로 한 만큼은 작은 글씨(한 것 …)로 같이 보인다. 체크하기 전에도 숫자가 바로 보인다.
+  _est(ds){
+    const o={ vol:0, sets:0, reps:0 };
+    try{
+      const ex=WorkoutMode._build(ds), seen=new Set(ex.map(e=>e.name)), L=PlanGen.log(ds);
+      ex.forEach(e=>{ if(e.cardio) return; e.rows.forEach(r=>{ const w=Number(r.w)||0, n=Number(r.r)||0; o.sets++; o.reps+=n; o.vol+=w*n; }); });
+      Object.entries(L).forEach(([n,ss])=>{ if(seen.has(n)||PlanGen.timed(n)) return; (ss||[]).forEach(x=>{ const w=Number(x.w)||0, r=Number(x.r)||0; o.sets++; o.reps+=r; o.vol+=w*r; }); });
+    }catch(e){}
+    return o;
+  },
+  _totHtml(d){ try{ const ds=this._dateStr(d), t=WorkoutHistory.day(ds, true), es=this._est(ds), b={ kcal:this.burn(d, true).kcal };
+    const w=this._totShown&&this._totShown.ds===ds?this._totShown:{vol:es.vol,sets:es.sets,kcal:b.kcal}; this._totShown={ds,vol:es.vol,sets:es.sets,kcal:b.kcal};
+    const cu=(k,v)=>`data-cu="n" data-from="${Math.round(w[k]||0)}" data-to="${Math.round(v)}"`, K=v=>Math.round(v).toLocaleString('ko-KR');
+    // 그날 실제로 든 총 볼륨만 한 사물(들어 올린 무게 단계) 아이콘 — 오른쪽에
     const vt=typeof VolTier!=='undefined'&&t.vol>=70?VolTier.tier(t.vol):null;
     const vic=vt&&vt.now?`<span class="ft-vic" title="${esc(vt.now[0])}만큼">${VolTier.img(vt.lv,'ftr-ic')}<small>${esc(vt.now[0])}</small></span>`:'';
-    return (b.kcal||t.sets) ? `<button type="button" class="fit-burn fit-tot" onclick="WorkoutHistory.openAll()">
-        <span class="ft-c"><b class="num" ${cu('vol',t.vol)}>${Math.round(w.vol||0).toLocaleString('ko-KR')}</b><i>kg</i><small>총 볼륨</small></span>
-        <span class="ft-c"><b class="num" ${cu('sets',t.sets)}>${w.sets||0}</b><i>세트</i><small>${t.reps}회</small></span>
-        <span class="ft-c"><b class="num" ${cu('kcal',b.kcal)}>${Math.round(w.kcal||0).toLocaleString('ko-KR')}</b><i>kcal</i><small>전부 하면(추정)</small></span>
+    return (b.kcal||es.sets||t.sets) ? `<button type="button" class="fit-burn fit-tot" onclick="WorkoutHistory.openAll()">
+        <span class="ft-c"><b class="num" ${cu('vol',es.vol)}>${K(w.vol||0)}</b><i>kg</i><small>${t.vol>0?`예상 · 한 것 ${K(t.vol)}`:'예상 총 볼륨'}</small></span>
+        <span class="ft-c"><b class="num" ${cu('sets',es.sets)}>${w.sets||0}</b><i>세트</i><small>${t.sets>0?`예상 · 한 것 ${t.sets}`:`예상 ${K(es.reps)}회`}</small></span>
+        <span class="ft-c"><b class="num" ${cu('kcal',b.kcal)}>${K(w.kcal||0)}</b><i>kcal</i><small>예상 소모</small></span>
         ${vic}<span class="ft-go">추이</span></button>${typeof VolTier!=='undefined'?VolTier.chip(d):''}` : (typeof VolTier!=='undefined'?VolTier.chip(d):''); }catch(e){ return ''; } },
 
   // ── 운동 소모 열량(추정) ─────────────────

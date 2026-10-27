@@ -138,8 +138,10 @@ Object.assign(Fitness, {
       return `<button type="button" class="rp-x${rp._cart.has(n) ? ' on' : ''}" data-n="${esc(n)}" onclick="Fitness._rpX(this)">
         <span class="rp-xth">${th ? ExMedia.poseHtml(th, '') : ''}</span><b>${esc(n)}</b>${tag ? `<small>${tag}</small>` : ''}<i class="rp-xck"></i></button>`; };
     box.innerHTML = `<div class="rp-xl">${recN.map(n => row(n, '추천')).join('')}${rest.slice(0, 15).map(n => row(n)).join('')}</div>
-      ${rest.length > 15 ? `<button type="button" class="rp-xmore" onclick="this.previousElementSibling.insertAdjacentHTML('beforeend', this.dataset.h); this.remove()" data-h="${esc(rest.slice(15).map(n => row(n)).join(''))}">${p} 종목 ${rest.length - 15}개 더 보기</button>` : ''}`;
+      ${rest.length > 15 ? `<button type="button" class="rp-xmore" onclick="Fitness._rpMore(this)">${p} 종목 ${rest.length - 15}개 더 보기</button>` : ''}`;
+    rp._more = () => rest.slice(15).map(n => row(n)).join('');   // 더 보기는 누를 때 그린다(그림 칸을 속성에 넣으면 따옴표가 깨졌다)
   },
+  _rpMore(btn) { const rp = btn.closest('.rp'); if (rp && rp._more) btn.previousElementSibling.insertAdjacentHTML('beforeend', rp._more()); btn.remove(); },
   _rpX(b) {
     const rp = b.closest('.rp'), n = b.dataset.n; rp._cart = rp._cart || new Map();
     if (rp._cart.has(n)) { rp._cart.delete(n); b.classList.remove('on'); } else { rp._cart.set(n, (rp._rec || {})[n] || this.defSets(n)); b.classList.add('on'); }
@@ -192,11 +194,13 @@ Object.assign(Fitness, {
     const mine = progs.filter(g => g.user);
     return `<p class="set-lead">루틴은 하루치 운동, 루틴 묶음은 여러 날(예: 초보자 3분할 · 어깨 깡패 프로그램)입니다. 요일별 운동과 '루틴 추가' 에서 묶음 이름을 누르면 그 묶음의 날을 고를 수 있습니다.</p>
       <div class="set-h">루틴 묶음 (분할)</div>
-      ${mine.map(g => S._link(esc(g.name), `Fitness.progEdit('${g.id}')`, `${g.days.length}일 분할${g.days.length ? ' · ' + g.days.map(([, l]) => esc(l)).join(' / ') : ''}`)).join('')}
+      ${mine.map(g => `<div class="set-item rt-set"><button type="button" class="set-tx rt-set-go" onclick="Fitness.progEdit('${g.id}')"><b>${esc(g.name)}</b><small>${g.days.length}일 분할${g.days.length ? ' · ' + g.days.map(([, l]) => esc(l)).join(' / ') : ''}</small></button>
+        <button type="button" class="pgm-b" onclick="Fitness.progEdit('${g.id}')">편집</button><button type="button" class="pgm-b rt-del" onclick="Fitness.progDel('${g.id}')">삭제</button></div>`).join('')}
       ${progs.filter(g => !g.user).map(g => S._item(esc(g.name), '', `${g.days.length}일 · ${g.days.map(([, l]) => esc(l)).join(' / ')} · ${g.id === '_home' ? '기본 제공' : '맞춤 플랜에서 만든 것'}`)).join('')}
       ${S._link('+ 새 루틴 묶음 만들기', 'Fitness.progEdit()', '이름을 짓고 날마다 루틴을 붙입니다')}
       <div class="set-h">루틴</div>
-      ${Object.entries(R).length ? Object.entries(R).map(([id, r]) => S._link(esc(r.name), `Fitness.showRoutineEdit('${id}')`, `${(r.exercises || []).length}종목${solo.some(([s]) => s === id) ? '' : ' · ' + esc((progs.find(g => g.days.some(([v]) => v === id)) || {}).name || '')}`)).join('') : S._item('아직 만든 루틴이 없습니다', '', '')}
+      ${Object.entries(R).length ? Object.entries(R).map(([id, r]) => `<div class="set-item rt-set"><button type="button" class="set-tx rt-set-go" onclick="Fitness.showRoutineEdit('${id}')"><b>${esc(r.name)}</b><small>${(r.exercises || []).length}종목${solo.some(([s]) => s === id) ? '' : ' · ' + esc((progs.find(g => g.days.some(([v]) => v === id)) || {}).name || '')}</small></button>
+        <button type="button" class="pgm-b" onclick="Fitness.showRoutineEdit('${id}')">편집</button><button type="button" class="pgm-b rt-del" onclick="Fitness.delRoutine('${id}','set')">삭제</button></div>`).join('') : S._item('아직 만든 루틴이 없습니다', '', '')}
       ${S._link('+ 새 루틴 만들기', 'Fitness.showRoutineEdit()', '종목을 골라 하루치 루틴을 만듭니다')}
       <div class="set-h">요일</div>
       ${S._link('요일별 운동', 'Fitness.showDayPlan()', '요일마다 할 부위·루틴·스포츠 정하기')}
@@ -240,6 +244,10 @@ Object.assign(Fitness, {
     const name = (pg.name || '').trim(); if (!name) { App.showToast('묶음 이름을 입력해 주세요', 'error'); return; }
     const P = this.progs(); P[pg.id] = { name, days: pg.days }; this.saveProgs(P);
     this._pg = null; Settings.open('workout'); App.showToast(`'${name}' 묶음 저장됨`, 'success');
+  },
+  progDel(pid) {
+    const P = this.progs(), g = P[pid]; if (!g || !confirm(`'${g.name}' 묶음을 지울까요? 안에 든 루틴은 그대로 남습니다.`)) return;
+    delete P[pid]; this.saveProgs(P); Settings.open('workout'); App.showToast('묶음을 지웠습니다', 'success');
   },
   _pgRemove() {
     const pg = this._pg; if (!pg || !confirm('이 묶음을 지울까요? 안에 든 루틴은 그대로 남습니다.')) return;
