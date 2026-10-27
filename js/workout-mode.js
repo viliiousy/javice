@@ -409,7 +409,8 @@ const WorkoutMode = {
     const ss = [...new Set(ex.map(e => e.sess).filter(v => v != null))];
     if (ss.length < 2) return null;
     let plan = {}; try { plan = Fitness.exercisesFor(new Date(this._cfDs + 'T00:00:00')).plan || {}; } catch (e) {}
-    return ss.map(si => ({ si, name: (plan.sessions && plan.sessions[si] && plan.sessions[si].name) || `${si + 1}회차`, ex: ex.filter(e => e.sess === si) }));
+    ss.sort((a, b) => a - b);
+    return ss.map((si, k) => ({ si, k, name: (Fitness.sessName ? Fitness.sessName(plan, si, ex) : '') || (plan.sessions && plan.sessions[si] && plan.sessions[si].name) || `${k + 1}회차`, ex: ex.filter(e => e.sess === si) }));
   },
   confirmStart(ds, pick) {
     ds = ds || Fitness._dateStr(new Date()); this._cfDs = ds;
@@ -434,7 +435,7 @@ const WorkoutMode = {
     const li = e => `<li class="${e.done ? 'done' : ''}"><b>${esc(e.name)}</b><span>${e.done ? '완료' : e.cardio ? esc(e.sets || '시간') : `${e.rows.length}세트 · ${e.rows[0].w ? e.rows[0].w + 'kg × ' : ''}${e.rows[0].r}회`}</span></li>`;
     const list = SS ? SS.map(x => { const ex = all.filter(e => e.sess === x.si || (e.sess == null && e._lastSess === x.si)), dn = ex.every(e => e.done);
         return `<button type="button" class="wk-cf-ss${x.si === sel ? ' on' : ''}${dn ? ' fin' : ''}" onclick="WorkoutMode.confirmStart('${ds}', ${x.si})">
-          <span class="wk-cf-ck">${x.si === sel ? '✓' : ''}</span><b>${x.si + 1}회차 · ${esc(x.name)}</b><small>${dn ? '완료' : ex.filter(e => e.done).length + '/' + ex.length}</small></button>
+          <span class="wk-cf-ck">${x.si === sel ? '✓' : ''}</span><b>${x.k + 1}회차 · ${esc(x.name)}</b><small>${dn ? '완료' : ex.filter(e => e.done).length + '/' + ex.length}</small></button>
           <ol class="wk-cf-list${x.si === sel ? '' : ' off'}">${ex.map(li).join('')}</ol>`; }).join('')
       : `<ol class="wk-cf-list">${todo.map(li).join('')}</ol>`;
     App.openModal('@dumbbell 운동을 시작하시겠습니까?', `
@@ -447,7 +448,7 @@ const WorkoutMode = {
       ${SS ? '<p class="pg-note">오늘 루틴이 둘 이상입니다 — 할 회차를 눌러 고르세요.</p>' : ''}
       ${list}
       <p class="pg-note">쉬는 시간 ${pf.timer ? this._fmt(pf.rest) : '타이머 끔'} · 소리 ${pf.sound ? '켬' : '끔'} — 운동 중 위쪽 단추에서 바꿀 수 있습니다.</p>
-      <div class="modal-btns"><button class="btn-sm accent" onclick="WorkoutMode.start('${ds}'${sel != null ? ', ' + sel : ''})">예, ${sel != null ? (sel + 1) + '회차 ' : ''}시작</button><button class="btn-sm" onclick="App.closeModal()">아니오</button></div>`);
+      <div class="modal-btns"><button class="btn-sm accent" onclick="WorkoutMode.start('${ds}'${sel != null ? ', ' + sel : ''})">예, ${sel != null ? ((SS.find(x => x.si === sel) || {}).k + 1) + '회차 ' : ''}시작</button><button class="btn-sm" onclick="App.closeModal()">아니오</button></div>`);
   },
 
   start(ds, only) {

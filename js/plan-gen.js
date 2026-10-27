@@ -228,10 +228,12 @@ const PlanGen = {
     });
     const order = Object.keys(cnt).filter(x => x !== '전신').sort((a, b) => cnt[b] - cnt[a]);
     const upper = order.filter(x => ['가슴', '등', '어깨'].includes(x)).length;
-    let main = (cnt['전신'] >= 2 || (order.length >= 4 && order.includes('하체') && upper >= 2)) ? ['전신'] : order.slice(0, 3);
+    // 부위가 셋 이상이면 가장 많이 한 두 곳만. 유산소는 다 합쳐 셋 이상이면 뺀다
+    let main = (cnt['전신'] >= 2 || (order.length >= 4 && order.includes('하체') && upper >= 2)) ? ['전신'] : order.length >= 3 ? order.slice(0, 2) : order;
     if (!main.length && cnt['전신']) main = ['전신'];
+    const total = order.length + (sport ? 1 : 0) + (cardio ? 1 : 0);
     if (sport) main.push('스포츠');
-    if (cardio) main.push('유산소');
+    if (cardio && (total < 3 || !main.length)) main.push('유산소');
     return main.join('·');
   },
   dayFor(parts, n) {

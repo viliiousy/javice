@@ -9,6 +9,7 @@ const Settings = {
   CATS: [
     { id:'design', ic:'palette', name:'디자인',      sub:() => `${Settings._uiName()} · ${Settings._themeName()}` },
     { id:'voice',  ic:'volume',  name:'소리 · 진동 · 효과', sub:() => `답 읽기 ${Settings._on(JARVIS?._ttsEnabled)} · 효과음 ${Settings._on(Sounds?.enabled)} · 진동 ${Settings._on(Haptic.on)} · 애니메이션 ${Settings._on(typeof Fx!=='undefined' && Fx.on)}` },
+    { id:'workout', ic:'dumbbell', name:'운동 · 루틴', sub:() => { try { const L = Fitness.progList(); return `루틴 묶음 ${L.progs.filter(g=>g.user).length}개 · 루틴 ${Object.keys(Fitness._rtRO()).length}개 · 요일별 운동`; } catch(e){ return '루틴 묶음 · 루틴 만들기·관리'; } } },
     { id:'notify', ic:'bell',    name:'알림',        sub:() => { try { return Notifications.getSettings().enabled ? '켜짐 · 습관·식단·할일·일정' : '꺼짐'; } catch(e){ return ''; } } },
     { id:'ai',     ic:'sparkle', name:'AI',          sub:() => { try { const P = JARVIS.PROVIDERS[JARVIS._active()]; return `기본 ${P ? (P.short || P.name) : '미설정'} · 사용량 추적`; } catch(e){ return 'AI 비서 · 사용량 추적'; } } },
     { id:'cal',    ic:'calendar', name:'일정과 할일', sub:() => { try { return `${CalSources.summary()} · 상단 지난 할일 ${localStorage.getItem('gl_top_overdue')==='0'?'숨김':'보임'}`; } catch(e){ return '캘린더 · 할일'; } } },
@@ -91,6 +92,8 @@ const Settings = {
         ${this._item('진동(햅틱)', this._sw(Haptic.on, 'Settings.toggleHaptic()'), '체크·순서 바꾸기·탭 전환 때 손끝 진동')}
         <div class="set-h">효과</div>
         ${this._item('체크 애니메이션', this._sw(typeof Fx!=='undefined' && Fx.on, 'Settings.toggleFx()'), '습관을 체크하면 터지는 효과 · 다 채우면 올클리어')}`;
+    } else if (cat === 'workout') {
+      h = Fitness.settingsHtml(this);
     } else if (cat === 'notify') {
       h = `<div id="setNotify" class="set-loading">불러오는 중…</div>`;
       setTimeout(async () => { const el = document.getElementById('setNotify'); if (el) { el.className=''; el.innerHTML = await Notifications.pageHtml(); } }, 0);
