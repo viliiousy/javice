@@ -253,3 +253,15 @@ html[data-ui="v2"] .db-opt{ display:flex; flex-direction:column; align-items:fle
 html[data-ui="v2"] .db-opt b{ font-size:15px; font-weight:600; }
 html[data-ui="v2"] .db-opt small{ font-size:12px; color:var(--text3); line-height:1.35; }
 html[data-ui="v2"] .db-opt.on{ border-color:var(--text); box-shadow:inset 0 0 0 1px var(--text); }
+.diet-ai-range{ margin:0 0 10px; font-size:12.5px; color:var(--text2); }
+.diet-ai-range b{ color:var(--text); }
+.diet-ai-refs{ margin:0 0 12px; font-size:12px; color:var(--text3); }
+.diet-ai-refs summary{ cursor:pointer; list-style:none; }
+.diet-ai-refs summary::-webkit-details-marker{ display:none; }
+.diet-ai-refs summary::before{ content:'› '; }
+.diet-ai-refs[open] summary::before{ content:'⌄ '; }
+.diet-ai-refs .dap-row{ padding:4px 0 4px 12px; }
+.diet-ai-qty{ display:flex; align-items:center; gap:6px; margin:4px 0 12px; font-size:12.5px; color:var(--text3); }
+.diet-ai-qty span{ margin-right:4px; }
+.diet-ai-qty button{ flex:1; height:36px; border-radius:18px; border:1px solid var(--v2-line, var(--border)); background:none; color:var(--text2); font:inherit; font-size:13px; cursor:pointer; }
+.diet-ai-qty button.on{ background:var(--text); border-color:var(--text); color:var(--bg, #101113); font-weight:600; }

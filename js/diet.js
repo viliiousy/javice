@@ -356,14 +356,25 @@ const Diet = {
     // 더하기는 우리가 한다 — 1,290 kcal 이 나왔고 세 번을 물어도 같은 값이었다.
     // 사람도 '버거 560 + 감자 470 + 콜라 260' 을 보면 어디가 틀렸는지 짚을 수 있다.
     // 합계 하나만 보여 주면 틀렸는지조차 알 수 없다.
+    // 식당 메뉴(예: '비범 깻잎 페스토 들기름 막국수')는 AI 가 그 집을 알 리가 없다. 기억에만 기대면 집밥 한 접시 값(350kcal)을 냈다.
+    // 그래서 ① 식약처 DB 에서 같은 음식(가게 이름을 뗀 '들기름 막국수')의 실측 1인분을 몇 개 찾아 근거로 주고,
+    // ② 재료별(면·기름·소스·토핑)로 g 과 함께 나눠 받고, ③ 적게~많이 범위도 받는다. 더하기는 우리가 한다.
+    let refs=null; try{ refs=await this._aiRefs(q); }catch(e){}
+    const refTxt = refs && refs.items.length ? `
+참고 — 식약처 영양성분DB 실측값(가게 이름을 뗀 「${refs.q}」, 1인분·한 봉 기준):
+${refs.items.map(x=>`- ${x.name}: ${x.g}g ${x.kcal}kcal (단백질 ${x.p}g, 탄수 ${x.c}g, 지방 ${x.f}g)`).join('\n')}
+이 값들을 기준점으로 쓰되, 식당 1인분은 보통 이보다 크거나 비슷하다.` : '';
     const prompt = `「${q}」가 사람이 먹는 음식인지 먼저 판단해라.
 음식이 아니면(사물·장소·사람 등) 다른 필드 없이 {"ok":false} 만 낸다. 이때는 절대 숫자를 지어내지 않는다.
 음식이면 한국에서 파는 1회 제공량 기준으로 답한다.
 세트·콤보처럼 여러 음식이 묶인 이름이면 구성품을 하나씩 나눠 적고 각각의 값을 낸다.
 세트는 보통 메인 + 사이드(감자튀김 등) + 음료다. 라지 세트면 사이드와 음료도 라지다.
-단일 음식이면 parts 에 그 하나만 넣는다.
+식당에서 파는 한 그릇 요리(면·밥·덮밥·파스타 등)는 재료별로 나눠라: 주재료(면·밥, 조리 후 g), 기름(들기름·참기름 등 큰술·g), 소스·양념, 페스토·치즈·견과, 고명(김가루·깨·달걀 등). 각 재료의 양(amt)을 g 으로 적는다.
+앞에 붙은 식당·브랜드 이름을 모르면 한국 일반 식당의 1인분으로 본다. 모르는 가게라고 값을 낮추지 마라.
+lo·hi 에는 양이 적은 집·많은 집을 가정한 총열량 범위를 넣는다.
+단일 음식이면 parts 에 그 하나만 넣는다.${refTxt}
 JSON 만 출력해. 다른 말은 붙이지 마.
-{"ok":true,"name":"음식 이름","unit":"기준량 (예: 100g, 1개, 1세트)","parts":[{"n":"구성품","amt":"양","cal":숫자,"protein":숫자,"carb":숫자,"fat":숫자}]}`;
+{"ok":true,"name":"음식 이름","unit":"기준량 (예: 1인분, 1개, 1세트)","lo":숫자,"hi":숫자,"parts":[{"n":"구성품","amt":"양(g)","cal":숫자,"protein":숫자,"carb":숫자,"fat":숫자}]}`;
     // 모델 이름은 JARVIS 가 고른다 — 한 군데서 고르지 않으면 Groq 이 모델을 내릴 때마다
     // 여기저기서 따로 죽는다. 실제로 그렇게 죽었다.
     //
@@ -374,7 +385,7 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     //
     // temperature 는 0 이다. 0.2 는 같은 음식을 두 번 물으면 다른 숫자를 줬고,
     // 그중 하나가 사전에 영영 저장됐다. 추정이어도 흔들리지는 말아야 한다.
-    const data=await JARVIS.chat({ max_tokens:900, temperature:0,
+    const data=await JARVIS.chat({ max_tokens:1400, temperature:0,
       messages:[{role:'user',content:prompt}] });
     const ch=data.choices?.[0];
     const text=ch?.message?.content||'';
@@ -408,8 +419,30 @@ JSON 만 출력해. 다른 말은 붙이지 마.
     if(derived>0 && Math.abs(c-derived)/derived > 0.3){ c=derived; fixed=true; }
 
     const name=String(j.name||q).trim().slice(0,40) || q;
+    // 범위는 합계를 감싸야 말이 된다 — 아니면 버린다
+    let lo=Math.round(num(j.lo)), hi=Math.round(num(j.hi)); if(!(lo>0&&hi>=lo&&lo<=c*1.05&&hi>=c*0.95)){ lo=0; hi=0; }
     return { n:name, u:String(j.unit||'').trim().slice(0,20),
-             c, p, cb, ft, parts, fixed };
+             c, p, cb, ft, parts, fixed, lo, hi, refs };
+  },
+  // 같은 음식의 실측 1인분 — 검색어 앞쪽(가게 이름 등)을 하나씩 떼며 식약처 DB 에서 '음식'(조리 음식)·대표 품목을 찾는다
+  async _aiRefs(q){
+    const w=String(q||'').trim().split(/\s+/).filter(Boolean); if(!w.length) return null;
+    const tries=[]; for(let k=w.length; k>=1; k--){ const sub=w.slice(w.length-k).join(' '); if(sub.length>=2 && !tries.includes(sub)) tries.push(sub); }
+    // 붙여 쓴 이름(들기름막국수)도 한 번
+    if(w.length>=2) tries.splice(1,0,w.slice(-2).join(''));
+    for(const sub of tries.slice(0,5)){
+      let j=null, j2=null; try{ j=await this._dbFetch(sub, 1); if(j&&j.more) j2=await this._dbFetch(sub, 2); }catch(e){}
+      const it=[...((j&&j.items)||[]), ...((j2&&j2.items)||[])].filter(x=>Number(x.kcal)>=90);   // 100g 에 90kcal 도 안 되면 곤약·두유면 같은 별종이라 기준점에서 뺀다
+      const pick=it.map(x=>{ const per=Number(x.per)||100, g=Number(x.pack)||0, unit=x.unit||'g';
+          if(unit!=='g'||!(g>=120&&g<=900)) return null;   // 1인분 무게가 있는 것만(소스·한 통 대용량 제외)
+          const f=v=>Math.round((Number(v)||0)*g/per*10)/10;
+          return { name:x.name, g:Math.round(g), kcal:Math.round(Number(x.kcal)*g/per), p:f(x.protein), c:f(x.carb), f:f(x.fat), grp:x.group||'', cls:x.cls||'' };
+        }).filter(Boolean)
+        .filter(x=>!/소스|육수|양념|칩|샐러드|&|와 |정식|김밥|세트|도시락|볶음|불고기/.test(x.name))
+        .sort((a,b)=>(a.grp==='음식'?0:1)-(b.grp==='음식'?0:1));
+      if(pick.length>=2) return { q:sub, items:pick.slice(0,5) };
+    }
+    return null;
   },
   // AI 가 낸 숫자는 그대로 들어가지 않는다. 추정값이라고 말하고, 고칠 수 있게 두고,
   // 누를 때 들어간다. 한번 들어간 칼로리는 나중에 틀린 걸 알아채기가 어렵다.
@@ -420,6 +453,9 @@ JSON 만 출력해. 다른 말은 붙이지 마.
         <span class="diet-ai-nm">${this._em('🤖')}${esc(f.n)}</span>
         <span class="diet-ai-warn">AI 추정값 · 맞는지 보고 담으세요</span>
       </div>
+      ${f.lo&&f.hi?`<div class="diet-ai-range">가게마다 양이 달라 <b class="num">${f.lo.toLocaleString('ko-KR')}~${f.hi.toLocaleString('ko-KR')}kcal</b> 사이로 봅니다</div>`:''}
+      ${f.refs&&f.refs.items.length?`<details class="diet-ai-refs"><summary>근거 · 식약처 실측 「${esc(f.refs.q)}」 ${f.refs.items.length}건 (1인분 ${Math.min(...f.refs.items.map(x=>x.kcal)).toLocaleString('ko-KR')}~${Math.max(...f.refs.items.map(x=>x.kcal)).toLocaleString('ko-KR')}kcal)</summary>
+        ${f.refs.items.map(x=>`<div class="dap-row"><span class="dap-n">${esc(x.name)} <i>${x.g}g</i></span><span class="dap-c num">${x.kcal}<i>kcal</i></span></div>`).join('')}</details>`:''}
       ${(f.parts&&f.parts.length>1)?`<div class="diet-ai-parts">
         ${f.parts.map(x=>`<div class="dap-row"><span class="dap-n">${esc(x.n)}${
           x.amt?` <i>${esc(x.amt)}</i>`:''}</span><span class="dap-c num">${x.c}<i>kcal</i></span></div>`).join('')}
@@ -433,8 +469,18 @@ JSON 만 출력해. 다른 말은 붙이지 마.
         <label>탄수화물<input id="aiCb" type="number" step="0.1" class="inp inp-sm" value="${f.cb}"></label>
         <label>지방<input id="aiFt" type="number" step="0.1" class="inp inp-sm" value="${f.ft}"></label>
       </div>
+      <div class="diet-ai-qty"><span>먹은 양</span>${[[0.7,'적게'],[1,'보통'],[1.3,'많이'],[1.6,'곱빼기']].map(([m,l])=>`<button type="button" class="${m===1?'on':''}" onclick="Diet._aiScale(${m},this)">${l}</button>`).join('')}</div>
       <button class="btn-sm accent diet-ai-add dt-go" onclick="Diet.aiConfirm('${meal}','${ds}')">담고 사전에 저장</button>
     </div>`;
+  },
+  // 먹은 양 — AI 가 낸 '보통 1인분' 에 곱해 칸을 바꾼다(손으로 고친 값 위에 곱하지 않게 늘 원래 값에서)
+  _aiScale(m, btn){
+    const f=this._aiPending; if(!f) return;
+    btn?.parentElement?.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===btn));
+    const set=(id,v,d)=>{ const e=document.getElementById(id); if(e) e.value=d?Math.round(v*10)/10:Math.round(v); };
+    set('aiC',f.c*m); set('aiP',f.p*m,1); set('aiCb',f.cb*m,1); set('aiFt',f.ft*m,1);
+    const u=document.getElementById('aiU'); if(u){ const base=f.u||'1인분'; u.value=m===1?base:`${base} × ${m}`; }
+    try{ Haptic.light(); }catch(e){}
   },
   aiConfirm(meal, ds){
     const f=this._aiPending; if(!f) return;
