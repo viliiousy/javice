@@ -276,7 +276,9 @@ const JARVIS = {
   async _callAPI(apiKey, userMsg) {
     this.history.push({role:'user',content:userMsg});
     const msgs=this.history.slice(-12);
-    const ctx=await this._buildCtx(), sys=this._buildSys(ctx);
+    const ctx=await this._buildCtx();
+    let refs=''; try{ if(typeof JarvisActions!=='undefined' && JarvisActions.foodRefs) refs=await JarvisActions.foodRefs(userMsg); }catch(e){}
+    const sys=this._buildSys(ctx)+refs;
     const data=await this.chat({ max_tokens:4000, messages:[{role:'system',content:sys},...msgs] });
     const text=data.choices?.[0]?.message?.content||'';
     this.history.push({role:'assistant',content:text});
