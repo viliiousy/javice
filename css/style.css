@@ -3992,3 +3992,7 @@ html.dark .vt-ic img, html.dark .ftr-ic img{ filter:invert(1); }
 .fx-kc{ color:var(--text3); }
 .ni-step{ display:flex; gap:8px; margin:8px 0 0; } .ni-step .btn-sm{ flex:1; height:40px; }
 .fit-list .fx[data-row]{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+.steps-diag{ display:flex; align-items:center; gap:8px; justify-content:space-between; font-size:12px; color:var(--text3); margin:-4px 0 8px; }
+.steps-diag #stepsDiag.ok{ color:var(--text2); }
+.steps-diag #stepsDiag.bad{ color:#E5484D; }
+.steps-diag .btn-sm{ flex:none; }

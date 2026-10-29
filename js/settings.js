@@ -82,6 +82,7 @@ const Settings = {
         ${this._link('카테고리 · 카드 순서와 켜고 끄기', "Settings.go('cats')", `지금 ${Tabs._onTabs().map(t => t.label).join(' → ')} — 탭 순서, 카드 순서(예: 운동을 식단 위로), PC·태블릿은 카드 칸 크기(1×1·2×1…)와 자리, 안 쓰는 카드 숨기기`)}`;
     } else if (cat === 'topinfo') {
       h = TopInfo.pageHtml();
+      setTimeout(() => { try { TopInfo._diagPaint(); } catch (e) {} }, 0);
     } else if (cat === 'cats') {
       h = Tabs.catsHtml();
     } else if (cat === 'voice') {

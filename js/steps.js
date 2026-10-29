@@ -71,14 +71,23 @@ const Steps = {
   on() { try { return typeof TopInfo === 'undefined' || TopInfo.get().steps !== false; } catch (e) { return true; } },
 
   // 건강 앱에서 최근 며칠 걸음을 받아 계정에 저장한다(5분에 한 번까지). 바뀌었으면 화면을 다시 그린다.
+  // 마지막으로 읽은 결과를 남겨 둔다(설정 › 상단바 정보 › 걸음 수 아래에 보임) — 걸음이 안 들어올 때 어디서 막혔는지 알 수 있게
+  DIAG: 'gl_steps_diag',
+  diag() { try { return JSON.parse(localStorage.getItem(this.DIAG) || 'null'); } catch (e) { return null; } },
+  _note(ok, msg) { try { localStorage.setItem(this.DIAG, JSON.stringify({ at: Date.now(), ok, msg })); } catch (e) {} return msg; },
   async refresh(force) {
-    if (!this.avail() || !this.on()) return;
+    if (!this.avail()) { this._note(false, window.Capacitor?.isNativePlatform?.() ? '이 앱에는 건강 앱 연결이 없습니다 — 새 앱으로 업데이트해 주세요' : '웹에서는 걸음을 읽을 수 없습니다 — 아이폰·갤럭시 앱에서 읽어 옵니다'); return; }
+    if (!this.on()) return;
     if (!force && this._at && Date.now() - this._at < 5 * 60000) return;
     if (this._busy) return; this._busy = true; this._at = Date.now();
     try {
-      const r = await HealthBridge.steps(this._first ? 2 : 7);
+      let r;
+      try { r = await HealthBridge.steps(this._first ? 2 : 7); }
+      catch (e) { const m = String(e && e.message || e); this._note(false, /not implemented|is not a function|UNIMPLEMENTED/i.test(m) ? '이 앱 버전은 걸음 읽기가 없습니다 — 새 앱으로 업데이트해 주세요' : '걸음을 읽지 못했습니다: ' + m); return; }
       this._first = true;
-      if (!r || !r.ok || !r.days) return;
+      if (!r || !r.ok || !r.days) { this._note(false, HealthBridge.plat() === 'android' ? (r && r.install ? 'Health Connect 가 없거나 꺼져 있습니다' : 'Health Connect 에서 Bashy 의 걸음 읽기를 허용해 주세요') : '건강 앱 권한이 없습니다 — 아이폰 설정 › 건강 › 데이터 접근 및 기기 › Bashy › 걸음을 켜 주세요' + (r && r.error ? ` (${r.error})` : '')); return; }
+      { const today = r.days[this._ds()] || 0, any = Object.values(r.days).some(v => Number(v) > 0);
+        this._note(any, any ? `오늘 ${Number(today).toLocaleString('ko-KR')}걸음 읽음` : (HealthBridge.plat() === 'android' ? 'Health Connect 에 걸음이 없습니다 — 삼성 헬스 › 설정 › Health Connect 연결과 Bashy 걸음 권한을 확인해 주세요' : '건강 앱에서 걸음이 0으로 옵니다 — 아이폰 설정 › 건강 › 데이터 접근 및 기기 › Bashy › 걸음이 꺼져 있을 가능성이 큽니다')); }
       const K = this._key(), m = this._rd(K); let ch = false;
       for (const [k, v] of Object.entries(r.days)) { const n = Math.round(Number(v) || 0); if (m[k] !== n) { m[k] = n; ch = true; } }
       // 60일보다 오래된 날은 지운다
@@ -88,8 +97,8 @@ const Steps = {
       UserStore.set(K, JSON.stringify(m)); window.FirebaseSync?.scheduleSave?.();
       try { App._updateStatsBanner(); } catch (e) {}
       try { if (document.getElementById('dietWrap')) Diet.render(App.S && App.S.selDate ? new Date(App.S.selDate) : new Date()); } catch (e) {}
-    } catch (e) { console.warn('[steps]', e); }
-    finally { this._busy = false; }
+    } catch (e) { console.warn('[steps]', e); this._note(false, '걸음을 읽다 오류: ' + (e && e.message || e)); }
+    finally { this._busy = false; try { if (document.getElementById('stepsDiag')) TopInfo._diagPaint(); } catch (e) {} }
   },
 
   // 그날 체크한 유산소 중 걷거나 뛰는 운동이 차지한 걸음(추정)
