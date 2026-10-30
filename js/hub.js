@@ -373,6 +373,17 @@ const ST = {
         put('lock.' + key, off || (s.lock === 'locked' ? 'locked' : 'unlocked'), base, d.id, d.room, 'lock');
       } else if (has('robotCleanerMovement')) {
         put('vacuum.' + key, off || (s.robotCleanerMovement === 'cleaning' ? 'cleaning' : 'docked'), base, d.id, d.room, 'vacuum');
+      }
+      // 한 기기에 스위치가 여럿(아파트 월패드 조명: 거실1·거실2 …)이면 칸마다 따로 — 예전엔 'main' 하나만 봐서 켜고 끄기가 안 됐다
+      for (const sc of d.subs || []) {
+        const ck = key + '_' + String(sc.comp).replace(/[^a-z0-9]/gi, '').toLowerCase();
+        const sdom = /light/.test(cat) || /light|조명|등/i.test(sc.label || '') || sc.level != null ? 'light' : 'switch';
+        const a2 = { friendly_name: `${d.name} ${sc.label || sc.comp}` };
+        if (sdom === 'light' && sc.level != null) { a2.supported_color_modes = ['brightness']; if (sc.sw === 'on') a2.brightness = Math.round(sc.level * 2.55); }
+        put(`${sdom}.${ck}`, off || sc.sw || 'off', a2, d.id, d.room, sdom); map[`${sdom}.${ck}`].comp = sc.comp;
+      }
+      if (has('airConditionerMode') || /airconditioner|thermostat/.test(cat) || has('washerOperatingState') || has('dryerOperatingState') || has('windowShade') || has('lock') || has('robotCleanerMovement')) {
+        // 위에서 이미 넣었다
       } else if (has('switch')) {
         const dom = /light/.test(cat) || has('switchLevel') ? 'light' : /fan/.test(cat) || has('fanSpeed') ? 'fan' : 'switch';
         const a = { ...base };
@@ -395,7 +406,16 @@ const ST = {
   },
   cmd(eid, capability, command, args) {
     const m = this.map[eid]; if (!m || !m.dev) throw new Error('기기를 찾지 못했습니다');
-    return hubCall({ act: 'stCmd', device: m.dev, commands: [{ capability, command, arguments: args || [] }] });
+    // 명령이 서버까지 갔는데 기기가 그대로면(클라우드 연동 기기가 응답 없음) 알려 준다
+    const want = command === 'on' ? 'on' : command === 'off' ? 'off' : null;
+    if (want) setTimeout(() => this.verify(eid, want), 6000);
+    return hubCall({ act: 'stCmd', device: m.dev, commands: [{ component: m.comp || 'main', capability, command, arguments: args || [] }] });
+  },
+  async verify(eid, want) {
+    try { await this.poll(); const s = (HA.states[eid] || {}).state; const n = (HA.states[eid] || {}).attributes?.friendly_name || '기기';
+      if (s === 'unavailable') toast(`${n}: SmartThings 에서 오프라인입니다 — 기기(월패드·허브) 연결을 확인해 주세요`);
+      else if (s && s !== want) toast(`${n}: 명령은 보냈는데 아직 ${want === 'on' ? '켜지지' : '꺼지지'} 않았습니다 — SmartThings 앱에서도 되는지 확인해 주세요`);
+    } catch (e) {}
   },
   setState(eid, state, attrs) { const x = HA.states[eid]; if (!x) return; HA.states[eid] = { ...x, state, attributes: { ...x.attributes, ...(attrs || {}) } }; HA.schedule(); },
   async send(msg) {
@@ -1837,6 +1857,10 @@ function nativeSetup() {
   }
   const KA = Native.plugin('KeepAwake');
   if (KA) KA.keepAwake().catch(() => {});
+  // 하루 종일 켜 두면 웹 화면 메모리가 쌓여 앱이 꺼지는 일이 있었다 — 새벽 4시, 5분 넘게 아무도 안 만졌으면 화면을 한 번 새로 연다
+  let lastTouch = Date.now();
+  ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { lastTouch = Date.now(); }, { passive: true }));
+  setInterval(() => { const d = new Date(); if (d.getHours() === 4 && Date.now() - lastTouch > 5 * 60e3 && performance.now() > 3 * 3600e3) location.reload(); }, 10 * 60e3);
   const SB = Native.plugin('StatusBar');
   if (SB) SB.hide().catch(() => {});
 }

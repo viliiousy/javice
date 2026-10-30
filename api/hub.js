@@ -416,13 +416,20 @@ async function stDevices(uid) {
     const main = (d.components || []).find(c => c.id === 'main') || (d.components || [])[0] || {};
     const caps = (main.capabilities || []).map(c => c.id);
     const cat = ((main.categories || [])[0] || {}).name || '';
-    const st = {};
+    const st = {}, subs = [];
+    // 'main' 말고 다른 칸에도 스위치가 있는 기기(아파트 월패드 조명 거실1·거실2, 멀티탭 등) — 칸마다 따로 보이고 따로 켠다
+    const swComps = (d.components || []).filter(c => c.id !== 'main' && (c.capabilities || []).some(x => x.id === 'switch'));
     try {
-      const s = await stGet(tok, `/devices/${d.deviceId}/components/main/status`);
+      const all = await stGet(tok, `/devices/${d.deviceId}/status`), comps = all.components || {};
+      const s = comps.main || {};
       for (const [cap, keys] of Object.entries(ST_PICK)) if (s[cap]) for (const k of keys) if (s[cap][k] && s[cap][k].value != null) st[k] = s[cap][k].value;
-      if (s.healthCheck && s.healthCheck.DeviceWatch && s.healthCheck['DeviceWatch-DeviceStatus']) st.health = s.healthCheck['DeviceWatch-DeviceStatus'].value;
+      if (s.healthCheck && s.healthCheck['DeviceWatch-DeviceStatus']) st.health = s.healthCheck['DeviceWatch-DeviceStatus'].value;
+      for (const c of swComps.slice(0, 12)) {
+        const cs = comps[c.id] || {};
+        subs.push({ comp: c.id, label: c.label || '', sw: cs.switch && cs.switch.switch ? cs.switch.switch.value : null, level: cs.switchLevel && cs.switchLevel.level ? cs.switchLevel.level.value : null });
+      }
     } catch (e) { st.err = 1; }
-    return { id: d.deviceId, name: d.label || d.name, room: d.roomId || null, cat, caps: caps.filter(c => ST_PICK[c] || c === 'switch'), st };
+    return { id: d.deviceId, name: d.label || d.name, room: d.roomId || null, cat, caps: caps.filter(c => ST_PICK[c] || c === 'switch'), st, ...(subs.length ? { subs } : {}) };
   }));
   return { rooms, devices: out, scenes: (scenes.items || []).slice(0, 30).map(x => ({ id: x.sceneId, name: x.sceneName })) };
 }
@@ -439,10 +446,10 @@ async function stCmd(uid, b) {
   if (!/^[0-9a-f-]{20,64}$/i.test(id)) throw new Error('잘못된 기기');
   const cmds = (Array.isArray(b.commands) ? b.commands : []).slice(0, 4)
     .filter(c => c && ST_CMD_OK.test(c.capability) && ST_CMD_OK.test(c.command))
-    .map(c => ({ component: 'main', capability: c.capability, command: c.command, arguments: Array.isArray(c.arguments) ? c.arguments.slice(0, 3) : [] }));
+    .map(c => ({ component: /^[a-zA-Z0-9_-]{1,40}$/.test(String(c.component || '')) ? c.component : 'main', capability: c.capability, command: c.command, arguments: Array.isArray(c.arguments) ? c.arguments.slice(0, 3) : [] }));
   if (!cmds.length) throw new Error('명령이 없습니다');
   const r = await tfetch(`${ST_API}/devices/${id}/commands`, { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify({ commands: cmds }) });
-  if (!r.ok) throw new Error('명령 실패 HTTP ' + r.status);
+  if (!r.ok) { let why = ''; try { const j = await r.json(); why = (j.error && (j.error.message || j.error.code)) || ''; } catch (e) {} throw new Error(`명령 실패 HTTP ${r.status}${why ? ' — ' + why : ''}`); }
   return { ok: true };
 }
 async function stStatus(idToken, unlink) {

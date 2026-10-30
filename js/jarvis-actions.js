@@ -169,6 +169,10 @@ const JHome = {
       out.push({ prov: 'st', id: d.id, name: d.name, room: rooms[d.room] || '', kind, caps,
         state: s.health === 'OFFLINE' ? '연결 끊김' : kind === 'cover' ? s.windowShade : kind === 'lock' ? s.lock : kind === 'vacuum' ? s.robotCleanerMovement : kind === 'appliance' ? s.machineState : s.switch,
         level: s.level, temp: s.temperature, target: s.coolingSetpoint ?? s.heatingSetpoint, humidity: s.humidity, mode: s.airConditionerMode });
+      // 한 기기 안의 여러 스위치(월패드 조명 거실1·거실2 …)는 칸마다 하나의 기기로
+      for (const sc of d.subs || []) out.push({ prov: 'st', id: d.id, comp: sc.comp, name: `${d.name} ${sc.label || sc.comp}`, room: rooms[d.room] || '',
+        kind: /light/.test(cat) || /light|조명|등/i.test(sc.label || '') || sc.level != null ? 'light' : 'switch', caps: ['switch'].concat(sc.level != null ? ['switchLevel'] : []),
+        state: s.health === 'OFFLINE' ? '연결 끊김' : sc.sw, level: sc.level });
     }
     for (const x of j.scenes || []) out.push({ prov: 'st', id: x.id, name: x.name, kind: 'scene', room: '' });
     return out;
@@ -259,7 +263,7 @@ const JHome = {
     if (r.item) return { items: [r.item] };
     return { items: [], miss: JMatch.miss('기기', q, r) };
   },
-  ST: (d, cap, cmd, args) => JHome._st({ cmd: { device: d.id, commands: [{ capability: cap, command: cmd, arguments: args || [] }] } }),
+  ST: (d, cap, cmd, args) => JHome._st({ cmd: { device: d.id, commands: [{ component: d.comp || 'main', capability: cap, command: cmd, arguments: args || [] }] } }),
   // 기기 하나에 명령 하나. 돌려주는 것은 사람에게 보일 한 줄
   async _do(d, cmd, val, hub) {
     const on = !['off', 'closed', 'locked', 'docked', '연결 끊김', 'unavailable'].includes(String(d.state));
