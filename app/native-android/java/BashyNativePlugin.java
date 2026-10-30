@@ -23,6 +23,31 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 public class BashyNativePlugin extends Plugin {
     static final String PREFS = "bashy_widget";
 
+    // 허브 모드(설정 › 스마트홈 허브): 하루 종일 켜 두는 화면 — 화면 꺼짐을 막고, 처음 켤 때 배터리 최적화 예외를 한 번 묻는다.
+    // MainActivity 는 이 표시(hub)를 보고 웹 화면이 죽거나 앱이 오류로 꺼지면 다시 띄운다.
+    @PluginMethod
+    public void hubMode(PluginCall call) {
+        final boolean on = call.getBoolean("on", false);
+        getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("hub", on).apply();
+        getActivity().runOnUiThread(() -> {
+            if (on) getActivity().getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            else getActivity().getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        });
+        if (on && Build.VERSION.SDK_INT >= 23) {
+            try {
+                SharedPreferences sp = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+                android.os.PowerManager pm = (android.os.PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+                if (!sp.getBoolean("askedBattery", false) && pm != null && !pm.isIgnoringBatteryOptimizations(getContext().getPackageName())) {
+                    sp.edit().putBoolean("askedBattery", true).apply();
+                    Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                    i.setData(Uri.parse("package:" + getContext().getPackageName()));
+                    getActivity().startActivity(i);
+                }
+            } catch (Exception ignored) {}
+        }
+        call.resolve();
+    }
+
     @PluginMethod
     public void setWidget(PluginCall call) {
         String json = call.getString("json", "{}");

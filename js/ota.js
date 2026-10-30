@@ -54,3 +54,5 @@ const OTA = {
 };
 window.OTA = OTA;
 OTA.start();
+// 일반 화면(index.html)으로 왔으면 허브 모드 표시를 끈다(화면 꺼짐 막기 해제) — 허브 화면(hub.html)이 다시 켠다
+try { const BN = window.Capacitor?.Plugins?.BashyNative; if (window.Capacitor?.isNativePlatform?.() && BN && BN.hubMode && !/hub\.html/.test(location.pathname)) BN.hubMode({ on: false }).catch(() => {}); } catch (e) {}

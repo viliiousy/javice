@@ -34,6 +34,7 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "healthRead", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "healthWatch", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "healthSteps", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "hubMode", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "calAccess", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "calList", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "calEvents", returnType: CAPPluginReturnPromise),
@@ -152,6 +153,12 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
             }
             self.health.execute(q)
         }
+    }
+
+    // 허브 모드: 화면 자동 잠금을 막는다(아이패드·아이폰을 거치대에 두고 하루 종일 켜 둘 때)
+    @objc func hubMode(_ call: CAPPluginCall) {
+        let on = call.getBool("on") ?? false
+        DispatchQueue.main.async { UIApplication.shared.isIdleTimerDisabled = on; call.resolve() }
     }
 
     // 건강 앱에 새 체성분이 들어오면 앱이 꺼져 있어도 알림 (BashyHealthWatch)

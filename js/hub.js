@@ -1835,6 +1835,7 @@ async function backToApp() {
   const J = Native.plugin('JarvisListener');
   if (J) { try { await Promise.race([J.stop(), new Promise(r => setTimeout(r, 400))]); } catch (e) {} }
   await setOrient('portrait');
+  { const BN = Native.plugin('BashyNative'); if (BN && BN.hubMode) { try { await BN.hubMode({ on: false }); } catch (e) {} } }
   location.href = 'index.html?nohub=1';
 }
 
@@ -1857,6 +1858,10 @@ function nativeSetup() {
   }
   const KA = Native.plugin('KeepAwake');
   if (KA) KA.keepAwake().catch(() => {});
+  // Bashy 앱의 허브 모드: 앱(네이티브)에 '허브 켜짐' 을 알린다 — 화면 꺼짐 막기, 배터리 최적화 예외(처음 한 번), 꺼지면 다시 켜기
+  { const BN = Native.plugin('BashyNative'); if (BN && BN.hubMode) BN.hubMode({ on: true }).catch(() => {}); }
+  // 앱 화면 업데이트(OTA): 허브 화면으로 바로 열려도 '이 화면은 잘 열렸다' 를 알린다(안 알리면 15초 뒤 이전 화면으로 되돌아간다 — js/ota.js)
+  { const U = Native.plugin('CapacitorUpdater'); if (U && U.notifyAppReady) U.notifyAppReady().catch(() => {}); }
   HubUpdate.check(); setInterval(() => HubUpdate.check(), 6 * 3600e3);
   // 하루 종일 켜 두면 웹 화면 메모리가 쌓여 앱이 꺼지는 일이 있었다 — 새벽 4시, 5분 넘게 아무도 안 만졌으면 화면을 한 번 새로 연다
   let lastTouch = Date.now();
