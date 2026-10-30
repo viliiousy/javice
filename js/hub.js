@@ -667,8 +667,9 @@ const HA = {
       this.states = Object.fromEntries(states.map(s => [s.entity_id, s]));
       this.areas = Object.fromEntries(areas.map(a => [a.area_id, a.name]));
       const devArea = Object.fromEntries(devs.map(d => [d.id, d.area_id]));
-      this.entArea = {}; this.hidden = new Set();
+      this.entArea = {}; this.hidden = new Set(); this._plat = {};
       for (const e of ents) {
+        if (e.platform) this._plat[e.entity_id] = e.platform;
         const a = e.area_id || devArea[e.device_id];
         if (a) this.entArea[e.entity_id] = a;
         if (e.hidden_by || e.disabled_by || e.entity_category) this.hidden.add(e.entity_id);
@@ -943,8 +944,22 @@ const HA = {
     if (dom === 'media_player') service = 'media_play_pause';
     const el = document.querySelector(`[data-id="${CSS.escape(id)}"]`);
     if (el) el.classList.add('pending');
-    try { await this.send({ type: 'call_service', domain, service, service_data: { entity_id: id } }); }
+    try { await this.send({ type: 'call_service', domain, service, service_data: { entity_id: id } }); this._verify(id, s.state); }
     catch (e) { toast('실패: ' + e.message); if (el) el.classList.remove('pending'); }
+  },
+
+  // 켜기·끄기를 보낸 뒤 30초 안에 원래 상태로 돌아오면(홈브리지 등 중간 연결이 명령은 받고 실제 기기는 안 움직인 경우) 알려 준다.
+  // HA 는 명령을 받자마자 화면 상태를 바꿔 두고, 15~20초 뒤 기기에서 읽은 실제 상태로 되돌린다 — 그래서 '눌렀는데 다시 꺼짐' 처럼 보인다.
+  _vt: {},
+  _verify(id, before) {
+    if (this.mode !== 'ha' || !/^(light|switch|fan)\./.test(id) || !/^(on|off)$/.test(before)) return;
+    clearTimeout(this._vt[id]);
+    this._vt[id] = setTimeout(() => {
+      delete this._vt[id];
+      const s = this.states[id]; if (!s || s.state !== before) return;
+      const via = (this._plat || {})[id];
+      toast(`${this.name(s)} — 명령은 보냈지만 기기가 따르지 않았습니다` + (via === 'homekit_controller' ? ' · 맥미니 홈브리지(eLife) 연결을 다시 시작해 주세요' : ''), 7000);
+    }, 30000);
   },
 
   // 화면은 °C 기준 0.5° 씩. HA 가 °F 면 그 단위로 바꿔 보낸다.

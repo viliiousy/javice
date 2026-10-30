@@ -74,7 +74,16 @@ const Steps = {
   // 마지막으로 읽은 결과를 남겨 둔다(설정 › 상단바 정보 › 걸음 수 아래에 보임) — 걸음이 안 들어올 때 어디서 막혔는지 알 수 있게
   DIAG: 'gl_steps_diag',
   diag() { try { return JSON.parse(localStorage.getItem(this.DIAG) || 'null'); } catch (e) { return null; } },
-  _note(ok, msg) { try { localStorage.setItem(this.DIAG, JSON.stringify({ at: Date.now(), ok, msg })); } catch (e) {} return msg; },
+  // 폰(앱)이 읽은 결과는 계정에도 남긴다(gl_steps_diag_ios / _android) — 웹·허브에서도 폰 쪽에서 어디서 막혔는지 보이게
+  _note(ok, msg) { const v = JSON.stringify({ at: Date.now(), ok, msg });
+    try { localStorage.setItem(this.DIAG, v); } catch (e) {}
+    try { const p = HealthBridge.plat(); if (p && typeof UserStore !== 'undefined') { UserStore.set(this.DIAG + '_' + p, v); window.FirebaseSync?.scheduleSave?.(); } } catch (e) {}
+    return msg; },
+  phoneDiag() { const out = [];
+    for (const [p, n] of [['ios', '아이폰'], ['android', '갤럭시']]) { try { const d = JSON.parse(UserStore.get(this.DIAG + '_' + p) || 'null'); if (d && d.at) out.push({ ...d, who: n }); } catch (e) {} }
+    return out; },
+  // 이 기기에 들어와 있는 가장 최근 걸음 날짜(폰에서 넘어온 마지막 날)
+  lastDay() { const a = this.all(), ks = Object.keys(a).filter(k => a[k] > 0).sort(); return ks[ks.length - 1] || null; },
   async refresh(force) {
     if (!this.avail()) { this._note(false, window.Capacitor?.isNativePlatform?.() ? '이 앱에는 건강 앱 연결이 없습니다 — 새 앱으로 업데이트해 주세요' : '웹에서는 걸음을 읽을 수 없습니다 — 아이폰·갤럭시 앱에서 읽어 옵니다'); return; }
     if (!this.on()) return;

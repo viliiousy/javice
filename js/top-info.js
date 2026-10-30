@@ -53,6 +53,10 @@ const TopInfo = {
       const d = App.S && App.S.selDate ? new Date(App.S.selDate) : new Date(), n = Steps.get(d), ds = Steps._ds(d);
       const was = this._st && this._st.ds === ds ? this._st.n : n, gain = n - was;
       this._st = { ds, n };
+      // 웹: 오늘 걸음이 아직 폰에서 안 넘어왔으면 '—' 로 자리만 보인다(칩이 사라져 고장처럼 보이지 않게)
+      if (!n && !Steps.avail() && ds === Steps._ds() && Steps.lastDay && Steps.lastDay()) {
+        st = `<div class="stat-chip stat-steps" data-s="diet" title="오늘 걸음은 폰에서 Bashy 앱을 열면 넘어옵니다" aria-label="오늘 걸음 아직 없음"><b>—</b><span class="ti-lb">걸음</span></div>`;
+      }
       if (n) {
         st = `<div class="stat-chip stat-steps" data-s="diet" title="걸음 수(건강 앱)" aria-label="걸음 수 ${n}"><b class="ti-stn" data-from="${was}" data-to="${n}">${was.toLocaleString('ko-KR')}</b><span class="ti-lb">걸음</span>${gain > 0 ? `<span class="ti-stp">👣 +${gain.toLocaleString('ko-KR')}</span>` : ''}</div>`;
         if (gain) setTimeout(() => this._anim(), 30);
@@ -129,9 +133,18 @@ const TopInfo = {
   },
   _diagPaint() {
     const el = document.getElementById('stepsDiag'); if (!el || typeof Steps === 'undefined') return;
+    const f = d => { const t = new Date(d.at); return `${t.getMonth() + 1}/${t.getDate()} ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')} · ${d.msg}`; };
+    // 웹·허브: 이 기기는 걸음을 못 읽으니, 폰 앱이 마지막으로 읽은 결과를 보여 준다
+    if (!Steps.avail()) {
+      const ph = Steps.phoneDiag ? Steps.phoneDiag() : [], last = Steps.lastDay ? Steps.lastDay() : null;
+      const lines = ph.map(d => `${d.who} ${f(d)}`);
+      if (!lines.length) lines.push('웹에서는 걸음을 직접 읽지 못합니다 — 아이폰·갤럭시 앱을 열면 읽어서 넘겨 줍니다');
+      if (last) lines.push(`넘어온 마지막 날: ${last}`);
+      el.textContent = lines.join('  ·  '); el.className = ph.length && ph.every(d => !d.ok) ? 'bad' : 'ok'; return;
+    }
     const d = Steps.diag();
     if (!d) { el.textContent = '아직 읽은 적이 없습니다'; el.className = ''; return; }
-    const t = new Date(d.at); el.textContent = `${t.getMonth() + 1}/${t.getDate()} ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')} · ${d.msg}`;
+    el.textContent = f(d);
     el.className = d.ok ? 'ok' : 'bad';
   },
   toggle(k) { this.set({ [k]: !this.get()[k] }); if (k === 'steps' && this.get().steps && typeof Steps !== 'undefined') Steps.refresh(true); Settings._re('topinfo'); },
