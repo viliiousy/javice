@@ -176,7 +176,10 @@ const Usage = {
       const v = latest[s.k];
       if (!v) return `<div class="u-card"><div class="u-name">${s.name}</div><div class="u-meta">아직 받은 값이 없습니다<br>PC 수집 확장을 확인해 주세요</div></div>`;
       const stale = Date.now() - Date.parse(v.at) > 30 * 60000;
-      const age = `<br><span class="u-age${stale ? ' stale' : ''}">${this._ago(v.at)} 갱신</span>`;
+      // 6시간 넘게 안 바뀌면 대개 PC 크롬에서 그 사이트 로그인이 풀린 것 — 어디서 다시 로그인할지 알려 준다
+      const site = { claude: 'claude.ai', chatgpt: 'chatgpt.com', higgsfield: 'higgsfield.ai' }[s.k];
+      const lost = Date.now() - Date.parse(v.at) > 6 * 3600e3;
+      const age = `<br><span class="u-age${stale ? ' stale' : ''}">${this._ago(v.at)} 갱신</span>${lost ? `<br><span class="u-age stale">PC 크롬에서 ${site} 로그인이 풀렸을 수 있습니다</span>` : ''}`;
       if (s.k === 'higgsfield') {
         const tot = Number(v.total) || 0, left = Number(v.credits) || 0;
         const frac = tot ? left / tot : 0;
