@@ -1857,6 +1857,7 @@ function nativeSetup() {
   }
   const KA = Native.plugin('KeepAwake');
   if (KA) KA.keepAwake().catch(() => {});
+  HubUpdate.check(); setInterval(() => HubUpdate.check(), 6 * 3600e3);
   // 하루 종일 켜 두면 웹 화면 메모리가 쌓여 앱이 꺼지는 일이 있었다 — 새벽 4시, 5분 넘게 아무도 안 만졌으면 화면을 한 번 새로 연다
   let lastTouch = Date.now();
   ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { lastTouch = Date.now(); }, { passive: true }));
@@ -1864,6 +1865,36 @@ function nativeSetup() {
   const SB = Native.plugin('StatusBar');
   if (SB) SB.hide().catch(() => {});
 }
+
+// 태블릿 허브 앱(APK)에 새 빌드가 나오면 알린다 — 깃허브 릴리스 hub-latest 의 build= 번호와 설치된 앱의 번호를 견준다.
+// 앱 껍데기(네이티브)가 바뀔 때만 나온다. 화면(hub.html)은 늘 bashy.app 에서 새로 받으므로 따로 알릴 것이 없다.
+const HubUpdate = {
+  API: 'https://api.github.com/repos/viliiousy/javice/releases/tags/hub-latest',
+  async check() {
+    try {
+      const J = Native.plugin('JarvisListener'); if (!J || !J.info) return;
+      const me = Number((await J.info()).build) || 0; if (!me) return;
+      const r = await fetch(this.API, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' }); if (!r.ok) return;
+      const j = await r.json(), m = /build=(\d+)/.exec(j.body || ''), remote = m ? Number(m[1]) : 0;
+      if (!(remote > me) || Number(localStorage.getItem('hub_apk_skip') || 0) >= remote) return;
+      const a = (j.assets || []).find(x => /\.apk$/.test(x.name)), url = a ? a.browser_download_url : 'https://github.com/viliiousy/javice/releases/tag/hub-latest';
+      this.show(remote, url);
+    } catch (e) {}
+  },
+  show(remote, url) {
+    document.getElementById('hubUp')?.remove();
+    const el = document.createElement('div'); el.id = 'hubUp'; el.className = 'hub-up';
+    el.innerHTML = `<b>허브 앱 새 버전이 나왔습니다</b><span>받은 뒤 다운로드 알림을 눌러 설치하면 설정은 그대로 남습니다</span>
+      <button type="button" class="hub-up-no">나중에</button><button type="button" class="hub-up-go">업데이트 받기</button>`;
+    document.body.appendChild(el);
+    el.querySelector('.hub-up-no').onclick = () => { localStorage.setItem('hub_apk_skip', String(remote)); el.remove(); };
+    el.querySelector('.hub-up-go').onclick = async () => {
+      const L = Native.plugin('AppLauncher');
+      try { if (L) { await L.openUrl({ url }); el.remove(); return; } } catch (e) {}
+      window.open(url, '_system'); el.remove();
+    };
+  },
+};
 
 function boot() {
   // 앱(설정 › 허브 모드)에서 왔는데 연결 코드가 없으면, 로그인한 계정으로 연결하러 앱에 잠깐 다녀온다

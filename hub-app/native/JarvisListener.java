@@ -66,6 +66,18 @@ public class JarvisListener extends Plugin {
     private final Runnable watch = this::watchdog;
 
     // ── JS 에서 부르는 것 ─────────────────────────
+    // 설치된 허브 앱의 빌드 번호(versionCode) — 허브 화면이 새 APK 가 나왔는지 견줄 때 쓴다(js/hub.js HubUpdate)
+    @PluginMethod
+    public void info(PluginCall call) {
+        JSObject o = new JSObject();
+        try {
+            android.content.pm.PackageInfo pi = getContext().getPackageManager().getPackageInfo(getContext().getPackageName(), 0);
+            o.put("build", Build.VERSION.SDK_INT >= 28 ? pi.getLongVersionCode() : pi.versionCode);
+            o.put("version", pi.versionName);
+        } catch (Exception e) { o.put("build", 0); }
+        call.resolve(o);
+    }
+
     @PluginMethod
     public void start(PluginCall call) {
         lang = call.getString("lang", "ko-KR");

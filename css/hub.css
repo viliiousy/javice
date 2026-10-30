@@ -296,3 +296,10 @@ body.night .hub{ filter:brightness(.45); }
 .st-state [hidden]{ display:none !important; }
 #stLink[hidden]{ display:none !important; }
 .pv-acct .chip:disabled{ opacity:.4; cursor:default; }
+/* 허브 앱 새 버전 알림 */
+.hub-up{ position:fixed; right:24px; bottom:24px; z-index:200; display:grid; grid-template-columns:1fr auto auto; gap:6px 12px; align-items:center; max-width:560px;
+  padding:16px 18px; border-radius:16px; background:#17181B; border:1px solid #2A2C31; color:#ECEDEE; box-shadow:0 12px 32px rgba(0,0,0,.45); }
+.hub-up b{ grid-column:1; font-size:15px; }
+.hub-up span{ grid-column:1; grid-row:2; font-size:12.5px; color:#8B8F97; }
+.hub-up button{ grid-row:1 / span 2; height:40px; padding:0 16px; border-radius:20px; border:1px solid #2A2C31; background:none; color:#ECEDEE; font:inherit; font-size:14px; cursor:pointer; }
+.hub-up .hub-up-go{ background:#FF6A2B; border-color:#FF6A2B; color:#101113; font-weight:600; }
