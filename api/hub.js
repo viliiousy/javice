@@ -709,6 +709,42 @@ async function icsFetch(idToken, raw) {
   } finally { clearTimeout(timer); }
 }
 
+// ── 걸음 백그라운드 전달 ─────────────────────
+async function stepsKey(idToken) {
+  const uid = await uidFromIdToken(idToken);
+  if (!uid) return { status: 401, error: '로그인이 필요합니다' };
+  let key = await fbGet(`/users/${uid}/_link/stepsKey.json`);
+  if (!key) {
+    key = crypto.randomBytes(24).toString('base64url');
+    const w = await fbFetch(`/users/${uid}/_link/stepsKey.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(key) });
+    if (!w.ok) throw new Error('걸음 연결 키 생성 실패 HTTP ' + w.status);
+  }
+  return { status: 200, ok: true, code: `${uid}.${key}` };
+}
+async function stepsPush(b) {
+  const c = parseCode(b.code);
+  if (!c) return { status: 401, error: '코드가 맞지 않습니다' };
+  const uid = safeUid(c.uid);
+  if (!sameSecret(await fbGet(`/users/${uid}/_link/stepsKey.json`), c.key)) return { status: 401, error: '코드가 맞지 않습니다' };
+  const plat = b.plat === 'android' ? 'android' : 'ios';
+  const sub = await googleSub(uid);
+  if (!sub) return { status: 404, error: '기록을 찾지 못했습니다' };
+  const cut = new Date(Date.now() + 9 * 3600e3 - 60 * 86400e3).toISOString().slice(0, 10);
+  const K = 'gl_steps_' + plat, m = await uget(uid, sub, K, {}) || {};
+  let ch = false;
+  for (const [d, v] of Object.entries(b.days || {}).slice(0, 14)) {
+    const n = Math.round(Number(v));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || d < cut || !(n >= 0 && n < 200000)) continue;
+    if (m[d] !== n) { m[d] = n; ch = true; }
+  }
+  for (const d of Object.keys(m)) if (d < cut) { delete m[d]; ch = true; }
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const patch = { ['gl_steps_diag_' + plat]: { at: Date.now(), ok: true, msg: `백그라운드 · 오늘 ${(m[today] || 0).toLocaleString('ko-KR')}걸음` } };
+  if (ch) patch[K] = m;
+  await uset(uid, sub, patch);
+  return { status: 200, ok: true, changed: ch };
+}
+
 const send = (res, r) => { const { status, ...rest } = r; res.status(status || 200).json(rest); };
 
 module.exports = async (req, res) => {
@@ -748,6 +784,11 @@ module.exports = async (req, res) => {
       catch (e) { res.status(e.code === 'NOLINK' ? 409 : 502).json({ error: e.message, nolink: e.code === 'NOLINK' }); }
       return;
     }
+    // 걸음 백그라운드 전달: 폰 앱이 꺼져 있어도 아이폰(건강 앱 백그라운드 전달)이 깨어나 하루 걸음을 올린다.
+    //   stepsKey  — 앱(로그인 상태)이 한 번 받아 네이티브에 넘기는 전용 코드 <uid>.<stepsKey> (걸음 칸만 쓸 수 있다)
+    //   stepsPush — 네이티브가 그 코드로 { plat, days:{ 'YYYY-MM-DD': n } } 를 올린다
+    if (body.act === 'stepsKey')  { send(res, await stepsKey(body.idToken)); return; }
+    if (body.act === 'stepsPush') { send(res, await stepsPush(body)); return; }
     const uid  = await verify(body.code);
     if (!uid) { res.status(401).json({ error: '연결 코드가 맞지 않습니다 — bashy.app 설정에서 다시 확인해 주세요' }); return; }
 

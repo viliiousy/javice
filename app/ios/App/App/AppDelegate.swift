@@ -9,6 +9,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // 인바디(건강 앱) 새 측정 알림 — 켜 둔 경우에만
         BashyHealthWatch.startIfEnabled()
+        // 걸음 백그라운드 전달 — 앱을 열지 않아도 걸음이 계정에 올라가게(켜 둔 경우)
+        BashyStepSync.startIfEnabled()
         return true
     }
 

@@ -97,6 +97,7 @@ const Steps = {
       if (!r || !r.ok || !r.days) { this._note(false, HealthBridge.plat() === 'android' ? (r && r.install ? 'Health Connect 가 없거나 꺼져 있습니다' : 'Health Connect 에서 Bashy 의 걸음 읽기를 허용해 주세요') : '건강 앱 권한이 없습니다 — 아이폰 설정 › 건강 › 데이터 접근 및 기기 › Bashy › 걸음을 켜 주세요' + (r && r.error ? ` (${r.error})` : '')); return; }
       { const today = r.days[this._ds()] || 0, any = Object.values(r.days).some(v => Number(v) > 0);
         this._note(any, any ? `오늘 ${Number(today).toLocaleString('ko-KR')}걸음 읽음` : (HealthBridge.plat() === 'android' ? 'Health Connect 에 걸음이 없습니다 — 삼성 헬스 › 설정 › Health Connect 연결과 Bashy 걸음 권한을 확인해 주세요' : '건강 앱에서 걸음이 0으로 옵니다 — 아이폰 설정 › 건강 › 데이터 접근 및 기기 › Bashy › 걸음이 꺼져 있을 가능성이 큽니다')); }
+      if (any) this._bg();
       const K = this._key(), m = this._rd(K); let ch = false;
       for (const [k, v] of Object.entries(r.days)) { const n = Math.round(Number(v) || 0); if (m[k] !== n) { m[k] = n; ch = true; } }
       // 60일보다 오래된 날은 지운다
@@ -108,6 +109,26 @@ const Steps = {
       try { if (document.getElementById('dietWrap')) Diet.render(App.S && App.S.selDate ? new Date(App.S.selDate) : new Date()); } catch (e) {}
     } catch (e) { console.warn('[steps]', e); this._note(false, '걸음을 읽다 오류: ' + (e && e.message || e)); }
     finally { this._busy = false; try { if (document.getElementById('stepsDiag')) TopInfo._diagPaint(); } catch (e) {} }
+  },
+
+  // 앱을 열지 않아도 걸음이 계정에 올라가게: 걸음 전용 코드를 받아 네이티브(아이폰 BashyStepSync)에 넘긴다.
+  //   그 뒤로는 건강 앱에 걸음이 쌓일 때 iOS 가 Bashy 를 잠깐 깨워(한 시간에 한 번까지) 서버로 바로 올린다(api/hub.js stepsPush).
+  async _bg() {
+    try {
+      const BN = window.Capacitor?.Plugins?.BashyNative;
+      if (this._bgOk || HealthBridge.plat() !== 'ios' || !BN || !BN.stepSync) return;
+      const fu = window.firebase?.auth?.().currentUser; if (!fu) return;
+      const st = await BN.stepSync({}).catch(() => null);
+      if (!st) { this._bgOk = true; return; }   // 옛 앱(네이티브에 아직 없음) — 새 빌드 뒤에 켜진다
+      const LK = 'gl_steps_bg_uid';
+      if (st && st.on && localStorage.getItem(LK) === fu.uid) { this._bgOk = true; return; }
+      const r = await fetch('https://bashy.app/api/hub', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ act: 'stepsKey', idToken: await fu.getIdToken() }) }).then(x => x.json()).catch(() => null);
+      if (!r || !r.code) return;
+      await BN.stepSync({ on: true, code: r.code });
+      try { localStorage.setItem(LK, fu.uid); } catch (e) {}
+      this._bgOk = true;
+    } catch (e) { console.warn('[steps bg]', e && e.message); }
   },
 
   // 그날 체크한 유산소 중 걷거나 뛰는 운동이 차지한 걸음(추정)

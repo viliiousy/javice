@@ -35,6 +35,7 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "healthWatch", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "healthSteps", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "hubMode", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stepSync", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "calAccess", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "calList", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "calEvents", returnType: CAPPluginReturnPromise),
@@ -159,6 +160,17 @@ public class BashyNativePlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func hubMode(_ call: CAPPluginCall) {
         let on = call.getBool("on") ?? false
         DispatchQueue.main.async { UIApplication.shared.isIdleTimerDisabled = on; call.resolve() }
+    }
+
+    // 걸음 백그라운드 전달 (BashyStepSync) — { on, code }. 상태만 물으면 { on: 현재 }
+    @objc func stepSync(_ call: CAPPluginCall) {
+        if let on = call.getBool("on") {
+            if on, let c = call.getString("code"), !c.isEmpty {
+                if BashyStepSync.code != c { BashyStepSync.stop(); BashyStepSync.code = c }
+                BashyStepSync.startIfEnabled()
+            } else if !on { BashyStepSync.stop() }
+        }
+        call.resolve(["ok": true, "on": BashyStepSync.code != nil])
     }
 
     // 건강 앱에 새 체성분이 들어오면 앱이 꺼져 있어도 알림 (BashyHealthWatch)
