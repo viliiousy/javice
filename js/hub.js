@@ -1876,6 +1876,10 @@ function nativeSetup() {
   }
   const KA = Native.plugin('KeepAwake');
   if (KA) KA.keepAwake().catch(() => {});
+  // 웹 표준 화면 꺼짐 막기(Wake Lock) — 앱을 새로 깔지 않아도(화면 업데이트만으로) 듣는 이중 장치.
+  //   다른 앱에 다녀오거나 화면이 잠깐 가려지면 풀리므로 돌아올 때마다 다시 건다.
+  const wake = async () => { try { if (navigator.wakeLock && !document.hidden && !(window._wl && !window._wl.released)) window._wl = await navigator.wakeLock.request('screen'); } catch (e) {} };
+  wake(); document.addEventListener('visibilitychange', wake); setInterval(wake, 60e3);
   // Bashy 앱의 허브 모드: 앱(네이티브)에 '허브 켜짐' 을 알린다 — 화면 꺼짐 막기, 배터리 최적화 예외(처음 한 번), 꺼지면 다시 켜기
   { const BN = Native.plugin('BashyNative'); if (BN && BN.hubMode) BN.hubMode({ on: true }).catch(() => {}); }
   // 앱 화면 업데이트(OTA): 허브 화면으로 바로 열려도 '이 화면은 잘 열렸다' 를 알린다(안 알리면 15초 뒤 이전 화면으로 되돌아간다 — js/ota.js)
