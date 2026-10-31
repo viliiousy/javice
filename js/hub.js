@@ -1890,7 +1890,7 @@ function nativeSetup() {
   ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { lastTouch = Date.now(); }, { passive: true }));
   setInterval(() => { const d = new Date(); if (d.getHours() === 4 && Date.now() - lastTouch > 5 * 60e3 && performance.now() > 3 * 3600e3) location.reload(); }, 10 * 60e3);
   const SB = Native.plugin('StatusBar');
-  if (SB) SB.hide().catch(() => {});
+  if (SB) { SB.hide().catch(() => {}); document.addEventListener('visibilitychange', () => { if (!document.hidden) SB.hide().catch(() => {}); }); }
 }
 
 // 태블릿 허브 앱(APK)에 새 빌드가 나오면 알린다 — 깃허브 릴리스 hub-latest 의 build= 번호와 설치된 앱의 번호를 견준다.

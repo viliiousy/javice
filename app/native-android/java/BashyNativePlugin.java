@@ -32,6 +32,7 @@ public class BashyNativePlugin extends Plugin {
         getActivity().runOnUiThread(() -> {
             if (on) getActivity().getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             else getActivity().getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            immersive(getActivity(), on);
         });
         if (on && Build.VERSION.SDK_INT >= 23) {
             try {
@@ -46,6 +47,17 @@ public class BashyNativePlugin extends Plugin {
             } catch (Exception ignored) {}
         }
         call.resolve();
+    }
+
+    // 허브 모드: 위쪽 상태바(시간·배터리)와 아래 내비게이션 바를 숨긴다. 가장자리에서 쓸면 잠깐 나왔다가 다시 숨는다.
+    static void immersive(android.app.Activity a, boolean on) {
+        try {
+            androidx.core.view.WindowInsetsControllerCompat c = androidx.core.view.WindowCompat.getInsetsController(a.getWindow(), a.getWindow().getDecorView());
+            if (on) {
+                c.setSystemBarsBehavior(androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                c.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());
+            } else c.show(androidx.core.view.WindowInsetsCompat.Type.systemBars());
+        } catch (Exception ignored) {}
     }
 
     @PluginMethod

@@ -38,7 +38,7 @@ public class MainActivity extends BridgeActivity implements ModifiedMainActivity
                 }
             });
         } catch (Exception ignored) {}
-        if (hubOn()) getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (hubOn()) { getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); BashyNativePlugin.immersive(this, true); }
         final Thread.UncaughtExceptionHandler prev = Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
             if (hubOn()) try {
@@ -50,6 +50,13 @@ public class MainActivity extends BridgeActivity implements ModifiedMainActivity
             } catch (Exception ignored) {}
             if (prev != null) prev.uncaughtException(t, e); else System.exit(2);
         });
+    }
+
+    // 다른 앱·알림창에 다녀오면 상태바가 다시 나온다 — 허브 모드면 돌아올 때마다 다시 숨긴다
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus && hubOn()) BashyNativePlugin.immersive(this, true);
     }
 
     private boolean hubOn() {

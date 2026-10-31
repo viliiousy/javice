@@ -8,7 +8,9 @@ const AppUpdate = {
   API: 'https://api.github.com/repos/viliiousy/javice/releases/tags/android-latest',
   APK: 'https://github.com/viliiousy/javice/releases/download/android-latest/bashy.apk',
   SKIP_KEY: 'gl_apk_skip',
-  get local() { return this._nat || Number((window.BASHY_BUILD || {}).n) || 0; },
+  // 비교는 설치된 APK 의 versionCode(App.getInfo().build — 분 단위 시각으로 매겨짐)와 릴리스의 vc= 로 한다.
+  //   예전에는 versionCode 를 깃허브 실행 번호(build=62)와 비교해서, versionCode(약 89만)가 늘 커 보여 새 버전 안내가 안 떴다.
+  get local() { return Number((window.BASHY_BUILD || {}).n) || 0; },
   get on() { try { return window.Capacitor?.getPlatform?.() === 'android'; } catch (e) { return false; } },
   // how: 'manual'(설정에서 누름) · 'login'(로그인 직후) · 없음(앱을 열거나 돌아올 때, 30분에 한 번)
   async check(how) {
@@ -17,17 +19,21 @@ const AppUpdate = {
     if (!force && Date.now() - (this._t || 0) < 30 * 60e3) return;
     this._t = Date.now();
     // 설치된 APK 의 빌드 번호는 앱(네이티브)에게 묻는다 — 화면 업데이트(js/ota.js)로 화면 파일이 바뀌면 build-info.js 의 번호는 APK 와 달라진다
-    try { const i = await window.Capacitor.Plugins.App.getInfo(); if (Number(i.build) > 0) this._nat = Number(i.build); } catch (e) {}
-    if (!this.local) return;
+    let vcMe = 0; try { const i = await window.Capacitor.Plugins.App.getInfo(); vcMe = Number(i.build) || 0; } catch (e) {}
+    if (!vcMe && !this.local) return;
     try {
       const r = await fetch(this.API, { headers: { Accept: 'application/vnd.github+json' } });
       if (!r.ok) return;
       const j = await r.json();
       const m = /build=(\d+)/.exec(j.body || '') || /빌드 (\d+)/.exec(j.name || '');
       const remote = m ? Number(m[1]) : 0;
-      if (!(remote > this.local)) { if (how === 'manual') App.showToast('최신 버전입니다', 'success'); return; }
-      if (how !== 'manual' && how !== 'login' && Number(localStorage.getItem(this.SKIP_KEY) || 0) >= remote) return;
       const asset = (j.assets || []).find(a => /\.apk$/.test(a.name));
+      // 릴리스의 versionCode: 본문의 vc=, 없으면(옛 릴리스) APK 를 올린 시각으로 짐작(versionCode = 분 단위 시각 - 29000000)
+      const vm = /vc=(\d+)/.exec(j.body || '');
+      const vcRemote = vm ? Number(vm[1]) : (asset && asset.updated_at ? Math.floor(Date.parse(asset.updated_at) / 60000) - 29000000 - 30 : 0);
+      const newer = vcMe && vcRemote ? vcRemote > vcMe : remote > this.local;
+      if (!newer) { if (how === 'manual') App.showToast('최신 버전입니다', 'success'); return; }
+      if (how !== 'manual' && how !== 'login' && Number(localStorage.getItem(this.SKIP_KEY) || 0) >= remote) return;
       this.show(remote, asset ? asset.browser_download_url : this.APK, asset ? asset.updated_at : '');
     } catch (e) {}
   },
@@ -37,7 +43,7 @@ const AppUpdate = {
     const d = at ? new Date(at) : null;
     el.innerHTML = `<div class="mx-sh fx-ask" role="dialog" aria-label="새 버전">
       <b class="fx-ask-t">새 버전이 나왔습니다</b>
-      <p class="fx-ask-p">지금 앱은 빌드 ${this.local}, 새 버전은 빌드 ${remote}${d ? ` (${d.getMonth() + 1}/${d.getDate()} 올라옴)` : ''}입니다.<br>
+      <p class="fx-ask-p">새 버전은 빌드 ${remote}${d ? ` (${d.getMonth() + 1}/${d.getDate()} 올라옴)` : ''}입니다.<br>
         아래 단추를 누르면 새 APK 파일을 받습니다. 받은 뒤 다운로드 알림(또는 파일 앱)에서 눌러 설치하면 기록은 그대로 두고 앱만 바뀝니다.</p>
       <div class="fx-ask-btns"><button type="button" class="fx-ask-no">나중에</button><button type="button" class="mx-go fx-ask-yes">업데이트 받기</button></div>
     </div>`;

@@ -131,6 +131,8 @@ if (!g.includes('bashy-debug-key')) {
         debug { signingConfig signingConfigs.debug }`);
 }
 fs.writeFileSync(gradlePath, g);
+// 앱(js/app-update.js)이 '설치된 앱보다 새 빌드인가' 를 versionCode 로 비교한다 — 릴리스 본문에 vc= 로 적도록 남긴다
+fs.writeFileSync(path.join(app, '.vcode'), String(vCode));
 
 // 6) 푸시(FCM)는 google-services.json 이 있을 때만 켜진다. 없으면 알림은 기기 안 예약 알림(LocalNotify)으로만 간다.
 const gs = path.join(app, 'google-services.json');
