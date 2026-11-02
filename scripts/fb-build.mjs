@@ -29,13 +29,13 @@ if (envFile && fs.existsSync(envFile)) {
     if (v === '[SENSITIVE]') { hidden.push(m[1]); continue; }   // Vercel '민감' 값은 내려받을 수 없다 → 깃허브 시크릿 FUNCTIONS_ENV 에서 채운다
     out[m[1]] = v;
   }
-  // 깃허브 시크릿 FUNCTIONS_ENV(JSON) 가 있으면 그 값이 우선한다 — Vercel 에서 못 받는 비밀 값을 여기에 둔다
-  let extra = {}; try { extra = JSON.parse(process.env.FUNCTIONS_ENV || '{}'); } catch (e) { console.log('FUNCTIONS_ENV 가 JSON 이 아닙니다'); }
-  Object.assign(out, extra);
+  // 비밀 값은 깃허브 저장소 시크릿에서 받는다(워크플로가 FN_<이름> 으로 넘겨준다) — Vercel 은 '민감' 값을 내려주지 않는다
+  for (const [k, v] of Object.entries(process.env)) if (k.startsWith('FN_') && v) out[k.slice(3)] = v;
+  out.FIREBASE_DB_URL = out.FIREBASE_DB_URL || 'https://javice-6b647-default-rtdb.asia-southeast1.firebasedatabase.app';
   fs.writeFileSync(path.join(fn, 'env.json'), JSON.stringify(out));
   console.log('env.json:', Object.keys(out).join(', '));
   const miss = hidden.filter(k => !(k in out));
-  if (miss.length) console.log('::warning::Vercel 에서 못 받은 비밀 값(FUNCTIONS_ENV 에 넣어야 함):', miss.join(', '));
+  if (miss.length) console.log('::warning::아직 없는 비밀 값(깃허브 시크릿에 넣어야 함):', miss.join(', '));
 }
 const n = (d) => fs.readdirSync(d, { recursive: true }).length;
 console.log(`public/ ${n(pub)}개 · functions/api ${fs.readdirSync(path.join(fn, 'api')).length}개`);

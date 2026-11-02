@@ -54,7 +54,16 @@ jobs:
         run: npx -y vercel@latest env pull .env.production --environment=production --yes --token=${{ secrets.VERCEL_TOKEN }} >/dev/null
 
       - name: Firebase 배포 준비 (public/ · functions/)
-        env: { FUNCTIONS_ENV: '${{ secrets.FUNCTIONS_ENV }}' }
+        env:
+          FN_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FN_CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          FN_PING_SECRET: ${{ secrets.PING_SECRET }}
+          FN_ECON_SECRET: ${{ secrets.ECON_SECRET }}
+          FN_FOOD_API_KEY: ${{ secrets.FOOD_API_KEY }}
+          FN_FOODSAFETY_API_KEY: ${{ secrets.FOODSAFETY_API_KEY }}
+          FN_GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          FN_ST_CLIENT_ID: ${{ secrets.ST_CLIENT_ID }}
+          FN_ST_CLIENT_SECRET: ${{ secrets.ST_CLIENT_SECRET }}
         run: |
           node scripts/fb-build.mjs .env.production
           rm -f .env.production
@@ -63,7 +72,9 @@ jobs:
 
       - name: Firebase 배포
         env: { GOOGLE_APPLICATION_CREDENTIALS: '${{ runner.temp }}/sa.json' }
-        run: npx -y firebase-tools@15 deploy --only hosting,functions --project javice-6b647 --non-interactive --force --debug 2>&1 | grep -vE 'private_key|Bearer' | tail -60; exit ${PIPESTATUS[0]}
+        run: |
+          if ! grep -q client_email "$GOOGLE_APPLICATION_CREDENTIALS" 2>/dev/null; then echo "::warning::깃허브 시크릿 FIREBASE_SERVICE_ACCOUNT 가 아직 없어 Firebase 배포를 건너뜁니다"; exit 0; fi
+          npx -y firebase-tools@15 deploy --only hosting,functions --project javice-6b647 --non-interactive --force
 
       # 앱(아이폰·갤럭시) 화면 업데이트 — 같은 화면을 zip 으로 묶어 릴리스 web-latest 에 올린다(js/ota.js 가 받아 간다).
       # 사이트(Vercel)가 아니라 깃허브 릴리스에 두는 건 Vercel 배포 저장 공간을 먹지 않게 하려고.
