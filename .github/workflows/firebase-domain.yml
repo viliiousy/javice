@@ -1,0 +1,43 @@
+name: Firebase 주소 연결 (bashy.app)
+
+# Firebase Hosting 에 bashy.app 을 붙이고, Cloudflare DNS 에 넣어야 할 레코드를 출력한다.
+# 손으로 한 번만 돌린다(Actions › 이 워크플로 › Run workflow). 다시 돌리면 현재 상태(인증서 발급 진행 등)를 보여 준다.
+on:
+  workflow_dispatch:
+    inputs:
+      domain: { description: '붙일 주소', default: 'bashy.app' }
+
+jobs:
+  domain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 계정 준비
+        env: { SA: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' }
+        run: |
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/sa.json" >/dev/null 2>&1
+      - name: 주소 붙이기 · 필요한 DNS 레코드 보기
+        run: |
+          T=$(gcloud auth print-access-token)
+          API="https://firebasehosting.googleapis.com/v1beta1/projects/javice-6b647/sites/javice-6b647/customDomains"
+          D="${{ inputs.domain }}"
+          echo "== 만들기(이미 있으면 409) =="
+          curl -s -X POST "$API?customDomainId=$D" -H "Authorization: Bearer $T" -H 'Content-Type: application/json' -d '{}' | head -c 1500; echo
+          sleep 10
+          echo "== 현재 상태 =="
+          curl -s "$API/$D" -H "Authorization: Bearer $T" | python3 -c "
+          import sys,json
+          j=json.load(sys.stdin)
+          print('host:', j.get('hostState'), '| ownership:', j.get('ownershipState'), '| cert:', (j.get('cert') or {}).get('state'))
+          for k in ('requiredDnsUpdates',):
+            u=j.get(k) or {}
+            for s in u.get('desired',[]):
+              print('--- 넣어야 할 레코드 ---')
+              for r in s.get('records',[]): print(r.get('type'), s.get('domainName'), r.get('rdata'), r.get('requiredAction'))
+            for s in u.get('discovered',[]):
+              print('--- 지금 DNS ---')
+              for r in s.get('records',[]): print(r.get('type'), s.get('domainName'), r.get('rdata'))
+          for c in ((j.get('cert') or {}).get('verification') or {}).get('dns',{}).get('desired',[]) or []:
+            for r in c.get('records',[]): print('인증서:', r.get('type'), c.get('domainName'), r.get('rdata'), r.get('requiredAction'))
+          print(json.dumps(j.get('issues',[]),ensure_ascii=False)[:800])
+          "
