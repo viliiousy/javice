@@ -115,7 +115,8 @@ const Usage = {
     { k: 'chatgpt',    name: 'ChatGPT',    color: 'var(--gpt)',    c: '#3fbf95', h: 'g5' },
     { k: 'higgsfield', name: 'Higgsfield', color: 'var(--higgs)',  c: '#b9d84a', h: 'hf' },
   ],
-  init() { this.load(); setInterval(() => { if (!document.hidden) this.load(); }, 60000); },
+  // 수집 확장이 5분마다 올리므로 5분마다만 받는다(1분마다 받으면 서버 호출만 다섯 배 — 무료 한도 초과로 사이트가 멈췄다)
+  init() { this.load(); setInterval(() => { if (!document.hidden) this.load(); }, 5 * 60000); },
 
   async load() {
     if (!Cfg.get().code) { this.render(null, '설정에서 bashy 계정을 연결하면 보입니다'); return; }
@@ -247,8 +248,10 @@ const Usage = {
 const Tasks = {
   data: null, sel: 'all', done: new Set(),
   init() {
-    // bashy.app 과 같은 구글 할일을 1분마다 다시 받는다(사이트에서 고친 것이 곧 보이게).
-    this.load(); setInterval(() => { if (!document.hidden) this.load(); }, 60000);
+    // bashy.app 과 같은 구글 할일을 5분마다 다시 받는다 — 허브는 하루 종일 켜져 있어 1분마다면 서버 호출이 너무 많다.
+    //   화면으로 돌아오거나 허브에서 체크·추가하면 그때는 바로 다시 받는다.
+    this.load(); setInterval(() => { if (!document.hidden) this.load(); }, 5 * 60000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - (this._at || 0) > 60000) this.load(); });
     $('taskTabs').addEventListener('click', e => {
       const b = e.target.closest('[data-list]'); if (!b) return;
       this.sel = b.dataset.list; this.render();
@@ -260,6 +263,7 @@ const Tasks = {
   async load() {
     if (!Cfg.get().code) { this.note('설정에서 bashy 계정을 연결하면 보입니다'); return; }
     try {
+      this._at = Date.now();
       const j = await hubCall({ act: 'tasks' });
       if (j.needConsent) { this.note(j.reason || '구글 할일 권한이 필요합니다'); return; }
       this.data = j; this.done.clear(); this.render();

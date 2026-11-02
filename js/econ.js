@@ -16,7 +16,7 @@ const Econ = {
   REPO:   'viliiousy/economy',
   BRANCH: 'main',
   KEY:    'gl_econ_config',
-  POLL:   60000,          // 1분마다 — 화면이 떠 있을 때만(서버가 네이버에서 바로 받아 준다: lib/market.js)
+  POLL:   3 * 60000,      // 3분마다(서버 호출 줄이기) — 화면이 떠 있을 때만(서버가 네이버에서 바로 받아 준다: lib/market.js)
 
   DEF: {
     move_pct: 10, favorites: [], watchlists: [], holdings: [],

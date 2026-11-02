@@ -116,7 +116,7 @@ const Usage = {
     { k: 'chatgpt',    name: 'ChatGPT',    color: 'var(--gpt)',    c: '#3fbf95', h: 'g5' },
     { k: 'higgsfield', name: 'Higgsfield', color: 'var(--higgs)',  c: '#b9d84a', h: 'hf' },
   ],
-  init() { this.load(); setInterval(() => { if (!document.hidden) this.load(); }, 60000); },
+  init() { this.load(); setInterval(() => { if (!document.hidden) this.load(); }, 5 * 60000); },
 
   async load() {
     if (!Cfg.get().code) { this.render(null, '설정에서 bashy 계정을 연결하면 보입니다'); return; }
@@ -246,7 +246,7 @@ const Tasks = {
   data: null, sel: 'all', done: new Set(),
   init() {
     // bashy.app 과 같은 구글 할일을 1분마다 다시 받는다(사이트에서 고친 것이 곧 보이게).
-    this.load(); setInterval(() => { if (!document.hidden) this.load(); }, 60000);
+    this.load(); setInterval(() => { if (!document.hidden) this.load(); }, 5 * 60000);
     $('taskTabs').addEventListener('click', e => {
       const b = e.target.closest('[data-list]'); if (!b) return;
       this.sel = b.dataset.list; this.render();

@@ -89,5 +89,8 @@
       "maxDuration": 60,
       "includeFiles": "data/**"
     }
+  },
+  "git": {
+    "deploymentEnabled": false
   }
 }
