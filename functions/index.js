@@ -23,7 +23,7 @@ exports.api = onRequest({
   region: 'us-central1',
   timeoutSeconds: 300,      // 알림 발송(cron-notify)이 길게 걸릴 때가 있다
   memory: '512MiB',
-  maxInstances: 5,          // 혹시 모를 폭주에도 요금이 무한정 늘지 않게
+  maxInstances: 3,          // 혹시 모를 폭주에도 요금이 무한정 늘지 않게(동시에 도는 서버 수 상한)
   invoker: 'public',
 }, async (req, res) => {
   const p = req.path || '/';
@@ -37,4 +37,26 @@ exports.api = onRequest({
   // Vercel 처럼 본문이 비어 있으면 빈 객체 대신 그대로 둔다(핸들러들이 문자열·객체 둘 다 처리한다)
   try { await load(name)(req, res); }
   catch (e) { console.error('[' + name + ']', e); if (!res.headersSent) res.status(500).json({ error: e.message }); }
+});
+
+// ── 요금 안전장치: 예산을 넘으면 결제 연결을 끊어 더 이상 청구되지 않게 한다 ─────────────
+// 예산 알림(Cloud Billing 예산)은 '알림' 일 뿐 청구를 막지 않는다. 구글이 안내하는 방식대로
+// 예산 → Pub/Sub 주제(billing-alerts) → 이 함수 → 프로젝트의 결제 계정 연결 해제.
+//   · 끊기면 Firebase 가 무료(Spark) 범위로 돌아간다: 사이트·데이터베이스는 무료 한도 안에서 계속 되고,
+//     서버 함수(이 파일)는 멈춘다. 다시 켜려면 Firebase 콘솔에서 Blaze 로 다시 바꾸면 된다.
+//   · 한도: env.json 의 BILLING_CAP_KRW (없으면 5,000원). 예산 금액보다 작게 두면 그 금액에서 끊긴다.
+const { onMessagePublished } = require('firebase-functions/v2/pubsub');
+exports.billingGuard = onMessagePublished({ topic: 'billing-alerts', region: 'us-central1', maxInstances: 1, memory: '256MiB' }, async (event) => {
+  const d = (event.data && event.data.message && event.data.message.json) || {};
+  const cap = Number(process.env.BILLING_CAP_KRW || 5000);
+  const cost = Number(d.costAmount || 0);
+  console.log('[billing]', JSON.stringify({ cost, budget: d.budgetAmount, currency: d.currencyCode, cap }));
+  if (!(cost >= cap)) return;
+  const pid = process.env.GCLOUD_PROJECT || 'javice-6b647';
+  const tk = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', { headers: { 'Metadata-Flavor': 'Google' } }).then(r => r.json());
+  const url = `https://cloudbilling.googleapis.com/v1/projects/${pid}/billingInfo`;
+  const cur = await fetch(url, { headers: { Authorization: 'Bearer ' + tk.access_token } }).then(r => r.json());
+  if (!cur.billingEnabled) { console.log('[billing] 이미 결제가 꺼져 있음'); return; }
+  const r = await fetch(url, { method: 'PUT', headers: { Authorization: 'Bearer ' + tk.access_token, 'Content-Type': 'application/json' }, body: JSON.stringify({ billingAccountName: '' }) });
+  console.error('[billing] 한도 ' + cap + '원 초과(' + cost + ') → 결제 연결 해제:', r.status, (await r.text()).slice(0, 300));
 });
