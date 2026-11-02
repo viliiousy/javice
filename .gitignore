@@ -1,3 +1,10 @@
 node_modules/
 bashy-extension.zip
 data/food-db.json
+public/
+functions/api/
+functions/lib/
+functions/data/
+functions/env.json
+functions/node_modules/
+.env.production

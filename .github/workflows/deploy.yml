@@ -1,4 +1,4 @@
-name: Deploy to Vercel
+name: Deploy (Firebase)
 
 on:
   push:
@@ -47,19 +47,27 @@ jobs:
           (cd /tmp && zip -qr "$GITHUB_WORKSPACE/bashy-extension.zip" bashy-extension -x '*.DS_Store')
           ls -l bashy-extension.zip
 
-      - name: Deploy to Vercel
-        run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+      # 2026-11 부터 사이트·서버는 Firebase(Hosting + Cloud Functions)에서 돈다 — Vercel 무료 한도(Active CPU) 초과로 한 달 멈춘 뒤 이사.
+      # 서버 환경변수(비밀 값)는 그동안 Vercel 에 보관돼 있던 것을 그대로 받아 쓴다(값을 저장소·로그에 남기지 않는다).
+      - name: 서버 환경변수 받기 (Vercel 보관함)
+        env: { VERCEL_ORG_ID: team_BjOijLot8tGOSEUll7FNM5bR, VERCEL_PROJECT_ID: prj_FGQHPLFSvjEBI5b1yux5bNfiLAJL }
+        run: npx -y vercel@latest env pull .env.production --environment=production --yes --token=${{ secrets.VERCEL_TOKEN }} >/dev/null
 
-      - name: 옛 배포 지우기 (최근 10개만 남김 — Vercel 배포 저장 공간 한도)
-        if: success()
-        continue-on-error: true
-        env: { VERCEL_TOKEN: '${{ secrets.VERCEL_TOKEN }}', KEEP: '10' }
-        run: node .github/scripts/prune-deploys.mjs
+      - name: Firebase 배포 준비 (public/ · functions/)
+        run: |
+          node scripts/fb-build.mjs .env.production
+          rm -f .env.production
+          (cd functions && npm i --no-audit --no-fund --omit=dev >/dev/null)
+          node -e "const e=require('./functions/env.json');require('fs').writeFileSync(process.env.RUNNER_TEMP+'/sa.json', e.FIREBASE_SERVICE_ACCOUNT||'')"
+
+      - name: Firebase 배포
+        env: { GOOGLE_APPLICATION_CREDENTIALS: '${{ runner.temp }}/sa.json' }
+        run: npx -y firebase-tools@15 deploy --only hosting,functions --project javice-6b647 --non-interactive --force
 
       # 앱(아이폰·갤럭시) 화면 업데이트 — 같은 화면을 zip 으로 묶어 릴리스 web-latest 에 올린다(js/ota.js 가 받아 간다).
       # 사이트(Vercel)가 아니라 깃허브 릴리스에 두는 건 Vercel 배포 저장 공간을 먹지 않게 하려고.
       - name: 앱 화면 묶음 올리기 (web-latest)
-        if: success()
+        if: ${{ !cancelled() }}
         continue-on-error: true
         env: { GH_TOKEN: '${{ github.token }}' }
         run: |
