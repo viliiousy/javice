@@ -54,6 +54,7 @@ jobs:
         run: npx -y vercel@latest env pull .env.production --environment=production --yes --token=${{ secrets.VERCEL_TOKEN }} >/dev/null
 
       - name: Firebase 배포 준비 (public/ · functions/)
+        env: { FUNCTIONS_ENV: '${{ secrets.FUNCTIONS_ENV }}' }
         run: |
           node scripts/fb-build.mjs .env.production
           rm -f .env.production
