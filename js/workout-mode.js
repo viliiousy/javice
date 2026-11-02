@@ -334,6 +334,17 @@ const WorkoutMode = {
     if (sec <= this.COUNT && sec !== this._lastTick) { this._lastTick = sec; this._tickSound(); }
     r.hidden = false;
     const pct = Math.max(0, Math.min(1, left / (S.restTot || 1)));
+    // 작게 접은 쉬는 시간: 아래쪽 띠로만 남기고, 그동안 세트 화면에서 다음 무게·횟수를 고칠 수 있다
+    r.classList.toggle('mini', !!S.restMin);
+    if (S.restMin) {
+      const mt = r.querySelector('.wk-rmt');
+      if (mt) { const t = this._fmt(left); if (mt.textContent !== t) mt.textContent = t; mt.classList.toggle('last', sec <= this.COUNT); r.querySelector('.wk-rmp').style.width = (pct * 100) + '%'; return; }
+      r.innerHTML = `<i class="wk-rmp" style="width:${pct * 100}%"></i>
+        <button class="wk-rm-open" onclick="WorkoutMode.restFull()" aria-label="쉬는 시간 크게 보기"><span>쉬는 시간</span><b class="wk-rmt num">${this._fmt(left)}</b></button>
+        <button class="wk-rm-b" onclick="WorkoutMode.addRest(10)">+10초</button>
+        <button class="wk-rm-b accent" onclick="WorkoutMode.skipRest()">건너뛰기</button>`;
+      return;
+    }
     const big = r.querySelector('.wk-rb');
     if (big) { const t = this._fmt(left); if (big.textContent !== t) big.textContent = t; big.classList.toggle('last', sec <= this.COUNT); r.querySelector('.wk-rp').style.width = (pct * 100) + '%'; return; }
     r.innerHTML = `<div class="wk-rt">쉬는 시간</div><div class="wk-rb num">${this._fmt(left)}</div>
@@ -341,8 +352,14 @@ const WorkoutMode = {
       <div class="wk-rnext">다음: ${esc(this._nextLabel())}</div>
       <div class="wk-rbtns"><button class="btn-sm" onclick="WorkoutMode.addRest(-10)">−10초</button>
         <button class="btn-sm accent" onclick="WorkoutMode.skipRest()">건너뛰기</button>
-        <button class="btn-sm" onclick="WorkoutMode.addRest(10)">+10초</button></div>`;
+        <button class="btn-sm" onclick="WorkoutMode.addRest(10)">+10초</button></div>
+      <button class="wk-rmin" onclick="WorkoutMode.restMini()">↓ 세트 보기 · 다음 무게 바꾸기</button>`;
   },
+  // 쉬는 시간 화면을 접고 펴기 — 타이머·소리·알림은 그대로 돈다
+  restMini() { const S = this.st; if (!S || !S.restEnd) return; S.restMin = true; const r = document.getElementById('wkRest'); if (r) r.innerHTML = ''; try { Haptic.light(); } catch (e) {} this._time();
+    // 다음에 할 세트(없으면 세트 표)가 띠에 가리지 않게 화면 가운데로
+    setTimeout(() => { const t = document.querySelector('.wk .wk-set.now') || document.querySelector('.wk .wk-sets'); if (t) t.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 30); },
+  restFull() { const S = this.st; if (!S) return; S.restMin = false; const r = document.getElementById('wkRest'); if (r) r.innerHTML = ''; this._time(); },
   _nextLabel() {
     const S = this.st, x = S.ex[S.cur], k = x.rows.findIndex(r => !r.ok);
     if (k >= 0) return `${x.name} ${k + 1}세트 · ${x.rows[k].w || '—'}kg × ${x.rows[k].r || '—'}회`;
@@ -507,11 +524,11 @@ const WorkoutMode = {
   _rest() {
     const S = this.st, pf = this.prefs();
     if (!pf.timer || !pf.rest) return;
-    S.restEnd = Date.now() + pf.rest * 1000; S.restTot = pf.rest; this._lastTick = null; this._nc = 0;
+    S.restEnd = Date.now() + pf.rest * 1000; S.restTot = pf.rest; S.restMin = false; this._lastTick = null; this._nc = 0;
     this._notify(pf.rest);
   },
   addRest(d) { const S = this.st; if (!S.restEnd) return; S.restEnd += d * 1000; S.restTot = Math.max(S.restTot + d, 1); this._notify((S.restEnd - Date.now()) / 1000); },
-  skipRest() { const S = this.st; if (!S) return; S.restEnd = 0; const r = document.getElementById('wkRest'); if (r) { r.hidden = true; r.innerHTML = ''; } this._cancelNotify(); this.live(); },
+  skipRest() { const S = this.st; if (!S) return; S.restEnd = 0; S.restMin = false; const r = document.getElementById('wkRest'); if (r) { r.hidden = true; r.innerHTML = ''; } this._cancelNotify(); this.live(); },
 
   // 쉬는 시간 설정: 분 · 초(10초 단위) 두 줄 휠 + 타이머·소리 켜고 끄기 (계정에 저장)
   restSetting() {

@@ -3379,6 +3379,17 @@ body.wk-on{ overflow:hidden; }
 .lg-row .inp[readonly]{ cursor:pointer; text-align:center; }
 /* 쉬는 시간 화면은 세트 줄(밀어서 삭제용으로 겹쳐 둔 층)보다 위에 */
 .wk-rest{ z-index:20; }
+/* 쉬는 시간 접기 — 아래쪽 띠(세트 완료 단추 위). 그동안 세트 화면을 그대로 쓴다 */
+.wk-rmin{ margin-top:8px; height:44px; padding:0 16px; border:0; background:none; color:#8B8F97; font:inherit; font-size:14px; cursor:pointer; }
+.wk-rest.mini{ inset:auto 16px calc(80px + env(safe-area-inset-bottom)) 16px; height:56px; flex-direction:row; justify-content:flex-start; gap:8px; padding:0 8px 0 16px;
+  background:#1B1C20; border:1px solid #2A2C31; border-radius:16px; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,.5); }
+.wk:has(.wk-rest.mini) .wk-body{ padding-bottom:88px; }
+.wk-rmp{ position:absolute; left:0; bottom:0; height:3px; background:#FF6A2B; transition:width .25s linear; }
+.wk-rm-open{ flex:1; display:flex; align-items:baseline; gap:8px; height:100%; border:0; background:none; color:#ECEDEE; font:inherit; cursor:pointer; text-align:left; }
+.wk-rm-open span{ font-size:13px; color:#8B8F97; }
+.wk-rmt{ font-size:24px; font-weight:600; letter-spacing:-.02em; } .wk-rmt.last{ color:#FF6A2B; }
+.wk-rm-b{ height:40px; padding:0 12px; border:1px solid #2A2C31; border-radius:12px; background:none; color:#ECEDEE; font:inherit; font-size:13px; cursor:pointer; }
+.wk-rm-b.accent{ background:#FF6A2B; color:#101113; border-color:#FF6A2B; font-weight:600; }
 
 /* 운동 끝내기 — 아래에서 올라오는 작은 시트 (8px 단위) */
 .wk-end{ position:fixed; inset:0; z-index:460; }
