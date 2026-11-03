@@ -253,6 +253,13 @@ const JHome = {
     const pool = want === 'scene' ? list.filter(d => d.kind === 'scene') : list.filter(d => d.kind !== 'scene');
     const r = JMatch.find(q, pool, { min: 0.6 });
     if (r.item && r.score >= 0.8) return { items: [r.item] };
+    // 적외선 리모컨처럼 '장면' 으로만 켜고 끄는 기기(예: 장면 '거실 줄조명 ON') — 이름에 말한 기기 이름이 들어 있으면 그 장면을 실행
+    if (want !== 'scene') {
+      const z = x => String(x || '').replace(/\s+/g, '').replace(/(켜|꺼|끄|켜줘|꺼줘|on|off)$/i, '').toLowerCase();
+      const qz = z(q).replace(/(을|를|좀)$/, '');
+      const sc = qz.length >= 2 ? list.filter(d => d.kind === 'scene' && z(d.name).includes(qz)) : [];
+      if (sc.length === 1) return { items: sc };
+    }
     const kw = (this.KIND_WORD.find(([re]) => re.test(q)) || [])[1];
     const rooms = [...new Set(pool.map(d => d.room).filter(Boolean))];
     const room = rooms.find(rm => q.replace(/\s/g, '').includes(rm.replace(/\s/g, '')));
