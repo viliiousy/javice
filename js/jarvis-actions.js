@@ -717,6 +717,12 @@ const JarvisActions = {
     if ((m = s.match(/^(\d+)\s*(?:회|개|번|렙)$/))) return `${(cur && WorkoutMode._nSets(cur)) || 3}×${m[1]}`;
     return s.slice(0, 20);
   },
+  // 기계·워치가 보여 준 실제 소모 열량(kcal)을 유산소 기록에 붙인다 — '30분' → '30분 · 163kcal'(앱은 추정 대신 이 값을 쓴다)
+  _kcalSets(sets, a) {
+    const k = Number(a && a.kcal);
+    const base = String(sets || '').replace(/\s*·?\s*[\d.]+\s*kcal/i, '').trim();
+    return k > 0 && k < 5000 ? `${base} · ${Math.round(k)}kcal` : String(sets || '');
+  },
   _setsTxt(x) {
     if (typeof PlanGen !== 'undefined' && PlanGen.timed(x.name)) return x.sets || '';
     return `${x.sets || ''}${x.w !== '' && x.w != null && Number(x.w) > 0 ? ` · ${x.w}kg` : ''}`;
@@ -725,6 +731,8 @@ const JarvisActions = {
   _exName(n) {
     n = String(n || '').trim().replace(/\s+/g, ' ').slice(0, 40);
     if (!n || typeof EX_DB === 'undefined') return n;
+    // '실내자전거'·'러닝머신' 처럼 같은 운동의 다른 이름이면 말한 이름 그대로 둔다(그림·열량은 사전 운동 것을 빌려 쓴다)
+    if (typeof exCanon === 'function' && exCanon(n) !== n) return n;
     const all = [...new Set(Object.values(EX_DB).flat())];
     const r = JMatch.find(n, all, { min: 0.86 });
     return r.item || n;
@@ -786,10 +794,17 @@ const JarvisActions = {
     ex_add(a) {
       const d = this._date(a.date), list = this._wList(d), name = this._exName(a.name || a.to);
       if (!name) return { ok: false, msg: '추가할 운동 이름을 알려 주세요' };
-      const x = { name, sets: this._sets(a) || Fitness.defSets(name), w: a.w != null && Number(a.w) > 0 ? Number(a.w) : '' };
+      const x = { name, sets: this._kcalSets(this._sets(a) || Fitness.defSets(name), a), w: a.w != null && Number(a.w) > 0 ? Number(a.w) : '' };
       const p = Number(a.pos);
-      if (p >= 1 && p <= list.length) list.splice(p - 1, 0, x); else list.push(x);
-      return this._wApply(d, list, a, `'${name}' ${this._setsTxt(x)} 을(를) 추가했습니다`);
+      let at = list.length;
+      if (p >= 1 && p <= list.length) { list.splice(p - 1, 0, x); at = p - 1; } else list.push(x);
+      const r = this._wApply(d, list, a, `'${name}' ${this._setsTxt(x)} 을(를) 추가했습니다`);
+      // '탔어·했어' 처럼 이미 한 운동이면 바로 완료 표시(오늘·지난날만)
+      if (a.done && !this._isFuture(d)) {
+        const now = Fitness.exercisesFor(d).list, i = now.findIndex((e, k) => e.name === name && k >= Math.min(at, now.length - 1)), k = i >= 0 ? i : now.map(e => e.name).lastIndexOf(name);
+        if (k >= 0) { const c = new Set(Fitness._checked(d)); c.add(k); Fitness._save([...c], d); this._rerender(); r.msg = r.msg.replace('추가했습니다', '추가하고 완료로 표시했습니다'); }
+      }
+      return r;
     },
     ex_remove(a) {
       const d = this._date(a.date), list = this._wList(d), f = this._wFind(list, a.name);
@@ -801,8 +816,9 @@ const JarvisActions = {
       const d = this._date(a.date), list = this._wList(d), f = this._wFind(list, a.name);
       if (f.miss) return { ok: false, msg: f.miss };
       const s = this._sets(a, f.x.sets);
-      if (!s && (a.w == null || a.w === '')) return { ok: false, msg: '세트·횟수나 무게 중 무엇을 바꿀지 알려 주세요' };
+      if (!s && (a.w == null || a.w === '') && a.kcal == null) return { ok: false, msg: '세트·횟수나 무게 중 무엇을 바꿀지 알려 주세요' };
       if (s) f.x.sets = s;
+      if (a.kcal != null) f.x.sets = this._kcalSets(f.x.sets, a);
       if (a.w != null && a.w !== '') f.x.w = Number(a.w) > 0 ? Number(a.w) : '';
       return this._wApply(d, list, a, `'${f.x.name}' 을(를) ${this._setsTxt(f.x)} 로 바꿨습니다`);
     },
@@ -1457,13 +1473,14 @@ const JarvisActions = {
 음식 이름(name)은 짧게 — 가게·대표 메뉴·크기까지만 씁니다(예: '서브웨이 15cm 참치', '비범 들기름페스토막국수'). 추가 토핑·채소·치즈·소스는 name 에 늘어놓지 말고 그 열량·탄단지만 더합니다. 여럿이 나눠 먹었다고 하면('2명이서 나눠', '반씩') 한 접시 전체를 어림한 뒤 인원수로 나눈 값을 넣고 name 끝에 '(1/2)' 처럼 적습니다. 아래에 '브랜드 공개값' 이 주어지면 그 숫자를 그대로 씁니다(메뉴 + 고른 추가 항목을 더함, 탄수·지방이 ? 면 비슷한 음식으로 어림).
 음식 이름은 사용자가 말한 그대로 한 음식으로 씁니다 — '갈비만두'·'김치볶음밥'·'치즈돈까스'·'불고기버거' 처럼 붙어 있는 말은 하나의 음식입니다. '랑·하고·와·과·그리고·쉼표' 로 나눠 말했을 때만 여러 음식으로 나눕니다. 이미 먹은 것으로 기록된 음식(현재 상태 diet.items)과 같은 것을 다시 말하면 양을 고치는 것인지 문맥으로 판단하세요.
 식단 기록(log_food)의 열량·단백질·탄수·지방은 당신이 추정해서 넣습니다 — 사용자에게 영양 정보를 묻거나 몰라서 못 넣는다고 하지 마세요. 처음 보는 음식도 비슷한 음식의 일반적인 한국 기준 1회 제공량으로 어림합니다. 식당 이름이 붙은 메뉴(예: '비범에서 깻잎 페스토 들기름 막국수')는 가게를 몰라도 한국 식당 1인분 기준으로, 면·밥(조리 후 g)·기름(들기름·참기름 큰술)·소스·페스토·고명을 더해 어림합니다 — 집밥 한 접시처럼 낮게 잡지 마세요(예: 식당 들기름막국수 한 그릇은 보통 600~800kcal). name 에는 가게 이름도 같이 적습니다. 여러 음식을 말하면 음식마다 log_food 하나씩(최대 20개), name 에는 양까지 그대로 적고(예 '후라이드 치킨 6조각'), 열량·탄단지는 아래 식품 참고의 1개·1인분 값에 그 양(반 줄·반 그릇·1.5인분·6조각·300ml)을 곱한 값입니다. '어제·그제·○요일' 은 현재 상태의 now 날짜로 계산해 date 에 YYYY-MM-DD 로 넣습니다.
+이미 한 운동을 말하면('탔어·했어·뛰었어') ex_add 에 done:true 를 넣어 완료로 표시합니다. 사용자가 소모 열량을 말하면('162.9칼로리 소모했다') kcal 에 그 숫자를 그대로 넣습니다 — 앱이 추정값 대신 씁니다. 운동 이름은 사용자가 말한 그대로 씁니다('실내자전거' → "실내자전거").
 운동 변경의 scope 는 기본 "day"(그날만), 사용자가 '앞으로·계속·루틴에·플랜에' 라고 하면 "plan". date 는 YYYY-MM-DD(생략=오늘). sets 는 "3×12" 또는 "30분", w 는 kg. 요일(dow·days)은 0=일 … 6=토.
 
 현재 상태: ${JSON.stringify(ctx)}
 
 JSON 하나만 출력: {"response":"","actions":[{"type":"…",…}]}
 actions (괄호 안 필드, ?는 생략 가능):
-[운동] ex_list(date?) ex_parts(parts:["가슴|등|하체|어깨|팔|복근"],scope?,date?) ex_swap(from,to,sets?,w?,scope?,date?) ex_add(name,sets?,w?,pos?,scope?,date?) ex_remove(name,scope?,date?) ex_set(name,sets?,w?,scope?,date?) ex_move(name,pos) ex_done(name|"전체",done) ex_log(name,sets:[{w,r}],date?) workout_start(date?) routine_save(name,exercises:[{name,sets}],days?,mode?:"add|replace") day_assign(dow,routines:["루틴 이름|휴식|유산소"],mode?:"set|add")
+[운동] ex_list(date?) ex_parts(parts:["가슴|등|하체|어깨|팔|복근"],scope?,date?) ex_swap(from,to,sets?,w?,scope?,date?) ex_add(name,sets?,w?,kcal?,done?,pos?,scope?,date?) ex_remove(name,scope?,date?) ex_set(name,sets?,w?,kcal?,scope?,date?) ex_move(name,pos) ex_done(name|"전체",done) ex_log(name,sets:[{w,r}],date?) workout_start(date?) routine_save(name,exercises:[{name,sets}],days?,mode?:"add|replace") day_assign(dow,routines:["루틴 이름|휴식|유산소"],mode?:"set|add")
 [습관] habit_check(name,done,date?) habit_add(name,days?,time?) habit_edit(name,newName?,days?,time?:"HH:MM|off") habit_del(name) habit_stats(name?,days?)
 [식단] log_food(meal:"아침|점심|저녁|간식",name,cal,protein,carb,fat,date?) delete_food(name,meal?,date?) edit_food(name,newName?,cal?,protein?,carb?,fat?,meal?,date?) move_food(name,to:"끼니",meal?,date?) diet_clear(meal?,date?) — 초기화·전부 지워·리셋(끼니를 말하면 그 끼니만) diet_copy(from,to?,meal?) — '어제랑 똑같이' undo() — 방금 한 식단 변경 되돌리기 diet_goal(cal?,protein?,carb?,fat?) diet_status(date?)
 [인바디] inbody_add(wt?,ms?,bf?,bmr?,date?) inbody_trend(n?)

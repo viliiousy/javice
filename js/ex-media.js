@@ -135,6 +135,8 @@ const ExMedia = {
       for (const k of this._all().keys()) add(k);
       if (typeof EX_AUTO !== 'undefined') for (const k of Object.keys(EX_AUTO)) add(k);
     }
+    // 같은 운동의 다른 이름(실내자전거 → 싸이클 등 — js/exercise-db.js EX_ALIAS)
+    if (typeof exCanon === 'function') { const c = exCanon(n); if (c !== n && this._all().get(c) || (c !== n && typeof EX_AUTO !== 'undefined' && EX_AUTO[c])) { const e2 = this.find(c); if (e2) return { ...e2, ko: n }; } }
     const z = this._norm(n);
     const cands = [z, z.replace('플랫', ''), z.replace(/(덤벨|바벨|케이블|스미스머신)프레스$/, '$1벤치프레스'), z.replace('플랫프레스', '벤치프레스'),
       z.replace(/^(케이블|로프|바)?푸쉬다운$/, '케이블트라이셉푸쉬다운'), z.replace('트라이셉스', '트라이셉'), z.replace(/^팔굽혀펴기$/, '푸쉬업')];

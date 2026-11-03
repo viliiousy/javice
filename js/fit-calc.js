@@ -26,13 +26,16 @@ Object.assign(Fitness, {
       let kcal, info, min=0, kmh=null;
       if(timed){
         const c=this.cardio(x.sets, x.name); min=c.min; kmh=c.kmh;
-        // 달리기·트레드밀은 속도(페이스)로 MET 를 정한다. 없으면 종목 MET
-        const met = kmh ? this.speedMet(kmh) : ((typeof EX_MET!=='undefined' && EX_MET[x.name]) || 6);
-        kcal=(met-1)*kg*min/60; info=`${min}분${kmh?` · ${this.speedTxt(x.name, kmh)}`:''}`;
+        // 기계·워치가 알려 준 열량을 적어 두었으면('30분 · 163kcal') 그 값을 그대로 쓴다
+        const mk=this.kcalOf(x.sets);
+        // 달리기·트레드밀은 속도(페이스)로 MET 를 정한다. 없으면 종목 MET(다른 이름이면 같은 운동의 값)
+        const met = kmh ? this.speedMet(kmh) : ((typeof exMet==='function' && exMet(x.name)) || 6);
+        kcal=mk!=null ? mk : (met-1)*kg*min/60; info=`${min}분${kmh?` · ${this.speedTxt(x.name, kmh)}`:''}`;
+        if(mk!=null){ items.push({ name:x.name, kcal:Math.round(kcal), info, min, kmh, measured:true }); return; }
       } else {
         // 근력·맨몸: (MET−1) × 몸무게 × 시간. 한 세트 + 쉬는 시간 = 2.5분. 종목 MET(버피·풀업 등)가 있으면 그것, 없으면 5
         const n=L.length || (typeof WorkoutMode!=='undefined' ? WorkoutMode._nSets(x.sets) : 3);
-        const met=(typeof EX_MET!=='undefined' && EX_MET[x.name]) || 5;
+        const met=(typeof exMet==='function' && exMet(x.name)) || 5;
         kcal=(met-1)*kg*(n*2.5)/60; info=`${n}세트`;
       }
       items.push({ name:x.name, kcal:Math.round(kcal), info, min, kmh });
@@ -66,8 +69,10 @@ Object.assign(Fitness, {
   paceTxt(kmh){ const sec=Math.round(3600/kmh); return `${Math.floor(sec/60)}'${String(sec%60).padStart(2,'0')}"/km`; },
   speedTxt(name, kmh){ return this.isTread(name) ? `${kmh}km/h` : this.paceTxt(kmh); },
   // '4×10-12' → '4세트 10-12회', '3×12' → '3세트 12회'(시간 운동은 그대로)
+  // sets 에 적어 둔 실제 소모 열량('… · 163kcal') — 없으면 null
+  kcalOf(sets){ const m=String(sets||'').match(/([\d.]+)\s*kcal/i); return m ? Math.round(Number(m[1])) : null; },
   setsLabel(sets){
-    const t=String(sets||'').trim(), m=t.match(/^(\d+)\s*[×xX*]\s*([\d\-~–]+)\s*(회)?$/);
+    const t=String(sets||'').replace(/\s*·?\s*[\d.]+\s*kcal/i,'').trim(), m=t.match(/^(\d+)\s*[×xX*]\s*([\d\-~–]+)\s*(회)?$/);
     return m ? `${m[1]}세트 ${m[2].replace(/[~–]/g,'-')}회` : t;
   },
   // 세트 기록 한 줄: 같은 무게·횟수가 이어지면 묶는다 — '18kg 10회 × 4세트' / '20kg 8회 × 2세트 · 18kg 10회'

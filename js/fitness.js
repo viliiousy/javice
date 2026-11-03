@@ -200,7 +200,7 @@ const Fitness = {
     // 다음에 할 운동 = 아직 안 한 것 중 첫 번째
     const nextI = allEx.findIndex((_,i)=>!on(i));
     // 종목마다 예상 소모 열량(전부 했을 때) — 끝낸 종목은 기록한 세트로
-    let bk = {}; try { bk = Object.fromEntries(this.burn(d, true).items.map(x=>[x.name, x.kcal])); } catch(e) {}
+    let bk = {}, bm = {}; try { const its = this.burn(d, true).items; bk = Object.fromEntries(its.map(x=>[x.name, x.kcal])); bm = Object.fromEntries(its.map(x=>[x.name, !!x.measured])); } catch(e) {}
     container.innerHTML=`
       <div class="fit-days">${tabs}</div>
       <div class="fit-prog"><div class="fit-prog-bar"><i style="width:${pct}%"></i></div><span class="num">${done} / ${allEx.length}</span></div>
@@ -217,7 +217,7 @@ const Fitness = {
           <button type="button" class="fx-th${src?'':' none'}" ${info?`onclick="event.stopPropagation();${info}"`:'tabindex="-1"'} aria-label="${esc(ex.name)} 자세 보기">
             ${typeof Icons!=='undefined'?Icons.svg('dumbbell','fx-ic'):''}${src?`<span class="fx-img">${ExMedia.poseHtml(src)}</span>`:''}
           </button>
-          <div class="fx-tx"><div class="fx-nm">${esc(ex.name)}</div><div class="fx-sets num">${esc(this.setsLabel(ex.sets||''))}${bk[ex.name]?`<span class="fx-kc"> · 약 ${bk[ex.name].toLocaleString('ko-KR')}kcal</span>`:''}</div>${this._logLine(ex, dsx)}</div>
+          <div class="fx-tx"><div class="fx-nm">${esc(ex.name)}</div><div class="fx-sets num">${esc(this.setsLabel(ex.sets||''))}${bk[ex.name]?`<span class="fx-kc"> · ${bm[ex.name]?'':'약 '}${bk[ex.name].toLocaleString('ko-KR')}kcal</span>`:''}</div>${this._logLine(ex, dsx)}</div>
           ${typeof PlanGen!=='undefined' && PlanGen.timed(ex.name)
             ? `<button type="button" class="fx-act" onclick="event.stopPropagation();Fitness.timeSheet('${A(ex.name)}','${dsx}')" aria-label="운동 시간 고치기">${typeof Icons!=='undefined'?Icons.svg('pen','fx-aic'):'시간'}</button>`
             : `<button type="button" class="fx-act" onclick="event.stopPropagation();PlanGen.openLog('${A(ex.name)}','${A(ex.sets||'')}','${dsx}')" aria-label="무게 기록">${typeof Icons!=='undefined'?Icons.svg('pen','fx-aic'):'기록'}</button>`}
