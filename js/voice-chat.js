@@ -47,7 +47,17 @@ const VoiceChat = {
   // ── 켜기/끄기 ─────────────────────────
   async start() {
     this.init();
-    if (this.active || this._starting) return;   // 권한 확인 중에 또 눌러도 한 번만 시작한다
+    if (this.active || this._starting) { this._dg('start ignored (active ' + this.active + ', starting ' + !!this._starting + ')'); return; }   // 권한 확인 중에 또 눌러도 한 번만 시작한다
+    try { await this._start(); }
+    catch (e) {
+      // 어디서든 멈추면 '준비 중' 에 갇히지 않게 정리하고 이유를 보여 준다
+      const m = String(e && e.message || e); this._dg('ERROR ' + m);
+      this._starting = false; this.active = false; this.state = 'off'; this._mount(false);
+      App.showToast('음성 대화를 시작하지 못했습니다: ' + m, 'error');
+    }
+  },
+  async _start() {
+    this._dg('start · native SR ' + !!this._nSR + ' · web SR ' + !!this._webSR);
     if (!this.supported()) {
       const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
       App.showToast(ios ? '이 브라우저는 음성 대화를 지원하지 않습니다. 키보드의 마이크 단추로 말해 주세요'
@@ -61,7 +71,9 @@ const VoiceChat = {
     if (this._nSR) {
       try {
         // 권한 창이 끝내 답하지 않는 경우(옛 앱 빌드·플러그인 오류)가 있다 — 8초 안에 답이 없으면 멈추고 알린다
+        this._dg('requestPermissions…');
         const p = await Promise.race([this._nSR.requestPermissions(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))]);
+        this._dg('permissions ' + JSON.stringify(p));
         if (p && p.speechRecognition && p.speechRecognition !== 'granted') {
           this._starting = false; this.state = 'off'; this._mount(false);
           App.showToast('설정 → Bashy 에서 마이크·음성 인식을 허용해 주세요', 'error'); return;
@@ -73,6 +85,7 @@ const VoiceChat = {
         return;
       }
       this._bindNative();
+      this._dg('listeners bound');
     }
     this._starting = false;
     try { JARVIS._stopSpeak?.(); } catch (e) {}
@@ -100,8 +113,25 @@ const VoiceChat = {
   },
 
   toggle() { this.active ? this.stop() : this.start(); },
+
+  // 진단: 마이크가 어디서 멈추는지 계정에 남긴다(설정 동기화로 웹에서도 보인다 — gl_voice_diag_<ios|android|web>)
+  _dg(step) {
+    try {
+      const now = Date.now();
+      if (!this._diag || now - this._diag.at > 60000) this._diag = { at: now, steps: [] };
+      this._diag.steps.push(`${((now - this._diag.at) / 1000).toFixed(1)}s ${step}`);
+      if (this._diag.steps.length > 40) this._diag.steps.shift();
+      const plat = window.Capacitor?.getPlatform?.() || 'web';
+      if (typeof UserStore !== 'undefined') { UserStore.set('gl_voice_diag_' + plat, JSON.stringify({ ...this._diag, web: (window.BASHY_BUILD || {}).web || '' })); window.FirebaseSync?.scheduleSave?.(); }
+    } catch (e) {}
+  },
   // 종료 단추: 켠 지 1초 안의 터치는 무시한다(시작하려고 두 번 누른 손가락이 끄지 않게)
-  end() { if (this._starting || Date.now() - (this._t0 || 0) < 1000) return; this.stop(); },
+  end() {
+    if (Date.now() - (this._t0 || 0) < 1000) return;
+    // 준비 중에 멈춰 있으면 종료가 먹지 않던 문제 — 시작 중이어도 화면은 닫고 처음 상태로 돌린다
+    if (this._starting) { this._dg('end while starting'); this._starting = false; this._turn++; this.state = 'off'; this._mount(false); try { JARVIS._setStatus('대기 중'); } catch (e) {} return; }
+    this.stop();
+  },
 
   // 동그라미: 말하는 중이면 끊고 듣기, 듣는 중이고 들은 말이 있으면 바로 보내기
   tap() {
@@ -222,30 +252,36 @@ const VoiceChat = {
     if (this._nBound || !this._nSR) return;
     this._nBound = true;
     const SR = this._nSR;
-    SR.addListener('partialResults', e => {
+    // addListener 가 약속(Promise)을 돌려주지 않는 경우에도 멈추지 않게
+    const on = (ev, fn) => { try { const r = SR.addListener(ev, fn); if (r && r.catch) r.catch(e => this._dg('addListener ' + ev + ' ' + (e && e.message))); } catch (e) { this._dg('addListener ' + ev + ' threw ' + (e && e.message)); } };
+    on('error', e => this._dg('SR error ' + JSON.stringify(e)));
+    on('partialResults', e => {
       const t = (e && (e.accumulatedText || (e.matches && e.matches[0]))) || '';
       this._heard(t, false, this._turn);
-    }).catch(() => {});
-    SR.addListener('audioLevel', e => { if (this.state === 'listen') this._level(e && e.level); }).catch(() => {});
-    SR.addListener('listeningState', e => {
+    });
+    on('audioLevel', e => { if (this.state === 'listen') this._level(e && e.level); });
+    on('listeningState', e => {
+      this._dg('listeningState ' + JSON.stringify(e));
       const st = e && (e.state || e.status);
       if (st !== 'stopped' || !this.active || this.state !== 'listen') return;
       const turn = this._turn;
       // 인식기가 스스로 멈췄다(안드로이드는 조용해지면 끝낸다). 들은 말이 있으면 보내고, 없으면 다시 듣는다.
       if (this.text.trim()) this._finalize(turn);
       else setTimeout(() => { if (turn === this._turn && this.active && this.state === 'listen') this._nativeStart(turn); }, 350);
-    }).catch(() => {});
+    });
   },
   async _nativeStart(turn, retry) {
     const SR = this._nSR;
+    this._dg('SR.start' + (retry ? ' (retry)' : ''));
     try {
       const r = await SR.start({ language: 'ko-KR', partialResults: true, popup: false, addPunctuation: false, maxResults: 1, muteRecognizerBeep: true });
       const m = r && r.matches && r.matches[0];
       if (m) this._heard(m, true, turn);
     } catch (e) {
+      this._dg('SR.start failed ' + (e && e.message || e));
       if (turn !== this._turn || !this.active) return;
       if (!retry) { setTimeout(() => this._nativeStart(turn, true), 500); return; }   // 지난 세션 정리 중일 수 있다
-      this.stop('음성 인식을 시작하지 못했습니다');
+      this.stop('음성 인식을 시작하지 못했습니다: ' + (e && e.message || e));
     }
   },
 
