@@ -83,7 +83,7 @@ const WebFresh = {
   busy() {
     const a = document.activeElement;
     if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable)) return true;
-    if (document.getElementById('wkMode')) return true;   // 운동 모드 화면
+    if (document.body.classList.contains('wk-on')) return true;   // 운동 모드 화면
     const j = document.getElementById('jarvisScrim'); return !!(j && !j.classList.contains('hidden'));   // AI 비서 열림
   },
   async check() {
