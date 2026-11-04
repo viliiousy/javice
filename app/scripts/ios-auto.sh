@@ -69,7 +69,9 @@ OLD=$(cat "$STATE" 2>/dev/null || true)
 # 이 스크립트 자신도 저장소에 있다 — 빌드하지 않는 커밋이라도 폴더를 최신으로 맞춰 다음 실행부터 새 규칙을 쓴다
 git reset -q --hard origin/main
 # 방금 실패한 커밋이면 1시간 쉬었다가 다시
-if read -r FC FT < "$STATE.fail" 2>/dev/null && [ "$FC" = "$NEW" ] && [ $(( $(date +%s) - FT )) -lt 3600 ]; then exit 0; fi
+# (그사이 API 키를 새로 넣었으면 기다리지 않고 바로 다시)
+if read -r FC FT < "$STATE.fail" 2>/dev/null && [ "$FC" = "$NEW" ] && [ $(( $(date +%s) - FT )) -lt 3600 ] \
+   && [ -z "$(find "$HOME/.appstoreconnect" -newer "$STATE.fail" 2>/dev/null | head -1)" ]; then exit 0; fi
 
 if [ -n "$OLD" ] && git cat-file -e "$OLD" 2>/dev/null; then
   CH=$(git diff --name-only "$OLD" "$NEW" | grep -E "$NATIVE" || true)
