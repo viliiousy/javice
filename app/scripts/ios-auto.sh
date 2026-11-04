@@ -11,10 +11,12 @@ set -uo pipefail
 # launchd 는 터미널과 달리 사용자 설정(.zprofile·.zshrc — nvm·brew 의 node 경로 등)을 읽지 않는다.
 # 터미널에서 직접 칠 때와 똑같은 환경이 되도록 로그인 셸로 한 번 다시 실행한다.
 if [ -z "${BASHY_LOGIN:-}" ] && [ "${1:-run}" != install ] && [ "${1:-run}" != uninstall ]; then
-  exec /bin/zsh -lic 'BASHY_LOGIN=1 /bin/bash "$0" "$@"' "$0" "$@" </dev/null
+  # 실행 중에 git 이 이 파일을 새 버전으로 바꿔도 꼬이지 않게, 복사본으로 실행한다(bash 는 파일을 읽어 가며 실행한다)
+  RUN="${TMPDIR:-/tmp}/bashy-ios-auto.run.sh"; cp "$0" "$RUN"
+  exec /bin/zsh -lic 'BASHY_LOGIN=1 /bin/bash "$0" "$@"' "$RUN" "$@" </dev/null
 fi
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
-REPO="$HOME/bashy-ios"
+REPO="$HOME/bashy-ios"   # 복사본으로 돌아도 저장소 위치는 고정
 TEAM="${TEAM:-4A96B688B4}"
 STATE="$HOME/.bashy-ios-built"          # 마지막으로 빌드한 커밋
 LOCK="/tmp/bashy-ios-auto.lock"
