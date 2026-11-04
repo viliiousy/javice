@@ -16,6 +16,8 @@ for (const f of fs.readdirSync(root)) {
   if (SKIP.has(f) || f.endsWith('.md')) continue;
   cp(path.join(root, f), path.join(pub, f));
 }
+// 웹 새 버전 알림용 — 열어 둔 창이 예전 코드로 계속 도는 것을 막는다(js/app-update.js WebFresh)
+fs.writeFileSync(path.join(pub, 'build.json'), JSON.stringify({ v: process.env.GITHUB_SHA || String(Date.now()) }));
 for (const d of ['api', 'lib', 'data']) { fs.rmSync(path.join(fn, d), { recursive: true, force: true }); cp(path.join(root, d), path.join(fn, d)); }
 
 const envFile = process.argv[2];

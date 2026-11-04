@@ -73,3 +73,31 @@ AppUpdate.justUpdated = function () {
 AppUpdate.justUpdated();
 setTimeout(() => AppUpdate.check(), 4000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) AppUpdate.check(); });
+
+// 웹: 탭을 오래 열어 두면 새로 배포한 코드가 반영되지 않는다(예: 사진 분석이 예전 방식으로 동작).
+// 처음 열 때의 배포 번호를 기억해 두었다가, 다시 화면으로 돌아왔을 때(또는 10분마다) 바뀌었으면 조용히 새로 고친다.
+// 입력 중이거나 운동 모드·AI 비서 대화 중이면 미루고, 앱(안드로이드·iOS)은 자체 업데이트가 있으니 건너뛴다.
+const WebFresh = {
+  v: null, pend: false,
+  async cur() { try { const r = await fetch('/build.json?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) return null; return (await r.json()).v || null; } catch (e) { return null; } },
+  busy() {
+    const a = document.activeElement;
+    if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable)) return true;
+    if (document.getElementById('wkMode')) return true;   // 운동 모드 화면
+    const j = document.getElementById('jarvisScrim'); return !!(j && !j.classList.contains('hidden'));   // AI 비서 열림
+  },
+  async check() {
+    const v = await this.cur(); if (!v) return;
+    if (!this.v) { this.v = v; return; }
+    if (v !== this.v) this.pend = true;
+    if (this.pend && document.visibilityState === 'visible' && !this.busy()) location.reload();
+  },
+  init() {
+    try { if (window.Capacitor?.isNativePlatform?.()) return; } catch (e) {}
+    if (!/^https?:/.test(location.protocol) || /localhost|127\.0\.0\.1/.test(location.hostname)) return;
+    this.check();
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.check(); });
+    setInterval(() => this.check(), 10 * 60e3);
+  },
+};
+WebFresh.init();
