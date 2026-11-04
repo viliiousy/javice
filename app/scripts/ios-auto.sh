@@ -1,7 +1,9 @@
 #!/bin/bash
-# 맥미니 자동 iOS 빌드 — 10분마다(launchd) 깃허브를 보고, 앱에 들어가는 파일(화면 JS·CSS·HTML·그림·소리·
-# 앱 네이티브 코드)이 바뀌었으면 ios-release.sh 를 돌려 TestFlight 에 올린다. 서버(api·functions)·문서만 바뀐 건 건너뛴다.
-# 빌드 도중 새 커밋이 오면 끝난 뒤 다음 확인(10분 안)에서 최신으로 한 번 더 빌드한다.
+# 맥미니 iOS 빌드 — 요청이 올 때만 돈다(주기적으로 검사하지 않는다).
+#   요청 = 다운로드 폴더의 숨김 파일 ~/Downloads/.bashy-build-request 를 새로 쓰는 것.
+#   (사용자가 "업데이트해" 라고 하면 Claude 가 이 파일을 쓴다 — 이 대화에 다운로드 폴더가 연결돼 있다)
+#   launchd 가 그 파일을 지켜보다가 바뀌는 순간 이 스크립트를 깨운다 → 깃허브 최신을 받아 ios-release.sh 로 TestFlight 업로드.
+#   앱에 들어가는 파일이 그대로면(서버·문서만 바뀜) 빌드하지 않고 '이미 최신' 이라고 남긴다.
 #
 # 설치(한 번):  bash ~/bashy-ios/app/scripts/ios-auto.sh install
 # 지우기:       bash ~/bashy-ios/app/scripts/ios-auto.sh uninstall
@@ -16,6 +18,8 @@ if [ -z "${BASHY_LOGIN:-}" ] && [ "${1:-run}" != install ] && [ "${1:-run}" != u
   exec /bin/zsh -lic 'BASHY_LOGIN=1 /bin/bash "$0" "$@"' "$RUN" "$@" </dev/null
 fi
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+REQ="$HOME/Downloads/.bashy-build-request"   # 빌드 요청(이 파일이 바뀌면 빌드)
+DONE="$HOME/.bashy-ios-req-done"             # 마지막으로 받은 요청 시각
 REPO="$HOME/bashy-ios"   # 복사본으로 돌아도 저장소 위치는 고정
 TEAM="${TEAM:-4A96B688B4}"
 STATE="$HOME/.bashy-ios-built"          # 마지막으로 빌드한 커밋
@@ -37,21 +41,26 @@ case "${1:-run}" in
 <plist version="1.0"><dict>
   <key>Label</key><string>app.bashy.ios-auto</string>
   <key>ProgramArguments</key><array><string>/bin/bash</string><string>$REPO/app/scripts/ios-auto.sh</string><string>run</string></array>
-  <key>StartInterval</key><integer>600</integer>
-  <key>RunAtLoad</key><true/>
+  <key>WatchPaths</key><array><string>$REQ</string></array>
+  <key>RunAtLoad</key><false/>
   <key>StandardOutPath</key><string>$LOG</string>
   <key>StandardErrorPath</key><string>$LOG</string>
 </dict></plist>
 PLIST
     launchctl bootout "gui/$(id -u)" "$PL" 2>/dev/null || true
     launchctl bootstrap "gui/$(id -u)" "$PL"
-    echo "✅ 자동 빌드를 켰습니다. 10분마다 확인합니다 (기록: $LOG)"
-    echo "   지금 한 번 확인을 시작합니다 — 새 빌드가 필요하면 바로 빌드합니다(20~30분)."
+    touch "$DONE"
+    echo "✅ 요청 빌드를 켰습니다. 이제 주기 검사 없이, 업데이트 요청이 올 때만 빌드합니다 (기록: $LOG)"
     exit 0 ;;
   uninstall)
     launchctl bootout "gui/$(id -u)" "$PL" 2>/dev/null || true; rm -f "$PL"
     echo "자동 빌드를 껐습니다."; exit 0 ;;
   force) rm -f "$STATE" "$STATE.fail" ;;
+  run)
+    # 요청이 없으면 아무것도 하지 않는다(예전 10분 설정으로 불려도 깃허브조차 보지 않는다)
+    { [ -f "$REQ" ] && { [ ! -f "$DONE" ] || [ "$REQ" -nt "$DONE" ]; }; } || exit 0
+    touch "$DONE"   # 빌드 중에 온 새 요청은 끝난 뒤 다시 깨운다(그 파일이 이 시각보다 새것이 된다)
+    say "업데이트 요청 받음" ;;
 esac
 
 # 한 번에 하나만
@@ -65,17 +74,13 @@ cd "$REPO" || { say "저장소가 없습니다: $REPO"; exit 1; }
 git fetch -q origin main 2>>"$LOG" || { say "깃허브에 닿지 못했습니다(인터넷?)"; exit 0; }
 NEW=$(git rev-parse origin/main)
 OLD=$(cat "$STATE" 2>/dev/null || true)
-[ "$NEW" = "$OLD" ] && exit 0
+[ "$NEW" = "$OLD" ] && { say "이미 최신입니다 (${NEW:0:7}) — 빌드하지 않음"; exit 0; }
 # 이 스크립트 자신도 저장소에 있다 — 빌드하지 않는 커밋이라도 폴더를 최신으로 맞춰 다음 실행부터 새 규칙을 쓴다
 git reset -q --hard origin/main
-# 방금 실패한 커밋이면 1시간 쉬었다가 다시
-# (그사이 API 키를 새로 넣었으면 기다리지 않고 바로 다시)
-if read -r FC FT < "$STATE.fail" 2>/dev/null && [ "$FC" = "$NEW" ] && [ $(( $(date +%s) - FT )) -lt 3600 ] \
-   && [ -z "$(find "$HOME/.appstoreconnect" -newer "$STATE.fail" 2>/dev/null | head -1)" ]; then exit 0; fi
 
 if [ -n "$OLD" ] && git cat-file -e "$OLD" 2>/dev/null; then
   CH=$(git diff --name-only "$OLD" "$NEW" | grep -E "$NATIVE" || true)
-  if [ -z "$CH" ]; then echo "$NEW" > "$STATE"; exit 0; fi   # 서버·문서만 바뀜 — 앱은 그대로
+  if [ -z "$CH" ]; then echo "$NEW" > "$STATE"; say "앱 파일 변경 없음 (${NEW:0:7}) — 빌드하지 않음"; exit 0; fi   # 서버·문서만 바뀜 — 앱은 그대로
   say "앱 파일 변경 $(echo "$CH" | wc -l | tr -d ' ')개: $(echo "$CH" | head -8 | tr '\n' ' ')"
 else
   say "처음 실행 — 지금 상태로 한 번 빌드합니다"
