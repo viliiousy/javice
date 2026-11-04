@@ -26,7 +26,7 @@ const OTA = {
 
   async check(manual) {
     if (!this.on || this._busy) return;
-    if (!manual && Date.now() - (this._t || 0) < 20 * 60e3) return;
+    if (!manual && Date.now() - (this._t || 0) < 5 * 60e3) return;
     this._busy = true; this._t = Date.now();
     try {
       const r = await fetch(this.API, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
@@ -45,9 +45,10 @@ const OTA = {
       let list = []; try { list = (await this.P.list()).bundles || []; } catch (e) {}
       let b = list.find(x => x.version === j.v && x.status !== 'error');
       if (!b) b = await this.P.download({ url: j.url, version: j.v });
-      await this.P.next({ id: b.id });
       console.log('[OTA] 새 화면 준비됨', j.v);
-      if (manual) App.showToast('새 화면을 받았습니다 — 앱을 다시 열면 바뀝니다', 'success');
+      // 직접 누른 확인이면 바로 바꾼다(화면이 한 번 새로 열린다). 저절로 받은 것은 다음에 열 때 바뀐다.
+      if (manual) { App.showToast('새 화면으로 바꿉니다', 'success'); await new Promise(r => setTimeout(r, 600)); await this.P.set({ id: b.id }); return; }
+      await this.P.next({ id: b.id });
     } catch (e) { console.warn('[OTA]', e && e.message); if (manual) App.showToast('화면 업데이트를 받지 못했습니다'); }
     finally { this._busy = false; }
   },

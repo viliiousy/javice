@@ -60,12 +60,18 @@ const VoiceChat = {
     this._mount(true); this._set('prep');
     if (this._nSR) {
       try {
-        const p = await this._nSR.requestPermissions();
+        // 권한 창이 끝내 답하지 않는 경우(옛 앱 빌드·플러그인 오류)가 있다 — 8초 안에 답이 없으면 멈추고 알린다
+        const p = await Promise.race([this._nSR.requestPermissions(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))]);
         if (p && p.speechRecognition && p.speechRecognition !== 'granted') {
           this._starting = false; this.state = 'off'; this._mount(false);
           App.showToast('설정 → Bashy 에서 마이크·음성 인식을 허용해 주세요', 'error'); return;
         }
-      } catch (e) { this._starting = false; this.state = 'off'; this._mount(false); App.showToast('음성 인식을 시작하지 못했습니다', 'error'); return; }
+      } catch (e) {
+        this._starting = false; this.state = 'off'; this._mount(false);
+        const m = String(e && e.message || e);
+        App.showToast(/timeout|not implemented|UNIMPLEMENTED/i.test(m) ? '음성 인식이 응답하지 않습니다 — 앱을 최신 버전으로 업데이트해 주세요' : '음성 인식을 시작하지 못했습니다: ' + m, 'error');
+        return;
+      }
       this._bindNative();
     }
     this._starting = false;
