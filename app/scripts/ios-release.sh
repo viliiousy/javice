@@ -45,8 +45,18 @@ xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
   DEVELOPMENT_TEAM="$TEAM" CURRENT_PROJECT_VERSION="$BUILD" \
   -allowProvisioningUpdates -allowProvisioningDeviceRegistration ${AUTH[@]+"${AUTH[@]}"} archive | tail -30
 
-xcodebuild -exportArchive -archivePath "$OUT/Bashy.xcarchive" \
+if ! xcodebuild -exportArchive -archivePath "$OUT/Bashy.xcarchive" \
   -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" \
-  -allowProvisioningUpdates | tail -30
+  -allowProvisioningUpdates ${AUTH[@]+"${AUTH[@]}"} | tail -30; then
+  # 키가 있으면 한 번 더: ipa 로만 내보낸 뒤 altool 로 API 키를 써서 직접 올린다(Xcode 계정 상태와 무관)
+  [ ${#AUTH[@]} -gt 0 ] || exit 1
+  echo "Xcode 업로드 실패 → ipa 로 내보내 altool 로 올립니다"
+  sed -i '' 's|<string>upload</string>|<string>export</string>|' "$OUT/ExportOptions.plist"
+  xcodebuild -exportArchive -archivePath "$OUT/Bashy.xcarchive" \
+    -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" \
+    -allowProvisioningUpdates "${AUTH[@]}" | tail -30
+  IPA=$(ls "$OUT"/export/*.ipa | head -1)
+  xcrun altool --upload-app -f "$IPA" -t ios --apiKey "$KID" --apiIssuer "$(tr -d ' \n' < "$HOME/.appstoreconnect/issuer_id")" 2>&1 | tail -20
+fi
 
 echo "✅ 업로드 완료 (빌드 $BUILD). 10~30분 뒤 App Store Connect → TestFlight 에 나타납니다."
