@@ -1,6 +1,7 @@
 #!/bin/bash
-# 맥미니 자동 iOS 빌드 — 10분마다(launchd) 깃허브를 보고, 앱 안쪽(네이티브) 코드가 바뀌었을 때만
-# ios-release.sh 를 돌려 TestFlight 에 올린다. 화면(JS·CSS)만 바뀐 건 앱이 스스로 받으니(OTA) 빌드하지 않는다.
+# 맥미니 자동 iOS 빌드 — 10분마다(launchd) 깃허브를 보고, 앱에 들어가는 파일(화면 JS·CSS·HTML·그림·소리·
+# 앱 네이티브 코드)이 바뀌었으면 ios-release.sh 를 돌려 TestFlight 에 올린다. 서버(api·functions)·문서만 바뀐 건 건너뛴다.
+# 빌드 도중 새 커밋이 오면 끝난 뒤 다음 확인(10분 안)에서 최신으로 한 번 더 빌드한다.
 #
 # 설치(한 번):  bash ~/bashy-ios/app/scripts/ios-auto.sh install
 # 지우기:       bash ~/bashy-ios/app/scripts/ios-auto.sh uninstall
@@ -14,8 +15,8 @@ STATE="$HOME/.bashy-ios-built"          # 마지막으로 빌드한 커밋
 LOCK="/tmp/bashy-ios-auto.lock"
 LOG="$HOME/Library/Logs/bashy-ios.log"
 PL="$HOME/Library/LaunchAgents/app.bashy.ios-auto.plist"
-# 이 경로가 바뀌면 앱을 새로 빌드해야 한다
-NATIVE='^app/(ios/|package\.json|package-lock\.json|capacitor\.config\.json|ota-native\.json)'
+# 이 경로가 바뀌면 앱을 새로 빌드한다(app/scripts/build-www.mjs 가 앱에 넣는 것 + 네이티브)
+NATIVE='^(js/|css/|icons/|img/|sounds/|[^/]+\.html$|manifest\.json|hub\.webmanifest|app/(ios/|scripts/build-www|package\.json|package-lock\.json|capacitor\.config\.json))'
 
 say() { echo "[$(date '+%m-%d %H:%M')] $*" >> "$LOG"; }
 note() { osascript -e "display notification \"$1\" with title \"Bashy 앱 빌드\"" >/dev/null 2>&1 || true; }
@@ -61,8 +62,8 @@ OLD=$(cat "$STATE" 2>/dev/null || true)
 
 if [ -n "$OLD" ] && git cat-file -e "$OLD" 2>/dev/null; then
   CH=$(git diff --name-only "$OLD" "$NEW" | grep -E "$NATIVE" || true)
-  if [ -z "$CH" ]; then echo "$NEW" > "$STATE"; exit 0; fi   # 화면만 바뀜 — 앱이 알아서 받는다
-  say "앱 코드 변경: $(echo "$CH" | tr '\n' ' ')"
+  if [ -z "$CH" ]; then echo "$NEW" > "$STATE"; exit 0; fi   # 서버·문서만 바뀜 — 앱은 그대로
+  say "앱 파일 변경 $(echo "$CH" | wc -l | tr -d ' ')개: $(echo "$CH" | head -8 | tr '\n' ' ')"
 else
   say "처음 실행 — 지금 상태로 한 번 빌드합니다"
 fi

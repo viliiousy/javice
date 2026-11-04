@@ -18,7 +18,8 @@ on:
         default: internal
   push:
     branches: [ main ]
-    paths: [ 'app/native-android/**', 'app/scripts/patch-android.mjs', '.github/workflows/android-release.yml' ]
+    # 앱에 들어가는 파일이 바뀌면 매번 새 APK 를 만든다(화면 업데이트에 기대지 않는다)
+    paths: [ 'app/native-android/**', 'app/scripts/**', 'app/package*.json', 'app/capacitor.config.json', '.github/workflows/android-release.yml', 'js/**', 'css/**', 'icons/**', 'img/**', 'sounds/**', '*.html', 'manifest.json', 'hub.webmanifest' ]
 
 permissions:
   contents: write
