@@ -95,7 +95,8 @@ const Steps = {
       catch (e) { const m = String(e && e.message || e); this._note(false, /not implemented|is not a function|UNIMPLEMENTED/i.test(m) ? '이 앱 버전은 걸음 읽기가 없습니다 — 새 앱으로 업데이트해 주세요' : '걸음을 읽지 못했습니다: ' + m); return; }
       this._first = true;
       if (!r || !r.ok || !r.days) { this._note(false, HealthBridge.plat() === 'android' ? (r && r.install ? 'Health Connect 가 없거나 꺼져 있습니다' : 'Health Connect 에서 Bashy 의 걸음 읽기를 허용해 주세요') : '건강 앱 권한이 없습니다 — 아이폰 설정 › 건강 › 데이터 접근 및 기기 › Bashy › 걸음을 켜 주세요' + (r && r.error ? ` (${r.error})` : '')); return; }
-      { const today = r.days[this._ds()] || 0, any = Object.values(r.days).some(v => Number(v) > 0);
+      const today = r.days[this._ds()] || 0, any = Object.values(r.days).some(v => Number(v) > 0);
+      {
         this._note(any, any ? `오늘 ${Number(today).toLocaleString('ko-KR')}걸음 읽음` : (HealthBridge.plat() === 'android' ? 'Health Connect 에 걸음이 없습니다 — 삼성 헬스 › 설정 › Health Connect 연결과 Bashy 걸음 권한을 확인해 주세요' : '건강 앱에서 걸음이 0으로 옵니다 — 아이폰 설정 › 건강 › 데이터 접근 및 기기 › Bashy › 걸음이 꺼져 있을 가능성이 큽니다')); }
       if (any) this._bg();
       const K = this._key(), m = this._rd(K); let ch = false;
