@@ -3381,9 +3381,12 @@ body.wk-on{ overflow:hidden; }
 .wk-rest{ z-index:20; }
 /* 쉬는 시간 접기 — 아래쪽 띠(세트 완료 단추 위). 그동안 세트 화면을 그대로 쓴다 */
 .wk-rmin{ margin-top:8px; height:44px; padding:0 16px; border:0; background:none; color:#8B8F97; font:inherit; font-size:14px; cursor:pointer; }
-.wk-rest.mini{ inset:auto 16px calc(80px + env(safe-area-inset-bottom)) 16px; height:56px; flex-direction:row; justify-content:flex-start; gap:8px; padding:0 8px 0 16px;
-  background:#1B1C20; border:1px solid #2A2C31; border-radius:16px; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,.5); }
-.wk:has(.wk-rest.mini) .wk-body{ padding-bottom:88px; }
+/* 접으면 떠 있는 창이 아니라 '세트 완료' 단추 바로 위에 붙는 한 줄 — 세트 표를 가리지 않는다(화면이 그만큼 줄어든다) */
+.wk-bar{ order:3; }
+.wk-rest.mini{ position:relative; inset:auto; order:2; flex:none; height:56px; width:calc(100% - 32px); max-width:608px; margin:8px auto 0; box-sizing:border-box;
+  flex-direction:row; justify-content:flex-start; gap:8px; padding:0 8px 0 16px;
+  background:#1B1C20; border:1px solid #2A2C31; border-radius:16px; overflow:hidden; box-shadow:none; }
+.wk:has(.wk-rest.mini) .wk-bar{ border-top:0; padding-top:8px; }
 .wk-rmp{ position:absolute; left:0; bottom:0; height:3px; background:#FF6A2B; transition:width .25s linear; }
 .wk-rm-open{ flex:1; display:flex; align-items:baseline; gap:8px; height:100%; border:0; background:none; color:#ECEDEE; font:inherit; cursor:pointer; text-align:left; }
 .wk-rm-open span{ font-size:13px; color:#8B8F97; }

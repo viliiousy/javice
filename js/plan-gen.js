@@ -431,7 +431,9 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
     const allHi = L.sets.every(s => Number(s.r) >= hi), under = L.sets.some(s => Number(s.r) < lo);
     const lower = this.PART_OF[Object.keys(this.POOL).find(k => this.POOL[k].includes(name))] === '하체';
     const step = lower ? 5 : 2.5;
-    const next = allHi ? top + step : under ? Math.round(top * 0.9 / 2.5) * 2.5 : top;
+    // 어시스트(도움 받는 무게)는 반대로 — 다 해냈으면 도움을 줄이고(▲ 실력), 못 채웠으면 도움을 늘린다
+    const as = this.assist(name);
+    const next = as ? (allHi ? Math.max(0, top - step) : under ? top + step : top) : allHi ? top + step : under ? Math.round(top * 0.9 / 2.5) * 2.5 : top;
     return `지난번 ${top}kg×${L.sets.map(s => s.r).join('·')} → 오늘 ${next}kg${allHi ? ' ▲' : under ? ' ▼' : ''}`;
   },
   openLog(name, sets, ds) {
@@ -550,6 +552,8 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
   HOLD_NOT: /푸쉬업|로테이션|쏘우|볼 스루|잭|업 ?다운|풀 ?업|워크/,
   hold(name) { const n = String(name || ''); return this.HOLD_RE.test(n) && !this.HOLD_NOT.test(n); },
   unit(name) { return this.hold(name) ? '초' : '회'; },
+  // 도움 받는 운동(어시스트 풀업·어시스트 딥스·밴드 어시스트 등) — 적은 무게는 '덜어 준 무게'라 들어 올린 무게(볼륨)에 넣지 않는다
+  assist(name) { return /어시스트|어시스티드|보조|assist/i.test(String(name || '')); },
   // 교체 후보: ① 같은 동작 칸 → ② 같은 동작 이름 → ③ 같은 부위. 가진 기구로 먼저 고르고,
   // 그래도 없으면 기구를 따지지 않고(대신 '기구 필요' 표시) 같은 부위에서 고른다 — 빈 목록은 보이지 않는다.
   alternatives(name) {

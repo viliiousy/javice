@@ -14,7 +14,7 @@ const Wheel = {
       <div class="whl">${cols}${o.unit ? `<div class="whl-unit">${esc(o.unit)}</div>` : ''}<div class="whl-sel" aria-hidden="true"></div></div>
       ${o.note ? `<p class="pg-note whl-note">${esc(o.note)}</p>` : ''}
       ${o.extra || ''}
-      <div class="modal-btns"><button class="btn-sm" onclick="Wheel.cancel()">취소</button><button class="btn-sm accent" onclick="Wheel.ok()">확인</button></div>`);
+      <div class="modal-btns">${o.alt ? `<button class="btn-sm" onclick="Wheel.ok(true)">${esc(o.alt.label)}</button>` : '<button class="btn-sm" onclick="Wheel.cancel()">취소</button>'}<button class="btn-sm accent" onclick="Wheel.ok()">확인</button></div>`);
     requestAnimationFrame(() => {
       document.querySelectorAll('.whl-col').forEach((col, ci) => {
         const c = o.cols[ci], sc = col.querySelector('.whl-sc');
@@ -68,14 +68,15 @@ const Wheel = {
     } catch (e) {}
   },
   cancel() { App.closeModal(); if (this.o && this.o.cancel) this.o.cancel(); },
-  ok() {
+  // alt: 왼쪽 단추를 취소 대신 다른 일로 쓸 때(취소는 오른쪽 위 X) — { label, fn(vals) }
+  ok(alt) {
     const vals = [...document.querySelectorAll('.whl-col')].map((col, ci) => {
       const c = this.o.cols[ci], i = Math.max(0, Math.min(c.vals.length - 1, Math.round(col.querySelector('.whl-sc').scrollTop / this.H)));
       return c.vals[i];
     });
     try { Haptic.light(); } catch (e) {}
     App.closeModal();
-    try { this.o.done(vals); } catch (e) { console.warn(e); }
+    try { (alt && this.o.alt ? this.o.alt.fn : this.o.done)(vals); } catch (e) { console.warn(e); }
   },
 };
 

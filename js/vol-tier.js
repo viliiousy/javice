@@ -57,7 +57,7 @@ const VolTier = {
   //   카드 기록 시트·AI 비서·운동 모드 체크에서 부른다. ds 날짜의 다른 기록과 합쳐 하루·한 주 상한도 본다.
   warn(n, sets, ds) {
     try {
-      if (PlanGen.hold(n)) return '';   // 버티는 운동(초)은 들어 올린 무게에 넣지 않는다
+      if (PlanGen.hold(n) || PlanGen.assist(n)) return '';   // 어시스트 무게는 덜어 준 무게   // 버티는 운동(초)은 들어 올린 무게에 넣지 않는다
       sets = (sets || []).map(x => ({ w: Number(x.w) || 0, r: Number(x.r) || 0 })).filter(x => x.w > 0 && x.r > 0);
       if (!sets.length) return '';
       const cap = this._cap(n), pre = UserStore.key(PlanGen.LOG_PREFIX);
@@ -68,7 +68,7 @@ const VolTier = {
         const d = key.slice(pre.length); if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
         let L; try { L = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) { continue; }
         for (const [m, ss] of Object.entries(L)) for (const x of ss || []) {
-          if (PlanGen.hold(m)) break;
+          if (PlanGen.hold(m) || PlanGen.assist(m)) break;
           const w = Number(x && x.w) || 0, r = Number(x && x.r) || 0; if (!(w > 0 && r > 0)) continue;
           if (m === n && d < ds) best = Math.max(best, Math.min(w, cap));
           if (m === n && d === ds) continue;   // 이 운동의 그날 기록은 지금 저장하는 것으로 바뀐다
@@ -122,7 +122,7 @@ const VolTier = {
       let s = 0, raw = 0; const dayBest = {};
       const off = this._unchecked(ds);   // 그날 목록에서 체크를 푼 운동은 세지 않는다(체크를 풀면 볼륨·레벨도 되돌아간다)
       for (const [n, ss] of Object.entries(L)) {
-        if (off.has(n) || PlanGen.hold(n)) continue;   // 버티는 운동(초 단위)은 볼륨에서 뺀다
+        if (off.has(n) || PlanGen.hold(n) || PlanGen.assist(n)) continue;   // 어시스트 무게는 볼륨이 아니다   // 버티는 운동(초 단위)은 볼륨에서 뺀다
         if (!(n in capOf)) capOf[n] = this._cap(n);
         for (const x of ss || []) {
           const w = Number(x.w) || 0, r = Number(x.r) || 0; if (!(w > 0 && r > 0)) continue;

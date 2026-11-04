@@ -279,7 +279,7 @@ const WorkoutMode = {
         ${x.cardio ? `<div class="wk-time"><button type="button" class="inp wk-num wk-tnum" onclick="WorkoutMode.pickTime()" aria-label="운동 시간 바꾸기"><b class="num">${Fitness.cardio(x.sets, x.name).min}</b><i>분</i></button>${(() => { const c = Fitness.cardio(x.sets, x.name); return (Fitness.isRun(x.name) || Fitness.isTread(x.name)) ? `<button type="button" class="inp wk-num wk-tnum" onclick="WorkoutMode.pickSpeed()" aria-label="속도 바꾸기"><b class="num">${c.kmh ? Fitness.speedTxt(x.name, c.kmh) : (Fitness.isTread(x.name) ? '속도' : '페이스')}</b></button>` : ''; })()}
           <p class="wk-note">세트 없이 시간으로 합니다. 숫자를 눌러 한 시간을 고치고, 끝나면 아래 ‘완료’ 를 눌러 주세요.</p></div>` : `
         <div class="wk-sets">
-          <div class="wk-sh"><span>세트</span><span>kg</span><span>${PlanGen.unit(x.name)}</span><span></span></div>
+          <div class="wk-sh"><span>세트</span><span>${PlanGen.assist(x.name) ? '보조kg' : 'kg'}</span><span>${PlanGen.unit(x.name)}</span><span></span></div>
           ${x.rows.map((r, k) => `<div class="wk-sw" data-k="${k}"><div class="wk-set${r.ok ? ' ok' : ''}${k === nowK ? ' now' : ''}">
             <span class="wk-k">${k + 1}</span>
             <button type="button" class="inp wk-num" onclick="WorkoutMode.pickVal(${k},'w')">${r.w !== '' && r.w != null ? r.w : '—'}</button>
@@ -539,7 +539,17 @@ const WorkoutMode = {
              { vals: [0, 10, 20, 30, 40, 50], cur: Math.round((pf.rest % 60) / 10) * 10, fmt: v => String(v).padStart(2, '0') + '초' }],
       extra: `<div class="set-item"><span class="set-tx"><b>쉬는 시간 타이머</b><small>세트를 끝내면 바로 카운트다운</small></span>${Settings._sw(pf.timer, "WorkoutMode._pref('timer')")}</div>
         <div class="set-item"><span class="set-tx"><b>타이머 소리</b><small>3초 전 째깍 · 끝나면 2초 알림음 (앱을 내려 둬도)</small></span>${Settings._sw(pf.sound, "WorkoutMode._pref('sound')")}</div>`,
+      // 왼쪽 단추: 고른 시간으로 지금 바로 쉬는 시간 시작(더 쉬고 싶을 때 한 번 더 돌린다). 닫기는 오른쪽 위 X
+      ...(this.st ? { alt: { label: this.st.restEnd ? '휴식 다시 시작' : '휴식 시작', fn: ([m, sec]) => { const t = Math.max(10, m * 60 + sec); this.setPrefs({ rest: t }); this.startRest(t); } } } : {}),
       done: ([m, sec]) => { this.setPrefs({ rest: Math.max(10, m * 60 + sec) }); this.paint(); } });
+  },
+  // 쉬는 시간을 직접 시작(타이머 설정이 꺼져 있어도) — 세트 완료 때와 같은 카운트다운·소리·알림
+  startRest(sec) {
+    const S = this.st; if (!S) return;
+    S.restEnd = Date.now() + sec * 1000; S.restTot = sec; S.restMin = false; this._lastTick = null; this._nc = 0;
+    const r = document.getElementById('wkRest'); if (r) r.innerHTML = '';
+    this._notify(sec); this._time(); this.live();
+    try { Haptic.light(); } catch (e) {}
   },
   _pref(k) {
     this.setPrefs({ [k]: !this.prefs()[k] });
