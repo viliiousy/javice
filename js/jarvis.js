@@ -214,21 +214,66 @@ const JARVIS = {
   _onPhotoSelected(input) {
     const file=input.files[0]; if(!file) return; input.value='';
     const reader=new FileReader();
-    reader.onload=e=>{ const b64=e.target.result.split(',')[1]; this._addMsg('user','음식 사진 분석'); this._analyzeFood(b64,file.type||'image/jpeg'); };
+    // 사진과 함께 할 말: 입력칸에 쓴 말, 없으면 바로 앞에 '사진 보낼게…' 처럼 한 말(5분 안)
+    const inp=document.getElementById('jInput'); let hint=(inp?.value||'').trim();
+    if(hint){ inp.value=''; this._syncSend?.(); }
+    else if(this._lastAsk && Date.now()-this._lastAsk.t<5*60e3 && /사진|캡처|캡쳐|스샷|이미지/.test(this._lastAsk.m)) hint=this._lastAsk.m;
+    reader.onload=e=>{ const b64=e.target.result.split(',')[1]; this._addMsg('user',hint?`사진 · ${hint}`:'사진 분석'); this._analyzePhoto(b64,file.type||'image/jpeg',hint); };
     reader.readAsDataURL(file);
   },
-  async _analyzeFood(base64,mimeType) {
+  // 사진이 무엇인지부터 본다 — 음식이면 식단, 운동 앱·기구 화면이면 운동 기록, 그 밖이면 내용을 읽어 평소처럼 답한다
+  async _analyzePhoto(base64,mimeType,hint='') {
     const key=this._getKey(); if(!key) return;
     this._setStatus('사진 분석 중...');
     try{
-      const data=await this.chat({ max_tokens:1000,
+      const data=await this.chat({ max_tokens:1500,
         messages:[{role:'user',content:[
           {type:'image_url',image_url:{url:`data:${mimeType};base64,${base64}`}},
-          {type:'text',text:`음식 사진 분석 JSON만 출력:\n{"foods":[{"name":"","amount":"","cal":0,"protein":0,"carb":0,"fat":0}],"total_cal":0,"meal":"아침|점심|저녁|간식","comment":""}\n한국 음식 기준으로 정확하게 추정해줘.`}
+          {type:'text',text:`이 사진이 무엇인지 먼저 판단하고 JSON 하나만 출력해.
+1) 음식·음료 사진: {"kind":"food","foods":[{"name":"","amount":"","cal":0,"protein":0,"carb":0,"fat":0}],"total_cal":0,"meal":"아침|점심|저녁|간식","comment":""} — 한국 음식 기준으로 추정.
+2) 운동 기록 화면(운동 앱 캡처·헬스 기구·워치 화면): {"kind":"workout","date":"MM-DD 또는 null","exercises":[{"name":"","w":0,"reps":0,"sets":0,"min":0}],"kcal":0}
+   - 화면에 보이는 운동을 위에서부터 빠짐없이, 숫자는 보이는 그대로. 이름은 화면 글자 그대로(한국어).
+   - "40kg x 10회 x 3세트" → w:40,reps:10,sets:3 / "10분 x 1세트" → min:10,sets:1 / 무게 없이 "15회 x 3세트" → w:0,reps:15,sets:3.
+   - 상단 날짜(예 "11.02.")가 있으면 date:"11-02". kcal 은 화면의 총 소모 열량.
+3) 그 밖: {"kind":"other","text":"사진에 보이는 글자와 내용을 자세히"}
+${hint?`사용자가 함께 한 말: "${hint}"`:''}`}
         ]}] }, 'vision');
       const text=data.choices?.[0]?.message?.content||'';
       let parsed; try{ const m=text.match(/\{[\s\S]*\}/); parsed=m?JSON.parse(m[0]):null; }catch{}
-      if(!parsed?.foods){ this._addMsg('ai','음식을 인식하지 못했습니다.'); return; }
+      if(!parsed){ this._addMsg('ai','사진을 읽지 못했습니다. 다시 한번 보내 주세요.'); this._setStatus('대기 중'); return; }
+      const kind=parsed.kind||(parsed.foods?'food':parsed.exercises?'workout':'other');
+      if(kind==='workout') await this._photoWorkout(parsed,hint);
+      else if(kind==='food') this._photoFood(parsed);
+      else {
+        // 사진 내용을 글로 바꿔 평소 대화로 넘긴다 — '이거 일정에 넣어 줘' 같은 말도 처리된다
+        const msg=`${hint||'이 사진 내용을 보고 필요한 걸 처리해 줘'}\n[첨부 사진 내용: ${String(parsed.text||'').slice(0,1500)}]`;
+        this._setStatus('생각 중...');
+        await this._handleReply(await this._callAPI(key,msg));
+      }
+    }catch(err){ this._addMsg('ai',`분석 실패: ${err.message}`); }
+    this._setStatus('대기 중');
+  },
+  async _photoWorkout(p,hint) {
+    const ex=(Array.isArray(p.exercises)?p.exercises:[]).filter(e=>e&&e.name);
+    if(!ex.length){ this._addMsg('ai','사진에서 운동을 찾지 못했습니다.'); return; }
+    // 날짜: 사진의 'MM-DD'(올해, 앞으로의 날이면 작년) → 없으면 오늘
+    let date=null; const m=String(p.date||'').match(/(\d{1,2})\D+(\d{1,2})/);
+    if(m){ const t=new Date(), d=new Date(t.getFullYear(),+m[1]-1,+m[2]); if(d>t) d.setFullYear(d.getFullYear()-1); if(!isNaN(d)) date=Fitness._dateStr(d); }
+    // '루틴으로 저장·루틴에 추가' 라고 했으면 같은 구성을 루틴으로도 저장한다(이름: 말한 이름 › 날짜)
+    let routine=null;
+    if(/루틴/.test(hint)){ const n=hint.match(/(?:이름(?:은|을)?|루틴\s*이름)\s*['"“]?([^'"”\n,.]{1,20})/); routine=(n&&n[1].trim())||`${date?date.slice(5).replace('-','/'):'사진'} 운동`; }
+    const r=await JarvisActions.exec({type:'ex_import',date,exercises:ex,routine});
+    const extra=Number(p.kcal)>0?`\n화면 총 소모: ${Math.round(p.kcal)}kcal`:'';
+    const tail=r.ok&&!routine?'\n같은 구성을 루틴으로도 두려면 "이 운동 루틴으로 저장해 줘, 이름은 ○○" 라고 말씀해 주세요.':'';
+    const out=r.ok?`${r.msg}\n${r.show||''}${extra}${tail}`:r.msg;
+    this._addMsg('ai',out);
+    // 다음 말('루틴으로 저장해 줘')이 이어지도록 대화 기록에 남긴다
+    this.history.push({role:'user',content:`[운동 앱 사진] ${date||'오늘'} ${ex.map(e=>`${e.name} ${e.min?`${e.min}분`:`${e.w?e.w+'kg ':''}${e.reps}회`}×${e.sets||1}세트`).join(', ')}${hint?` — ${hint}`:''}`},{role:'assistant',content:JSON.stringify({response:out,actions:[]})+' [앱이 바로 실행함]'});
+    this.history=this.history.slice(-24);
+    if(r.ok) App.showToast(`운동 ${ex.length}개 기록`,'success');
+  },
+  _photoFood(parsed) {
+      if(!parsed?.foods?.length){ this._addMsg('ai','음식을 인식하지 못했습니다.'); return; }
       const meal=parsed.meal||'저녁';
       this._addMsg('ai',`${meal} 분석\n${parsed.foods.map(f=>`${f.name}(${f.amount||'?'}) ${f.cal}kcal`).join(', ')}\n합계: ${parsed.total_cal}kcal`);
       const d=Diet.getData(); if(!d[meal])d[meal]=[];
@@ -236,8 +281,6 @@ const JARVIS = {
       Diet.saveData(d); Diet.render();
       App.showToast(`${meal}에 ${parsed.foods.length}개 추가`,'success');
       App._updateStatsBanner();
-    }catch(err){ this._addMsg('ai',`분석 실패: ${err.message}`); }
-    this._setStatus('대기 중');
   },
 
   // ── 텍스트 전송 ───────────────────────
@@ -247,6 +290,13 @@ const JARVIS = {
     if(inp) inp.value='';
     this._syncSend();
     this._addMsg('user',msg);
+    this._lastAsk={m:msg,t:Date.now()};
+    // '사진 보낼게 · 캡처 첨부할 테니 …' — 사진을 먼저 받는다. 고른 사진은 이 말대로 처리한다(_onPhotoSelected 가 이어 받음)
+    if(/사진|캡처|캡쳐|스샷|스크린샷/.test(msg) && /(보낼|보내|첨부|올릴|올려|줄\s*테니|줄게)/.test(msg) && this._getKey()){
+      this._addMsg('ai','사진을 골라 주세요. 고른 사진은 방금 말씀하신 대로 처리하겠습니다.');
+      try{ document.getElementById('jPhotoInput')?.click(); }catch(e){}
+      return;
+    }
     // 짧은 기기 명령("조명 꺼 줘"·"거실 불 켜"·"에어컨 24도로")은 허브처럼 바로 처리한다 — AI 를 거치지 않고, 실제 결과로 답한다.
     // 확실하지 않으면 null 이 오고 아래 AI 로 넘어간다. (js/jarvis-actions.js JHome.quick)
     try{

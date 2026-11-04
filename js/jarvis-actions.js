@@ -865,6 +865,38 @@ const JarvisActions = {
       this._rerender();
       return { ok: true, msg: `'${name}' ${sets.map(s => s.w ? `${s.w}kg×${s.r}` : `${s.r}회`).join(', ')} 기록했습니다${f.miss ? ' (그날 목록에는 없는 운동이라 기록만 남겼습니다)' : ''}${(() => { const m = typeof VolTier !== 'undefined' ? VolTier.warn(name, sets, ds) : ''; return m ? '\n' + m : ''; })()}` };
     },
+    // 운동 앱 캡처(사진)에서 읽은 운동을 그날 기록으로 한꺼번에 넣는다 — 목록에 넣고, 세트 기록을 남기고, 완료로 표시.
+    // exercises: [{name, w, reps, sets, min}] · routine: 이름을 주면 같은 구성을 루틴으로도 저장
+    ex_import(a) {
+      const d = this._date(a.date);
+      if (this._isFuture(d)) return { ok: false, msg: '아직 오지 않은 날에는 기록할 수 없습니다' };
+      const ds = this._ds(d), list = this._wList(d), L = PlanGen.log(ds), done = new Set(), rx = [];
+      const items = (Array.isArray(a.exercises) ? a.exercises : []).filter(e => e && String(e.name || '').trim()).slice(0, 20);
+      if (!items.length) return { ok: false, msg: '사진에서 운동을 찾지 못했습니다' };
+      for (const e of items) {
+        const nm = this._exName(e.name);
+        const w = Math.max(0, Number(e.w) || 0), r = Math.max(0, Math.round(Number(e.reps) || 0)), n = Math.min(20, Math.max(1, Math.round(Number(e.sets) || 1))), min = Math.max(0, Number(e.min) || 0);
+        const timed = min > 0 || PlanGen.timed(nm);
+        const sets = min > 0 ? `${Math.round(min * n)}분` : r > 0 ? `${n}×${r}` : Fitness.defSets(nm);
+        const hit = JMatch.find(nm, list, { min: 0.86 }).item;
+        const x = hit || { name: nm };
+        x.sets = sets; x.w = !timed && w > 0 ? w : (hit ? x.w : '');
+        if (!hit) list.push(x);
+        if (!timed && r > 0) L[x.name] = Array.from({ length: n }, () => ({ w, r }));
+        done.add(x.name);
+        rx.push({ name: x.name, sets, ...(x.w ? { w: x.w } : {}) });
+      }
+      if (Fitness._ed && Fitness._ed.ds === ds) Fitness._ed = null;
+      Fitness.applyList(ds, list, 'day');
+      PlanGen.saveLog(ds, L);
+      const now = Fitness.exercisesFor(d).list, chk = new Set(Fitness._checked(d));
+      now.forEach((x, i) => { if (done.has(x.name)) chk.add(i); });
+      Fitness._save([...chk], d);
+      this._rerender();
+      let msg = `${ds === this._ds() ? '오늘' : this._md(d)} 운동 ${rx.length}개를 기록하고 완료로 표시했습니다`;
+      if (a.routine) { const s = this.W.routine_save.call(this, { name: a.routine, exercises: rx }); msg += s.ok ? `\n${s.msg}` : ''; }
+      return { ok: true, msg, show: rx.map(x => `· ${x.name} ${this._setsTxt(x)}`).join('\n') };
+    },
     workout_start(a) {
       const ds = this._ds(this._date(a.date));
       if (!Fitness.exercisesFor(new Date(ds + 'T00:00:00')).list.length) return { ok: false, msg: '그날 계획된 운동이 없습니다 — 먼저 운동을 추가해 주세요' };
@@ -1487,7 +1519,7 @@ const JarvisActions = {
 
 JSON 하나만 출력: {"response":"","actions":[{"type":"…",…}]}
 actions (괄호 안 필드, ?는 생략 가능):
-[운동] ex_list(date?) ex_parts(parts:["가슴|등|하체|어깨|팔|복근"],scope?,date?) ex_swap(from,to,sets?,w?,scope?,date?) ex_add(name,sets?,w?,kcal?,done?,pos?,scope?,date?) ex_remove(name,scope?,date?) ex_set(name,sets?,w?,kcal?,scope?,date?) ex_move(name,pos) ex_done(name|"전체",done) ex_log(name,sets:[{w,r}],date?) workout_start(date?) routine_save(name,exercises:[{name,sets}],days?,mode?:"add|replace") day_assign(dow,routines:["루틴 이름|휴식|유산소"],mode?:"set|add")
+[운동] ex_list(date?) ex_parts(parts:["가슴|등|하체|어깨|팔|복근"],scope?,date?) ex_swap(from,to,sets?,w?,scope?,date?) ex_add(name,sets?,w?,kcal?,done?,pos?,scope?,date?) ex_remove(name,scope?,date?) ex_set(name,sets?,w?,kcal?,scope?,date?) ex_move(name,pos) ex_done(name|"전체",done) ex_log(name,sets:[{w,r}],date?) workout_start(date?) ex_import(date,exercises:[{name,w,reps,sets,min}],routine?) — 운동 앱 캡처에서 읽은 운동 한꺼번에 기록 routine_save(name,exercises:[{name,sets}],days?,mode?:"add|replace") day_assign(dow,routines:["루틴 이름|휴식|유산소"],mode?:"set|add")
 [습관] habit_check(name,done,date?) habit_add(name,days?,time?) habit_edit(name,newName?,days?,time?:"HH:MM|off") habit_del(name) habit_stats(name?,days?)
 [식단] log_food(meal:"아침|점심|저녁|간식",name,cal,protein,carb,fat,date?) delete_food(name,meal?,date?) edit_food(name,newName?,cal?,protein?,carb?,fat?,meal?,date?) move_food(name,to:"끼니",meal?,date?) diet_clear(meal?,date?) — 초기화·전부 지워·리셋(끼니를 말하면 그 끼니만) diet_copy(from,to?,meal?) — '어제랑 똑같이' undo() — 방금 한 식단 변경 되돌리기 diet_goal(cal?,protein?,carb?,fat?) diet_status(date?)
 [인바디] inbody_add(wt?,ms?,bf?,bmr?,date?) inbody_trend(n?)
