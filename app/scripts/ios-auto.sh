@@ -64,6 +64,8 @@ git fetch -q origin main 2>>"$LOG" || { say "깃허브에 닿지 못했습니다
 NEW=$(git rev-parse origin/main)
 OLD=$(cat "$STATE" 2>/dev/null || true)
 [ "$NEW" = "$OLD" ] && exit 0
+# 이 스크립트 자신도 저장소에 있다 — 빌드하지 않는 커밋이라도 폴더를 최신으로 맞춰 다음 실행부터 새 규칙을 쓴다
+git reset -q --hard origin/main
 
 if [ -n "$OLD" ] && git cat-file -e "$OLD" 2>/dev/null; then
   CH=$(git diff --name-only "$OLD" "$NEW" | grep -E "$NATIVE" || true)
