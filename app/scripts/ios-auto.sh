@@ -8,6 +8,11 @@
 # 지금 강제로:  bash ~/bashy-ios/app/scripts/ios-auto.sh force
 # 기록:         ~/Library/Logs/bashy-ios.log
 set -uo pipefail
+# launchd 는 터미널과 달리 사용자 설정(.zprofile·.zshrc — nvm·brew 의 node 경로 등)을 읽지 않는다.
+# 터미널에서 직접 칠 때와 똑같은 환경이 되도록 로그인 셸로 한 번 다시 실행한다.
+if [ -z "${BASHY_LOGIN:-}" ] && [ "${1:-run}" != install ] && [ "${1:-run}" != uninstall ]; then
+  exec /bin/zsh -lic 'BASHY_LOGIN=1 /bin/bash "$0" "$@"' "$0" "$@" </dev/null
+fi
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 REPO="$HOME/bashy-ios"
 TEAM="${TEAM:-4A96B688B4}"
@@ -18,7 +23,7 @@ PL="$HOME/Library/LaunchAgents/app.bashy.ios-auto.plist"
 # 이 경로가 바뀌면 앱을 새로 빌드한다(app/scripts/build-www.mjs 가 앱에 넣는 것 + 네이티브)
 NATIVE='^(js/|css/|icons/|img/|sounds/|[^/]+\.html$|manifest\.json|hub\.webmanifest|app/(ios/|scripts/build-www|package\.json|package-lock\.json|capacitor\.config\.json))'
 
-say() { echo "[$(date '+%m-%d %H:%M')] $*" >> "$LOG"; }
+say() { echo "[$(date '+%m-%d %H:%M')] $*" >> "$LOG"; tail -n 200 "$LOG" > "$HOME/Downloads/bashy-ios-build.log" 2>/dev/null || true; }
 note() { osascript -e "display notification \"$1\" with title \"Bashy 앱 빌드\"" >/dev/null 2>&1 || true; }
 
 case "${1:-run}" in
@@ -76,6 +81,7 @@ if TEAM="$TEAM" bash app/scripts/ios-release.sh >> "$LOG" 2>&1; then
   echo "$NEW" > "$STATE"
   say "✅ 업로드 완료 ${NEW:0:7}"; note "TestFlight 에 올렸습니다 — 10~30분 뒤 업데이트하세요"
 else
+  say "도구: node=$(command -v node || echo 없음) npm=$(command -v npm || echo 없음) xcodebuild=$(command -v xcodebuild || echo 없음)"
   say "❌ 빌드 실패 ${NEW:0:7} — 위 기록 확인"; note "빌드 실패 — ~/Library/Logs/bashy-ios.log 확인"
   echo "$NEW $(date +%s)" > "$STATE.fail"   # 같은 커밋은 1시간 뒤에 다시 시도
 fi
