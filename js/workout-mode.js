@@ -188,7 +188,7 @@ const WorkoutMode = {
     const mins = Math.round((sets * 45 + Math.max(0, sets - 1) * (pf.timer ? pf.rest : 30)) / 60) + cardioMin;
     const vol = todo.reduce((t, e) => t + e.rows.reduce((a, r) => a + (Number(r.w) || 0) * (Number(r.r) || 0), 0), 0);
     const k = n => Math.round(n).toLocaleString('ko-KR');
-    const li = e => `<li class="${e.done ? 'done' : ''}"><b>${esc(e.name)}</b><span>${e.done ? '완료' : e.cardio ? esc(e.sets || '시간') : `${e.rows.length}세트 · ${e.rows[0].w ? e.rows[0].w + 'kg × ' : ''}${e.rows[0].r}회`}</span></li>`;
+    const li = e => `<li class="${e.done ? 'done' : ''}"><b>${esc(e.name)}</b><span>${e.done ? '완료' : e.cardio ? esc(e.sets || '시간') : `${e.rows.length}세트 · ${e.rows[0].w ? e.rows[0].w + 'kg × ' : ''}${e.rows[0].r}${PlanGen.unit(e.name)}`}</span></li>`;
     const list = SS ? SS.map(x => { const ex = all.filter(e => e.sess === x.si || (e.sess == null && e._lastSess === x.si)), dn = ex.every(e => e.done);
         return `<button type="button" class="wk-cf-ss${x.si === sel ? ' on' : ''}${dn ? ' fin' : ''}" onclick="WorkoutMode.confirmStart('${ds}', ${x.si})">
           <span class="wk-cf-ck">${x.si === sel ? '✓' : ''}</span><b>${x.k + 1}회차 · ${esc(x.name)}</b><small>${dn ? '완료' : ex.filter(e => e.done).length + '/' + ex.length}</small></button>
@@ -267,7 +267,7 @@ const WorkoutMode = {
         <div class="wk-stage">${th ? `<div class="wk-pose">${ExMedia.poseHtml(th, esc(x.name))}</div>` : `<div class="wk-pose none">${typeof Icons !== 'undefined' ? Icons.svg('dumbbell') : ''}<span>자세 그림 준비 중</span></div>`}</div>
         <div class="wk-ex-tx">
           <div class="wk-n">${S.cur + 1}<i>/${S.ex.length}</i>${part ? `<span class="wk-part">${esc(part)}</span>` : ''}</div>
-          <h2>${esc(x.name)}</h2><p>${esc(Fitness.setsLabel(x.sets || ''))}${x.sug ? ` · <em>${esc(x.sug)}</em>` : ''}</p>
+          <h2>${esc(x.name)}</h2><p>${esc(Fitness.setsLabel(x.sets || '', x.name))}${x.sug ? ` · <em>${esc(x.sug)}</em>` : ''}</p>
           <div class="wk-tools">
             <button class="wk-tool" onclick="WorkoutMode.swap()">⇄ 운동 교체</button>
             <button class="wk-tool" onclick="WorkoutMode.addEx()">+ 종목 추가</button>
@@ -279,7 +279,7 @@ const WorkoutMode = {
         ${x.cardio ? `<div class="wk-time"><button type="button" class="inp wk-num wk-tnum" onclick="WorkoutMode.pickTime()" aria-label="운동 시간 바꾸기"><b class="num">${Fitness.cardio(x.sets, x.name).min}</b><i>분</i></button>${(() => { const c = Fitness.cardio(x.sets, x.name); return (Fitness.isRun(x.name) || Fitness.isTread(x.name)) ? `<button type="button" class="inp wk-num wk-tnum" onclick="WorkoutMode.pickSpeed()" aria-label="속도 바꾸기"><b class="num">${c.kmh ? Fitness.speedTxt(x.name, c.kmh) : (Fitness.isTread(x.name) ? '속도' : '페이스')}</b></button>` : ''; })()}
           <p class="wk-note">세트 없이 시간으로 합니다. 숫자를 눌러 한 시간을 고치고, 끝나면 아래 ‘완료’ 를 눌러 주세요.</p></div>` : `
         <div class="wk-sets">
-          <div class="wk-sh"><span>세트</span><span>kg</span><span>회</span><span></span></div>
+          <div class="wk-sh"><span>세트</span><span>kg</span><span>${PlanGen.unit(x.name)}</span><span></span></div>
           ${x.rows.map((r, k) => `<div class="wk-sw" data-k="${k}"><div class="wk-set${r.ok ? ' ok' : ''}${k === nowK ? ' now' : ''}">
             <span class="wk-k">${k + 1}</span>
             <button type="button" class="inp wk-num" onclick="WorkoutMode.pickVal(${k},'w')">${r.w !== '' && r.w != null ? r.w : '—'}</button>
@@ -362,7 +362,7 @@ const WorkoutMode = {
   restFull() { const S = this.st; if (!S) return; S.restMin = false; const r = document.getElementById('wkRest'); if (r) r.innerHTML = ''; this._time(); },
   _nextLabel() {
     const S = this.st, x = S.ex[S.cur], k = x.rows.findIndex(r => !r.ok);
-    if (k >= 0) return `${x.name} ${k + 1}세트 · ${x.rows[k].w || '—'}kg × ${x.rows[k].r || '—'}회`;
+    if (k >= 0) return `${x.name} ${k + 1}세트 · ${x.rows[k].w || '—'}kg × ${x.rows[k].r || '—'}${PlanGen.unit(x.name)}`;
     const n = S.ex.findIndex((e, i) => i > S.cur && !e.done);
     return n >= 0 ? S.ex[n].name : '마무리';
   },
@@ -393,9 +393,10 @@ const WorkoutMode = {
   pickVal(k, f) {
     if (!this.st) return;
     const x = this.st.ex[this.st.cur], v = x.rows[k][f];
-    NumIn.open({ title: `${k + 1}세트 ${f === 'w' ? '무게' : '횟수'}`, unit: f === 'w' ? 'kg' : '회', dec: f === 'w',
+    const hd = PlanGen.hold(x.name);
+    NumIn.open({ title: `${k + 1}세트 ${f === 'w' ? '무게' : hd ? '시간(초)' : '횟수'}`, unit: f === 'w' ? 'kg' : hd ? '초' : '회', dec: f === 'w',
       cur: v !== '' && v != null ? v : (f === 'r' ? this._reps(x.sets) : ''),
-      note: `아래 세트도 같은 ${f === 'w' ? '무게' : '횟수'}로 바뀝니다 (위 세트는 그대로)`,
+      note: `아래 세트도 같은 ${f === 'w' ? '무게' : hd ? '시간' : '횟수'}로 바뀝니다 (위 세트는 그대로)`,
       done: val => this.setVal(k, f, val) });
   },
   setDone(k) {
@@ -616,7 +617,7 @@ const WorkoutMode = {
     const x = S.ex[S.cur], k = x.rows.findIndex(r => !r.ok), r = x.rows[k >= 0 ? k : x.rows.length - 1] || {};
     const doneN = S.ex.filter(e => e.done).length;
     return { title: x.name, step: k >= 0 ? `${k + 1} / ${x.rows.length}세트` : '이 운동 끝',
-      sub: `${r.w ? r.w + 'kg × ' : ''}${r.r || '—'}회 · ${doneN + 1}/${S.ex.length} 종목`,
+      sub: `${r.w ? r.w + 'kg × ' : ''}${r.r || '—'}${PlanGen.unit(x.name)} · ${doneN + 1}/${S.ex.length} 종목`,
       restEnd: S.restEnd || 0, startedAt: S.t0 };
   },
   live() {

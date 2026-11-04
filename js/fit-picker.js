@@ -176,7 +176,7 @@ Object.assign(Fitness, {
         done:([a,b])=>done(Math.round(3600/Math.max(60,a*60+b)*100)/100), cancel });   // 1초 단위(속도는 소수 둘째 자리까지 기억해 페이스가 그대로 돌아오게)
     }
   },
-  defSets(n){ const p=typeof PlanGen!=='undefined'?PlanGen.partOf(n):null; return p==='스포츠' ? '60분' : p==='유산소' ? '30분' : this.DEFAULT_SETS; },
+  defSets(n){ const p=typeof PlanGen!=='undefined'?PlanGen.partOf(n):null; return p==='스포츠' ? '60분' : p==='유산소' ? '30분' : (typeof PlanGen!=='undefined'&&PlanGen.hold(n)) ? '3×30' : this.DEFAULT_SETS; },
   // 운동 만들기 시트 — 지금 열린 창(고르기·교체) 위에 얹어서, 고르던 목록이 날아가지 않게 한다
   makeEx(name, done){
     document.getElementById('myExSheet')?.remove();

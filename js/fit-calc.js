@@ -71,14 +71,15 @@ Object.assign(Fitness, {
   // '4×10-12' → '4세트 10-12회', '3×12' → '3세트 12회'(시간 운동은 그대로)
   // sets 에 적어 둔 실제 소모 열량('… · 163kcal') — 없으면 null
   kcalOf(sets){ const m=String(sets||'').match(/([\d.]+)\s*kcal/i); return m ? Math.round(Number(m[1])) : null; },
-  setsLabel(sets){
-    const t=String(sets||'').replace(/\s*·?\s*[\d.]+\s*kcal/i,'').trim(), m=t.match(/^(\d+)\s*[×xX*]\s*([\d\-~–]+)\s*(회)?$/);
-    return m ? `${m[1]}세트 ${m[2].replace(/[~–]/g,'-')}회` : t;
+  setsLabel(sets, name){
+    const t=String(sets||'').replace(/\s*·?\s*[\d.]+\s*kcal/i,'').trim(), m=t.match(/^(\d+)\s*[×xX*]\s*([\d\-~–]+)\s*(회|초)?$/);
+    return m ? `${m[1]}세트 ${m[2].replace(/[~–]/g,'-')}${m[3]==='초'||PlanGen.hold(name)?'초':'회'}` : t;
   },
   // 세트 기록 한 줄: 같은 무게·횟수가 이어지면 묶는다 — '18kg 10회 × 4세트' / '20kg 8회 × 2세트 · 18kg 10회'
-  setsLine(L){
+  setsLine(L, name){
+    const u=PlanGen.unit(name);
     const g=[]; for(const s of L||[]){ const w=Number(s.w)||0, r=Number(s.r)||0, last=g[g.length-1]; if(last&&last.w===w&&last.r===r) last.n++; else g.push({ w, r, n:1 }); }
-    return g.map(x=>`${x.w?x.w+'kg ':''}${x.r}회${x.n>1?` × ${x.n}세트`:''}`).join(' · ');
+    return g.map(x=>`${x.w?x.w+'kg ':''}${x.r}${u}${x.n>1?` × ${x.n}세트`:''}`).join(' · ');
   },
 
   // ── 오늘 부위 바꾸기: 부위를 고르면 그날 운동을 그 부위로 다시 짠다(오늘만 / 앞으로 이 요일도) ──

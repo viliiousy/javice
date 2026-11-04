@@ -217,7 +217,7 @@ const Fitness = {
           <button type="button" class="fx-th${src?'':' none'}" ${info?`onclick="event.stopPropagation();${info}"`:'tabindex="-1"'} aria-label="${esc(ex.name)} 자세 보기">
             ${typeof Icons!=='undefined'?Icons.svg('dumbbell','fx-ic'):''}${src?`<span class="fx-img">${ExMedia.poseHtml(src)}</span>`:''}
           </button>
-          <div class="fx-tx"><div class="fx-nm">${esc(ex.name)}</div><div class="fx-sets num">${esc(this.setsLabel(ex.sets||''))}${bk[ex.name]?`<span class="fx-kc"> · ${bm[ex.name]?'':'약 '}${bk[ex.name].toLocaleString('ko-KR')}kcal</span>`:''}</div>${this._logLine(ex, dsx)}</div>
+          <div class="fx-tx"><div class="fx-nm">${esc(ex.name)}</div><div class="fx-sets num">${esc(this.setsLabel(ex.sets||'', ex.name))}${bk[ex.name]?`<span class="fx-kc"> · ${bm[ex.name]?'':'약 '}${bk[ex.name].toLocaleString('ko-KR')}kcal</span>`:''}</div>${this._logLine(ex, dsx)}</div>
           ${typeof PlanGen!=='undefined' && PlanGen.timed(ex.name)
             ? `<button type="button" class="fx-act" onclick="event.stopPropagation();Fitness.timeSheet('${A(ex.name)}','${dsx}')" aria-label="운동 시간 고치기">${typeof Icons!=='undefined'?Icons.svg('pen','fx-aic'):'시간'}</button>`
             : `<button type="button" class="fx-act" onclick="event.stopPropagation();PlanGen.openLog('${A(ex.name)}','${A(ex.sets||'')}','${dsx}')" aria-label="무게 기록">${typeof Icons!=='undefined'?Icons.svg('pen','fx-aic'):'기록'}</button>`}
@@ -255,7 +255,7 @@ const Fitness = {
     if (typeof PlanGen==='undefined') return '';
     if (PlanGen.timed(ex.name)) return '';   // 유산소·스포츠는 시간만(위 줄) — 무게 권장·기록 줄 없음
     const L = PlanGen.log(ds)[ex.name];
-    if (L && L.length) return `<div class="fx-log num">${esc(this.setsLine(L))}</div>`;
+    if (L && L.length) return `<div class="fx-log num">${esc(this.setsLine(L, ex.name))}</div>`;
     const sg = PlanGen.suggest(ex.name, ex.sets, ds);
     return sg ? `<div class="fx-log fx-sug">${esc(sg)}</div>` : '';
   },

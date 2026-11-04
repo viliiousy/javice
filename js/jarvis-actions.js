@@ -715,6 +715,9 @@ const JarvisActions = {
     if (typeof s === 'number') return `${s}×${(cur && WorkoutMode._reps(cur)) || 12}`;
     s = String(s).trim();
     let m;
+    // 버티는 운동: '3×45초' · '3세트 45초' · '45초 3세트' → '3×45'(횟수 자리에 초)
+    if ((m = s.match(/(\d+)\s*(?:[×xX*]|세트\D*)\s*(\d+)\s*초/))) return `${m[1]}×${m[2]}`;
+    if ((m = s.match(/(\d+)\s*초\D*(\d+)\s*세트/))) return `${m[2]}×${m[1]}`;
     if ((m = s.match(/(\d+)\s*(?:분|min)/i))) return `${m[1]}분`;
     if ((m = s.match(/^(\d+)\s*[×xX*]\s*(\d+(?:\s*[-~]\s*\d+)?)$/))) return `${m[1]}×${m[2].replace(/\s/g, '')}`;
     if ((m = s.match(/(\d+)\s*세트\D*(\d+)\s*(?:회|개|번|렙)/))) return `${m[1]}×${m[2]}`;
@@ -863,7 +866,7 @@ const JarvisActions = {
       const L = PlanGen.log(ds); L[name] = sets; PlanGen.saveLog(ds, L);
       if (!f.miss) { const chk = Fitness._checked(d); if (!chk.includes(f.i)) { chk.push(f.i); Fitness._save(chk, d); } }
       this._rerender();
-      return { ok: true, msg: `'${name}' ${sets.map(s => s.w ? `${s.w}kg×${s.r}` : `${s.r}회`).join(', ')} 기록했습니다${f.miss ? ' (그날 목록에는 없는 운동이라 기록만 남겼습니다)' : ''}${(() => { const m = typeof VolTier !== 'undefined' ? VolTier.warn(name, sets, ds) : ''; return m ? '\n' + m : ''; })()}` };
+      return { ok: true, msg: `'${name}' ${sets.map(s => s.w ? `${s.w}kg×${s.r}${PlanGen.hold(name) ? '초' : ''}` : `${s.r}${PlanGen.unit(name)}`).join(', ')} 기록했습니다${f.miss ? ' (그날 목록에는 없는 운동이라 기록만 남겼습니다)' : ''}${(() => { const m = typeof VolTier !== 'undefined' ? VolTier.warn(name, sets, ds) : ''; return m ? '\n' + m : ''; })()}` };
     },
     // 운동 앱 캡처(사진)에서 읽은 운동을 그날 기록으로 한꺼번에 넣는다 — 목록에 넣고, 세트 기록을 남기고, 완료로 표시.
     // exercises: [{name, w, reps, sets, min}] · routine: 이름을 주면 같은 구성을 루틴으로도 저장
@@ -876,13 +879,14 @@ const JarvisActions = {
       for (const e of items) {
         const nm = this._exName(e.name);
         const w = Math.max(0, Number(e.w) || 0), r = Math.max(0, Math.round(Number(e.reps) || 0)), n = Math.min(20, Math.max(1, Math.round(Number(e.sets) || 1))), min = Math.max(0, Number(e.min) || 0);
-        const timed = min > 0 || PlanGen.timed(nm);
-        const sets = min > 0 ? `${Math.round(min * n)}분` : r > 0 ? `${n}×${r}` : Fitness.defSets(nm);
+        const hold = PlanGen.hold(nm), hr = hold && !r && min > 0 ? Math.round(min * 60) : r;   // 플랭크 '1분 × 3세트' → 60초 × 3
+        const timed = !hold && (min > 0 || PlanGen.timed(nm));
+        const sets = timed ? `${Math.round((min || 30) * (min ? n : 1))}분` : hr > 0 ? `${n}×${hr}` : Fitness.defSets(nm);
         const hit = JMatch.find(nm, list, { min: 0.86 }).item;
         const x = hit || { name: nm };
         x.sets = sets; x.w = !timed && w > 0 ? w : (hit ? x.w : '');
         if (!hit) list.push(x);
-        if (!timed && r > 0) L[x.name] = Array.from({ length: n }, () => ({ w, r }));
+        if (!timed && hr > 0) L[x.name] = Array.from({ length: n }, () => ({ w, r: hr }));
         done.add(x.name);
         rx.push({ name: x.name, sets, ...(x.w ? { w: x.w } : {}) });
       }
@@ -1513,7 +1517,7 @@ const JarvisActions = {
 음식 이름은 사용자가 말한 그대로 한 음식으로 씁니다 — '갈비만두'·'김치볶음밥'·'치즈돈까스'·'불고기버거' 처럼 붙어 있는 말은 하나의 음식입니다. '랑·하고·와·과·그리고·쉼표' 로 나눠 말했을 때만 여러 음식으로 나눕니다. 이미 먹은 것으로 기록된 음식(현재 상태 diet.items)과 같은 것을 다시 말하면 양을 고치는 것인지 문맥으로 판단하세요.
 식단 기록(log_food)의 열량·단백질·탄수·지방은 당신이 추정해서 넣습니다 — 사용자에게 영양 정보를 묻거나 몰라서 못 넣는다고 하지 마세요. 처음 보는 음식도 비슷한 음식의 일반적인 한국 기준 1회 제공량으로 어림합니다. 식당 이름이 붙은 메뉴(예: '비범에서 깻잎 페스토 들기름 막국수')는 가게를 몰라도 한국 식당 1인분 기준으로, 면·밥(조리 후 g)·기름(들기름·참기름 큰술)·소스·페스토·고명을 더해 어림합니다 — 집밥 한 접시처럼 낮게 잡지 마세요(예: 식당 들기름막국수 한 그릇은 보통 600~800kcal). name 에는 가게 이름도 같이 적습니다. 여러 음식을 말하면 음식마다 log_food 하나씩(최대 20개), name 에는 양까지 그대로 적고(예 '후라이드 치킨 6조각'), 열량·탄단지는 아래 식품 참고의 1개·1인분 값에 그 양(반 줄·반 그릇·1.5인분·6조각·300ml)을 곱한 값입니다. '어제·그제·○요일' 은 현재 상태의 now 날짜로 계산해 date 에 YYYY-MM-DD 로 넣습니다.
 이미 한 운동을 말하면('탔어·했어·뛰었어') ex_add 에 done:true 를 넣어 완료로 표시합니다. 사용자가 소모 열량을 말하면('162.9칼로리 소모했다') kcal 에 그 숫자를 그대로 넣습니다 — 앱이 추정값 대신 씁니다. 운동 이름은 사용자가 말한 그대로 씁니다('실내자전거' → "실내자전거").
-운동 변경의 scope 는 기본 "day"(그날만), 사용자가 '앞으로·계속·루틴에·플랜에' 라고 하면 "plan". date 는 YYYY-MM-DD(생략=오늘). sets 는 "3×12" 또는 "30분", w 는 kg. 요일(dow·days)은 0=일 … 6=토.
+운동 변경의 scope 는 기본 "day"(그날만), 사용자가 '앞으로·계속·루틴에·플랜에' 라고 하면 "plan". date 는 YYYY-MM-DD(생략=오늘). sets 는 "3×12" 또는 "30분", w 는 kg. 플랭크·월 싯·매달리기 같은 버티는 운동은 횟수 자리에 초를 쓴다("3×45" = 45초 3세트, ex_log 의 r 도 초). 요일(dow·days)은 0=일 … 6=토.
 
 현재 상태: ${JSON.stringify(ctx)}
 

@@ -94,7 +94,7 @@ Object.assign(Fitness, {
   _edSetsLabel(x){
     if(PlanGen.timed(x.name)) return x.sets||'시간';
     const n=WorkoutMode._nSets(x.sets), r=WorkoutMode._reps(x.sets);
-    return `${n}세트 × ${r}회${x.w!==''&&x.w!=null&&Number(x.w)>0?` · ${x.w}kg`:''}`;
+    return `${n}세트 × ${r}${PlanGen.unit(x.name)}${x.w!==''&&x.w!=null&&Number(x.w)>0?` · ${x.w}kg`:''}`;
   },
   edSets(i){
     const x=this._ed?.list[i]; if(!x) return;
@@ -109,7 +109,9 @@ Object.assign(Fitness, {
     const cw=Number(x.w)||0;
     Wheel.open({ title:x.name, cols:[
       { vals:Array.from({length:10},(_,k)=>k+1), cur:WorkoutMode._nSets(x.sets), fmt:v=>v+'세트' },
-      { vals:Array.from({length:30},(_,k)=>k+1), cur:WorkoutMode._reps(x.sets), fmt:v=>v+'회' },
+      PlanGen.hold(x.name)
+        ? { vals:Array.from({length:60},(_,k)=>(k+1)*5), cur:Math.max(5,Math.round(WorkoutMode._reps(x.sets)/5)*5), fmt:v=>v>=60&&v%60===0?`${v/60}분`:v>=60?`${Math.floor(v/60)}분 ${v%60}초`:v+'초' }
+        : { vals:Array.from({length:30},(_,k)=>k+1), cur:WorkoutMode._reps(x.sets), fmt:v=>v+'회' },
       { vals:W, cur:W.reduce((a,b)=>Math.abs(b-cw)<Math.abs(a-cw)?b:a,0), fmt:v=>v?v+'kg':'맨몸' },
     ], done:([n,r,w])=>{ x.sets=`${n}×${r}`; x.w=w||''; this._ed.dirty=true; this._edPaint(); } });
   },

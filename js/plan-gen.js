@@ -427,7 +427,7 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
     const L = this.last(name, ds); if (!L) return '';
     const [lo, hi] = this._range(sets);
     const top = Math.max(...L.sets.map(s => Number(s.w) || 0));
-    if (!top) return `지난번 ${L.sets.map(s => s.r).join('·')}회`;
+    if (!top) return `지난번 ${L.sets.map(s => s.r).join('·')}${this.unit(name)}`;
     const allHi = L.sets.every(s => Number(s.r) >= hi), under = L.sets.some(s => Number(s.r) < lo);
     const lower = this.PART_OF[Object.keys(this.POOL).find(k => this.POOL[k].includes(name))] === '하체';
     const step = lower ? 5 : 2.5;
@@ -498,7 +498,8 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
     const rows = [...document.querySelectorAll('#lgRows .lg-row')], k = rows.indexOf(el.closest('.lg-row'));
     const cls = f === 'w' ? '.lg-w' : '.lg-r', old = el.value;
     if (typeof NumIn === 'undefined') return;
-    NumIn.open({ title: `${k + 1}세트 ${f === 'w' ? '무게' : '횟수'}`, unit: f === 'w' ? 'kg' : '회', dec: f === 'w', cur: el.value === '' ? (f === 'r' ? 10 : '') : Number(el.value),
+    const hd = this.hold((this._lg || {}).name);
+    NumIn.open({ title: `${k + 1}세트 ${f === 'w' ? '무게' : hd ? '시간(초)' : '횟수'}`, unit: f === 'w' ? 'kg' : hd ? '초' : '회', dec: f === 'w', cur: el.value === '' ? (f === 'r' ? (hd ? 30 : 10) : '') : Number(el.value),
       note: `아래 세트(빈 칸·같은 값)도 같은 ${f === 'w' ? '무게' : '횟수'}로 채웁니다`,
       done: v => {
         const rs = [...document.querySelectorAll('#lgRows .lg-row')];
@@ -544,6 +545,11 @@ JSON 만 출력: {"routines":[{"name":"상체","exercises":[{"name":"벤치 프�
   },
   // 시간으로 하는 운동(유산소·스포츠) — 세트·무게 대신 '몇 분'
   timed(name) { return ['유산소', '스포츠'].includes(this.partOf(name)); },
+  // 버티는 운동(플랭크·월 싯·철봉 매달리기·할로우 홀드 등) — 횟수 대신 '초'로 센다. 무게는 그대로 쓴다(중량 플랭크 등).
+  HOLD_RE: /플랭크|월 ?싯|매달리기|데드 ?행|할로우|홀드|엘 ?싯|L ?싯|버티기/,
+  HOLD_NOT: /푸쉬업|로테이션|쏘우|볼 스루|잭|업 ?다운|풀 ?업|워크/,
+  hold(name) { const n = String(name || ''); return this.HOLD_RE.test(n) && !this.HOLD_NOT.test(n); },
+  unit(name) { return this.hold(name) ? '초' : '회'; },
   // 교체 후보: ① 같은 동작 칸 → ② 같은 동작 이름 → ③ 같은 부위. 가진 기구로 먼저 고르고,
   // 그래도 없으면 기구를 따지지 않고(대신 '기구 필요' 표시) 같은 부위에서 고른다 — 빈 목록은 보이지 않는다.
   alternatives(name) {
