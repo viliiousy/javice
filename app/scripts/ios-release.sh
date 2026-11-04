@@ -31,10 +31,19 @@ cat > "$OUT/ExportOptions.plist" <<PLIST
 </dict></plist>
 PLIST
 
+# 무인(자동 빌드) 업로드용 App Store Connect API 키 — 있으면 Xcode 계정 로그인 대신 이것으로 서명·업로드한다
+#   키 파일: ~/.appstoreconnect/private_keys/AuthKey_<키ID>.p8 · 발급자 ID: ~/.appstoreconnect/issuer_id (한 줄)
+AUTH=()
+KEYF=$(ls "$HOME"/.appstoreconnect/private_keys/AuthKey_*.p8 2>/dev/null | head -1 || true)
+if [ -n "$KEYF" ] && [ -s "$HOME/.appstoreconnect/issuer_id" ]; then
+  KID=$(basename "$KEYF" .p8); KID=${KID#AuthKey_}
+  AUTH=(-authenticationKeyPath "$KEYF" -authenticationKeyID "$KID" -authenticationKeyIssuerID "$(tr -d ' \n' < "$HOME/.appstoreconnect/issuer_id")")
+  echo "App Store Connect API 키로 업로드합니다 ($KID)"
+fi
 xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$OUT/Bashy.xcarchive" \
   DEVELOPMENT_TEAM="$TEAM" CURRENT_PROJECT_VERSION="$BUILD" \
-  -allowProvisioningUpdates -allowProvisioningDeviceRegistration archive | tail -30
+  -allowProvisioningUpdates -allowProvisioningDeviceRegistration ${AUTH[@]+"${AUTH[@]}"} archive | tail -30
 
 xcodebuild -exportArchive -archivePath "$OUT/Bashy.xcarchive" \
   -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" \

@@ -66,6 +66,8 @@ OLD=$(cat "$STATE" 2>/dev/null || true)
 [ "$NEW" = "$OLD" ] && exit 0
 # 이 스크립트 자신도 저장소에 있다 — 빌드하지 않는 커밋이라도 폴더를 최신으로 맞춰 다음 실행부터 새 규칙을 쓴다
 git reset -q --hard origin/main
+# 방금 실패한 커밋이면 1시간 쉬었다가 다시
+if read -r FC FT < "$STATE.fail" 2>/dev/null && [ "$FC" = "$NEW" ] && [ $(( $(date +%s) - FT )) -lt 3600 ]; then exit 0; fi
 
 if [ -n "$OLD" ] && git cat-file -e "$OLD" 2>/dev/null; then
   CH=$(git diff --name-only "$OLD" "$NEW" | grep -E "$NATIVE" || true)
@@ -75,8 +77,6 @@ else
   say "처음 실행 — 지금 상태로 한 번 빌드합니다"
 fi
 
-# 방금 실패한 커밋이면 1시간 쉬었다가 다시
-if read -r FC FT < "$STATE.fail" 2>/dev/null && [ "$FC" = "$NEW" ] && [ $(( $(date +%s) - FT )) -lt 3600 ]; then exit 0; fi
 git reset -q --hard origin/main   # 이 폴더는 빌드 전용 — 손으로 고친 것은 없앤다
 say "빌드 시작 ${NEW:0:7}"; note "새 앱 빌드를 시작합니다 (${NEW:0:7})"
 if TEAM="$TEAM" bash app/scripts/ios-release.sh >> "$LOG" 2>&1; then
@@ -84,6 +84,10 @@ if TEAM="$TEAM" bash app/scripts/ios-release.sh >> "$LOG" 2>&1; then
   say "✅ 업로드 완료 ${NEW:0:7}"; note "TestFlight 에 올렸습니다 — 10~30분 뒤 업데이트하세요"
 else
   say "도구: node=$(command -v node || echo 없음) npm=$(command -v npm || echo 없음) xcodebuild=$(command -v xcodebuild || echo 없음)"
+  if tail -40 "$LOG" | grep -q "App Store Connect access\|Failed to Use Accounts"; then
+    say "❌ 업로드 로그인이 풀렸습니다 — Xcode › Settings › Accounts 에서 Apple ID 다시 로그인하거나 API 키를 넣어 주세요"
+    note "업로드 로그인이 풀렸습니다 — Xcode 계정 다시 로그인 필요"
+  fi
   say "❌ 빌드 실패 ${NEW:0:7} — 위 기록 확인"; note "빌드 실패 — ~/Library/Logs/bashy-ios.log 확인"
   echo "$NEW $(date +%s)" > "$STATE.fail"   # 같은 커밋은 1시간 뒤에 다시 시도
 fi
