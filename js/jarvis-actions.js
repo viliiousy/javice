@@ -185,6 +185,22 @@ const JHome = {
     if (location.protocol === 'https:') L = L.filter(u => u.startsWith('wss:')).concat(L.filter(u => !u.startsWith('wss:')));   // https 페이지에서는 ws:// 가 막힌다
     return [...new Set(L)];
   },
+  // 샤오미(미홈) 클라우드 로그인 갱신이 실패하면(401) HA 에 만들어 둔 script.xiaomi_reconnect 로 연동을 다시 불러와 한 번 더 시도한다.
+  // 그래도 안 되면 다시 로그인이 필요하다고 분명히 알린다(Claude 에게 '샤오미 다시 로그인' 이라고 하면 처리).
+  XI_RE: /unauthorized\s*\(?401|mihome api|oauth/i,
+  async _haXi(h, call) {
+    try { return await call(); }
+    catch (e) {
+      if (!this.XI_RE.test(String(e && e.message))) throw e;
+      try { await this._haRun(h, send => send({ type: 'call_service', domain: 'script', service: 'turn_on', service_data: { entity_id: 'script.xiaomi_reconnect' } })); } catch (e2) {}
+      await new Promise(r => setTimeout(r, 15000));
+      try { return await call(); }
+      catch (e3) {
+        if (this.XI_RE.test(String(e3 && e3.message))) throw new Error('샤오미 로그인이 풀렸습니다 — 다시 연결도 실패했어요. Claude 에게 "샤오미 다시 로그인" 이라고 말해 주세요');
+        throw e3;
+      }
+    }
+  },
   async _haRun(h, fn) {
     let last = null;
     for (const url of this._haUrls(h)) {
@@ -283,7 +299,7 @@ const JHome = {
     if (d.kind === 'lock' && cmd === 'on') cmd = 'lock';
     if (d.kind === 'scene') cmd = 'scene';
     const P = d.prov;
-    const ha = (domain, service, data = {}) => this._haRun(hub, send => send({ type: 'call_service', domain, service, service_data: { entity_id: d.id, ...data } }));
+    const ha = (domain, service, data = {}) => this._haXi(hub, () => this._haRun(hub, send => send({ type: 'call_service', domain, service, service_data: { entity_id: d.id, ...data } })));
     const ap = (key, value) => this._apple().set({ id: d.id, key, value });
     if (cmd === 'scene') {
       if (P === 'st') await this._st({ cmd: { scene: d.id } }); else if (P === 'ha') await ha(d.dom, 'turn_on'); else await this._apple().scene({ id: d.id });

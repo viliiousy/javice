@@ -632,7 +632,19 @@ const HA = {
   markStale(on) { this.stale = on; const t = $('tiles'); if (t) t.classList.toggle('stale', on); },
   note(t, bad) { $('haNote').textContent = t || ''; $('haNote').classList.toggle('bad', !!bad); },
 
-  send(msg) {
+  // 샤오미(미홈) 로그인 갱신 실패(401)면 HA 의 script.xiaomi_reconnect 로 연동을 다시 불러와 한 번 더 시도한다
+  async send(msg) {
+    try { return await this._send1(msg); }
+    catch (e) {
+      if (msg.type !== 'call_service' || !/unauthorized\s*\(?401|mihome api|oauth/i.test(String(e && e.message))) throw e;
+      try { toast('샤오미 연결을 다시 잇는 중…'); } catch (x) {}
+      await this._send1({ type: 'call_service', domain: 'script', service: 'turn_on', service_data: { entity_id: 'script.xiaomi_reconnect' } }).catch(() => {});
+      await new Promise(r => setTimeout(r, 15000));
+      try { return await this._send1(msg); }
+      catch (e2) { throw /unauthorized\s*\(?401|mihome api|oauth/i.test(String(e2 && e2.message)) ? new Error('샤오미 로그인이 풀렸습니다 — Claude 에게 "샤오미 다시 로그인" 이라고 말해 주세요') : e2; }
+    }
+  },
+  _send1(msg) {
     if (this.mode === 'st') return ST.send(msg);
     if (this.mode === 'apple') return AH.send(msg);
     return new Promise((res, rej) => {
