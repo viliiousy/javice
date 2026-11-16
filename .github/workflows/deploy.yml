@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # latest(26.04)에서는 Playwright 가 의존 패키지를 못 깐다 — 자동 검사가 멈춰 배포가 안 됐다(11/15~)
     steps:
       - uses: actions/checkout@v4
 
