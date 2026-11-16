@@ -608,8 +608,8 @@ ${hint?`사용자가 함께 한 말: "${hint}"`:''}`}
   COMPANY:{ groq:'Groq, Inc. (미국)', openai:'OpenAI (미국)', anthropic:'Anthropic (미국)', gemini:'Google (미국)', xai:'xAI (미국)' },
   _consented(p){ try{ return !!(JSON.parse(UserStore.get(this.CONSENT_KEY)||'{}')||{})[p]; }catch{ return false; } },
   revokeConsent(){ UserStore.set(this.CONSENT_KEY,'{}'); window.FirebaseSync?.scheduleSave?.(); },
-  _askConsent(p){
-    if(this._consented(p)) return Promise.resolve(true);
+  _askConsent(p, again){
+    if(this._consented(p) && !again) return Promise.resolve(true);
     if(this._consentP) return this._consentP;
     const P=this.PROVIDERS[p]||{}, co=this.COMPANY[p]||P.name||p;
     this._consentP=new Promise(res=>{
@@ -674,7 +674,10 @@ ${hint?`사용자가 함께 한 말: "${hint}"`:''}`}
     return r.data;
   },
 
-  showKeySetup() {
+  // 키를 넣기 전에 먼저 알린다 — 무엇을 어느 회사로 보내는지 보고 동의한 뒤에야 키 화면이 열린다.
+  // (예전엔 키가 있어야 첫 질문 때 동의 창이 떴다 — 키가 없으면 동의 창을 볼 길이 없었다)
+  async showKeySetup() {
+    if(!this._consented(this.prov) && !(await this._askConsent(this.prov))){ App.showToast('동의하지 않아 AI 설정을 열지 않았습니다 — AI 를 뺀 나머지는 그대로 쓸 수 있습니다',''); return; }
     App.openModal('@key AI 비서 설정', this.setupHtml() + `
       <div class="modal-btns ai-setup-btns">
         <button onclick="JARVIS.saveSetup();App.closeModal()" class="btn-sm accent">저장</button>
@@ -708,6 +711,7 @@ ${hint?`사용자가 함께 한 말: "${hint}"`:''}`}
         </div>`).join('')}
       <div class="ai-foot">
         <p class="ai-note">ChatGPT Plus·Claude Pro 같은 월 구독은 API 키가 아니어서 여기에 넣을 수 없습니다. 대신 <a href="#" onclick="event.preventDefault();JARVIS._toConnector()"><b>ChatGPT · Claude 에 Bashy 연결</b></a>을 하면 그 앱에서 말한 내용이 Bashy 에 기록됩니다.</p>
+        <p class="ai-note"><a href="#" onclick="event.preventDefault();JARVIS._askConsent(document.querySelector('.ai-setup input[name=aiProv]:checked')?.value||JARVIS.prov,true)"><b>AI 에 보내는 내용 · 동의 다시 보기</b></a></p>
         <p class="ai-note">키가 여러 개면 고른 AI 를 먼저 쓰고, 그 키가 없으면 키가 있는 다른 AI 로 넘어갑니다. 키는 이 계정에만 저장되고, 이 기기에서 각 AI 회사로 바로 보냅니다.</p>
       </div>
     </div>`;
