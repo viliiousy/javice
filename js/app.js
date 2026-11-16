@@ -147,6 +147,7 @@ const App = {
   },
   // 구글 연결이 끊겼을 때(Apple 로그인 사용자의 토큰 만료 등) 구글 것만 내린다
   dropGoogle() {
+    this._gTasksOk=false; try{ localStorage.removeItem('gl_w_g'); localStorage.removeItem('gl_w_tasks'); }catch(e){}
     this._srcEv.google=[];
     this.S.lists=this.S.lists.filter(l=>l.id===BashyCal.LIST_ID);
     Object.keys(this.S.tasks).forEach(k=>{ if(k!==BashyCal.LIST_ID) delete this.S.tasks[k]; });
@@ -177,6 +178,8 @@ const App = {
       Object.keys(this.S.tasks).forEach(k=>{ if(k!==BashyCal.LIST_ID) delete this.S.tasks[k]; });
       Object.assign(this.S.tasks,tasks);
       this.S.lists=[...lists,BashyCal.list()];
+      // 위젯: 구글 할 일을 이번에 제대로 받았다는 표시(받기 전·실패 때는 위젯이 지난 목록을 그대로 둔다 — js/widget-sync.js)
+      this._gTasksOk=true; try{ localStorage.setItem('gl_w_g','1'); }catch(e){}
       this._buildTaskFilters(); this._renderTasks();
       this._srcEv.google=(await GoogleCalendar.fetchEvents(tMin,tMax)).map(e=>({...e,_src:'google'}));
     })().catch(e=>{ errs.push(e); }):Promise.resolve();
@@ -940,72 +943,65 @@ const App = {
     return out.join('');
   },
 
-  // 구글 Tasks 의 추가 창을 그대로 따랐다. 거기서 만든 할일이 여기로 내려오는데
-  // 필드 이름이 서로 다르면(메모 vs 세부사항) 같은 칸을 다른 것으로 착각하게 된다.
+  // 할 일 추가는 한 가지 화면만 쓴다 — 아래에서 올라오는 시트(위젯의 + 와 같은 것).
+  // 앱 안에서 열면 보고 있던 날짜가 미리 골라져 있다. 달력에서 연 것이 아니면(= 날짜를 안 넘기면) 고른 날짜를 따른다.
   showAddTask(date) {
-    // 구글이 없으면 Bashy 목록에 넣는다 — 할일 카드는 구글 없이도 쓴다
-    if(!this.S.lists.some(l=>l.id===BashyCal.LIST_ID)) this.S.lists=[...this.S.lists,BashyCal.list()];
     const d = date ? new Date(date) : (this.S.selDate || new Date());
-    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    // 지금 보고 있는 목록으로 기본값을 맞춘다. '전체' 를 보고 있으면 첫 목록.
-    const cur = this.S.taskFilter !== 'all' && this.S.lists.some(l=>l.id===this.S.taskFilter)
-      ? this.S.taskFilter : (Auth.isLoggedIn() ? (this.S.lists[0]?.id || BashyCal.LIST_ID) : BashyCal.LIST_ID);
-    this.openModal('@tasks 할일 추가',`
-      <div class="modal-row"><label class="modal-lbl">제목 *</label>
-        <input id="qtTitle" type="text" class="inp" placeholder="할 일"></div>
-      <div class="modal-row"><label class="modal-lbl">세부사항</label>
-        <textarea id="qtNotes" class="inp" rows="2" placeholder="(선택)"></textarea></div>
-      <div class="modal-grid2">
-        <div><label class="modal-lbl">마감 날짜</label>
-          <input id="qtDue" type="date" value="${ds}" class="inp inp-sm"></div>
-        <div><label class="modal-lbl">시간</label>
-          <select id="qtTime" class="inp inp-sm">${this._halfHours('')}</select></div>
-      </div>
-      <div class="modal-row"><label class="modal-lbl">목록</label>
-        <select id="qtList" class="inp inp-sm">${this.visLists().map(l=>
-          `<option value="${l.id}"${l.id===cur?' selected':''}>${esc(l.title)}</option>`).join('')}</select></div>
-      <div class="modal-btns">
-        <button onclick="App._saveQuickTask()" class="btn-sm accent">추가</button>
-        <button onclick="App.closeModal()" class="btn-sm">취소</button>
-      </div>`);
-    setTimeout(()=>{
-      const t=document.getElementById('qtTitle');
-      t?.focus();
-      // 제목만 치고 엔터 — 가장 흔한 경우를 두 번 누르게 하지 않는다.
-      t?.addEventListener('keydown', e => {
-        if(e.key==='Enter'){ e.preventDefault(); App._saveQuickTask(); }
-      });
-    },50);
+    this.quickTask('', { date: d });
   },
-  // ── 빠른 할 일 (위젯의 + 에서) ─────────────
-  // 제목과 세부만 적는 아래 시트. 목록은 위젯에서 고른 목록이 먼저 골라져 있고, 위 칩으로 바꿀 수 있다.
-  // 날짜는 기본 없음 — 오늘/내일만 한 번에. 제목 치고 엔터(또는 저장)면 끝.
-  quickTask(listId) {
+  // ── 할 일 추가 시트 ─────────────
+  // 제목 → (세부) → 저장. 목록은 위 칩, 날짜는 아래 줄: 오늘 · 내일 · 날짜(달력에서 고름) · 시간(선택).
+  // 위젯에서 열면 날짜 없음이 기본, 앱에서 열면 보고 있던 날짜가 기본. 제목 치고 엔터면 끝.
+  quickTask(listId, opt={}) {
     if(!this.S.lists.some(l=>l.id===BashyCal.LIST_ID)) this.S.lists=[...this.S.lists,BashyCal.list()];
     const lists=this.visLists().length?this.visLists():this.S.lists, cur=lists.some(l=>l.id===listId) ? listId : (this.S.taskFilter!=='all' && lists.some(l=>l.id===this.S.taskFilter) ? this.S.taskFilter : (lists[0]?.id||BashyCal.LIST_ID));
+    this.closeModal?.();
     document.getElementById('qtSheet')?.remove();
     const ov=document.createElement('div'); ov.id='qtSheet'; ov.className='mx-ov qt-ov';
     const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    const t0=new Date(), t1=new Date(Date.now()+864e5);
+    const d0=ymd(new Date()), d1=ymd(new Date(Date.now()+864e5));
+    const cal='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>';
+    const clk='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>';
     ov.innerHTML=`<div class="mx-sh qt-sh" role="dialog" aria-label="새 할 일">
       <div class="qt-lists">${lists.map(l=>`<button type="button" class="qt-l${l.id===cur?' on':''}" data-id="${esc(l.id)}">${esc(l.title)}</button>`).join('')}</div>
       <input id="qtTitle" class="qt-title" type="text" placeholder="새 할 일" enterkeyhint="done" autocomplete="off">
       <textarea id="qtNotes" class="qt-notes" rows="1" placeholder="세부정보 추가"></textarea>
       <input type="hidden" id="qtList" value="${esc(cur)}"><input type="hidden" id="qtDue" value=""><input type="hidden" id="qtTime" value="">
       <div class="qt-bar">
-        <button type="button" class="qt-d" data-d="${ymd(t0)}">오늘</button>
-        <button type="button" class="qt-d" data-d="${ymd(t1)}">내일</button>
-        <span class="qt-sp"></span>
+        <div class="qt-when">
+          <button type="button" class="qt-d" data-d="${d0}">오늘</button>
+          <button type="button" class="qt-d" data-d="${d1}">내일</button>
+          <label class="qt-d qt-pick" data-k="date">${cal}<span>날짜</span><input type="date" id="qtDate" aria-label="날짜 고르기"></label>
+          <label class="qt-d qt-pick" data-k="time">${clk}<span>시간</span><select id="qtTimeSel" aria-label="시간 고르기">${this._halfHours('')}</select></label>
+        </div>
         <button type="button" class="qt-save" disabled>저장</button>
       </div></div>`;
     document.body.appendChild(ov);
-    const $=s=>ov.querySelector(s), title=$('#qtTitle'), save=$('.qt-save');
+    const $=s=>ov.querySelector(s), title=$('#qtTitle'), save=$('.qt-save'), due=$('#qtDue'), dIn=$('#qtDate'), tSel=$('#qtTimeSel');
     const close=()=>{ ov.classList.remove('on'); setTimeout(()=>ov.remove(),200); };
     ov.addEventListener('click',e=>{ if(e.target===ov) close(); });
     ov.querySelectorAll('.qt-l').forEach(b=>b.onclick=()=>{ ov.querySelectorAll('.qt-l').forEach(x=>x.classList.toggle('on',x===b)); $('#qtList').value=b.dataset.id; try{Haptic.light();}catch(e){} title.focus(); });
-    ov.querySelectorAll('.qt-d').forEach(b=>b.onclick=()=>{ const on=!b.classList.contains('on'); ov.querySelectorAll('.qt-d').forEach(x=>x.classList.remove('on')); b.classList.toggle('on',on); $('#qtDue').value=on?b.dataset.d:''; title.focus(); });
+    // 날짜 한 곳(#qtDue)만 바꾸고 칩은 거기에 맞춰 그린다 — 오늘·내일이면 그 칩이, 다른 날이면 '날짜' 칩이 날짜를 보여 준다
+    const paint=()=>{
+      const v=due.value;
+      ov.querySelectorAll('button.qt-d').forEach(b=>b.classList.toggle('on',b.dataset.d===v));
+      const other=!!v && v!==d0 && v!==d1, pk=$('.qt-pick[data-k="date"]');
+      pk.classList.toggle('on',other);
+      if(other){ const d=new Date(v+'T00:00:00'), y=d.getFullYear()!==new Date().getFullYear(); pk.querySelector('span').textContent=`${y?d.getFullYear()+'. ':''}${d.getMonth()+1}월 ${d.getDate()}일 (${'일월화수목금토'[d.getDay()]})`; }
+      else pk.querySelector('span').textContent='날짜';
+      dIn.value=v;
+      const tk=$('.qt-pick[data-k="time"]'), tv=tSel.value; tk.classList.toggle('on',!!tv);
+      tk.querySelector('span').textContent=tv?tSel.options[tSel.selectedIndex].text:'시간'; $('#qtTime').value=tv;
+    };
+    ov.querySelectorAll('button.qt-d').forEach(b=>b.onclick=()=>{ due.value=due.value===b.dataset.d?'':b.dataset.d; if(!due.value) tSel.value=''; try{Haptic.light();}catch(e){} paint(); title.focus(); });
+    dIn.addEventListener('click',()=>{ try{ dIn.showPicker(); }catch(e){} });
+    dIn.addEventListener('change',()=>{ due.value=dIn.value; if(!due.value) tSel.value=''; paint(); });
+    // 시간만 고르면 날짜는 오늘로 — 날짜 없는 시간은 알림도 표시도 할 수 없다
+    tSel.addEventListener('change',()=>{ if(tSel.value && !due.value) due.value=d0; paint(); });
+    if(opt.date){ due.value=ymd(new Date(opt.date)); }
+    paint();
     title.addEventListener('input',()=>{ save.disabled=!title.value.trim(); });
-    const go=async()=>{ if(!title.value.trim()) return; save.disabled=true; await this._saveQuickTask(); close(); };
+    const go=async()=>{ if(!title.value.trim()) return; save.disabled=true; const ok=await this._saveQuickTask(); if(ok) close(); else save.disabled=false; };
     title.addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.isComposing){ e.preventDefault(); go(); } });
     $('#qtNotes').addEventListener('input',e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(120,e.target.scrollHeight)+'px'; });
     save.onclick=go;
@@ -1034,7 +1030,8 @@ const App = {
       CalendarUI.render(document.getElementById('miniCal'),this.S.calDate,this.S.events,this.S.selDate);
       this.closeModal(); this.showToast('할일 추가됨','success');
       this._updateStatsBanner();
-    }catch{ this.showToast('추가 실패','error'); }
+      return true;
+    }catch{ this.showToast('추가 실패','error'); return false; }
   },
 
   _showAddChecklistForDate(date) {

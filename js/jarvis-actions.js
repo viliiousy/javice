@@ -1499,18 +1499,30 @@ const JarvisActions = {
     ['스타벅스','스타벅스','스벅'],['이디야','이디야'],['메가커피','메가커피','메가MGC'],['컴포즈','컴포즈'],['빽다방','빽다방'],['투썸','투썸'],['파리바게뜨','파리바게뜨','파바'],['뚜레쥬르','뚜레쥬르'],['배스킨라빈스','배스킨','베라'],['던킨','던킨'],['공차','공차'],['할리스','할리스'],['이삭토스트','이삭']],
   async foodRefs(text) {
     try {
-      const t = String(text || ''), low = t.toLowerCase(), qs = [];
+      const t = String(text || ''), low = t.toLowerCase(), qs = [], exact = [];
+      const cn = x => String(x || '').toLowerCase().replace(/[\s®™()]+/g, '');
       for (const [brand, ...al] of this.BRANDS) {
         const hit = al.map(a => low.indexOf(a.toLowerCase())).filter(i => i >= 0).sort((a, b) => a - b)[0];
         if (hit == null) continue;
         // 브랜드 뒤 그 문장(마침표·다음 끼니 말까지)의 낱말
         const seg = t.slice(hit).split(/[.!?\n]|(?:저녁|점심|아침|간식)으로/)[0];
+        // 먼저 말 전체에서 메뉴 이름을 통째로 찾는다('통새우 와퍼 주니어 라지 세트' → 통새우와퍼주니어 라지세트). 찾은 메뉴에 들어 있는 낱말은 따로 검색하지 않는다 —
+        // 낱말 하나씩('와퍼'·'주니어') 찾으면 다른 메뉴가 걸려 숫자가 틀어진다.
+        let got = [];
+        try {
+          const r = await Promise.race([fetch(Platform.api('/api/food?menu=' + encodeURIComponent(brand) + '&text=' + encodeURIComponent(seg.slice(0, 200)))), new Promise((_, rej) => setTimeout(() => rej(new Error('t')), 4000))]);
+          got = ((await r.json()).items || []).filter(x => Number(x.kcal) > 0);
+        } catch (e) {}
+        const k1 = v => v == null ? '?' : Math.round(Number(v) * 10) / 10;
+        got.forEach(x => exact.push(`${x.maker || brand} ${x.name} [${x.sv}] ${x.kcal}kcal 단${k1(x.protein)} 탄${k1(x.carb)} 지${k1(x.fat)}${x.parts ? ` (= ${x.parts})` : ''}${x.set ? ' — 세트 전체 값입니다. log_food 하나로, cal 은 이 숫자 그대로' : x.cls === '공식' ? ' (공식)' : ''}`));
+        const covered = got.map(x => cn(x.name)).join('|'), setDone = got.some(x => x.set || /세트/.test(x.name));
         const words = seg.split(/[\s,·]+|랑|이랑|하고|그리고/).slice(1)
           .map(w => { let x = w.trim(); for (let k = 0; k < 3; k++) x = x.replace(/(짜리|추가해서|추가|넣고|넣어서|해서|에|을|를|은|는|도|하나|한개|한 개|두개|1개|2개|샌드위치|먹었어|먹음|먹었다)$/, ''); return x; })
           .filter(x => x.length >= 2 && !/^\d+\s*(cm|ml|g|인분|개|조각)?$/i.test(x) && !/^(먹|에서|나눠|명이서|짜리)/.test(x));
-        [...new Set(words)].slice(0, 7).forEach(w => qs.push([brand, w]));
+        [...new Set(words)].filter(w => !(covered && covered.includes(cn(w))) && !(setDone && /라지|세트|제로|콜라|사이다|음료|감자|프라이|후라이|바꾸|바꿔|먹었/.test(w)))
+          .slice(0, 7).forEach(w => qs.push([brand, w]));
       }
-      if (!qs.length) return '';
+      if (!qs.length && !exact.length) return '';
       const one = async ([brand, w]) => {
         try {
           const r = await Promise.race([fetch(Platform.api('/api/food?q=' + encodeURIComponent(brand + ' ' + w) + '&rows=3')), new Promise((_, rej) => setTimeout(() => rej(new Error('t')), 4000))]);
@@ -1520,7 +1532,7 @@ const JarvisActions = {
           return `${x.maker || brand} ${x.name} [${x.sv || (g + (x.unit || 'g'))}] ${Math.round(Number(x.kcal) * g / per)}kcal 단${k(x.protein)} 탄${k(x.carb)} 지${k(x.fat)}${x.cls === '공식' ? ' (공식)' : ''}`;
         } catch (e) { return ''; }
       };
-      const lines = [...new Set((await Promise.all(qs.slice(0, 12).map(one))).filter(Boolean))];
+      const lines = [...new Set(exact.concat((await Promise.all(qs.slice(0, 12).map(one))).filter(Boolean)))];
       return lines.length ? `\n브랜드 공개값(이번 말에 나온 메뉴 — 이 숫자를 씁니다):\n- ${lines.join('\n- ')}` : '';
     } catch (e) { return ''; }
   },

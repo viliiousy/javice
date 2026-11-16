@@ -76,6 +76,52 @@ function frSearch(q) {
     .sort((a, b) => a.ex - b.ex || b.c - a.c || a.s - b.s || a.l - b.l || a.i - b.i).map(o => o.x);
   return { items, brand: bt.length > 0 };
 }
+// ── 말 한 줄에서 그 브랜드 메뉴 찾기 (?menu=버거킹&text=통새우 와퍼 주니어 라지 세트 … 제로콜라) ─────────────
+// AI 비서용. 낱말을 하나씩 검색하면 '통새우' '와퍼' '주니어' 가 저마다 다른 메뉴에 걸려 엉뚱한 숫자가 나온다
+// (통새우 와퍼 주니어 라지 세트가 376kcal 로 들어갔다 — 버거 하나가 414kcal 인데).
+// 띄어쓰기를 지운 말 안에 통째로 들어 있는 메뉴 이름을 긴 것부터 고르고,
+// '세트' 라고 했는데 그 세트가 표에 없으면 버거 + 감자튀김 + 음료로 만들어 준다(제로 음료면 음료 열량은 뺀다).
+// 세트에 더할 값 [기본, 라지, 기본 음료, 라지 음료] — 버거킹·맥도날드는 공개값에서 계산한 것, 나머지는 어림.
+const SETS = { '버거킹': [430, 585, 150, 195], '맥도날드': [457, 582, 133, 185] }, SET_GEN = [430, 580, 140, 190];
+const BURGER = /버거|와퍼|맥|치킨|샌드|싸이|불고기|새우|휠레|징거|타워/;
+function menuFind(brand, text) {
+  const F = fr(), cb = canon(brand), T = canon(String(text || '').replace(/®|™/g, ''));
+  if (!F.length || !cb || T.length < 2) return [];
+  const mine = F.filter(x => { const m = canon(x.maker); return m.includes(cb) || cb.includes(m); });
+  if (!mine.length) return [];
+  const maker = mine[0].maker, cand = [];
+  for (const x of mine) {
+    if (!(Number(x.kcal) > 0)) continue;
+    const n = canon(String(x.name).replace(/®|™/g, '').replace(/\([^)]*\)/g, ''));
+    if (n.length < 2) continue;
+    const at = T.indexOf(n); if (at >= 0) cand.push({ x, at, len: n.length });
+  }
+  cand.sort((a, b) => b.len - a.len || a.at - b.at);
+  const took = [];
+  for (const c of cand) if (!took.some(t => c.at < t.at + t.len && t.at < c.at + c.len)) took.push(c);
+  took.sort((a, b) => a.at - b.at);
+  const row = (x, extra) => ({ name: x.name, maker, kcal: Math.round(x.kcal), protein: x.protein, carb: x.carb, fat: x.fat, sv: x.sv || '1개', cls: x.cls, ...extra });
+  const out = took.map(t => row(t.x));
+  // 세트
+  const wantSet = /세트/.test(text), hasSet = took.some(t => /세트/.test(t.x.name) || t.x.cat === '세트');
+  if (wantSet && !hasSet) {
+    const k = took.findIndex(t => t.x.cat === '버거' || BURGER.test(t.x.name));
+    if (k >= 0) {
+      const main = took[k].x, large = /라지|large|\bL\b/i.test(text), zero = /제로|zero|물로|생수|아메리카노|탄산수/i.test(text);
+      const D = SETS[maker] || SET_GEN, add = (large ? D[1] : D[0]) - (zero ? (large ? D[3] : D[2]) : 0);
+      const fries = (large ? D[1] - D[3] : D[0] - D[2]), drink = zero ? 0 : (large ? D[3] : D[2]);
+      out[k] = { name: `${main.name} ${large ? '라지세트' : '세트'}${zero ? ' (제로 음료)' : ''}`, maker, kcal: Math.round(main.kcal + add),
+        // 감자튀김 단백질 3~5g · 탄수 35~50g · 지방 14~19g, 콜라는 탄수뿐(1kcal ≈ 0.25g)
+        protein: main.protein != null ? Math.round((Number(main.protein) + (large ? 5 : 3.5)) * 10) / 10 : null,
+        carb: main.carb != null ? Math.round(Number(main.carb) + fries * 0.125 + drink / 4) : null,
+        fat: main.fat != null ? Math.round(Number(main.fat) + fries * 0.048) : null,
+        sv: '1세트', cls: SETS[maker] ? '공식값 합산' : '추정', set: true,
+        parts: `${main.name} ${Math.round(main.kcal)} + 감자튀김${large ? '(L)' : ''} ${fries} + ${zero ? '제로 음료 0' : `음료${large ? '(L)' : ''} ${drink}`}` };
+    }
+  }
+  return out;
+}
+
 function localSearch(q) {
   const D = db(); if (!D) return null;
   const tk = tokens(q), core = tk.filter(t => !MODS.includes(t)), cq = canon(q), out = [];
@@ -116,6 +162,12 @@ module.exports = async function handler(req, res) {
       const { total, items, head } = await dumpPage(pg, rows);
       res.status(200).json({ ok: true, page: pg, rows, total, items: items.map(normalize), ...(head ? { head } : {}) });
     } catch (e) { res.status(502).json({ error: e.message }); }
+    return;
+  }
+
+  if (qy.menu) {
+    try { res.status(200).json({ ok: true, items: menuFind(String(qy.menu), String(qy.text || '').slice(0, 300)) }); }
+    catch (e) { res.status(200).json({ ok: false, items: [], error: e.message }); }
     return;
   }
 

@@ -34,7 +34,23 @@ const Widgets = {
       const pend = [];
       // 앱에서 '지난 할 일 안 보기' 로 해 두면 위젯에서도 기한 지난 것은 뺀다
       const showOver = typeof App.showOverdue === 'function' ? App.showOverdue() : true;
-      Object.entries(App.S.tasks || {}).forEach(([lid, l]) => (l || []).forEach(t => { if (t.status === 'needsAction' && !t._hidden && (showOver || !t.due || t.due.split('T')[0] >= today)) pend.push({ ...t, _l: lid }); }));
+      const keep = t => t.status === 'needsAction' && !t._hidden && (showOver || !t.due || String(t.due).split('T')[0] >= today);
+      Object.entries(App.S.tasks || {}).forEach(([lid, l]) => (l || []).forEach(t => { if (keep(t)) pend.push({ ...t, _l: lid }); }));
+      // 구글 할 일을 아직 못 받았으면(앱을 막 열었거나, 받기 전에 닫혔거나, 동기화 실패) 화면에는 Bashy 목록만 있다.
+      // 그 상태를 그대로 보내면 위젯이 '남은 할 일이 없습니다' 로 덮인다 — 지난번에 제대로 받은 구글 목록을 그대로 쓴다.
+      let listSrc = typeof App.visLists === 'function' ? App.visLists() : (App.S.lists || []);
+      const BL = typeof BashyCal !== 'undefined' ? BashyCal.LIST_ID : '';
+      let expectG = false; try { expectG = localStorage.getItem('gl_w_g') === '1'; } catch (e) {}
+      if (expectG && !App._gTasksOk) {
+        let c = null; try { c = JSON.parse(localStorage.getItem('gl_w_tasks') || 'null'); } catch (e) {}
+        if (c && Array.isArray(c.pend)) {
+          const mine = pend.filter(t => t._l === BL);
+          pend.length = 0; pend.push(...c.pend.filter(t => t._l !== BL && keep(t)), ...mine);
+          listSrc = (c.lists || []).filter(l => l.id !== BL).concat(listSrc.filter(l => l.id === BL));
+        }
+      } else {
+        try { localStorage.setItem('gl_w_tasks', JSON.stringify({ pend: pend.slice(0, 200).map(t => ({ id: t.id, title: t.title, due: t.due || null, starred: !!t.starred, status: 'needsAction', _l: t._l })), lists: listSrc.map(l => ({ id: l.id, title: l.title })) })); } catch (e) {}
+      }
       const todays = pend.filter(t => t.due ? t.due.split('T')[0] <= today : true);
       todays.sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0) || String(a.due || '9').localeCompare(String(b.due || '9')));
       out.tasks = { count: pend.filter(t => t.due ? t.due.split('T')[0] === today : true).length,
@@ -48,7 +64,7 @@ const Widgets = {
       const row = t => ({ id: String(t.id), l: String(t._l), t: String(t.title || '').slice(0, 30),
         d: t.due ? (t.due.split('T')[0] < today ? `${+t.due.slice(5, 7)}월 ${+t.due.slice(8, 10)}일` : t.due.split('T')[0] === today ? '오늘' : `${+t.due.slice(5, 7)}/${+t.due.slice(8, 10)}`) : '',
         o: t.due ? t.due.split('T')[0] < today : false, s: !!t.starred });
-      out.lists = (typeof App.visLists === 'function' ? App.visLists() : (App.S.lists || [])).map(l => ({ id: String(l.id), n: String(l.title || '목록').slice(0, 12), c: pend.filter(t => t._l === String(l.id)).length }));
+      out.lists = listSrc.map(l => ({ id: String(l.id), n: String(l.title || '목록').slice(0, 12), c: pend.filter(t => t._l === String(l.id)).length }));
       out.tl = {};
       out.lists.forEach(l => { out.tl[l.id] = pend.filter(t => t._l === l.id).sort(ord).slice(0, 8).map(row); });
       out.tl.__all = pend.slice().sort(ord).slice(0, 8).map(row);

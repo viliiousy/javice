@@ -3623,6 +3623,14 @@ html.card-ordered .dashboard .card{ grid-area:auto !important; grid-column:auto;
 .qt-d{ height:32px; padding:0 12px; border-radius:8px; border:1px solid var(--border); background:none; color:var(--text3); font:inherit; font-size:13px; cursor:pointer; }
 .qt-d.on{ border-color:var(--accent); color:var(--accent); font-weight:600; }
 .qt-sp{ flex:1; }
+/* 날짜 줄: 오늘 · 내일 · 날짜 · 시간 — 좁으면 옆으로 민다. 날짜·시간 칩은 위에 투명한 입력을 덮어 누르면 기기 달력·휠이 뜬다 */
+.qt-when{ flex:1; min-width:0; display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; }
+.qt-when::-webkit-scrollbar{ display:none; }
+.qt-when .qt-d{ flex:none; }
+.qt-pick{ position:relative; display:inline-flex; align-items:center; gap:6px; overflow:hidden; }
+.qt-pick > span{ white-space:nowrap; }
+.qt-pick > input, .qt-pick > select{ position:absolute; inset:0; width:100%; height:100%; opacity:0; border:0; margin:0; padding:0; font-size:16px; cursor:pointer; -webkit-appearance:none; appearance:none; }
+.qt-save{ flex:none; }
 .qt-save{ height:36px; padding:0 18px; border-radius:18px; border:0; background:var(--accent); color:var(--accent-fg, #fff); font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
 .qt-save:disabled{ background:none; color:var(--text3); cursor:default; }
 /* 오른쪽으로 밀어 즐겨찾기: 왼쪽부터 노랗게, 35% 를 넘으면 진하게 + 별 */
