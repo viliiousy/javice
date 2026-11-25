@@ -113,6 +113,7 @@ const Settings = {
       const bev = BashyCal._read(BashyCal.EV_KEY).length, btk = BashyCal._read(BashyCal.TASK_KEY).filter(t => t.status !== 'completed').length;
       h = `<div class="set-h">구글 캘린더</div>
         ${g ? this._link('보일 캘린더 · 기본 캘린더', 'App.closeModal();GoogleCalendar.showSettings()', '어떤 캘린더 일정을 보일지, 새 일정을 어디에 넣을지')
+            : Auth.demo ? this._link('계정으로 로그인', 'Auth.logout()', '둘러보기를 끝내고 로그인 화면으로 갑니다 — 구글·Apple 계정으로 로그인하면 기록이 기기 사이에 이어집니다')
             : Auth.appleUser ? this._link('구글 캘린더·할 일 연결', 'App.closeModal();Auth.connectGoogle()', '구글 계정의 일정과 할 일을 함께 봅니다')
             : this._item('구글 캘린더', '<span class="set-val">연결 안 됨</span>', '다시 로그인하면 구글 일정과 할 일이 보입니다')}
         ${DeviceCal.avail() ? `<div class="set-h">아이폰 캘린더</div><div id="setDevCal">${this._devCalHtml()}</div>` : ''}

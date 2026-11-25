@@ -30,6 +30,7 @@ const Auth = {
     const native = typeof Platform !== 'undefined' && Platform.native;
     // 아이폰 앱: Apple 로 로그인 (App Store 가이드라인 4.8)
     if (this.appleAvail()) { const b = document.getElementById('btnAppleLogin'); if (b) b.hidden = false; }
+    if (localStorage.getItem('gl_demo') === '1') { setTimeout(() => this.demoLogin(true), 0); return; }
     if (this.appleAvail() && localStorage.getItem('gl_apple') === '1') { this._restoreApple(); return; }
     if (!native) {
     if (typeof google === 'undefined' || !google.accounts) return;
@@ -390,6 +391,23 @@ const Auth = {
     }
   },
 
+  // ── 로그인 없이 둘러보기 ──────────────────
+  // 계정 없이 앱을 그대로 써 볼 수 있다(App Store 심사 2.1(a) — 구글 테스트 계정은 새 기기에서 인증 코드를 물어 심사자가 들어오지 못했다).
+  // 기록은 이 기기에만 저장되고 서버로 올라가지 않는다. Apple 로그인(구글 없음)과 같은 길을 탄다 — 일정·할 일은 Bashy 목록에 저장.
+  // 나중에 로그아웃하고 계정으로 로그인하면 계정 기록이 열린다(둘러보기 기록은 이 기기의 '둘러보기' 칸에 남는다).
+  demo: false,
+  async demoLogin(restore) {
+    try {
+      localStorage.setItem('gl_demo', '1');
+      this.demo = true;
+      this.appleUser = { uid: 'demo', email: '', name: '둘러보기' };
+      UserStore.setUser('demo');
+      await App.onAuthSuccess({ name: '둘러보기', email: '' });
+      this._paintGConnect();
+      if (!restore) App.showToast('둘러보기 — 기록은 이 기기에만 저장됩니다. 설정에서 언제든 로그인할 수 있습니다', '');
+    } catch (e) { console.warn('[Auth] 둘러보기 시작 실패', e); localStorage.removeItem('gl_demo'); App.showToast('둘러보기를 시작하지 못했습니다: ' + (e.message || e), 'error'); }
+  },
+
   // ── Apple 로 로그인 (아이폰 앱) ──────────────────
   // Apple 계정으로 Firebase 에 로그인해 기록(습관·식단·운동·인바디·메모…)을 계정에 붙인다.
   // 구글 캘린더·할 일은 나중에 '구글 연결' 로 같은 계정에 덧붙인다(Firebase 계정 연결).
@@ -454,7 +472,7 @@ const Auth = {
   // Apple 로 로그인했고 구글이 없을 때 '일정과 할일' 카드에 한 번 보이는 안내.
   // 예전엔 '구글을 연결해야 쓴다' 였다 — 이제 일정·할일은 Bashy 계정에 저장되고, 아이폰 캘린더·구독 주소도 볼 수 있다.
   _paintGConnect() {
-    const noG = !!(this.appleUser && !this.isLoggedIn());
+    const noG = !!(this.appleUser && !this.demo && !this.isLoggedIn());   // 둘러보기에서는 계정 연결 안내를 띄우지 않는다
     const el = document.getElementById('gConnect');
     let other = false, closed = false;
     try { other = DeviceCal.on() || IcsCal.sources().length > 0; } catch (e) {}
@@ -512,6 +530,7 @@ const Auth = {
     localStorage.removeItem('gl_scope');
     localStorage.removeItem('gl_offline');
     localStorage.removeItem('gl_apple');
+    localStorage.removeItem('gl_demo');
     try { FirebaseSync.clearSecrets(); } catch {}
     try { if (typeof firebase !== 'undefined' && firebase.apps.length) firebase.auth().signOut().finally(() => location.reload()); else location.reload(); }
     catch { location.reload(); }
